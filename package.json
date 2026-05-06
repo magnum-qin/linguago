@@ -1,0 +1,31 @@
+{
+  "name": "translation-pwa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "style:build": "tailwindcss -i ./src/styles.css -o ./public/styles.css --minify",
+    "style:watch": "tailwindcss -i ./src/styles.css -o ./public/styles.css --watch",
+    "check": "tsc --noEmit",
+    "dict:download": "node scripts/download-dictionaries.mjs && node scripts/download-frequency-lists.mjs",
+    "dict:clean": "node scripts/clean-dictionaries.mjs && node scripts/prepare-frequency-batch.mjs",
+    "dict:test:ollama": "node scripts/ollama-schema-test.mjs --terms-file data/processed/generation_batch_frequency_400.txt --limit 12 --word-only",
+    "dict:validate": "node scripts/validate-generated-dictionary.mjs output/ollama-dictionary-test.jsonl",
+    "dict:import": "node scripts/import-generated-dictionary.mjs",
+    "dict:query": "node scripts/query-dictionary.mjs",
+    "dict:audit": "node scripts/audit-dictionary-quality.mjs",
+    "dict:batch": "node scripts/run-dictionary-batch.mjs",
+    "dict:test:deepseek": "node scripts/deepseek-dictionary-test.mjs --candidates-file data/processed/generation_batch_frequency_400.jsonl --limit 12 --word-only"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260410.0",
+    "@tailwindcss/cli": "^4.2.4",
+    "playwright": "^1.59.1",
+    "sql.js": "^1.14.1",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.13.2"
+  }
+}

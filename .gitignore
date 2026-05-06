@@ -1,0 +1,11 @@
+node_modules
+.wrangler
+.dev.vars
+dist
+dist-worker
+data
+output
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log

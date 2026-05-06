@@ -1,0 +1,5 @@
+# UTF-8 test terms. Prefer this file over --term for Chinese/Japanese on Windows PowerShell.
+我爱你
+hello
+ありがとう
+saudade
