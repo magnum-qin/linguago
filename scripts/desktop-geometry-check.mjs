@@ -1,8 +1,9 @@
 import { chromium } from "playwright";
 
+const url = process.env.PWA_URL || "https://translation-pwa.qhzggzh-linguago.workers.dev";
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
-await page.goto("https://translation-pwa.qhzggzh-linguago.workers.dev", { waitUntil: "networkidle" });
+await page.goto(url, { waitUntil: "networkidle" });
 const geometry = await page.evaluate(() => {
   const pick = (selector) => {
     const node = document.querySelector(selector);
@@ -23,11 +24,12 @@ const geometry = await page.evaluate(() => {
   };
   return {
     viewportCenter: window.innerWidth / 2,
-    app: pick(".app"),
-    hero: pick(".hero"),
-    input: pick(".input"),
-    text: pick("#text"),
-    actions: pick(".actions")
+    shell: pick(".app-shell"),
+    history: pick(".history-card"),
+    translator: pick(".translator-card"),
+    result: pick("#resultCard"),
+    textInput: pick("#textInput"),
+    actionBar: pick(".action-bar")
   };
 });
 await browser.close();

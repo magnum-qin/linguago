@@ -16,8 +16,10 @@
     "dict:import": "node scripts/import-generated-dictionary.mjs",
     "dict:query": "node scripts/query-dictionary.mjs",
     "dict:audit": "node scripts/audit-dictionary-quality.mjs",
+    "dict:audit:senses": "node scripts/audit-dictionary-senses.mjs",
     "dict:batch": "node scripts/run-dictionary-batch.mjs",
-    "dict:test:deepseek": "node scripts/deepseek-dictionary-test.mjs --candidates-file data/processed/generation_batch_frequency_400.jsonl --limit 12 --word-only"
+    "dict:test:deepseek": "node scripts/deepseek-dictionary-test.mjs --candidates-file data/processed/generation_batch_frequency_400.jsonl --limit 12 --word-only",
+    "check:theme": "node scripts/system-theme-check.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260410.0",

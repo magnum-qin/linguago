@@ -4,8 +4,9 @@
   "description": "可以安装到 iPhone 主屏幕的 AI 翻译 PWA。",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#060606",
   "lang": "zh-CN",
   "icons": [
     {

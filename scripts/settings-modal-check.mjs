@@ -20,7 +20,7 @@ page.on("requestfailed", (request) => {
 });
 
 await page.goto(url, { waitUntil: "networkidle" });
-await page.locator("#settingsBtn").click();
+await page.locator("#settingsButton").click();
 await page.waitForSelector("#settingsOverlay:not(.hidden)", { timeout: 5000 });
 const opened = await page.locator("#settingsOverlay").evaluate((node) => {
   const style = getComputedStyle(node);
@@ -51,12 +51,12 @@ const closedByBackdrop = await page.locator("#settingsOverlay").evaluate((node, 
 
 let closedByButton = false;
 if (!closedByBackdrop.hidden) {
-  await page.locator("#closeSettings").click();
+  await page.locator("#closeSettingsButton").click();
   await page.waitForFunction(() => document.querySelector("#settingsOverlay")?.classList.contains("hidden"), null, { timeout: 5000 });
   closedByButton = await page.locator("#settingsOverlay").evaluate((node) => node.classList.contains("hidden"));
 } else {
-  await page.locator("#settingsBtn").click();
-  await page.locator("#closeSettings").click();
+  await page.locator("#settingsButton").click();
+  await page.locator("#closeSettingsButton").click();
   await page.waitForFunction(() => document.querySelector("#settingsOverlay")?.classList.contains("hidden"), null, { timeout: 5000 });
   closedByButton = await page.locator("#settingsOverlay").evaluate((node) => node.classList.contains("hidden"));
 }

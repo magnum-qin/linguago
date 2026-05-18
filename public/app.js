@@ -1,5 +1,6 @@
 const HISTORY_KEY = "linguago-history-v5";
 const SETTINGS_KEY = "linguago-settings-v1";
+const THEME_SETTINGS_VERSION = 2;
 
 const RESULT_LANGUAGES = [
   { code: "en", label: "EN", speech: "en-US" },
@@ -54,7 +55,15 @@ const I18N = {
   lightToDark: "切换到暗黑模式 / Mudar para modo escuro",
   speak: "朗读 / Ouvir",
   dictionarySyncing: "词典同步中 / Sincronizando",
-  dictionaryAdded: "已添加单词 / Palavras adicionadas"
+  dictionaryAdded: "已添加单词 / Palavras adicionadas",
+  dictionaryUnavailable: "词典状态未知 / Dicionário indisponível",
+  providerIdle: "来源 / Fonte",
+  providerLoading: "查询 / Consulta",
+  providerDictionary: "词典 / Dicionário",
+  providerOpenRouter: "OpenRouter",
+  providerDashScope: "DashScope",
+  providerGemini: "Gemini",
+  providerAuto: "AI"
 };
 
 const elements = {
@@ -77,6 +86,7 @@ const elements = {
   clearHistoryButton: document.querySelector("#clearHistoryButton"),
   resultCard: document.querySelector("#resultCard"),
   modeBadge: document.querySelector("#modeBadge"),
+  providerBadge: document.querySelector("#providerBadge"),
   statusText: document.querySelector("#statusText"),
   resultLanguageTabs: document.querySelector("#resultLanguageTabs"),
   translationCard: document.querySelector("#translationCard"),
@@ -97,6 +107,7 @@ let latestDetectedLang = "en";
 let settings = readSettings();
 let settingsCloseTimer = 0;
 let keyboardScrollTimer = 0;
+let systemThemeQuery = null;
 
 bootstrap();
 
@@ -160,7 +171,9 @@ function bootstrap() {
   elements.textInput.addEventListener("input", applyTextState);
   elements.textInput.addEventListener("focus", () => {
     updateKeyboardLift();
-    scheduleKeyboardScroll(220);
+    if (!document.body.classList.contains("has-result")) {
+      scheduleKeyboardScroll(220);
+    }
   });
   elements.textInput.addEventListener("blur", () => {
     setInputLift(0);
@@ -177,16 +190,30 @@ function bootstrap() {
   window.addEventListener("resize", syncDesktopIdleClass);
 
   applyStaticText();
+  setupSystemThemeListener();
   applySettings();
   setupKeyboardLift();
   lockEmptyPageScroll();
   settleInitialAnimations();
-  loadRemoteSettings();
-  loadDictionaryStats();
   autoResizeInput();
   renderHistory();
   renderIdleResult();
   registerServiceWorker();
+  scheduleStartupNetworkTasks();
+}
+
+function scheduleStartupNetworkTasks() {
+  const run = () => {
+    loadRemoteSettings();
+    loadDictionaryStats();
+  };
+
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(run, { timeout: 1200 });
+    return;
+  }
+
+  window.setTimeout(run, 700);
 }
 
 function settleInitialAnimations() {
@@ -226,10 +253,11 @@ function setupKeyboardLift() {
 function updateKeyboardLift() {
   const isInputFocused = document.activeElement === elements.textInput;
   const isMobileWidth = window.matchMedia("(max-width: 560px)").matches;
+  const hasResult = document.body.classList.contains("has-result");
   const visualViewport = window.visualViewport;
   const keyboardLikelyOpen =
     visualViewport && window.innerHeight - visualViewport.height > 120;
-  const shouldLift = isInputFocused && isMobileWidth && keyboardLikelyOpen;
+  const shouldLift = isInputFocused && isMobileWidth && keyboardLikelyOpen && !hasResult;
 
   document.body.classList.toggle("keyboard-active", shouldLift);
   if (shouldLift) {
@@ -247,8 +275,9 @@ function scheduleKeyboardScroll(delay = 80) {
 function scrollFocusedInputIntoView() {
   const isInputFocused = document.activeElement === elements.textInput;
   const isMobileWidth = window.matchMedia("(max-width: 560px)").matches;
+  const hasResult = document.body.classList.contains("has-result");
 
-  if (!isInputFocused || !isMobileWidth) {
+  if (!isInputFocused || !isMobileWidth || hasResult) {
     return;
   }
 
@@ -276,14 +305,25 @@ function scrollFocusedInputIntoView() {
 
 function readSettings() {
   try {
+    const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    const theme =
+      stored.themeSettingsVersion === THEME_SETTINGS_VERSION
+        ? normalizeTheme(stored.theme)
+        : "system";
     return {
       provider: "auto",
       model: DEFAULT_MODELS.auto,
-      theme: "light",
-      ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")
+      ...stored,
+      theme,
+      themeSettingsVersion: THEME_SETTINGS_VERSION
     };
   } catch {
-    return { provider: "auto", model: DEFAULT_MODELS.auto, theme: "light" };
+    return {
+      provider: "auto",
+      model: DEFAULT_MODELS.auto,
+      theme: "system",
+      themeSettingsVersion: THEME_SETTINGS_VERSION
+    };
   }
 }
 
@@ -423,7 +463,7 @@ async function loadDictionaryStats() {
     }
     elements.dictionaryStats.textContent = `${t("dictionaryAdded")}: ${count.toLocaleString()}`;
   } catch {
-    elements.dictionaryStats.textContent = t("dictionarySyncing");
+    elements.dictionaryStats.textContent = t("dictionaryUnavailable");
   }
 }
 
@@ -442,10 +482,49 @@ function closeSettings() {
 }
 
 function toggleTheme() {
-  settings.theme = settings.theme === "dark" ? "light" : "dark";
+  settings.theme =
+    settings.theme === "system" ? "dark" : settings.theme === "dark" ? "light" : "system";
+  settings.themeSettingsVersion = THEME_SETTINGS_VERSION;
   applySettings();
   saveSettings();
   pulse(elements.themeToggleButton);
+}
+
+function normalizeTheme(theme) {
+  return ["system", "light", "dark"].includes(theme) ? theme : "system";
+}
+
+function getSystemTheme() {
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function getResolvedTheme() {
+  settings.theme = normalizeTheme(settings.theme);
+  return settings.theme === "system" ? getSystemTheme() : settings.theme;
+}
+
+function setupSystemThemeListener() {
+  if (!window.matchMedia) {
+    return;
+  }
+  systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = () => {
+    if (settings.theme === "system") {
+      applySettings();
+    }
+  };
+  if (systemThemeQuery.addEventListener) {
+    systemThemeQuery.addEventListener("change", onChange);
+  } else if (systemThemeQuery.addListener) {
+    systemThemeQuery.addListener(onChange);
+  }
+  window.addEventListener("pageshow", onChange);
+  window.addEventListener("focus", onChange);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      onChange();
+    }
+  });
 }
 
 function applySettings() {
@@ -457,12 +536,18 @@ function applySettings() {
   elements.providerSelect.value = settings.provider;
   elements.modelInput.value = settings.model;
 
-  const isDark = settings.theme === "dark";
+  const isDark = getResolvedTheme() === "dark";
   document.documentElement.dataset.theme = isDark ? "dark" : "light";
+  document.documentElement.dataset.themePreference = settings.theme;
   elements.themeToggleButton.setAttribute(
     "aria-label",
-    isDark ? t("darkToLight") : t("lightToDark")
+    settings.theme === "system"
+      ? "跟随系统 / Seguir sistema"
+      : isDark
+        ? t("darkToLight")
+        : t("lightToDark")
   );
+  elements.themeToggleButton.setAttribute("title", elements.themeToggleButton.getAttribute("aria-label"));
   const pageBg = isDark ? "#060606" : "#ffffff";
   document.documentElement.style.backgroundColor = pageBg;
   document.body.style.backgroundColor = pageBg;
@@ -540,6 +625,8 @@ async function onTranslate() {
 }
 
 function renderLoadingResult() {
+  setInputLift(0);
+  document.body.classList.remove("keyboard-active");
   document.body.classList.add("has-result");
   document.body.classList.remove("has-desktop-idle");
   elements.resultCard.classList.remove("desktop-idle");
@@ -549,6 +636,7 @@ function renderLoadingResult() {
   void elements.resultCard.offsetWidth;
   elements.resultCard.classList.add("reveal");
   updateStatus(t("translating"), "...");
+  updateProviderBadge("loading");
   renderResultLanguageTabs();
   elements.translationCard.innerHTML = `
     <div class="loading-loop" aria-hidden="true">
@@ -574,6 +662,7 @@ function renderIdleResult() {
   elements.resultCard.scrollTop = 0;
   elements.resultCard.setAttribute("aria-busy", "false");
   updateStatus("", t("ready"));
+  updateProviderBadge("");
   renderResultLanguageTabs();
   elements.translationCard.innerHTML = `
     <div class="idle-loop" aria-hidden="true">
@@ -607,6 +696,7 @@ function renderErrorResult(message) {
   void elements.resultCard.offsetWidth;
   elements.resultCard.classList.add("reveal");
   updateStatus(message || t("failed"), "!");
+  updateProviderBadge("error");
   renderResultLanguageTabs();
   elements.translationCard.innerHTML = `
     <div class="compact-line error-panel">
@@ -626,6 +716,8 @@ function renderResult(data) {
   latestResultData = data;
   latestResultText = getSelectedTranslation(data);
   latestDetectedLang = data.detected_source_lang || "en";
+  setInputLift(0);
+  document.body.classList.remove("keyboard-active");
   document.body.classList.add("has-result");
   document.body.classList.remove("has-desktop-idle");
   elements.resultCard.classList.remove("desktop-idle");
@@ -639,6 +731,7 @@ function renderResult(data) {
   }
 
   renderResultLanguageTabs();
+  updateProviderBadge(data.provider);
   renderTranslationCard(data);
 
   if (data.type === "word") {
@@ -780,7 +873,7 @@ function getSelectedTranslation(data) {
 
 function renderLanguageScopedSections(data) {
   if (data.type === "word") {
-    renderWordDetails(data.word_details || {});
+    renderWordDetails(data);
     renderExamples(data.examples || []);
     return;
   }
@@ -808,12 +901,37 @@ function getSelectedSentenceExplanation(data) {
   return data.explanation || data.sentence_explanation || "-";
 }
 
-function renderWordDetails(details) {
-  const item = details[selectedResultLang] || {};
+function renderWordDetails(data) {
+  const details = data.word_details || {};
+  const senses = Array.isArray(data.senses) ? data.senses : [];
+  const word = getSelectedTranslation(data) || details[selectedResultLang]?.word || data.translation || data.original || "";
   animateSwap(elements.wordDetailsList);
+
+  if (senses.length) {
+    elements.wordDetailsList.innerHTML = senses
+      .map((sense, index) => {
+        const definitions = sense.definitions || {};
+        const definition = normalizeTextValue(definitions[selectedResultLang]) || normalizeTextValue(definitions.en) || "-";
+        const meta = [sense.part_of_speech, sense.gloss_key].map(normalizeTextValue).filter(Boolean).join(" · ");
+        return `
+          <article class="word-detail-card sense-card section-appear">
+            <div class="sense-card-head">
+              <strong>${escapeHtml(word)}</strong>
+              <span class="sense-index">${escapeHtml(String(sense.sense_order || index + 1))}</span>
+            </div>
+            ${meta ? `<div class="sense-meta">${escapeHtml(meta)}</div>` : ""}
+            <p>${escapeHtml(definition)}</p>
+          </article>
+        `;
+      })
+      .join("");
+    return;
+  }
+
+  const item = details[selectedResultLang] || {};
   elements.wordDetailsList.innerHTML = `
     <article class="word-detail-card section-appear">
-      <strong>${escapeHtml(item.word || getSelectedTranslation(latestResultData || {}))}</strong>
+      <strong>${escapeHtml(item.word || word)}</strong>
       <p>${escapeHtml(item.definition || "-")}</p>
     </article>
   `;
@@ -826,17 +944,132 @@ function renderExamples(examples) {
     return;
   }
 
+  const highlightTerms = getExampleHighlightTerms(latestResultData || {}, selectedResultLang);
   elements.examplesList.innerHTML = examples
     .map((example) => {
       const translations = example.translations || {};
       const selectedExample = normalizeTextValue(translations[selectedResultLang]) || example.sentence || "";
       return `
         <article class="example-card section-appear">
-          <p class="example-source">${escapeHtml(selectedExample)}</p>
+          <p class="example-source">${highlightExampleText(selectedExample, highlightTerms)}</p>
         </article>
       `;
     })
     .join("");
+}
+
+function getExampleHighlightTerms(data, lang) {
+  const terms = [];
+  const localized = getLocalized(data.translations || {}, lang);
+  const selectedWord = localized.text || data.translation || "";
+  const detailWord = data.word_details?.[lang]?.word || "";
+  const detailDefinition = data.word_details?.[lang]?.definition || "";
+
+  terms.push(selectedWord, detailWord);
+  terms.push(...splitMeaningTerms(selectedWord));
+  terms.push(...splitMeaningTerms(detailDefinition));
+  for (const sense of Array.isArray(data.senses) ? data.senses : []) {
+    terms.push(...splitMeaningTerms(sense.definitions?.[lang] || ""));
+  }
+
+  if (lang === data.detected_source_lang || lang === "en") {
+    terms.push(data.original);
+  }
+
+  return uniqueHighlightTerms(terms);
+}
+
+function splitMeaningTerms(value) {
+  return normalizeTextValue(value)
+    .split(/[、,，;；/／|｜()（）[\]{}<>《》"“”'‘’]+/u)
+    .map((term) => term.trim())
+    .filter(Boolean);
+}
+
+function uniqueHighlightTerms(terms) {
+  const seen = new Set();
+  return terms
+    .map(normalizeTextValue)
+    .map((term) => term.trim())
+    .filter((term) => term && isHighlightableTerm(term))
+    .sort((a, b) => b.length - a.length)
+    .filter((term) => {
+      const key = term.toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function isHighlightableTerm(term) {
+  if (/^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]+$/u.test(term)) {
+    return term.length >= 2;
+  }
+  return term.length >= 2;
+}
+
+function highlightExampleText(text, terms) {
+  const source = normalizeTextValue(text);
+  if (!source || !terms.length) {
+    return escapeHtml(source);
+  }
+
+  const matches = [];
+  for (const term of terms) {
+    const flags = /[\p{Script=Latin}]/u.test(term) ? "giu" : "gu";
+    const pattern = new RegExp(escapeRegExp(term), flags);
+    for (const match of source.matchAll(pattern)) {
+      const start = match.index ?? -1;
+      const end = start + match[0].length;
+      if (start < 0 || !isWholeExampleMatch(source, start, end, term)) continue;
+      matches.push({ start, end });
+    }
+  }
+
+  const ranges = mergeHighlightRanges(matches);
+  if (!ranges.length) {
+    return escapeHtml(source);
+  }
+
+  let html = "";
+  let cursor = 0;
+  for (const range of ranges) {
+    html += escapeHtml(source.slice(cursor, range.start));
+    html += `<mark class="example-hit">${escapeHtml(source.slice(range.start, range.end))}</mark>`;
+    cursor = range.end;
+  }
+  html += escapeHtml(source.slice(cursor));
+  return html;
+}
+
+function isWholeExampleMatch(source, start, end, term) {
+  if (!/^[\p{Script=Latin}][\p{Script=Latin}'-]*$/u.test(term)) {
+    return true;
+  }
+
+  const before = start > 0 ? source[start - 1] : "";
+  const after = end < source.length ? source[end] : "";
+  return !/[\p{Script=Latin}'-]/u.test(before) && !/[\p{Script=Latin}'-]/u.test(after);
+}
+
+function mergeHighlightRanges(ranges) {
+  const sorted = ranges
+    .filter((range) => range.end > range.start)
+    .sort((a, b) => a.start - b.start || b.end - a.end);
+  const merged = [];
+  for (const range of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && range.start < last.end) {
+      if (range.end > last.end) last.end = range.end;
+      continue;
+    }
+    merged.push({ ...range });
+  }
+  return merged;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function getLocalized(translations, lang) {
@@ -1008,6 +1241,26 @@ function setInputLift(value) {
 function updateStatus(status, mode) {
   elements.statusText.textContent = status;
   elements.modeBadge.textContent = mode;
+}
+
+function updateProviderBadge(provider) {
+  if (!elements.providerBadge) {
+    return;
+  }
+
+  const labels = {
+    dictionary: t("providerDictionary"),
+    openrouter: t("providerOpenRouter"),
+    dashscope: t("providerDashScope"),
+    gemini: t("providerGemini"),
+    loading: t("providerLoading"),
+    error: "!",
+    auto: t("providerAuto"),
+    "": t("providerIdle")
+  };
+  const normalized = String(provider || "");
+  elements.providerBadge.textContent = labels[normalized] || t("providerAuto");
+  elements.providerBadge.dataset.provider = normalized || "idle";
 }
 
 function setLoading(loading) {

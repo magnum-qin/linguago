@@ -6,8 +6,10 @@ import initSqlJs from "sql.js";
 const INPUT = path.resolve(process.argv[2] || "data/processed/generated_dictionary.accepted.jsonl");
 const DB_FILE = path.resolve(process.argv[3] || "data/dictionary.sqlite");
 const SCHEMA_FILE = path.resolve("data/schema/dictionary.sql");
+const SOURCE_CANDIDATES_FILE = path.resolve(process.env.DICTIONARY_CANDIDATES_FILE || "data/processed/frequency_candidates.jsonl");
 const SQL_WASM = path.resolve("node_modules/sql.js/dist/sql-wasm.wasm");
 const LANGS = ["zh", "en", "pt-BR", "ja"];
+const sourceLangHints = loadSourceLangHints(INPUT, SOURCE_CANDIDATES_FILE);
 
 if (!fs.existsSync(INPUT)) throw new Error(`Input file not found: ${INPUT}`);
 if (!fs.existsSync(SCHEMA_FILE)) throw new Error(`Schema file not found: ${SCHEMA_FILE}`);
@@ -124,7 +126,7 @@ try {
     if (!entry || entry.type !== "word") continue;
 
     const normalized = normalize(entry.normalized_text || entry.source_text);
-    const sourceLang = detectSourceLang(entry.source_text);
+    const sourceLang = sourceLangFromRow(row, entry.source_text);
     const metadata = {
       imported_from: path.relative(process.cwd(), INPUT),
       validation: {
@@ -316,6 +318,32 @@ function getEntryId(statement, sourceLang, normalized) {
   } finally {
     statement.reset();
   }
+}
+
+function sourceLangFromRow(row, text) {
+  if (LANGS.includes(row.source_lang)) return row.source_lang;
+  const hinted = sourceLangHints.get(normalize(row.term || text));
+  if (LANGS.includes(hinted)) return hinted;
+  return detectSourceLang(text);
+}
+
+function loadSourceLangHints(inputFile, candidatesFile) {
+  const match = path.basename(inputFile).match(/qwen35b-prod-(\d+)-(\d+)\.accepted\.jsonl$/);
+  if (!match || !fs.existsSync(candidatesFile)) return new Map();
+
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) return new Map();
+
+  const hints = new Map();
+  const lines = fs.readFileSync(candidatesFile, "utf8").split(/\r?\n/).filter(Boolean);
+  for (const line of lines.slice(start - 1, end)) {
+    const candidate = JSON.parse(line);
+    if (!LANGS.includes(candidate.source_lang)) continue;
+    const key = normalize(candidate.headword || candidate.normalized_headword);
+    if (key) hints.set(key, candidate.source_lang);
+  }
+  return hints;
 }
 
 function detectSourceLang(text) {

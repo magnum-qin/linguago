@@ -75,6 +75,23 @@ Decision:
 - Use `/api/settings` for persisted provider/model settings.
 - The frontend can keep local settings as a convenience, but backend settings are authoritative.
 
+## 5a. Provider Support And Health
+
+The Worker supports OpenRouter, DashScope, Gemini, and automatic routing.
+
+Reason:
+
+- The settings UI exposes these providers.
+- Silent normalization of an explicit provider hides configuration mistakes.
+- Health checks should help diagnose missing keys without leaking secrets.
+
+Decision:
+
+- Keep `openrouter` as a first-class provider.
+- Keep `auto` conservative: DashScope, then Gemini, then OpenRouter.
+- Use structured translation error codes for provider configuration, API, and empty-response failures.
+- `/api/health` may expose configured/reachable booleans and dictionary stats, but never secret values.
+
 ## 6. EN / PT / Chinese / Japanese Tab Order
 
 Result tabs are ordered:
@@ -118,6 +135,7 @@ Decision:
 - Bilingual button labels are constrained.
 - Loading and result states share stable dimensions.
 - Avoid button `scale()` feedback.
+- The provider badge in the result header keeps a fixed width and height.
 
 ## 9. Safe Motion Over Layout Motion
 
