@@ -10,6 +10,7 @@
 
 @layer base {
   :root {
+    color-scheme: light dark;
     --bg: #ffffff;
     --ink: #171412;
     --muted: #766c63;
@@ -28,7 +29,12 @@
     --button-radius-compact: 18px;
   }
 
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+
   :root[data-theme="dark"] {
+    color-scheme: dark;
     --bg: #060606;
     --ink: #f7f4ee;
     --muted: #b8b0a6;
@@ -275,7 +281,8 @@
   .setting-field span,
   .input-wrap span,
   .section-label,
-  .mode-badge {
+  .mode-badge,
+  .provider-badge {
     @apply text-xs font-black uppercase tracking-[0.08em];
     color: var(--muted);
   }
@@ -516,7 +523,7 @@
   .result-card.desktop-idle::after {
     content: attr(data-idle-message);
     display: block;
-    margin: -2px auto 0;
+    margin: 8px auto 0;
     max-width: 80%;
     color: var(--muted);
     font-size: 0.95rem;
@@ -531,7 +538,7 @@
   }
 
   .result-card.desktop-idle .translation-card {
-    margin-top: auto;
+    margin-top: 0;
   }
 
   .result-head {
@@ -547,11 +554,55 @@
   }
 
   .result-head .mode-badge,
-  .result-head .status-text {
+  .result-head .status-text,
+  .result-head .provider-badge {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .provider-badge {
+    @apply inline-grid shrink-0 place-items-center rounded-full border;
+    width: 8.2rem;
+    height: 24px;
+    padding: 0 0.45rem;
+    border-color: color-mix(in srgb, var(--leaf) 24%, var(--line));
+    background: color-mix(in srgb, var(--leaf) 10%, transparent);
+    color: var(--leaf);
+    font-size: 0.64rem;
+    line-height: 1;
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      opacity 180ms ease,
+      filter 180ms ease;
+  }
+
+  .provider-badge[data-provider="idle"] {
+    opacity: 0.62;
+    color: var(--muted);
+    border-color: var(--line);
+    background: transparent;
+  }
+
+  .provider-badge[data-provider="loading"] {
+    filter: brightness(0.98) saturate(1.04);
+  }
+
+  .provider-badge[data-provider="error"] {
+    color: var(--accent-deep);
+    border-color: color-mix(in srgb, var(--accent-deep) 28%, var(--line));
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .provider-badge[data-provider="openrouter"],
+  .provider-badge[data-provider="dashscope"],
+  .provider-badge[data-provider="gemini"] {
+    color: var(--accent-deep);
+    border-color: color-mix(in srgb, var(--accent-deep) 22%, var(--line));
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
   }
 
   .status-text {
@@ -623,7 +674,10 @@
 
   .loading-loop {
     @apply grid h-full place-items-center gap-3 text-center;
+    align-content: center;
+    justify-items: center;
     color: var(--muted);
+    transform: translateY(5px);
   }
 
   .loading-loop p {
@@ -800,8 +854,34 @@
     @apply grid gap-1.5;
   }
 
+  .sense-card {
+    min-height: 104px;
+  }
+
+  .sense-card-head {
+    @apply flex items-center justify-between gap-3;
+    min-height: 30px;
+  }
+
   .word-detail-card strong {
     @apply text-[1.05rem];
+  }
+
+  .sense-index {
+    @apply grid place-items-center rounded-full text-xs font-black;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    color: var(--accent-deep);
+    background: color-mix(in srgb, var(--soft) 58%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  }
+
+  .sense-meta {
+    @apply text-xs font-black uppercase;
+    min-height: 18px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
   }
 
   .word-detail-card p,
@@ -817,6 +897,14 @@
   .history-source {
     @apply mb-2.5 mt-0 font-black leading-snug;
     color: var(--ink) !important;
+  }
+
+  .example-hit {
+    @apply rounded-[8px] px-1;
+    color: var(--accent-deep);
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
   }
 
   .example-translations {
@@ -987,16 +1075,16 @@
 
   body.has-result .translator-card {
     min-height: auto;
-    gap: 12px;
-    border-radius: 24px;
+    gap: 16px;
+    border-radius: 28px;
     padding: 12px;
   }
 
   body.has-result textarea {
     min-height: 64px;
-    border-radius: 20px;
-    font-size: clamp(1.08rem, 4.5vw, 1.42rem);
-    padding: calc((64px - 1.28em) / 2) 16px;
+    border-radius: 24px;
+    font-size: clamp(1.15rem, 4.6vw, 1.75rem);
+    padding: calc((64px - 1.28em) / 2) 20px;
   }
 
   body.has-result textarea:placeholder-shown {
@@ -1121,7 +1209,15 @@
     padding: 18px;
     max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 44px);
     overflow: auto;
-    grid-template-rows: auto auto minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(36px, 0.36fr) minmax(0, 1fr) auto minmax(0, 0.72fr);
+  }
+
+  .result-card.desktop-idle .translation-card {
+    grid-row: 4;
+  }
+
+  .result-card.desktop-idle::after {
+    grid-row: 5;
   }
 
   .history-card,
@@ -1195,10 +1291,17 @@
   }
 
   .result-head .mode-badge,
-  .result-head .status-text {
+  .result-head .status-text,
+  .result-head .provider-badge {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .provider-badge {
+    width: 7.8rem;
+    height: 24px;
+    font-size: 0.62rem;
   }
 
   body.has-result .content-card,
@@ -1328,7 +1431,8 @@
 
   .translator-card .input-wrap span,
   .result-card .section-label,
-  .result-card .mode-badge {
+  .result-card .mode-badge,
+  .result-card .provider-badge {
     letter-spacing: 0.06em;
   }
 

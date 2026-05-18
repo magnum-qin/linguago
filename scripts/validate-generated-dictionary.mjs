@@ -26,11 +26,14 @@ for (const [index, line] of lines.entries()) {
   }
 
   const entry = parsed.entry || parsed.result?.entry || parsed;
-  const { errors, warnings } = validateEntry(entry);
+  const { errors, warnings } = validateEntry(entry, parsed);
   const row = {
     source_line: index + 1,
     term: parsed.term || entry?.source_text || "",
     normalized_term: normalize(parsed.term || entry?.normalized_text || entry?.source_text || ""),
+    source_lang: parsed.source_lang || null,
+    source_id: parsed.source_id || null,
+    frequency_rank: parsed.frequency_rank ?? null,
     raw_hash: hash(JSON.stringify(entry)),
     quality_score: score(errors, warnings),
     validation_errors: errors,
@@ -67,7 +70,7 @@ console.log(`[done] wrote ${path.relative(process.cwd(), ACCEPTED_OUT)}`);
 console.log(`[done] wrote ${path.relative(process.cwd(), REVIEW_OUT)}`);
 console.log(`[done] wrote ${path.relative(process.cwd(), REPORT_OUT)}`);
 
-function validateEntry(entry) {
+function validateEntry(entry, parsed = {}) {
   const errors = [];
   const warnings = [];
 
@@ -78,6 +81,8 @@ function validateEntry(entry) {
   if (entry.type !== "word") errors.push("entry.type must be word for dictionary prefill");
   requireText(errors, entry.source_text, "source_text");
   requireText(errors, entry.normalized_text, "normalized_text");
+  validateSourceText(errors, warnings, entry, parsed);
+  validateSourceLanguageFields(errors, entry, parsed);
 
   for (const lang of LANGS) {
     const translation = entry.translations?.[lang];
@@ -126,6 +131,10 @@ function validateSenses(entry, errors, warnings) {
   }
 
   const seenOrders = new Set();
+  const seenGlosses = new Map();
+  const seenDefinitions = Object.fromEntries(LANGS.map((lang) => [lang, new Map()]));
+  const senseMeta = new Map();
+  const duplicateDefinitionPairs = new Map();
   for (const [index, sense] of entry.senses.entries()) {
     const order = Number(sense?.sense_order || sense?.order || index + 1);
     if (!Number.isFinite(order) || order < 1) {
@@ -137,14 +146,92 @@ function validateSenses(entry, errors, warnings) {
     }
     seenOrders.add(order);
 
+    const gloss = normalize(sense?.gloss_key || sense?.key);
+    const partOfSpeech = normalize(sense?.part_of_speech || "");
+    senseMeta.set(order, { gloss, partOfSpeech });
     requireText(warnings, sense?.gloss_key || sense?.key, `senses.${index}.gloss_key`);
+    if (gloss) {
+      if (seenGlosses.has(gloss)) {
+        const firstOrder = seenGlosses.get(gloss);
+        const firstMeta = senseMeta.get(firstOrder);
+        if (firstMeta?.partOfSpeech && firstMeta.partOfSpeech === partOfSpeech) {
+          errors.push(`duplicate sense gloss_key: ${sense?.gloss_key || sense?.key}`);
+        } else {
+          warnings.push(`shared sense gloss_key across parts of speech: ${sense?.gloss_key || sense?.key}`);
+        }
+      }
+      seenGlosses.set(gloss, order);
+    }
     for (const lang of LANGS) {
       const definition =
         sense?.definitions?.[lang] ||
         sense?.word_details?.[lang]?.definition ||
         (order === 1 ? entry.word_details?.[lang]?.definition : "");
       requireText(errors, definition, `senses.${index}.definitions.${lang}`);
+      const normalizedDefinition = normalizeDefinition(definition);
+      if (normalizedDefinition) {
+        if (seenDefinitions[lang].has(normalizedDefinition)) {
+          const firstOrder = seenDefinitions[lang].get(normalizedDefinition);
+          const key = [Number(firstOrder), order].sort((a, b) => a - b).join(":");
+          const pair = duplicateDefinitionPairs.get(key) || {
+            firstOrder: Number(firstOrder),
+            secondOrder: order,
+            languages: []
+          };
+          pair.languages.push(lang);
+          duplicateDefinitionPairs.set(key, pair);
+        }
+        seenDefinitions[lang].set(normalizedDefinition, order);
+      }
     }
+  }
+
+  for (const pair of duplicateDefinitionPairs.values()) {
+    const firstMeta = senseMeta.get(pair.firstOrder);
+    const secondMeta = senseMeta.get(pair.secondOrder);
+    const samePartOfSpeech = firstMeta?.partOfSpeech && firstMeta.partOfSpeech === secondMeta?.partOfSpeech;
+    if (samePartOfSpeech || pair.languages.length > 1) {
+      errors.push(
+        `duplicate sense definition at senses ${pair.firstOrder} and ${pair.secondOrder} for ${pair.languages.join(", ")}`
+      );
+    } else {
+      warnings.push(
+        `shared sense definition across parts of speech at senses ${pair.firstOrder} and ${pair.secondOrder} for ${pair.languages.join(", ")}`
+      );
+    }
+  }
+}
+
+function validateSourceText(errors, warnings, entry, parsed) {
+  const expected = normalize(parsed.term || "");
+  if (!expected) return;
+
+  const sourceText = normalize(entry.source_text);
+  const normalizedText = normalize(entry.normalized_text);
+  if (sourceText !== expected) {
+    errors.push(`source_text drifted from requested term: expected ${parsed.term}, got ${entry.source_text}`);
+  }
+  if (normalizedText && normalizedText !== expected) {
+    warnings.push(`normalized_text differs from requested term: expected ${parsed.term}, got ${entry.normalized_text}`);
+  }
+}
+
+function validateSourceLanguageFields(errors, entry, parsed) {
+  const sourceLang = parsed.source_lang;
+  const expected = normalize(parsed.term || entry.source_text || "");
+  if (!LANGS.includes(sourceLang) || !expected) return;
+
+  const sourceTranslation = normalize(entry.translations?.[sourceLang]?.text);
+  const sourceDetailWord = normalize(entry.word_details?.[sourceLang]?.word);
+  if (sourceTranslation && sourceTranslation !== expected) {
+    errors.push(
+      `source-language translation drifted from requested term: expected ${parsed.term}, got ${entry.translations?.[sourceLang]?.text}`
+    );
+  }
+  if (sourceDetailWord && sourceDetailWord !== expected) {
+    errors.push(
+      `source-language word_detail drifted from requested term: expected ${parsed.term}, got ${entry.word_details?.[sourceLang]?.word}`
+    );
   }
 }
 
@@ -208,6 +295,12 @@ function score(errors, warnings) {
 
 function normalize(value) {
   return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+}
+
+function normalizeDefinition(value) {
+  return normalize(value)
+    .replace(/[.,;:!?，。；：！？、\s]+/gu, " ")
+    .trim();
 }
 
 function hash(value) {

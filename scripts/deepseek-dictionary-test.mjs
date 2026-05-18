@@ -76,6 +76,10 @@ word_details.zh.definition must be written in Chinese. word_details.en.definitio
 audio_text must be pronounceable text for that same language, not the original source word unless it is also the translated word.
 If the input is a single lexical word, type must be "word"; include word_details for zh, en, pt-BR, ja, include 1 to 4 common senses, and at least one example sentence containing the word or its natural translated equivalent.
 For polysemous words, split common meanings into separate senses instead of merging them into one long definition.
+Do not create near-duplicate senses. Each sense must have a distinct gloss_key and distinct definitions in all languages.
+Do not drift to an inflected, plural, conjugated, or translated headword. source_text must exactly equal the requested entry text. normalized_text must be only its canonical normalized form.
+word_details.*.word should be the best translation of the requested entry, not a different grammatical form unless the requested entry itself is that form.
+For each sense, examples should illustrate that sense. Use sense_order to connect examples to senses when there are multiple senses.
 If source dictionary facts are provided, treat them as evidence. Preserve their main meaning, reading, part of speech, and translation hints unless they are clearly malformed.
 Do not copy source dictionary text blindly. Clean it, resolve mojibake if obvious, and make the final entry natural in all four languages.
 For high-frequency single-character Chinese or Japanese entries, prefer the common daily function-word or particle sense when source variants include one.

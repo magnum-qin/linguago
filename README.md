@@ -13,12 +13,16 @@ The app is designed around a simple flow:
 ## Features
 
 - Installable PWA for iPhone Safari and desktop browsers.
+- System-aware theme with manual light/dark/system cycling.
 - Four-language result tabs: English, Brazilian Portuguese, Chinese, and Japanese.
 - Dictionary-first lookup for accepted word entries.
 - Model fallback through OpenRouter, Alibaba Cloud Bailian, Gemini, or automatic routing.
 - Backend-stored model settings exposed through the settings modal.
 - Cloudflare KV cache for repeated translation results.
+- Structured provider errors and `/api/health` observability for KV, dictionary, and provider configuration.
+- Stable provider badge showing dictionary hits or the selected model provider without changing result card dimensions.
 - Mobile-first UI with stable button sizes, smooth tab transitions, and no layout jump during loading-to-result changes.
+- Service worker app-shell caching that keeps the PWA fast while bypassing cache for `/api/*` requests.
 - Dictionary pipeline scripts for downloading, cleaning, validating, importing, and syncing generated word entries.
 
 ## Tech Stack
@@ -90,6 +94,24 @@ Configure these as Cloudflare Worker secrets or variables where applicable:
 - `DASHSCOPE_API_KEY`: Alibaba Cloud Bailian API key.
 - `GEMINI_API_KEY`: Gemini API key.
 
+## Health And Errors
+
+The Worker exposes:
+
+- `GET /api/health`: reports Worker time, KV reachability, dictionary reachability/stats, and provider configuration booleans without exposing secrets.
+- `GET /health`: compatibility alias for the same health payload.
+
+`POST /api/translate` returns structured error responses:
+
+```json
+{
+  "error": "翻译暂时不可用，请检查 API Key、平台或模型名称。",
+  "error_code": "PROVIDER_CONFIG_MISSING",
+  "provider": "openrouter",
+  "model": "qwen/qwen3.6-30b-a3b:free"
+}
+```
+
 ## Useful Checks
 
 ```bash
@@ -97,9 +119,10 @@ node scripts/mobile-devtools-jump-audit.mjs
 node scripts/mobile-translate-height-check.mjs
 node scripts/interaction-motion-check.mjs
 node scripts/result-tabs-check.mjs
+npm run check:theme
 ```
 
-These Playwright checks verify the mobile layout, tab animation, button size stability, and loading-to-result layout stability.
+These checks verify the mobile layout, tab animation, button size stability, loading-to-result layout stability, and system/manual theme behavior.
 
 ## Documentation For New Codex Sessions
 

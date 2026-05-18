@@ -1,6 +1,7 @@
 interface Env {
   ASSETS: Fetcher;
   CACHE: KVNamespace;
+  OPENROUTER_API_KEY?: string;
   DASHSCOPE_API_KEY?: string;
   GEMINI_API_KEY?: string;
   DICTIONARY_API_URL?: string;
@@ -9,8 +10,14 @@ interface Env {
 
 type LanguageCode = "en" | "zh" | "pt-BR" | "ja";
 type DisplayLanguageCode = LanguageCode;
-type Provider = "auto" | "dashscope" | "gemini";
+type Provider = "auto" | "openrouter" | "dashscope" | "gemini";
 type ResponseProvider = Exclude<Provider, "auto"> | "dictionary";
+type ErrorCode =
+  | "EMPTY_INPUT"
+  | "PROVIDER_CONFIG_MISSING"
+  | "PROVIDER_API_ERROR"
+  | "PROVIDER_EMPTY_RESPONSE"
+  | "TRANSLATION_FAILED";
 
 interface LocalizedText {
   text: string;
@@ -36,6 +43,13 @@ interface WordDetail {
   definition: string;
 }
 
+interface WordSense {
+  sense_order: number;
+  part_of_speech: string;
+  gloss_key: string;
+  definitions: Record<DisplayLanguageCode, string>;
+}
+
 interface BaseResponse {
   detected_source_lang: string;
   target_lang: LanguageCode;
@@ -53,11 +67,13 @@ interface WordResponse extends BaseResponse {
   audio_text: string;
   examples: WordExample[];
   word_details: Record<DisplayLanguageCode, WordDetail>;
+  senses?: WordSense[];
 }
 
 interface SentenceResponse extends BaseResponse {
   type: "sentence";
   explanation: string;
+  explanations: Record<DisplayLanguageCode, string>;
 }
 
 type TranslateResponse = WordResponse | SentenceResponse;
@@ -80,9 +96,22 @@ const MESSAGES = {
 
 const DEFAULT_MODELS: Record<Provider, string> = {
   auto: "qwen3.6-flash-2026-04-16",
+  openrouter: "qwen/qwen3.6-30b-a3b:free",
   dashscope: "qwen3.6-flash-2026-04-16",
   gemini: "gemini-2.5-flash"
 };
+
+class TranslateError extends Error {
+  constructor(
+    public code: ErrorCode,
+    message: string,
+    public status = 500,
+    public provider?: ResponseProvider,
+    public model?: string
+  ) {
+    super(message);
+  }
+}
 
 const SYSTEM_PROMPT = `You are a translation engine for a mobile PWA.
 Return valid JSON only. Never wrap JSON in markdown fences.
@@ -128,7 +157,13 @@ Rules:
   "type": "sentence",
   "detected_source_lang": "en",
   "translation": "target-language translation",
-  "explanation": "A concise explanation of meaning, tone, and usage in the requested target language.",
+  "explanation": "A concise explanation in the requested target language.",
+  "explanations": {
+    "zh": "简体中文解释含义、语气和用法。不要使用日语假名。",
+    "en": "English explanation of meaning, tone, and usage.",
+    "pt-BR": "Explicação em português do Brasil sobre significado, tom e uso.",
+    "ja": "意味、ニュアンス、使い方の日本語説明。"
+  },
   "translations": {
     "zh": {"text": "中文翻译", "phonetic": "pinyin for the whole sentence", "audio_text": "中文翻译"},
     "en": {"text": "English translation", "phonetic": "IPA or readable pronunciation", "audio_text": "English translation"},
@@ -136,7 +171,12 @@ Rules:
     "ja": {"text": "Japanese translation", "phonetic": "kana reading", "audio_text": "Japanese translation"}
   }
 }
-7. Preserve the requested target language exactly and keep all text natural and concise.`;
+7. The language-keyed fields must be written in their own language:
+- zh must be Simplified Chinese only. Do not use Japanese kana or Portuguese.
+- en must be English only.
+- pt-BR must be Brazilian Portuguese only.
+- ja must be Japanese only.
+8. Preserve the requested target language exactly and keep all text natural and concise.`;
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -158,12 +198,12 @@ export default {
       return handleDictionaryStats(env, url.searchParams.get("debug") === "1");
     }
 
+    if (url.pathname === "/api/health" && request.method === "GET") {
+      return handleHealth(env);
+    }
+
     if (url.pathname === "/health") {
-      return json({
-        ok: true,
-        date: new Date().toISOString(),
-        version: "settings-modal-overlay-v1"
-      });
+      return handleHealth(env);
     }
 
     return env.ASSETS.fetch(request);
@@ -187,7 +227,7 @@ async function handleTranslate(
       : await getStoredModel(env, provider);
 
     if (!text) {
-      return json({ error: MESSAGES.emptyInput }, 400);
+      throw new TranslateError("EMPTY_INPUT", MESSAGES.emptyInput, 400);
     }
 
     const dictionaryResponse = await lookupDictionaryFirst({
@@ -239,16 +279,73 @@ async function handleTranslate(
 
     return json(normalizedResponse);
   } catch (error) {
+    const translateError =
+      error instanceof TranslateError
+        ? error
+        : new TranslateError(
+            "TRANSLATION_FAILED",
+            MESSAGES.serviceUnavailable,
+            500
+          );
     console.error(
       JSON.stringify({
         level: "error",
         message: "translate_failed",
+        error_code: translateError.code,
+        provider: translateError.provider,
+        model: translateError.model,
         error: error instanceof Error ? error.message : String(error)
       })
     );
 
-    return json({ error: MESSAGES.serviceUnavailable }, 500);
+    return json(
+      {
+        error: translateError.message,
+        error_code: translateError.code,
+        ...(translateError.provider ? { provider: translateError.provider } : {}),
+        ...(translateError.model ? { model: translateError.model } : {})
+      },
+      translateError.status
+    );
   }
+}
+
+async function handleHealth(env: Env): Promise<Response> {
+  const dictionary = {
+    configured: Boolean(env.DICTIONARY_API_URL && env.DICTIONARY_API_TOKEN),
+    reachable: false,
+    stats: null as Record<string, unknown> | null
+  };
+  let kv = false;
+
+  try {
+    await env.CACHE.get("global:model-settings");
+    kv = true;
+  } catch {
+    kv = false;
+  }
+
+  if (dictionary.configured) {
+    try {
+      dictionary.stats = await fetchDictionaryStats(env);
+      dictionary.reachable = true;
+    } catch {
+      dictionary.reachable = false;
+    }
+  }
+
+  return json({
+    ok: true,
+    date: new Date().toISOString(),
+    version: "provider-observability-v1",
+    kv: { reachable: kv },
+    dictionary,
+    providers: {
+      openrouter: { configured: Boolean(env.OPENROUTER_API_KEY) },
+      dashscope: { configured: Boolean(env.DASHSCOPE_API_KEY) },
+      gemini: { configured: Boolean(env.GEMINI_API_KEY) }
+    }
+  });
 }
 
 async function handleDictionaryStats(env: Env, debug = false): Promise<Response> {
@@ -316,9 +413,32 @@ function selectProvider(
   requestedProvider: Provider,
   requestedModel: string
 ): { provider: Exclude<Provider, "auto">; model: string; apiKey: string } {
+  if (requestedProvider === "openrouter") {
+    if (!env.OPENROUTER_API_KEY) {
+      throw new TranslateError(
+        "PROVIDER_CONFIG_MISSING",
+        "OpenRouter API Key is not configured.",
+        500,
+        "openrouter",
+        requestedModel || DEFAULT_MODELS.openrouter
+      );
+    }
+    return {
+      provider: "openrouter",
+      model: requestedModel || DEFAULT_MODELS.openrouter,
+      apiKey: env.OPENROUTER_API_KEY
+    };
+  }
+
   if (requestedProvider === "dashscope") {
     if (!env.DASHSCOPE_API_KEY) {
-      throw new Error("DASHSCOPE_API_KEY is not configured.");
+      throw new TranslateError(
+        "PROVIDER_CONFIG_MISSING",
+        "DashScope API Key is not configured.",
+        500,
+        "dashscope",
+        requestedModel || DEFAULT_MODELS.dashscope
+      );
     }
     return {
       provider: "dashscope",
@@ -329,7 +449,13 @@ function selectProvider(
 
   if (requestedProvider === "gemini") {
     if (!env.GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured.");
+      throw new TranslateError(
+        "PROVIDER_CONFIG_MISSING",
+        "Gemini API Key is not configured.",
+        500,
+        "gemini",
+        requestedModel || DEFAULT_MODELS.gemini
+      );
     }
     return {
       provider: "gemini",
@@ -341,7 +467,7 @@ function selectProvider(
   if (env.DASHSCOPE_API_KEY) {
     return {
       provider: "dashscope",
-      model: requestedModel || DEFAULT_MODELS.dashscope,
+      model: selectModelForProvider(requestedProvider, "dashscope", requestedModel),
       apiKey: env.DASHSCOPE_API_KEY
     };
   }
@@ -349,12 +475,40 @@ function selectProvider(
   if (env.GEMINI_API_KEY) {
     return {
       provider: "gemini",
-      model: requestedModel || DEFAULT_MODELS.gemini,
+      model: selectModelForProvider(requestedProvider, "gemini", requestedModel),
       apiKey: env.GEMINI_API_KEY
     };
   }
 
-  throw new Error("No translation provider API key is configured.");
+  if (env.OPENROUTER_API_KEY) {
+    return {
+      provider: "openrouter",
+      model: selectModelForProvider(requestedProvider, "openrouter", requestedModel),
+      apiKey: env.OPENROUTER_API_KEY
+    };
+  }
+
+  throw new TranslateError(
+    "PROVIDER_CONFIG_MISSING",
+    "No translation provider API key is configured.",
+    500
+  );
+}
+
+function selectModelForProvider(
+  requestedProvider: Provider,
+  selectedProvider: Exclude<Provider, "auto">,
+  requestedModel: string
+): string {
+  if (!requestedModel) {
+    return DEFAULT_MODELS[selectedProvider];
+  }
+
+  if (requestedProvider === "auto" && requestedModel === DEFAULT_MODELS.auto) {
+    return DEFAULT_MODELS[selectedProvider];
+  }
+
+  return requestedModel;
 }
 
 function normalizeResponse(input: {
@@ -392,10 +546,81 @@ function normalizeResponse(input: {
   return {
     ...base,
     type,
-    explanation: String(
-      input.translated.explanation ?? input.translated.sentence_explanation ?? ""
-    )
+    explanation: selectTargetExplanation(input.translated, input.targetLang),
+    explanations: normalizeSentenceExplanations(input.translated, input.targetLang)
   };
+}
+
+function selectTargetExplanation(
+  translated: Record<string, unknown>,
+  targetLang: LanguageCode
+): string {
+  const explanations = normalizeSentenceExplanations(translated, targetLang);
+  if (explanations[targetLang]) {
+    return explanations[targetLang];
+  }
+
+  const fallback =
+    normalizeStringOrText(translated.explanation) ||
+    normalizeStringOrText(translated.sentence_explanation);
+  return isExpectedExplanationLanguage(targetLang, fallback) ? fallback : "";
+}
+
+function normalizeSentenceExplanations(
+  translated: Record<string, unknown>,
+  targetLang: LanguageCode
+): Record<DisplayLanguageCode, string> {
+  const explanationSources = [
+    translated.explanations,
+    translated.sentence_explanations,
+    translated.localized_explanations
+  ];
+  const normalized = {
+    zh: "",
+    en: "",
+    "pt-BR": "",
+    ja: ""
+  };
+
+  for (const source of explanationSources) {
+    if (!source || typeof source !== "object") continue;
+    const items = source as Record<string, unknown>;
+    normalized.zh ||= normalizeStringOrText(items.zh);
+    normalized.en ||= normalizeStringOrText(items.en);
+    normalized["pt-BR"] ||= normalizeStringOrText(items["pt-BR"]);
+    normalized.ja ||= normalizeStringOrText(items.ja);
+  }
+
+  const fallback =
+    normalizeStringOrText(translated.explanation) ||
+    normalizeStringOrText(translated.sentence_explanation);
+  if (fallback) {
+    normalized[targetLang] ||= fallback;
+  }
+
+  return {
+    zh: isExpectedExplanationLanguage("zh", normalized.zh) ? normalized.zh : "",
+    en: isExpectedExplanationLanguage("en", normalized.en) ? normalized.en : "",
+    "pt-BR": isExpectedExplanationLanguage("pt-BR", normalized["pt-BR"])
+      ? normalized["pt-BR"]
+      : "",
+    ja: isExpectedExplanationLanguage("ja", normalized.ja) ? normalized.ja : ""
+  };
+}
+
+function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolean {
+  const value = text.trim();
+  if (!value) return true;
+
+  if (lang === "zh") {
+    return /[\u4e00-\u9fff]/u.test(value) && !/[\u3040-\u30ff]/u.test(value);
+  }
+
+  if (lang === "ja") {
+    return /[\u3040-\u30ff]/u.test(value);
+  }
+
+  return true;
 }
 
 async function translateWithProvider(input: {
@@ -410,6 +635,10 @@ async function translateWithProvider(input: {
 
   if (input.provider === "dashscope") {
     return translateWithDashScope({ ...input, prompt });
+  }
+
+  if (input.provider === "openrouter") {
+    return translateWithOpenRouter({ ...input, prompt });
   }
 
   return translateWithGemini({ ...input, prompt });
@@ -468,12 +697,10 @@ function dictionaryEntryToResponse(
   targetLang: LanguageCode
 ): WordResponse {
   const translations = normalizeDictionaryTranslations(entry.translations, entry.pronunciations);
-  const senses = Array.isArray(entry.senses) ? (entry.senses as Array<Record<string, unknown>>) : [];
-  const firstSense = senses[0] || {};
+  const senses = normalizeDictionarySenses(entry.senses);
+  const firstSense = senses[0] || null;
   const definitions =
-    firstSense.definitions && typeof firstSense.definitions === "object"
-      ? (firstSense.definitions as Record<string, unknown>)
-      : {};
+    firstSense?.definitions || {};
   const targetText = translations[targetLang]?.text || translations.en?.text || original;
 
   return {
@@ -489,6 +716,7 @@ function dictionaryEntryToResponse(
     phonetic: translations[String(entry.source_lang || "en") as LanguageCode]?.phonetic || "",
     audio_text: original,
     examples: normalizeExamples(entry.examples),
+    senses,
     word_details: {
       zh: dictionaryWordDetail(translations.zh?.text, definitions.zh),
       en: dictionaryWordDetail(translations.en?.text, definitions.en),
@@ -496,6 +724,30 @@ function dictionaryEntryToResponse(
       ja: dictionaryWordDetail(translations.ja?.text, definitions.ja)
     }
   };
+}
+
+function normalizeDictionarySenses(value: unknown): WordSense[] {
+  const items = Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
+  return items
+    .map((sense, index) => {
+      const definitions =
+        sense.definitions && typeof sense.definitions === "object"
+          ? (sense.definitions as Record<string, unknown>)
+          : {};
+      const senseOrder = Number(sense.sense_order || index + 1);
+      return {
+        sense_order: Number.isFinite(senseOrder) && senseOrder > 0 ? senseOrder : index + 1,
+        part_of_speech: normalizeStringOrText(sense.part_of_speech),
+        gloss_key: normalizeStringOrText(sense.gloss_key),
+        definitions: {
+          zh: normalizeStringOrText(definitions.zh),
+          en: normalizeStringOrText(definitions.en),
+          "pt-BR": normalizeStringOrText(definitions["pt-BR"]),
+          ja: normalizeStringOrText(definitions.ja)
+        }
+      };
+    })
+    .filter((sense) => Object.values(sense.definitions).some(Boolean));
 }
 
 function normalizeDictionaryTranslations(
@@ -550,6 +802,7 @@ async function translateWithDashScope(input: {
   model: string;
   apiKey: string;
 }): Promise<Record<string, unknown>> {
+  const provider = "dashscope";
   const response = await fetch(
     "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
     {
@@ -573,7 +826,13 @@ async function translateWithDashScope(input: {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`DashScope API error: ${response.status} ${errorText}`);
+    throw new TranslateError(
+      "PROVIDER_API_ERROR",
+      `DashScope API error: ${response.status} ${errorText}`,
+      502,
+      provider,
+      input.model
+    );
   }
 
   const payload = (await response.json()) as {
@@ -582,7 +841,65 @@ async function translateWithDashScope(input: {
   const rawText = payload.choices?.[0]?.message?.content?.trim() ?? "";
 
   if (!rawText) {
-    throw new Error("DashScope returned empty content.");
+    throw new TranslateError(
+      "PROVIDER_EMPTY_RESPONSE",
+      "DashScope returned empty content.",
+      502,
+      provider,
+      input.model
+    );
+  }
+
+  return JSON.parse(stripJsonFence(rawText)) as Record<string, unknown>;
+}
+
+async function translateWithOpenRouter(input: {
+  prompt: string;
+  model: string;
+  apiKey: string;
+}): Promise<Record<string, unknown>> {
+  const provider = "openrouter";
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${input.apiKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: input.model,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: input.prompt }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new TranslateError(
+      "PROVIDER_API_ERROR",
+      `OpenRouter API error: ${response.status} ${errorText}`,
+      502,
+      provider,
+      input.model
+    );
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const rawText = payload.choices?.[0]?.message?.content?.trim() ?? "";
+
+  if (!rawText) {
+    throw new TranslateError(
+      "PROVIDER_EMPTY_RESPONSE",
+      "OpenRouter returned empty content.",
+      502,
+      provider,
+      input.model
+    );
   }
 
   return JSON.parse(stripJsonFence(rawText)) as Record<string, unknown>;
@@ -593,6 +910,7 @@ async function translateWithGemini(input: {
   model: string;
   apiKey: string;
 }): Promise<Record<string, unknown>> {
+  const provider = "gemini";
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
     {
@@ -620,7 +938,13 @@ async function translateWithGemini(input: {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} ${errorText}`);
+    throw new TranslateError(
+      "PROVIDER_API_ERROR",
+      `Gemini API error: ${response.status} ${errorText}`,
+      502,
+      provider,
+      input.model
+    );
   }
 
   const payload = (await response.json()) as {
@@ -634,7 +958,13 @@ async function translateWithGemini(input: {
     payload.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
 
   if (!rawText) {
-    throw new Error("Gemini returned empty content.");
+    throw new TranslateError(
+      "PROVIDER_EMPTY_RESPONSE",
+      "Gemini returned empty content.",
+      502,
+      provider,
+      input.model
+    );
   }
 
   return JSON.parse(stripJsonFence(rawText)) as Record<string, unknown>;
@@ -659,7 +989,7 @@ async function buildCacheKey(
   provider: Exclude<Provider, "auto">,
   model: string
 ): Promise<string> {
-  const normalized = `v29::${provider}::${model}::${text.toLowerCase()}::${sourceLang ?? "auto"}::${targetLang}`;
+  const normalized = `v31::${provider}::${model}::${text.toLowerCase()}::${sourceLang ?? "auto"}::${targetLang}`;
   const data = new TextEncoder().encode(normalized);
   const digest = await crypto.subtle.digest("SHA-256", data);
   const bytes = Array.from(new Uint8Array(digest));
@@ -678,7 +1008,7 @@ function normalizeTargetLang(target?: string): LanguageCode {
 }
 
 function normalizeProvider(provider?: string): Provider {
-  if (provider === "dashscope" || provider === "gemini") {
+  if (provider === "openrouter" || provider === "dashscope" || provider === "gemini") {
     return provider;
   }
   return "auto";

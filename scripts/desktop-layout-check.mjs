@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 
-const url = "https://translation-pwa.qhzggzh-linguago.workers.dev";
+const url = process.env.PWA_URL || "https://translation-pwa.qhzggzh-linguago.workers.dev";
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
 
@@ -17,43 +17,40 @@ page.on("requestfailed", (request) => {
 
 await page.goto(url, { waitUntil: "networkidle" });
 const before = await page.evaluate(() => {
-  const gear = document.querySelector(".gear");
-  const text = document.querySelector("#text");
-  const app = document.querySelector(".app");
-  const gearStyle = gear ? getComputedStyle(gear) : null;
+  const text = document.querySelector("#textInput");
+  const shell = document.querySelector(".app-shell");
   const textRect = text.getBoundingClientRect();
-  const appRect = app.getBoundingClientRect();
+  const shellRect = shell.getBoundingClientRect();
   return {
-    gearDisplay: gearStyle?.display || null,
     textHeight: Math.round(textRect.height),
-    textCenterDelta: Math.round((textRect.left + textRect.width / 2) - (appRect.left + appRect.width / 2)),
+    textCenterDelta: Math.round((textRect.left + textRect.width / 2) - (shellRect.left + shellRect.width / 2)),
     textAlign: getComputedStyle(text).textAlign,
-    hasResultClass: app.classList.contains("has-result")
+    hasResultClass: document.body.classList.contains("has-result")
   };
 });
 
-await page.locator("#text").fill(`hello ${Date.now()}`);
+await page.locator("#textInput").fill(`hello ${Date.now()}`);
 await page.keyboard.press("Enter");
-await page.waitForSelector(".app.has-result", { timeout: 20000 });
-await page.waitForSelector("#results:not(.hidden)", { timeout: 20000 });
+await page.waitForSelector("#resultCard:not(.hidden)", { timeout: 30000 });
+await page.locator("#translateButton:not(.loading)").waitFor({ timeout: 30000 });
 const after = await page.evaluate(() => {
-  const app = document.querySelector(".app");
-  const hero = document.querySelector(".hero");
-  const results = document.querySelector("#results");
-  const text = document.querySelector("#text");
-  const appRect = app.getBoundingClientRect();
-  const heroRect = hero.getBoundingClientRect();
-  const resultRect = results.getBoundingClientRect();
+  const shell = document.querySelector(".app-shell");
+  const translator = document.querySelector(".translator-card");
+  const result = document.querySelector("#resultCard");
+  const text = document.querySelector("#textInput");
+  const shellRect = shell.getBoundingClientRect();
+  const translatorRect = translator.getBoundingClientRect();
+  const resultRect = result.getBoundingClientRect();
   return {
-    gridColumns: getComputedStyle(app).gridTemplateColumns,
-    hasResultClass: app.classList.contains("has-result"),
-    heroLeftOfResults: heroRect.left < resultRect.left,
-    heroRight: Math.round(heroRect.right),
+    gridColumns: getComputedStyle(shell).gridTemplateColumns,
+    hasResultClass: document.body.classList.contains("has-result"),
+    translatorLeftOfResult: translatorRect.left < resultRect.left,
+    translatorRight: Math.round(translatorRect.right),
     resultLeft: Math.round(resultRect.left),
     textHeight: Math.round(text.getBoundingClientRect().height),
     textAlign: getComputedStyle(text).textAlign,
-    appWidth: Math.round(appRect.width),
-    resultVisible: !results.classList.contains("hidden")
+    shellWidth: Math.round(shellRect.width),
+    resultVisible: !result.classList.contains("hidden")
   };
 });
 

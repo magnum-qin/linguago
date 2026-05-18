@@ -28,7 +28,7 @@ fi
   total="$(wc -l < data/processed/frequency_candidates.jsonl)"
   if (( start > total )); then
     echo "$(date -Is) all candidates completed: next=$start total=$total"
-    return 0
+    exit 0
   fi
 
   end=$((start + BATCH_SIZE - 1))

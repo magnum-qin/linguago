@@ -65,6 +65,9 @@ async function inspect(viewport, name) {
         target_lang: "zh",
         original: "you",
         translation: "你",
+        provider: "dictionary",
+        model: "louis-sqlite",
+        cached: true,
         translations: {
           en: { text: "you", phonetic: "ju", audio_text: "you" },
           "pt-BR": { text: "você", phonetic: "vo-se", audio_text: "você" },
@@ -102,6 +105,7 @@ async function inspect(viewport, name) {
         historyClear: "#clearHistoryButton",
         save: "#saveModelButton",
         verify: "#verifyModelButton",
+        providerBadge: "#providerBadge",
         tabs: "#resultLanguageTabs",
         tab: ".result-tab"
       };
@@ -142,7 +146,7 @@ async function inspect(viewport, name) {
   await page.close();
 
   const delta = {};
-  for (const key of ["clear", "translate", "historyClear", "save", "verify"]) {
+  for (const key of ["clear", "translate", "historyClear", "save", "verify", "providerBadge"]) {
     delta[key] = {
       idleToLoadingH: (loading[key]?.height || 0) - (idle[key]?.height || 0),
       idleToLoadingW: (loading[key]?.width || 0) - (idle[key]?.width || 0),

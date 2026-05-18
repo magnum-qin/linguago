@@ -13,6 +13,7 @@ The app should feel like a small native dictionary/translator:
 - Smooth mobile interactions.
 - Stable card and button dimensions.
 - Backend-controlled provider/model settings.
+- Observable provider/dictionary health without exposing secrets.
 
 ## Current Product Behavior
 
@@ -20,12 +21,14 @@ The UI supports:
 
 - Input for words or sentences.
 - Clear and translate buttons.
-- Dark mode button.
+- Theme button that follows the system by default and cycles system, dark, and light modes.
 - Settings modal for provider/model selection.
 - Dictionary stats in settings.
+- Provider badge in the result header, including dictionary hits.
 - Result tabs ordered as EN, PT, Chinese, Japanese.
 - Single-language scoped result display: selecting a tab shows only that language's translation, explanation, and example.
 - Local history with duplicate promotion instead of duplicate rows.
+- Installed PWA shell caching for fast reopen, with API requests kept network-only.
 
 ## Core Files
 
@@ -55,6 +58,7 @@ Important routes:
 - `/api/translate`: main translation API.
 - `/api/settings`: reads/saves backend model provider settings.
 - `/api/dictionary/stats`: proxies Louis dictionary stats.
+- `/api/health`: reports Worker, KV, dictionary, and provider configured/reachable status without exposing secrets.
 
 Translation order:
 
@@ -63,6 +67,12 @@ Translation order:
 3. If dictionary hit, return a frontend-compatible response with `provider: "dictionary"` and `cached: true`.
 4. If dictionary misses or is unavailable, silently fall back to configured model provider.
 5. Sentences go directly to model providers.
+
+Sentence responses should include language-keyed `explanations` for EN, PT-BR, Chinese, and Japanese. The legacy `explanation` field is kept as the selected target-language explanation for compatibility.
+
+Supported providers are `auto`, `openrouter`, `dashscope`, and `gemini`.
+`auto` currently tries DashScope, then Gemini, then OpenRouter.
+Explicit provider selection returns a structured `PROVIDER_CONFIG_MISSING` error if its secret is absent.
 
 ## Frontend Constraints
 
@@ -75,8 +85,10 @@ The UI has been tuned repeatedly. Preserve these constraints:
 - Use brightness/filter/opacity feedback instead.
 - Result tab switching must animate with a sliding indicator.
 - Tab switching must not change `resultCard` or `translationCard` height.
+- Provider badge must keep fixed dimensions; update text/color only.
 - Settings overlay must cover the whole viewport and sit above result cards.
-- Dark mode should update status bar/theme color immediately.
+- Theme changes should update status bar/theme color immediately.
+- After a translation result is shown, keyboard/input scroll guards should release so history scrolling on mobile does not snap back upward.
 - Result layout on desktop is three-column: history, input, result.
 
 ## Current Motion System
@@ -115,6 +127,7 @@ npm run check
 node scripts/mobile-devtools-jump-audit.mjs
 node scripts/mobile-translate-height-check.mjs
 node scripts/interaction-motion-check.mjs
+node scripts/system-theme-check.mjs
 ```
 
 Expected results:
@@ -139,15 +152,30 @@ npm run deploy
 https://translation-pwa.qhzggzh-linguago.workers.dev
 ```
 
+## Current Operational Snapshot
+
+Last checked on 2026-05-18:
+
+- Production `/api/health` is reachable.
+- Louis dictionary is reachable through the Worker.
+- Dictionary stats reported `accepted_words=39408` and `updated_at=2026-05-18 05:48:54`.
+- Hangzhou expansion cron is active and processing the `zh-en-ja-expansion-2026-05-18` candidate extension.
+- Remote candidates total is `44189`; the current next pointer was `41790` during the last check.
+
 ## Common Pitfalls
 
 - Do not edit generated `public/styles.css` without also updating `src/styles.css`.
 - Do not expose `DICTIONARY_API_TOKEN` to the browser.
+- Do not expose provider API keys through `/api/health`; use booleans only.
 - Do not assume frontend settings are enough; model settings can be stored in the backend.
+- Do not let `openrouter` silently normalize to `auto`.
 - Do not reintroduce `button:active { transform: scale(...) }`.
 - Do not let bilingual labels wrap inside fixed-size buttons.
 - Do not rebuild result tabs on every click if you want smooth tab animation.
 - Do not let loading UI use different heights than final result UI.
+- Do not let `/api/*` responses be cached by the service worker.
+- Bump `CACHE_NAME` in `public/sw.js` when changing app-shell assets or cache behavior.
+- Remote dictionary batches should leave `state/batches/<run>.status` files so interrupted or empty runs are observable.
 
 ## Good First Task For New Codex Session
 

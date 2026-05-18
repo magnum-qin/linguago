@@ -14,22 +14,23 @@ This is the working backlog for future Codex sessions.
 - Continue expanding accepted word entries in batches.
 - Keep validating generated entries before importing them.
 - Track accepted / needs-review counts per batch.
-- Add idempotent sync status files for every 200-word batch if not already present on the VPS.
+- Monitor `state/batches/<run>.status` files from remote sync batches and use them when checking progress.
 - Consider a lightweight admin endpoint or sync log for Louis dictionary imports.
 
 ## Frontend UX
 
 - Keep tab switching animated and dimension-stable.
 - Keep settings modal above all cards on mobile and desktop.
-- Consider adding a tiny "dictionary hit" visual indicator that does not add clutter.
+- Keep the provider badge compact and dimension-stable, including dictionary hit state.
 - Consider haptic-like visual feedback for PWA buttons using only safe visual properties.
 - Check installed PWA mode on iPhone after any viewport/status-bar changes.
+- Check installed PWA cold-start behavior after service worker or manifest changes.
 
 ## Backend
 
 - Keep provider routing simple and observable.
-- Add structured error codes for model provider failures.
-- Consider a `/api/health` endpoint that reports Worker, KV, and dictionary reachability.
+- Keep structured error codes for model provider failures current.
+- Keep `/api/health` limited to safe booleans/status fields and dictionary stats.
 - Consider separating settings storage from translation cache if settings become more complex.
 
 ## Documentation

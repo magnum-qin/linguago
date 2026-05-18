@@ -97,12 +97,12 @@ function lookupTerm(normalizedTerm) {
     `
       SELECT id, 'headword' AS match_type
       FROM dictionary_entries
-      WHERE normalized_headword = ?
+      WHERE (normalized_headword = ? OR headword = ?)
         AND status = 'accepted'
       ORDER BY quality_score DESC, id ASC
       LIMIT 8
     `,
-    [normalizedTerm]
+    [normalizedTerm, normalizedTerm]
   );
 
   const translationMatches = selectAll(
