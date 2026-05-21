@@ -1,4 +1,4 @@
-const CACHE_NAME = "linguago-shell-v11";
+const CACHE_NAME = "linguago-shell-v16";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -6,26 +6,25 @@ const APP_SHELL = [
   "/app.js",
   "/manifest.webmanifest",
   "/icons/icon.svg",
-  "/icons/apple-touch-icon.png"
+  "/icons/apple-touch-icon.png",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png"
 ];
 const APP_SHELL_PATHS = new Set(APP_SHELL);
+const INDEX_PATH = "/index.html";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(precacheShell());
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
@@ -43,33 +42,65 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  const isNavigation = event.request.mode === "navigate";
-  const isShellAsset = APP_SHELL_PATHS.has(url.pathname);
-  if (isNavigation || isShellAsset) {
-    event.respondWith(cacheFirst(event.request, isNavigation ? "/index.html" : url.pathname));
+  if (event.request.mode === "navigate" || url.pathname === "/" || url.pathname === INDEX_PATH) {
+    event.respondWith(networkFirstNavigation(event.request));
+    return;
+  }
+
+  if (APP_SHELL_PATHS.has(url.pathname)) {
+    event.respondWith(cacheFirstAsset(url.pathname));
     return;
   }
 
   event.respondWith(staleWhileRevalidate(event.request));
 });
 
-async function cacheFirst(request, fallbackPath) {
-  const cached = await caches.match(request).then((match) => match || caches.match(fallbackPath));
-  const update = refreshCache(request).catch(() => cached);
-  return cached || update;
+async function precacheShell() {
+  const cache = await caches.open(CACHE_NAME);
+  await Promise.allSettled(APP_SHELL.map((path) => cache.add(path)));
+}
+
+async function networkFirstNavigation(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(INDEX_PATH, response.clone()).catch(() => {});
+    }
+    return response;
+  } catch {
+    const cached = (await caches.match(INDEX_PATH)) || (await caches.match("/"));
+    return cached || offlineHtml();
+  }
+}
+
+async function cacheFirstAsset(pathname) {
+  const cached = await caches.match(pathname);
+  const request = new Request(new URL(pathname, self.location.origin), {
+    method: "GET",
+    credentials: "same-origin"
+  });
+  const update = fetchAndCache(request).catch(() => cached);
+  return cached || update || new Response("", { status: 503, statusText: "Offline" });
 }
 
 async function staleWhileRevalidate(request) {
   const cached = await caches.match(request);
-  const update = refreshCache(request).catch(() => cached);
-  return cached || update;
+  const update = fetchAndCache(request).catch(() => cached);
+  return cached || update || new Response("", { status: 503, statusText: "Offline" });
 }
 
-async function refreshCache(request) {
+async function fetchAndCache(request) {
   const response = await fetch(request);
   if (response.ok) {
-    const copy = response.clone();
-    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(request, response.clone()).catch(() => {});
   }
   return response;
+}
+
+function offlineHtml() {
+  return new Response("<!doctype html><html><head><meta charset=\"utf-8\"><title>LinguaGo</title></head><body>LinguaGo</body></html>", {
+    headers: { "content-type": "text/html; charset=utf-8" }
+  });
 }
