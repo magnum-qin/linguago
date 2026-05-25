@@ -1,4 +1,4 @@
-const CACHE_NAME = "linguago-shell-v16";
+const CACHE_NAME = "linguago-shell-v28";
 const APP_SHELL = [
   "/",
   "/index.html",

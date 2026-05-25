@@ -44,7 +44,7 @@ async function inspect(viewport, name) {
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ provider: "auto", model: "qwen3.6-flash-2026-04-16" })
+      body: JSON.stringify({ provider: "auto", model: "qwen3.6-flash" })
     })
   );
   await page.route("**/api/dictionary/stats", (route) =>

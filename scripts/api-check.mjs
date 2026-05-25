@@ -15,7 +15,7 @@ const payload = await page.evaluate(async () => {
       source_lang: "auto",
       target_lang: "zh",
       provider: "auto",
-    model: "qwen3.6-flash-2026-04-16"
+      model: "qwen3.6-flash"
     })
   });
   return {

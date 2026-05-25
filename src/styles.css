@@ -237,13 +237,41 @@
     animation: overlay-out 160ms ease both;
   }
 
+  .model-editor-overlay {
+    @apply fixed inset-0 grid h-dvh w-screen place-items-center transition duration-200;
+    z-index: 2147483100;
+    padding: calc(env(safe-area-inset-top) + 18px) 18px
+      calc(env(safe-area-inset-bottom) + 18px);
+    background: color-mix(in srgb, var(--bg) 66%, rgba(20, 15, 12, 0.22));
+    backdrop-filter: blur(20px);
+    animation: overlay-in 180ms ease both;
+  }
+
+  .model-editor-overlay.closing {
+    animation: overlay-out 160ms ease both;
+  }
+
   .settings-panel {
     @apply grid w-full max-w-[420px] grid-cols-1 gap-2.5 rounded-[26px] p-4;
     box-shadow: 0 26px 90px rgba(0, 0, 0, 0.28);
     animation: settings-in 240ms var(--ease-spring) both;
   }
 
+  .model-editor-panel {
+    @apply grid w-full max-w-[460px] grid-cols-1 gap-3 rounded-[26px] border p-4;
+    max-height: min(720px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 36px));
+    overflow: hidden;
+    border-color: var(--line);
+    background: var(--paper);
+    box-shadow: 0 28px 96px rgba(0, 0, 0, 0.32);
+    animation: settings-in 260ms var(--ease-spring) both;
+  }
+
   .settings-overlay.closing .settings-panel {
+    animation: settings-out 160ms ease both;
+  }
+
+  .model-editor-overlay.closing .model-editor-panel {
     animation: settings-out 160ms ease both;
   }
 
@@ -278,6 +306,10 @@
     @apply gap-1.5;
   }
 
+  .setting-field-head {
+    @apply flex items-center justify-between gap-2;
+  }
+
   .setting-field span,
   .input-wrap span,
   .section-label,
@@ -308,8 +340,104 @@
     filter: brightness(0.97) saturate(1.04);
   }
 
+  .model-list-toggle {
+    @apply min-h-0 rounded-xl px-2 py-1 text-[0.72rem] font-black;
+    color: var(--leaf);
+    background: color-mix(in srgb, var(--leaf) 10%, transparent);
+  }
+
+  .model-list-editor {
+    @apply grid gap-2.5 rounded-[18px] border p-3;
+    border-color: color-mix(in srgb, var(--leaf) 22%, var(--line));
+    background: color-mix(in srgb, var(--leaf) 6%, transparent);
+  }
+
+  .model-list-editor textarea {
+    @apply w-full rounded-2xl border px-3 py-2 text-[0.9rem] leading-snug outline-none;
+    min-height: 112px;
+    max-height: 180px;
+    resize: vertical;
+    color: var(--ink);
+    background: var(--paper);
+    border-color: var(--line);
+    caret-color: var(--accent-deep);
+  }
+
+  .model-editor-list-wrap {
+    @apply grid gap-2;
+    min-height: 0;
+  }
+
+  .model-items-list {
+    @apply grid gap-2;
+    max-height: min(360px, 46dvh);
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .model-item-row {
+    @apply grid items-center gap-2 rounded-[16px] border p-2;
+    grid-template-columns: minmax(0, 1fr) 40px;
+    border-color: var(--line);
+    background: color-mix(in srgb, var(--field) 76%, transparent);
+  }
+
+  .model-item-input,
+  .model-add-row input {
+    @apply min-h-10 w-full rounded-[12px] border px-3 text-[0.86rem] outline-none;
+    min-width: 0;
+    border-color: var(--line);
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  .model-item-delete {
+    @apply grid h-10 min-h-10 w-10 min-w-10 place-items-center rounded-[12px];
+    color: var(--accent-deep);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .model-item-delete svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .model-add-row {
+    @apply grid gap-2;
+    grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+  }
+
+  .model-add-row button {
+    @apply min-h-10 rounded-[14px] px-3 text-[0.86rem] font-black;
+    color: var(--leaf);
+    background: color-mix(in srgb, var(--leaf) 12%, transparent);
+  }
+
+  .model-list-tools {
+    @apply grid grid-cols-2 gap-2;
+  }
+
+  .model-list-tools button {
+    @apply min-h-10 rounded-[14px] px-3 text-[0.86rem] font-black;
+    color: var(--leaf);
+    background: color-mix(in srgb, var(--leaf) 12%, transparent);
+  }
+
+  .model-list-tools button:last-child {
+    color: var(--accent-deep);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
   .setting-field select:focus,
   .setting-field input:focus,
+  .model-list-editor textarea:focus,
+  .model-item-input:focus,
+  .model-add-row input:focus,
   textarea:focus {
     box-shadow: 0 0 0 4px var(--glow);
   }
@@ -599,7 +727,8 @@
 
   .provider-badge[data-provider="openrouter"],
   .provider-badge[data-provider="dashscope"],
-  .provider-badge[data-provider="gemini"] {
+  .provider-badge[data-provider="gemini"],
+  .provider-badge[data-provider="deepseek"] {
     color: var(--accent-deep);
     border-color: color-mix(in srgb, var(--accent-deep) 22%, var(--line));
     background: color-mix(in srgb, var(--accent) 9%, transparent);
@@ -840,6 +969,28 @@
     font-size: clamp(1.12rem, 4vw, 1.55rem);
   }
 
+  .compact-line ruby {
+    ruby-align: center;
+  }
+
+  .compact-line rt {
+    color: var(--muted);
+    font-size: 0.54em;
+    font-weight: 700;
+  }
+
+  .keyword-pronunciation {
+    @apply inline-grid align-baseline;
+    gap: 1px;
+  }
+
+  .keyword-pronunciation small {
+    color: var(--muted);
+    font-size: 0.58em;
+    font-weight: 800;
+    line-height: 1;
+  }
+
   .compact-line span {
     @apply mt-1 block leading-relaxed;
     color: var(--muted);
@@ -913,11 +1064,42 @@
   }
 
   .history-item {
-    @apply w-full text-left;
+    @apply grid w-full items-center gap-2 text-left;
+    grid-template-columns: minmax(0, 1fr) 40px;
+  }
+
+  .history-open-button {
+    min-width: 0;
+    min-height: 56px;
+    text-align: left;
+    background: transparent;
+    color: inherit;
+    border-radius: 14px;
+  }
+
+  .history-delete-button {
+    @apply grid place-items-center;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 14px;
+    color: var(--accent-deep);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .history-delete-button svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .history-item:hover,
-  .history-item:focus-visible {
+  .history-item:focus-within {
     border-color: color-mix(in srgb, var(--leaf) 28%, var(--line));
     box-shadow: 0 10px 24px color-mix(in srgb, var(--ink) 8%, transparent);
   }
@@ -1388,10 +1570,28 @@
     padding: 11px 12px;
     background: transparent;
     box-shadow: none;
+    grid-template-columns: minmax(0, 1fr) 34px;
+  }
+
+  .history-open-button {
+    min-height: 50px;
+  }
+
+  .history-delete-button {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 12px;
+  }
+
+  .history-delete-button svg {
+    width: 17px;
+    height: 17px;
   }
 
   .history-item:hover,
-  .history-item:focus-visible {
+  .history-item:focus-within {
     background: var(--desktop-field);
   }
 

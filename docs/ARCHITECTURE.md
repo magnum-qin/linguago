@@ -18,6 +18,7 @@ Cloudflare Worker + Assets
             +-- OpenRouter
             +-- Alibaba Cloud Bailian
             +-- Gemini
+            +-- DeepSeek
 ```
 
 ## Frontend
@@ -47,12 +48,15 @@ Main responsibilities:
 
 - Serve static assets through Workers Assets.
 - Handle `/api/translate`.
+- Handle `/api/translate-stream` for progressive NDJSON responses.
+- Handle `/api/models` for the backend model catalog.
 - Handle backend settings through `/api/settings`.
 - Report lightweight runtime status through `/api/health`.
 - Proxy dictionary stats through `/api/dictionary/stats`.
 - Cache translation responses in KV.
 - Route requests to the configured model provider.
 - Convert dictionary hits into the same frontend-compatible shape as model results.
+- Validate model JSON responses before normalizing them for the frontend.
 - Return structured translation errors with `error_code`, plus provider/model context when available.
 
 ## Translation Flow
@@ -90,7 +94,7 @@ The frontend expects a compatible response with these high-level fields:
 - `word_details`: language-keyed definitions for word mode.
 - `examples`: examples and translations for word mode.
 - `explanations`: language-keyed sentence explanation for sentence mode.
-- `provider`: provider name such as `dictionary`, `openrouter`, `dashscope`, or `gemini`.
+- `provider`: provider name such as `dictionary`, `openrouter`, `dashscope`, `gemini`, or `deepseek`.
 - `cached`: boolean cache indicator.
 
 For sentence mode, the Worker normalizes `explanations` for all four result tabs and keeps `explanation` as a target-language compatibility field. Bump the KV cache version whenever sentence response shape changes so old single-language explanations do not persist.
@@ -99,13 +103,21 @@ For sentence mode, the Worker normalizes `explanations` for all four result tabs
 
 Supported providers are:
 
-- `auto`: DashScope first, then Gemini, then OpenRouter.
+- `auto`: DashScope first, then DeepSeek, then Gemini, then OpenRouter.
 - `openrouter`: OpenRouter chat completions.
 - `dashscope`: Alibaba Cloud Bailian compatible chat completions.
 - `gemini`: Gemini `generateContent`.
+- `deepseek`: DeepSeek OpenAI-compatible chat completions.
 
 The frontend settings modal can save any supported provider/model pair through `/api/settings`.
 Explicit provider selections fail with `PROVIDER_CONFIG_MISSING` when the matching secret is absent.
+The model dropdown is seeded from `GET /api/models`, then users can edit provider-specific model lists locally.
+
+Provider responses use JSON mode where supported:
+
+- DashScope, DeepSeek, and OpenRouter use OpenAI-compatible `response_format: { type: "json_object" }`.
+- Gemini uses `responseMimeType: "application/json"` with a response schema.
+- The Worker validates required fields after parsing. Invalid complete responses are retried once with a JSON repair prompt.
 
 ## Health And Error Shape
 
@@ -114,14 +126,17 @@ Explicit provider selections fail with `PROVIDER_CONFIG_MISSING` when the matchi
 - Worker timestamp and version.
 - KV reachability.
 - Louis dictionary configured/reachable status and stats when reachable.
-- Provider `configured` booleans for OpenRouter, DashScope, and Gemini.
+- Provider `configured` booleans for OpenRouter, DashScope, Gemini, and DeepSeek.
 
 `POST /api/translate` errors use:
 
 - `EMPTY_INPUT`
+- `INPUT_TOO_LONG`
+- `RATE_LIMITED`
 - `PROVIDER_CONFIG_MISSING`
 - `PROVIDER_API_ERROR`
 - `PROVIDER_EMPTY_RESPONSE`
+- `PROVIDER_INVALID_JSON`
 - `TRANSLATION_FAILED`
 
 ## Dictionary Service

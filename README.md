@@ -16,7 +16,7 @@ The app is designed around a simple flow:
 - System-aware theme with manual light/dark/system cycling.
 - Four-language result tabs: English, Brazilian Portuguese, Chinese, and Japanese.
 - Dictionary-first lookup for accepted word entries.
-- Model fallback through OpenRouter, Alibaba Cloud Bailian, Gemini, or automatic routing.
+- Model fallback through OpenRouter, Alibaba Cloud Bailian, Gemini, DeepSeek, or automatic routing.
 - Backend-stored model settings exposed through the settings modal.
 - Cloudflare KV cache for repeated translation results.
 - Structured provider errors and `/api/health` observability for KV, dictionary, and provider configuration.
@@ -38,11 +38,17 @@ The app is designed around a simple flow:
 ## Project Layout
 
 ```text
-public/              PWA shell, frontend logic, generated CSS, service worker, icons
-src/index.ts         Cloudflare Worker API and provider routing
-src/styles.css       Source stylesheet compiled into public/styles.css
-scripts/             Dictionary pipeline, deployment helpers, and Playwright checks
-docs/                Architecture, handoff, decisions, and operation notes
+public/
+  index.html         PWA shell and settings/model editor DOM
+  app.js             Frontend state, streaming translation UI, tabs, history, speech
+  styles.css         Generated CSS; do not edit directly
+  sw.js              App-shell service worker
+  icons/             PWA icons
+src/
+  index.ts           Cloudflare Worker API, provider routing, cache, validation
+  styles.css         Source stylesheet compiled into public/styles.css
+scripts/             Dictionary pipeline, remote helpers, smoke tests, Playwright checks
+docs/                Architecture, handoff, decisions, TODO, dictionary pipeline notes
 wrangler.jsonc       Cloudflare Worker configuration
 ```
 
@@ -93,6 +99,7 @@ Configure these as Cloudflare Worker secrets or variables where applicable:
 - `OPENROUTER_API_KEY`: OpenRouter API key.
 - `DASHSCOPE_API_KEY`: Alibaba Cloud Bailian API key.
 - `GEMINI_API_KEY`: Gemini API key.
+- `DEEPSEEK_API_KEY`: DeepSeek API key. The default model is `deepseek-v4-flash`.
 
 ## Health And Errors
 
@@ -100,17 +107,22 @@ The Worker exposes:
 
 - `GET /api/health`: reports Worker time, KV reachability, dictionary reachability/stats, and provider configuration booleans without exposing secrets.
 - `GET /health`: compatibility alias for the same health payload.
+- `GET /api/models`: returns the backend model catalog used by the settings UI.
+- `POST /api/translate`: one-shot translation response.
+- `POST /api/translate-stream`: NDJSON progressive translation events.
 
 `POST /api/translate` returns structured error responses:
 
 ```json
 {
-  "error": "翻译暂时不可用，请检查 API Key、平台或模型名称。",
+  "error": "OpenRouter API Key is not configured.",
   "error_code": "PROVIDER_CONFIG_MISSING",
   "provider": "openrouter",
-  "model": "qwen/qwen3.6-30b-a3b:free"
+  "model": "qwen/qwen3-next-80b-a3b-instruct:free"
 }
 ```
+
+Model responses are requested in JSON mode where supported, then validated by the Worker before they are normalized for the frontend. Invalid complete responses are retried once with a JSON repair prompt.
 
 ## Useful Checks
 

@@ -29,5 +29,8 @@
     "tailwindcss": "^4.2.4",
     "typescript": "^5.8.3",
     "wrangler": "^4.13.2"
+  },
+  "dependencies": {
+    "pinyin-pro": "^3.28.1"
   }
 }

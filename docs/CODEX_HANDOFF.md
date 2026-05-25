@@ -23,6 +23,7 @@ The UI supports:
 - Clear and translate buttons.
 - Theme button that follows the system by default and cycles system, dark, and light modes.
 - Settings modal for provider/model selection.
+- Editable provider-specific model lists loaded from `/api/models`.
 - Dictionary stats in settings.
 - Provider badge in the result header, including dictionary hits.
 - Result tabs ordered as EN, PT, Chinese, Japanese.
@@ -56,6 +57,8 @@ npm run style:build
 Important routes:
 
 - `/api/translate`: main translation API.
+- `/api/translate-stream`: NDJSON progressive translation API.
+- `/api/models`: backend model catalog for the settings UI.
 - `/api/settings`: reads/saves backend model provider settings.
 - `/api/dictionary/stats`: proxies Louis dictionary stats.
 - `/api/health`: reports Worker, KV, dictionary, and provider configured/reachable status without exposing secrets.
@@ -69,9 +72,10 @@ Translation order:
 5. Sentences go directly to model providers.
 
 Sentence responses should include language-keyed `explanations` for EN, PT-BR, Chinese, and Japanese. The legacy `explanation` field is kept as the selected target-language explanation for compatibility.
+Provider JSON is validated in the Worker before normalization. Invalid complete responses retry once with a repair prompt; preview responses fail softly so first paint stays fast.
 
-Supported providers are `auto`, `openrouter`, `dashscope`, and `gemini`.
-`auto` currently tries DashScope, then Gemini, then OpenRouter.
+Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepseek`.
+`auto` currently tries DashScope, then DeepSeek, then Gemini, then OpenRouter.
 Explicit provider selection returns a structured `PROVIDER_CONFIG_MISSING` error if its secret is absent.
 
 ## Frontend Constraints
@@ -168,6 +172,7 @@ Last checked on 2026-05-18:
 - Do not expose `DICTIONARY_API_TOKEN` to the browser.
 - Do not expose provider API keys through `/api/health`; use booleans only.
 - Do not assume frontend settings are enough; model settings can be stored in the backend.
+- Do not bypass provider JSON validation when adding a new model provider.
 - Do not let `openrouter` silently normalize to `auto`.
 - Do not reintroduce `button:active { transform: scale(...) }`.
 - Do not let bilingual labels wrap inside fixed-size buttons.

@@ -19,10 +19,13 @@ const buttonState = await page.evaluate(() => ({
   hasSave: Boolean(document.querySelector("#saveModelButton")),
   hasVerify: Boolean(document.querySelector("#verifyModelButton")),
   saveText: document.querySelector("#saveModelButton")?.textContent,
-  verifyText: document.querySelector("#verifyModelButton")?.textContent
+  verifyText: document.querySelector("#verifyModelButton")?.textContent,
+  hasModelSelect: Boolean(document.querySelector("#modelSelect")),
+  hasEditModelList: Boolean(document.querySelector("#editModelListButton"))
 }));
 
-await page.locator("#modelInput").fill("qwen3.6-flash-2026-04-16");
+await page.locator("#providerSelect").selectOption("dashscope");
+await page.locator("#modelSelect").selectOption("qwen3.6-flash");
 await page.locator("#saveModelButton").click();
 const savedStatus = await page.locator("#modelStatus").innerText();
 await page.locator("#verifyModelButton").click();

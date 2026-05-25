@@ -1,22 +1,28 @@
+import { pinyin } from "pinyin-pro";
+
 interface Env {
   ASSETS: Fetcher;
   CACHE: KVNamespace;
   OPENROUTER_API_KEY?: string;
   DASHSCOPE_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  DEEPSEEK_API_KEY?: string;
   DICTIONARY_API_URL?: string;
   DICTIONARY_API_TOKEN?: string;
 }
 
 type LanguageCode = "en" | "zh" | "pt-BR" | "ja";
 type DisplayLanguageCode = LanguageCode;
-type Provider = "auto" | "openrouter" | "dashscope" | "gemini";
+type Provider = "auto" | "openrouter" | "dashscope" | "gemini" | "deepseek";
 type ResponseProvider = Exclude<Provider, "auto"> | "dictionary";
 type ErrorCode =
   | "EMPTY_INPUT"
+  | "INPUT_TOO_LONG"
+  | "RATE_LIMITED"
   | "PROVIDER_CONFIG_MISSING"
   | "PROVIDER_API_ERROR"
   | "PROVIDER_EMPTY_RESPONSE"
+  | "PROVIDER_INVALID_JSON"
   | "TRANSLATION_FAILED";
 
 interface LocalizedText {
@@ -90,16 +96,196 @@ const CORS_HEADERS = {
 };
 
 const MESSAGES = {
-  emptyInput: "请输入要翻译的内容。",
-  serviceUnavailable: "翻译暂时不可用，请检查 API Key、平台或模型名称。"
+  emptyInput: "\u8bf7\u8f93\u5165\u8981\u7ffb\u8bd1\u7684\u5185\u5bb9\u3002",
+  inputTooLong: "\u8f93\u5165\u8fc7\u957f\uff0c\u8bf7\u63a7\u5236\u5728 1200 \u4e2a\u5b57\u7b26\u4ee5\u5185\u3002",
+  rateLimited: "\u8bf7\u6c42\u8fc7\u4e8e\u9891\u7e41\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002",
+  serviceUnavailable: "\u7ffb\u8bd1\u6682\u65f6\u4e0d\u53ef\u7528\uff0c\u8bf7\u68c0\u67e5 API Key\u3001\u5e73\u53f0\u6216\u6a21\u578b\u540d\u79f0\u3002"
 };
 
 const DEFAULT_MODELS: Record<Provider, string> = {
-  auto: "qwen3.6-flash-2026-04-16",
-  openrouter: "qwen/qwen3.6-30b-a3b:free",
-  dashscope: "qwen3.6-flash-2026-04-16",
-  gemini: "gemini-2.5-flash"
+  auto: "qwen3.6-flash",
+  openrouter: "qwen/qwen3-next-80b-a3b-instruct:free",
+  dashscope: "qwen3.6-flash",
+  gemini: "gemini-2.5-flash",
+  deepseek: "deepseek-v4-flash"
 };
+
+const MODEL_OPTIONS_VERSION = 5;
+const EDITABLE_PROVIDERS: Exclude<Provider, "auto">[] = [
+  "openrouter",
+  "dashscope",
+  "gemini",
+  "deepseek"
+];
+const MODEL_OPTIONS: Record<Provider, string[]> = {
+  auto: ["qwen3.6-flash"],
+  openrouter: [
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "openrouter/free",
+    "openrouter/owl-alpha",
+    "deepseek/deepseek-v4-flash:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "minimax/minimax-m2.5:free",
+    "z-ai/glm-4.5-air:free",
+    "qwen/qwen3-coder:free",
+    "openai/gpt-oss-120b:free",
+    "openai/gpt-oss-20b:free",
+    "baidu/cobuddy:free",
+    "arcee-ai/trinity-large-thinking:free",
+    "poolside/laguna-m.1:free",
+    "poolside/laguna-xs.2:free",
+    "liquid/lfm-2.5-1.2b-thinking:free",
+    "liquid/lfm-2.5-1.2b-instruct:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+  ],
+  dashscope: [
+    "qwen3.6-flash",
+    "qwen3.6-35b-a3b",
+    "glm-5.1",
+    "qwen3.6-plus-2026-04-02",
+    "qwen3.6-plus",
+    "qwen3.5-plus-2026-04-20",
+    "qwen3.6-max-preview",
+    "qwen3.7-max",
+    "kimi-k2.6",
+    "qwen3.7-max-2026-05-20",
+    "qwen-flash-character-2026-02-26",
+    "deepseek-v4-pro",
+    "qwen3.6-27b",
+    "gui-plus-2026-02-26",
+    "deepseek-v4-flash"
+  ],
+  gemini: [
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-pro-preview",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro"
+  ],
+  deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"]
+};
+
+const TRANSLATION_CACHE_VERSION = "v32";
+const PREVIEW_TIMEOUT_MS = 10_000;
+const FULL_TRANSLATION_TIMEOUT_MS = 30_000;
+const MAX_INPUT_CHARS = 1200;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+const RATE_LIMIT_MAX_REQUESTS = 30;
+const FULL_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    type: { type: "string", enum: ["word", "sentence"] },
+    detected_source_lang: { type: "string" },
+    translation: { type: "string" },
+    translations: {
+      type: "object",
+      properties: {
+        zh: {
+          type: "object",
+          properties: { text: { type: "string" } },
+          required: ["text"]
+        },
+        en: {
+          type: "object",
+          properties: { text: { type: "string" } },
+          required: ["text"]
+        },
+        "pt-BR": {
+          type: "object",
+          properties: { text: { type: "string" } },
+          required: ["text"]
+        },
+        ja: {
+          type: "object",
+          properties: { text: { type: "string" } },
+          required: ["text"]
+        }
+      },
+      required: ["zh", "en", "pt-BR", "ja"]
+    },
+    explanations: {
+      type: "object",
+      properties: {
+        zh: { type: "string" },
+        en: { type: "string" },
+        "pt-BR": { type: "string" },
+        ja: { type: "string" }
+      }
+    },
+    word_details: {
+      type: "object",
+      properties: {
+        zh: {
+          type: "object",
+          properties: {
+            word: { type: "string" },
+            definition: { type: "string" }
+          }
+        },
+        en: {
+          type: "object",
+          properties: {
+            word: { type: "string" },
+            definition: { type: "string" }
+          }
+        },
+        "pt-BR": {
+          type: "object",
+          properties: {
+            word: { type: "string" },
+            definition: { type: "string" }
+          }
+        },
+        ja: {
+          type: "object",
+          properties: {
+            word: { type: "string" },
+            definition: { type: "string" }
+          }
+        }
+      }
+    },
+    examples: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          sentence: { type: "string" },
+          translations: {
+            type: "object",
+            properties: {
+              zh: { type: "string" },
+              en: { type: "string" },
+              "pt-BR": { type: "string" },
+              ja: { type: "string" }
+            }
+          }
+        },
+        required: ["sentence", "translations"]
+      }
+    }
+  },
+  required: ["type", "detected_source_lang", "translation", "translations"]
+} as const;
+const PREVIEW_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    type: { type: "string", enum: ["sentence"] },
+    detected_source_lang: { type: "string" },
+    translation: { type: "string" },
+    explanation: { type: "string" }
+  },
+  required: ["type", "detected_source_lang", "translation", "explanation"]
+} as const;
 
 class TranslateError extends Error {
   constructor(
@@ -119,20 +305,18 @@ Return valid JSON only. Never wrap JSON in markdown fences.
 Rules:
 1. Detect whether the input is a single word or a sentence/phrase.
 2. Every response must include translations for zh, en, pt-BR, and ja.
-3. Each translation entry must include text, phonetic, and audio_text.
-4. For Chinese phonetic, provide pinyin. For English, provide IPA or readable pronunciation. For Japanese, provide kana reading. For Brazilian Portuguese, provide a readable Brazilian pronunciation guide.
+3. Each translation entry should include only text. Do not generate phonetic or audio_text fields.
+4. The server will generate pronunciation fields separately.
 5. If it is a single word, return:
 {
   "type": "word",
   "detected_source_lang": "en",
   "translation": "target-language word",
-  "phonetic": "source word pronunciation",
-  "audio_text": "source word",
   "translations": {
-    "zh": {"text": "中文词", "phonetic": "pin yin", "audio_text": "中文词"},
-    "en": {"text": "English word", "phonetic": "/ipa/", "audio_text": "English word"},
-    "pt-BR": {"text": "palavra", "phonetic": "pronunciation", "audio_text": "palavra"},
-    "ja": {"text": "日本語", "phonetic": "かな", "audio_text": "日本語"}
+    "zh": {"text": "中文词"},
+    "en": {"text": "English word"},
+    "pt-BR": {"text": "palavra"},
+    "ja": {"text": "日本語"}
   },
   "word_details": {
     "zh": {"word": "中文词", "definition": "中文解释"},
@@ -157,18 +341,18 @@ Rules:
   "type": "sentence",
   "detected_source_lang": "en",
   "translation": "target-language translation",
-  "explanation": "A concise explanation in the requested target language.",
+  "explanation": "Write a real explanation for the input sentence in the requested target language.",
   "explanations": {
     "zh": "简体中文解释含义、语气和用法。不要使用日语假名。",
-    "en": "English explanation of meaning, tone, and usage.",
+    "en": "Real English explanation for this exact sentence.",
     "pt-BR": "Explicação em português do Brasil sobre significado, tom e uso.",
     "ja": "意味、ニュアンス、使い方の日本語説明。"
   },
   "translations": {
-    "zh": {"text": "中文翻译", "phonetic": "pinyin for the whole sentence", "audio_text": "中文翻译"},
-    "en": {"text": "English translation", "phonetic": "IPA or readable pronunciation", "audio_text": "English translation"},
-    "pt-BR": {"text": "Brazilian Portuguese translation", "phonetic": "Brazilian pronunciation guide", "audio_text": "Brazilian Portuguese translation"},
-    "ja": {"text": "Japanese translation", "phonetic": "kana reading", "audio_text": "Japanese translation"}
+    "zh": {"text": "中文翻译"},
+    "en": {"text": "English translation"},
+    "pt-BR": {"text": "Brazilian Portuguese translation"},
+    "ja": {"text": "Japanese translation"}
   }
 }
 7. The language-keyed fields must be written in their own language:
@@ -176,7 +360,86 @@ Rules:
 - en must be English only.
 - pt-BR must be Brazilian Portuguese only.
 - ja must be Japanese only.
-8. Preserve the requested target language exactly and keep all text natural and concise.`;
+8. Preserve the requested target language exactly and keep all text natural and concise.
+9. Never copy placeholder wording such as "English explanation of meaning, tone, and usage" or "Real English explanation for this exact sentence".`;
+
+const PREVIEW_SYSTEM_PROMPT = `You are a fast translation preview engine.
+Return valid JSON only. Never wrap JSON in markdown fences.
+
+Return only this compact shape:
+{
+  "type": "sentence",
+  "detected_source_lang": "en",
+  "translation": "natural translation in the requested target language",
+  "explanation": "one concise explanation in the requested target language"
+}
+
+Keep the translation natural and concise. Do not include other languages, phonetics, examples, or markdown.`;
+
+const ACTIVE_SYSTEM_PROMPT = `You are a translation engine for a mobile PWA.
+Return valid JSON only. Never wrap JSON in markdown fences.
+
+Rules:
+1. Detect whether the input is a single word or a sentence/phrase.
+2. Always provide translations for zh, en, pt-BR, and ja.
+3. Translation entries must include only "text". Do not generate phonetic or audio_text fields.
+4. The server will generate pronunciation fields separately.
+5. Language-keyed fields must be written in their own language:
+- zh: Simplified Chinese only. Do not use Japanese kana or Portuguese.
+- en: English only.
+- pt-BR: Brazilian Portuguese only.
+- ja: Japanese only.
+6. Explanations must be specific to the actual input text. Never copy placeholder wording from this prompt.
+
+For a single word, return:
+{
+  "type": "word",
+  "detected_source_lang": "en",
+  "translation": "<target-language word>",
+  "translations": {
+    "zh": {"text": "<Simplified Chinese word>"},
+    "en": {"text": "<English word>"},
+    "pt-BR": {"text": "<Brazilian Portuguese word>"},
+    "ja": {"text": "<Japanese word>"}
+  },
+  "word_details": {
+    "zh": {"word": "<Simplified Chinese word>", "definition": "<Simplified Chinese definition>"},
+    "en": {"word": "<English word>", "definition": "<English definition>"},
+    "pt-BR": {"word": "<Brazilian Portuguese word>", "definition": "<Brazilian Portuguese definition>"},
+    "ja": {"word": "<Japanese word>", "definition": "<Japanese definition>"}
+  },
+  "examples": [
+    {
+      "sentence": "<short source-language example sentence>",
+      "translations": {
+        "zh": "<Simplified Chinese example translation>",
+        "en": "<English example translation>",
+        "pt-BR": "<Brazilian Portuguese example translation>",
+        "ja": "<Japanese example translation>"
+      }
+    }
+  ]
+}
+
+For a sentence or phrase, return:
+{
+  "type": "sentence",
+  "detected_source_lang": "en",
+  "translation": "<target-language translation>",
+  "explanation": "<real explanation in the requested target language>",
+  "explanations": {
+    "zh": "<real Simplified Chinese explanation for this exact sentence>",
+    "en": "<real English explanation for this exact sentence>",
+    "pt-BR": "<real Brazilian Portuguese explanation for this exact sentence>",
+    "ja": "<real Japanese explanation for this exact sentence>"
+  },
+  "translations": {
+    "zh": {"text": "<Simplified Chinese translation>"},
+    "en": {"text": "<English translation>"},
+    "pt-BR": {"text": "<Brazilian Portuguese translation>"},
+    "ja": {"text": "<Japanese translation>"}
+  }
+}`;
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -188,6 +451,14 @@ export default {
 
     if (url.pathname === "/api/translate" && request.method === "POST") {
       return handleTranslate(request, env, ctx);
+    }
+
+    if (url.pathname === "/api/translate-stream" && request.method === "POST") {
+      return handleTranslateStream(request, env, ctx);
+    }
+
+    if (url.pathname === "/api/models" && request.method === "GET") {
+      return handleModels();
     }
 
     if (url.pathname === "/api/settings") {
@@ -229,6 +500,9 @@ async function handleTranslate(
     if (!text) {
       throw new TranslateError("EMPTY_INPUT", MESSAGES.emptyInput, 400);
     }
+
+    validateInputLength(text);
+    await assertRateLimit(request, env);
 
     const dictionaryResponse = await lookupDictionaryFirst({
       env,
@@ -310,6 +584,170 @@ async function handleTranslate(
   }
 }
 
+async function handleTranslateStream(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<Response> {
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: unknown) => {
+        controller.enqueue(encoder.encode(`${JSON.stringify({ event, data })}\n`));
+      };
+
+      try {
+        const body = (await request.json()) as TranslateRequest;
+        const text = normalizeText(body.text ?? "");
+        const targetLang = normalizeTargetLang(body.target_lang);
+        const sourceLang = body.source_lang ?? "auto";
+        const provider = normalizeProvider(body.provider);
+        const requestedModel =
+          typeof body.model === "string" && body.model.trim()
+            ? normalizeModel(body.model, provider)
+            : await getStoredModel(env, provider);
+
+        if (!text) {
+          throw new TranslateError("EMPTY_INPUT", MESSAGES.emptyInput, 400);
+        }
+
+        validateInputLength(text);
+        await assertRateLimit(request, env);
+
+        send("status", { stage: "started" });
+
+        const dictionaryResponse = await lookupDictionaryFirst({
+          env,
+          text,
+          targetLang
+        });
+
+        if (dictionaryResponse) {
+          send("final", dictionaryResponse);
+          send("done", { ok: true });
+          controller.close();
+          return;
+        }
+
+        const selected = selectProvider(env, provider, requestedModel);
+        const cacheKey = await buildCacheKey(
+          text,
+          sourceLang,
+          targetLang,
+          selected.provider,
+          selected.model
+        );
+        const cached = await env.CACHE.get<TranslateResponse>(cacheKey, "json");
+
+        if (cached) {
+          send("final", { ...cached, cached: true });
+          send("done", { ok: true });
+          controller.close();
+          return;
+        }
+
+        try {
+          send("status", { stage: "preview" });
+          const preview = await translateWithProvider({
+            text,
+            sourceLang,
+            targetLang,
+            provider: selected.provider,
+            model: selected.model,
+            apiKey: selected.apiKey,
+            systemPrompt: PREVIEW_SYSTEM_PROMPT,
+            prompt: buildUserPrompt(text, sourceLang, targetLang)
+          });
+          send(
+            "partial",
+            normalizePreviewResponse({
+              translated: preview,
+              text,
+              targetLang,
+              provider: selected.provider,
+              model: selected.model
+            })
+          );
+        } catch (error) {
+          console.warn(
+            JSON.stringify({
+              level: "warn",
+              message: "translate_preview_failed",
+              provider: selected.provider,
+              model: selected.model,
+              error: error instanceof Error ? error.message : String(error)
+            })
+          );
+        }
+
+        send("status", { stage: "full" });
+        const translated = await translateWithProvider({
+          text,
+          sourceLang,
+          targetLang,
+          provider: selected.provider,
+          model: selected.model,
+          apiKey: selected.apiKey
+        });
+
+        const normalizedResponse = normalizeResponse({
+          translated,
+          text,
+          targetLang,
+          provider: selected.provider,
+          model: selected.model
+        });
+
+        ctx.waitUntil(
+          env.CACHE.put(cacheKey, JSON.stringify(normalizedResponse), {
+            expirationTtl: 60 * 60 * 24 * 30
+          })
+        );
+
+        send("final", normalizedResponse);
+        send("done", { ok: true });
+        controller.close();
+      } catch (error) {
+        const translateError =
+          error instanceof TranslateError
+            ? error
+            : new TranslateError(
+                "TRANSLATION_FAILED",
+                MESSAGES.serviceUnavailable,
+                500
+              );
+        console.error(
+          JSON.stringify({
+            level: "error",
+            message: "translate_stream_failed",
+            error_code: translateError.code,
+            provider: translateError.provider,
+            model: translateError.model,
+            error: error instanceof Error ? error.message : String(error)
+          })
+        );
+        send("error", {
+          error: translateError.message,
+          error_code: translateError.code,
+          ...(translateError.provider ? { provider: translateError.provider } : {}),
+          ...(translateError.model ? { model: translateError.model } : {})
+        });
+        controller.close();
+      }
+    }
+  });
+
+  return new Response(stream, {
+    headers: {
+      ...CORS_HEADERS,
+      "content-type": "application/x-ndjson; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
+
 async function handleHealth(env: Env): Promise<Response> {
   const dictionary = {
     configured: Boolean(env.DICTIONARY_API_URL && env.DICTIONARY_API_TOKEN),
@@ -343,7 +781,8 @@ async function handleHealth(env: Env): Promise<Response> {
     providers: {
       openrouter: { configured: Boolean(env.OPENROUTER_API_KEY) },
       dashscope: { configured: Boolean(env.DASHSCOPE_API_KEY) },
-      gemini: { configured: Boolean(env.GEMINI_API_KEY) }
+      gemini: { configured: Boolean(env.GEMINI_API_KEY) },
+      deepseek: { configured: Boolean(env.DEEPSEEK_API_KEY) }
     }
   });
 }
@@ -366,6 +805,67 @@ async function handleDictionaryStats(env: Env, debug = false): Promise<Response>
         : {})
     });
   }
+}
+
+function handleModels(): Response {
+  return json({
+    version: MODEL_OPTIONS_VERSION,
+    providers: ["auto", ...EDITABLE_PROVIDERS],
+    editableProviders: EDITABLE_PROVIDERS,
+    defaults: DEFAULT_MODELS,
+    options: MODEL_OPTIONS
+  });
+}
+
+function validateInputLength(text: string) {
+  if (text.length > MAX_INPUT_CHARS) {
+    throw new TranslateError("INPUT_TOO_LONG", MESSAGES.inputTooLong, 413);
+  }
+}
+
+async function assertRateLimit(request: Request, env: Env): Promise<void> {
+  try {
+    const clientId = await getRateLimitClientId(request);
+    const bucket = Math.floor(Date.now() / (RATE_LIMIT_WINDOW_SECONDS * 1000));
+    const key = `rate:${bucket}:${clientId}`;
+    const current = Number((await env.CACHE.get(key)) || "0");
+
+    if (current >= RATE_LIMIT_MAX_REQUESTS) {
+      throw new TranslateError("RATE_LIMITED", MESSAGES.rateLimited, 429);
+    }
+
+    await env.CACHE.put(key, String(current + 1), {
+      expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2
+    });
+  } catch (error) {
+    if (error instanceof TranslateError) {
+      throw error;
+    }
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        message: "rate_limit_unavailable",
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+  }
+}
+
+async function getRateLimitClientId(request: Request): Promise<string> {
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const raw =
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("true-client-ip") ||
+    forwardedFor ||
+    "anonymous";
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(raw)
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 24);
 }
 
 async function handleSettings(request: Request, env: Env): Promise<Response> {
@@ -464,11 +964,36 @@ function selectProvider(
     };
   }
 
+  if (requestedProvider === "deepseek") {
+    if (!env.DEEPSEEK_API_KEY) {
+      throw new TranslateError(
+        "PROVIDER_CONFIG_MISSING",
+        "DeepSeek API Key is not configured.",
+        500,
+        "deepseek",
+        requestedModel || DEFAULT_MODELS.deepseek
+      );
+    }
+    return {
+      provider: "deepseek",
+      model: requestedModel || DEFAULT_MODELS.deepseek,
+      apiKey: env.DEEPSEEK_API_KEY
+    };
+  }
+
   if (env.DASHSCOPE_API_KEY) {
     return {
       provider: "dashscope",
       model: selectModelForProvider(requestedProvider, "dashscope", requestedModel),
       apiKey: env.DASHSCOPE_API_KEY
+    };
+  }
+
+  if (env.DEEPSEEK_API_KEY) {
+    return {
+      provider: "deepseek",
+      model: selectModelForProvider(requestedProvider, "deepseek", requestedModel),
+      apiKey: env.DEEPSEEK_API_KEY
     };
   }
 
@@ -511,6 +1036,12 @@ function selectModelForProvider(
   return requestedModel;
 }
 
+function modelRequestTimeout(systemPrompt?: string): number {
+  return systemPrompt === PREVIEW_SYSTEM_PROMPT
+    ? PREVIEW_TIMEOUT_MS
+    : FULL_TRANSLATION_TIMEOUT_MS;
+}
+
 function normalizeResponse(input: {
   translated: Record<string, unknown>;
   text: string;
@@ -536,8 +1067,11 @@ function normalizeResponse(input: {
     return {
       ...base,
       type,
-      phonetic: String(input.translated.phonetic ?? ""),
-      audio_text: String(input.translated.audio_text ?? input.text),
+      phonetic: buildLocalPhonetic(
+        normalizeTargetLang(String(input.translated.detected_source_lang || "")),
+        input.text
+      ),
+      audio_text: input.text,
       examples: normalizeExamples(input.translated.examples),
       word_details: normalizeWordDetails(input.translated.word_details)
     };
@@ -549,6 +1083,51 @@ function normalizeResponse(input: {
     explanation: selectTargetExplanation(input.translated, input.targetLang),
     explanations: normalizeSentenceExplanations(input.translated, input.targetLang)
   };
+}
+
+function normalizePreviewResponse(input: {
+  translated: Record<string, unknown>;
+  text: string;
+  targetLang: LanguageCode;
+  provider: ResponseProvider;
+  model: string;
+}): SentenceResponse {
+  const translation =
+    normalizeStringOrText(input.translated.translation) ||
+    normalizeStringOrText(input.translated.translations);
+  const explanation =
+    normalizeStringOrText(input.translated.explanation) ||
+    normalizeStringOrText(input.translated.explanations);
+
+  return {
+    type: "sentence",
+    detected_source_lang: String(input.translated.detected_source_lang ?? "auto"),
+    target_lang: input.targetLang,
+    original: input.text,
+    translation,
+    translations: {
+      zh: emptyLocalizedText(),
+      en: emptyLocalizedText(),
+      "pt-BR": emptyLocalizedText(),
+      ja: emptyLocalizedText(),
+      [input.targetLang]: localPronunciationText(input.targetLang, translation)
+    },
+    explanation,
+    explanations: {
+      zh: "",
+      en: "",
+      "pt-BR": "",
+      ja: "",
+      [input.targetLang]: explanation
+    },
+    provider: input.provider,
+    model: input.model,
+    cached: false
+  };
+}
+
+function emptyLocalizedText(): LocalizedText {
+  return { text: "", phonetic: "", audio_text: "" };
 }
 
 function selectTargetExplanation(
@@ -563,7 +1142,7 @@ function selectTargetExplanation(
   const fallback =
     normalizeStringOrText(translated.explanation) ||
     normalizeStringOrText(translated.sentence_explanation);
-  return isExpectedExplanationLanguage(targetLang, fallback) ? fallback : "";
+  return isUsableExplanation(targetLang, fallback) ? fallback : "";
 }
 
 function normalizeSentenceExplanations(
@@ -599,13 +1178,52 @@ function normalizeSentenceExplanations(
   }
 
   return {
-    zh: isExpectedExplanationLanguage("zh", normalized.zh) ? normalized.zh : "",
-    en: isExpectedExplanationLanguage("en", normalized.en) ? normalized.en : "",
-    "pt-BR": isExpectedExplanationLanguage("pt-BR", normalized["pt-BR"])
+    zh: isUsableExplanation("zh", normalized.zh) ? normalized.zh : fallbackExplanation("zh", translated),
+    en: isUsableExplanation("en", normalized.en) ? normalized.en : fallbackExplanation("en", translated),
+    "pt-BR": isUsableExplanation("pt-BR", normalized["pt-BR"])
       ? normalized["pt-BR"]
-      : "",
-    ja: isExpectedExplanationLanguage("ja", normalized.ja) ? normalized.ja : ""
+      : fallbackExplanation("pt-BR", translated),
+    ja: isUsableExplanation("ja", normalized.ja) ? normalized.ja : fallbackExplanation("ja", translated)
   };
+}
+
+function isUsableExplanation(lang: LanguageCode, text: string): boolean {
+  return isExpectedExplanationLanguage(lang, text) && !isPlaceholderExplanation(text);
+}
+
+function isPlaceholderExplanation(text: string): boolean {
+  const value = text.trim().toLocaleLowerCase();
+  if (!value) return false;
+  return [
+    "english explanation of meaning",
+    "meaning, tone, and usage",
+    "real english explanation for this exact sentence",
+    "real simplified chinese explanation",
+    "real brazilian portuguese explanation",
+    "real japanese explanation",
+    "a concise explanation in the requested target language",
+    "explicação em português do brasil sobre significado",
+    "explicacao em portugues do brasil sobre significado",
+    "简体中文解释含义",
+    "解释含义、语气和用法",
+    "不要使用日语假名"
+  ].some((placeholder) => value.includes(placeholder));
+}
+
+function fallbackExplanation(lang: LanguageCode, translated: Record<string, unknown>): string {
+  const translation = normalizeStringOrText(translated.translation);
+  if (!translation) return "";
+
+  if (lang === "zh") {
+    return `这句话的意思是：${translation}`;
+  }
+  if (lang === "ja") {
+    return `この文の意味は「${translation}」です。`;
+  }
+  if (lang === "pt-BR") {
+    return `A frase significa: ${translation}`;
+  }
+  return `The sentence means: ${translation}`;
 }
 
 function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolean {
@@ -623,6 +1241,10 @@ function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolea
   return true;
 }
 
+function isPreviewPrompt(systemPrompt?: string): boolean {
+  return systemPrompt === PREVIEW_SYSTEM_PROMPT;
+}
+
 async function translateWithProvider(input: {
   text: string;
   sourceLang: TranslateRequest["source_lang"];
@@ -630,18 +1252,63 @@ async function translateWithProvider(input: {
   provider: Exclude<Provider, "auto">;
   model: string;
   apiKey: string;
+  prompt?: string;
+  systemPrompt?: string;
 }): Promise<Record<string, unknown>> {
-  const prompt = buildUserPrompt(input.text, input.sourceLang, input.targetLang);
+  const prompt = input.prompt || buildUserPrompt(input.text, input.sourceLang, input.targetLang);
+  const request = { ...input, prompt };
 
+  try {
+    return await callProvider(request);
+  } catch (error) {
+    if (
+      !(error instanceof TranslateError) ||
+      error.code !== "PROVIDER_INVALID_JSON" ||
+      isPreviewPrompt(input.systemPrompt)
+    ) {
+      throw error;
+    }
+
+    return callProvider({
+      ...request,
+      prompt: buildJsonRepairPrompt(prompt, error.message),
+      systemPrompt: ACTIVE_SYSTEM_PROMPT
+    });
+  }
+}
+
+async function callProvider(input: {
+  text: string;
+  sourceLang: TranslateRequest["source_lang"];
+  targetLang: LanguageCode;
+  provider: Exclude<Provider, "auto">;
+  model: string;
+  apiKey: string;
+  prompt: string;
+  systemPrompt?: string;
+}): Promise<Record<string, unknown>> {
   if (input.provider === "dashscope") {
-    return translateWithDashScope({ ...input, prompt });
+    return translateWithDashScope(input);
   }
 
   if (input.provider === "openrouter") {
-    return translateWithOpenRouter({ ...input, prompt });
+    return translateWithOpenRouter(input);
   }
 
-  return translateWithGemini({ ...input, prompt });
+  if (input.provider === "deepseek") {
+    return translateWithDeepSeek(input);
+  }
+
+  return translateWithGemini(input);
+}
+
+function buildJsonRepairPrompt(originalPrompt: string, error: string): string {
+  return [
+    "The previous response did not match the required JSON schema.",
+    `Validation error: ${error}`,
+    "Return only corrected JSON. Do not include markdown, commentary, or extra text.",
+    originalPrompt
+  ].join("\n\n");
 }
 
 async function lookupDictionaryFirst(input: {
@@ -801,6 +1468,7 @@ async function translateWithDashScope(input: {
   prompt: string;
   model: string;
   apiKey: string;
+  systemPrompt?: string;
 }): Promise<Record<string, unknown>> {
   const provider = "dashscope";
   const response = await fetch(
@@ -814,13 +1482,14 @@ async function translateWithDashScope(input: {
       body: JSON.stringify({
         model: input.model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: input.systemPrompt || ACTIVE_SYSTEM_PROMPT },
           { role: "user", content: input.prompt }
         ],
         response_format: { type: "json_object" },
         temperature: 0.2,
         enable_thinking: false
-      })
+      }),
+      signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
     }
   );
 
@@ -850,13 +1519,14 @@ async function translateWithDashScope(input: {
     );
   }
 
-  return JSON.parse(stripJsonFence(rawText)) as Record<string, unknown>;
+  return parseProviderJson(rawText, provider, input.model, isPreviewPrompt(input.systemPrompt));
 }
 
 async function translateWithOpenRouter(input: {
   prompt: string;
   model: string;
   apiKey: string;
+  systemPrompt?: string;
 }): Promise<Record<string, unknown>> {
   const provider = "openrouter";
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -868,12 +1538,13 @@ async function translateWithOpenRouter(input: {
     body: JSON.stringify({
       model: input.model,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: input.systemPrompt || ACTIVE_SYSTEM_PROMPT },
         { role: "user", content: input.prompt }
       ],
       response_format: { type: "json_object" },
       temperature: 0.2
-    })
+    }),
+    signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
   });
 
   if (!response.ok) {
@@ -902,13 +1573,69 @@ async function translateWithOpenRouter(input: {
     );
   }
 
-  return JSON.parse(stripJsonFence(rawText)) as Record<string, unknown>;
+  return parseProviderJson(rawText, provider, input.model, isPreviewPrompt(input.systemPrompt));
+}
+
+async function translateWithDeepSeek(input: {
+  prompt: string;
+  model: string;
+  apiKey: string;
+  systemPrompt?: string;
+}): Promise<Record<string, unknown>> {
+  const provider = "deepseek";
+  const response = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${input.apiKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: input.model,
+      messages: [
+        { role: "system", content: input.systemPrompt || ACTIVE_SYSTEM_PROMPT },
+        { role: "user", content: input.prompt }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      thinking: { type: "disabled" }
+    }),
+    signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new TranslateError(
+      "PROVIDER_API_ERROR",
+      `DeepSeek API error: ${response.status} ${errorText}`,
+      502,
+      provider,
+      input.model
+    );
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const rawText = payload.choices?.[0]?.message?.content?.trim() ?? "";
+
+  if (!rawText) {
+    throw new TranslateError(
+      "PROVIDER_EMPTY_RESPONSE",
+      "DeepSeek returned empty content.",
+      502,
+      provider,
+      input.model
+    );
+  }
+
+  return parseProviderJson(rawText, provider, input.model, isPreviewPrompt(input.systemPrompt));
 }
 
 async function translateWithGemini(input: {
   prompt: string;
   model: string;
   apiKey: string;
+  systemPrompt?: string;
 }): Promise<Record<string, unknown>> {
   const provider = "gemini";
   const response = await fetch(
@@ -920,7 +1647,7 @@ async function translateWithGemini(input: {
       },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: SYSTEM_PROMPT }]
+          parts: [{ text: input.systemPrompt || ACTIVE_SYSTEM_PROMPT }]
         },
         contents: [
           {
@@ -930,9 +1657,13 @@ async function translateWithGemini(input: {
         ],
         generationConfig: {
           temperature: 0.2,
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          responseSchema: isPreviewPrompt(input.systemPrompt)
+            ? PREVIEW_RESPONSE_SCHEMA
+            : FULL_RESPONSE_SCHEMA
         }
-      })
+      }),
+      signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
     }
   );
 
@@ -967,7 +1698,7 @@ async function translateWithGemini(input: {
     );
   }
 
-  return JSON.parse(stripJsonFence(rawText)) as Record<string, unknown>;
+  return parseProviderJson(rawText, provider, input.model, isPreviewPrompt(input.systemPrompt));
 }
 
 function buildUserPrompt(
@@ -989,7 +1720,7 @@ async function buildCacheKey(
   provider: Exclude<Provider, "auto">,
   model: string
 ): Promise<string> {
-  const normalized = `v31::${provider}::${model}::${text.toLowerCase()}::${sourceLang ?? "auto"}::${targetLang}`;
+  const normalized = `${TRANSLATION_CACHE_VERSION}::${provider}::${model}::${text.toLowerCase()}::${sourceLang ?? "auto"}::${targetLang}`;
   const data = new TextEncoder().encode(normalized);
   const digest = await crypto.subtle.digest("SHA-256", data);
   const bytes = Array.from(new Uint8Array(digest));
@@ -1008,7 +1739,12 @@ function normalizeTargetLang(target?: string): LanguageCode {
 }
 
 function normalizeProvider(provider?: string): Provider {
-  if (provider === "openrouter" || provider === "dashscope" || provider === "gemini") {
+  if (
+    provider === "openrouter" ||
+    provider === "dashscope" ||
+    provider === "gemini" ||
+    provider === "deepseek"
+  ) {
     return provider;
   }
   return "auto";
@@ -1053,27 +1789,48 @@ function normalizeLocalizedTranslations(
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 
   return {
-    zh: normalizeLocalizedText(translations.zh),
-    en: normalizeLocalizedText(translations.en),
-    "pt-BR": normalizeLocalizedText(translations["pt-BR"]),
-    ja: normalizeLocalizedText(translations.ja)
+    zh: normalizeLocalizedText(translations.zh, "zh"),
+    en: normalizeLocalizedText(translations.en, "en"),
+    "pt-BR": normalizeLocalizedText(translations["pt-BR"], "pt-BR"),
+    ja: normalizeLocalizedText(translations.ja, "ja")
   };
 }
 
-function normalizeLocalizedText(value: unknown): LocalizedText {
+function normalizeLocalizedText(value: unknown, lang: DisplayLanguageCode): LocalizedText {
   if (typeof value === "string") {
-    return { text: value, phonetic: "", audio_text: value };
+    return localPronunciationText(lang, value);
   }
 
   const item =
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const text = normalizeStringOrText(item.text);
 
+  return localPronunciationText(lang, text);
+}
+
+function localPronunciationText(lang: DisplayLanguageCode, text: string): LocalizedText {
+  const normalized = normalizeText(text);
   return {
-    text,
-    phonetic: String(item.phonetic ?? ""),
-    audio_text: normalizeStringOrText(item.audio_text) || text
+    text: normalized,
+    phonetic: buildLocalPhonetic(lang, normalized),
+    audio_text: normalized
   };
+}
+
+function buildLocalPhonetic(lang: DisplayLanguageCode, text: string): string {
+  if (!text) return "";
+  if (lang !== "zh" || !/[\u4e00-\u9fff]/u.test(text)) {
+    return "";
+  }
+
+  try {
+    return pinyin(text, {
+      toneType: "symbol",
+      nonZh: "consecutive"
+    });
+  } catch {
+    return "";
+  }
 }
 
 function normalizeWordDetails(value: unknown): Record<DisplayLanguageCode, WordDetail> {
@@ -1107,6 +1864,113 @@ function normalizeStringOrText(value: unknown): string {
     return String(item.text ?? item.translation ?? "");
   }
   return String(value);
+}
+
+function parseProviderJson(
+  rawText: string,
+  provider: ResponseProvider,
+  model: string,
+  preview: boolean
+): Record<string, unknown> {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(stripJsonFence(rawText));
+  } catch (error) {
+    throw new TranslateError(
+      "PROVIDER_INVALID_JSON",
+      `Provider returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      502,
+      provider,
+      model
+    );
+  }
+
+  const errors = validateProviderPayload(payload, preview);
+  if (errors.length) {
+    throw new TranslateError(
+      "PROVIDER_INVALID_JSON",
+      `Provider JSON failed schema validation: ${errors.join("; ")}`,
+      502,
+      provider,
+      model
+    );
+  }
+
+  return payload as Record<string, unknown>;
+}
+
+function validateProviderPayload(payload: unknown, preview: boolean): string[] {
+  const errors: string[] = [];
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return ["root must be an object"];
+  }
+
+  const item = payload as Record<string, unknown>;
+  const type = normalizeStringOrText(item.type);
+  if (preview) {
+    if (type !== "sentence") errors.push("type must be sentence");
+    requireString(item, "detected_source_lang", errors);
+    requireString(item, "translation", errors);
+    requireString(item, "explanation", errors);
+    return errors;
+  }
+
+  if (type !== "word" && type !== "sentence") {
+    errors.push("type must be word or sentence");
+  }
+  requireString(item, "detected_source_lang", errors);
+  requireString(item, "translation", errors);
+  validateTranslations(item.translations, errors);
+
+  if (type === "sentence") {
+    const explanations =
+      item.explanations && typeof item.explanations === "object"
+        ? (item.explanations as Record<string, unknown>)
+        : null;
+    if (!explanations && !normalizeStringOrText(item.explanation)) {
+      errors.push("sentence requires explanations or explanation");
+    }
+  }
+
+  if (type === "word") {
+    const details =
+      item.word_details && typeof item.word_details === "object"
+        ? (item.word_details as Record<string, unknown>)
+        : null;
+    if (!details) {
+      errors.push("word requires word_details");
+    }
+  }
+
+  return errors;
+}
+
+function validateTranslations(value: unknown, errors: string[]) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    errors.push("translations must be an object");
+    return;
+  }
+
+  const translations = value as Record<string, unknown>;
+  for (const lang of ["zh", "en", "pt-BR", "ja"]) {
+    const translation = translations[lang];
+    if (!translation || typeof translation !== "object" || Array.isArray(translation)) {
+      errors.push(`translations.${lang} must be an object`);
+      continue;
+    }
+    requireString(translation as Record<string, unknown>, "text", errors, `translations.${lang}`);
+  }
+}
+
+function requireString(
+  item: Record<string, unknown>,
+  key: string,
+  errors: string[],
+  prefix?: string
+) {
+  if (!normalizeStringOrText(item[key])) {
+    errors.push(`${prefix ? `${prefix}.` : ""}${key} must be a non-empty string`);
+  }
 }
 
 function stripJsonFence(text: string): string {

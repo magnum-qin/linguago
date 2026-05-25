@@ -20,9 +20,11 @@
         try {
           const settings = JSON.parse(localStorage.getItem("linguago-settings-v1") || "{}");
           const themeSettingsVersion = 2;
-          const preference = settings.themeSettingsVersion === themeSettingsVersion && ["light", "dark", "system"].includes(settings.theme)
-            ? settings.theme
-            : "system";
+          const preference =
+            settings.themeSettingsVersion === themeSettingsVersion &&
+            ["light", "dark", "system"].includes(settings.theme)
+              ? settings.theme
+              : "system";
           const resolved =
             preference === "system" && matchMedia("(prefers-color-scheme: dark)").matches
               ? "dark"
@@ -47,7 +49,7 @@
     <main class="app-shell">
       <section class="translator-card enter">
         <div class="toolbar">
-          <button id="themeToggleButton" class="toolbar-button theme-action" type="button" aria-label="切换暗黑模式 / Alternar modo escuro">
+          <button id="themeToggleButton" class="toolbar-button theme-action" type="button" aria-label="切换暗色模式 / Alternar modo escuro">
             <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 4V2M12 22v-2M4.93 4.93 3.52 3.52M20.48 20.48l-1.41-1.41M4 12H2M22 12h-2M4.93 19.07l-1.41 1.41M20.48 3.52l-1.41 1.41" />
               <circle cx="12" cy="12" r="4" />
@@ -109,18 +111,51 @@
               <option value="openrouter">OpenRouter</option>
               <option value="dashscope">阿里云百炼 / Alibaba Cloud Bailian</option>
               <option value="gemini">Gemini</option>
+              <option value="deepseek">DeepSeek</option>
             </select>
           </label>
-          <label class="setting-field">
-            <span data-i18n="model">模型名称 / Nome do modelo</span>
-            <input id="modelInput" type="text" autocomplete="off" placeholder="qwen3.6-flash-2026-04-16" />
-          </label>
+          <div class="setting-field">
+            <div class="setting-field-head">
+              <span data-i18n="model">模型名称 / Nome do modelo</span>
+              <button id="editModelListButton" class="model-list-toggle" type="button" data-i18n="editModels">编辑模型 / Editar modelos</button>
+            </div>
+            <select id="modelSelect"></select>
+          </div>
           <div class="model-tools">
             <button id="saveModelButton" type="button" data-i18n="saveModel">修改 / Salvar</button>
             <button id="verifyModelButton" type="button" data-i18n="verifyModel">验证 / Verificar</button>
           </div>
           <p id="modelStatus" class="model-status"></p>
           <p id="dictionaryStats" class="dictionary-stats">词典同步中 / Sincronizando</p>
+        </section>
+      </div>
+
+      <div id="modelEditorOverlay" class="model-editor-overlay hidden" aria-hidden="true">
+        <section id="modelEditorPanel" class="model-editor-panel" role="dialog" aria-modal="true" aria-labelledby="modelEditorTitle">
+          <div class="settings-head">
+            <strong id="modelEditorTitle" data-i18n="editModels">编辑模型 / Editar modelos</strong>
+            <button id="closeModelEditorButton" class="modal-close" type="button" aria-label="关闭模型编辑 / Fechar editor de modelos">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 7l10 10M17 7L7 17" />
+              </svg>
+            </button>
+          </div>
+          <label class="setting-field">
+            <span data-i18n="editProvider">供应商 / Provedor</span>
+            <select id="editProviderSelect"></select>
+          </label>
+          <div class="model-editor-list-wrap">
+            <div class="section-label" data-i18n="modelList">模型列表 / Lista de modelos</div>
+            <div id="modelItemsList" class="model-items-list"></div>
+          </div>
+          <div class="model-add-row">
+            <input id="newModelInput" type="text" autocomplete="off" spellcheck="false" placeholder="model/name:free" />
+            <button id="addModelButton" type="button" data-i18n="addModel">添加 / Adicionar</button>
+          </div>
+          <div class="model-list-tools">
+            <button id="resetModelListButton" type="button" data-i18n="resetModelList">恢复默认 / Restaurar</button>
+            <button id="doneModelListButton" type="button" data-i18n="doneModelList">完成 / Concluir</button>
+          </div>
         </section>
       </div>
 

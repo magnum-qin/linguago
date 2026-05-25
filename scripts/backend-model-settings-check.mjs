@@ -2,7 +2,7 @@ const base = process.env.LINGUAGO_CHECK_BASE_URL || "http://127.0.0.1:8787";
 const shouldWrite = process.env.LINGUAGO_CHECK_WRITE_SETTINGS === "1";
 const payload = {
   provider: "auto",
-  model: "qwen3.6-flash-2026-04-16"
+  model: "qwen3.6-flash"
 };
 
 let postStatus = null;
