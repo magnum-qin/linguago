@@ -1565,11 +1565,11 @@ function renderWordDetails(data) {
         return `
           <article class="word-detail-card sense-card section-appear">
             <div class="sense-card-head">
-              <strong>${escapeHtml(word)}</strong>
+              <strong class="word-detail-title">${escapeHtml(word)}</strong>
               <span class="sense-index">${escapeHtml(String(sense.sense_order || index + 1))}</span>
             </div>
             ${meta ? `<div class="sense-meta">${escapeHtml(meta)}</div>` : ""}
-            <p>${escapeHtml(definition)}</p>
+            <p class="definition-text">${escapeHtml(definition)}</p>
           </article>
         `;
       })
@@ -1578,12 +1578,17 @@ function renderWordDetails(data) {
   }
 
   const item = details[selectedResultLang] || {};
+  const title = item.word && item.word !== word ? item.word : word;
   elements.wordDetailsList.innerHTML = `
     <article class="word-detail-card section-appear">
-      <strong>${escapeHtml(item.word || word)}</strong>
-      <p>${escapeHtml(item.definition || "-")}</p>
+      ${title ? `<strong class="word-detail-title">${escapeHtml(title)}</strong>` : ""}
+      <p class="definition-text">${escapeHtml(cleanDisplayDefinition(item.definition || "-"))}</p>
     </article>
   `;
+}
+
+function cleanDisplayDefinition(definition) {
+  return normalizeTextValue(definition).replace(/\s+[-–—]\s*$/u, "").trim() || "-";
 }
 
 function renderExamples(examples) {

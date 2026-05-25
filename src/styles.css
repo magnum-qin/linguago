@@ -307,7 +307,8 @@
   }
 
   .setting-field-head {
-    @apply flex items-center justify-between gap-2;
+    @apply grid items-center gap-2;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .setting-field span,
@@ -341,7 +342,10 @@
   }
 
   .model-list-toggle {
-    @apply min-h-0 rounded-xl px-2 py-1 text-[0.72rem] font-black;
+    @apply grid min-h-0 place-items-center rounded-xl px-2 py-1 text-[0.7rem] font-black;
+    width: min(10.4rem, 44vw);
+    min-height: 46px;
+    line-height: 1.05;
     color: var(--leaf);
     background: color-mix(in srgb, var(--leaf) 10%, transparent);
   }
@@ -1002,7 +1006,7 @@
   }
 
   .word-detail-card {
-    @apply grid gap-1.5;
+    @apply grid gap-2;
   }
 
   .sense-card {
@@ -1014,8 +1018,9 @@
     min-height: 30px;
   }
 
-  .word-detail-card strong {
-    @apply text-[1.05rem];
+  .word-detail-title {
+    @apply text-[1rem] font-black leading-snug;
+    color: var(--ink);
   }
 
   .sense-index {
@@ -1042,6 +1047,13 @@
   .empty-state {
     @apply m-0 leading-relaxed;
     color: var(--muted);
+  }
+
+  .word-detail-card .definition-text {
+    font-size: 0.98rem;
+    font-weight: 650;
+    line-height: 1.58;
+    color: var(--ink);
   }
 
   .example-source,

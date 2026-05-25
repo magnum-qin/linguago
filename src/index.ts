@@ -174,7 +174,7 @@ const MODEL_OPTIONS: Record<Provider, string[]> = {
   deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"]
 };
 
-const TRANSLATION_CACHE_VERSION = "v32";
+const TRANSLATION_CACHE_VERSION = "v33";
 const PREVIEW_TIMEOUT_MS = 10_000;
 const FULL_TRANSLATION_TIMEOUT_MS = 30_000;
 const MAX_INPUT_CHARS = 1200;
@@ -390,6 +390,7 @@ Rules:
 - pt-BR: Brazilian Portuguese only.
 - ja: Japanese only.
 6. Explanations must be specific to the actual input text. Never copy placeholder wording from this prompt.
+7. For word_details definitions, write only a concise definition in that language. Do not include pronunciation, part-of-speech labels, cross-language equivalents, markdown, bullet points, or comparisons such as "in Japanese/English/Portuguese". Keep each definition under 28 words or 45 Chinese/Japanese characters.
 
 For a single word, return:
 {
@@ -403,10 +404,10 @@ For a single word, return:
     "ja": {"text": "<Japanese word>"}
   },
   "word_details": {
-    "zh": {"word": "<Simplified Chinese word>", "definition": "<Simplified Chinese definition>"},
-    "en": {"word": "<English word>", "definition": "<English definition>"},
-    "pt-BR": {"word": "<Brazilian Portuguese word>", "definition": "<Brazilian Portuguese definition>"},
-    "ja": {"word": "<Japanese word>", "definition": "<Japanese definition>"}
+    "zh": {"word": "<Simplified Chinese word>", "definition": "<concise Simplified Chinese definition only>"},
+    "en": {"word": "<English word>", "definition": "<concise English definition only>"},
+    "pt-BR": {"word": "<Brazilian Portuguese word>", "definition": "<concise Brazilian Portuguese definition only>"},
+    "ja": {"word": "<Japanese word>", "definition": "<concise Japanese definition only>"}
   },
   "examples": [
     {
@@ -1838,21 +1839,62 @@ function normalizeWordDetails(value: unknown): Record<DisplayLanguageCode, WordD
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 
   return {
-    zh: normalizeWordDetail(details.zh),
-    en: normalizeWordDetail(details.en),
-    "pt-BR": normalizeWordDetail(details["pt-BR"]),
-    ja: normalizeWordDetail(details.ja)
+    zh: normalizeWordDetail(details.zh, "zh"),
+    en: normalizeWordDetail(details.en, "en"),
+    "pt-BR": normalizeWordDetail(details["pt-BR"], "pt-BR"),
+    ja: normalizeWordDetail(details.ja, "ja")
   };
 }
 
-function normalizeWordDetail(value: unknown): WordDetail {
+function normalizeWordDetail(value: unknown, lang: DisplayLanguageCode): WordDetail {
   const detail =
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const word = normalizeStringOrText(detail.word);
 
   return {
-    word: normalizeStringOrText(detail.word),
-    definition: normalizeStringOrText(detail.definition)
+    word,
+    definition: cleanWordDefinition(lang, word, normalizeStringOrText(detail.definition))
   };
+}
+
+function cleanWordDefinition(
+  lang: DisplayLanguageCode,
+  word: string,
+  definition: string
+): string {
+  let value = normalizeText(definition)
+    .replace(/^[-*•]\s*/u, "")
+    .replace(/\s+[-–—]\s*$/u, "")
+    .trim();
+
+  if (!value) return "";
+
+  const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (escapedWord) {
+    value = value
+      .replace(new RegExp(`^${escapedWord}\\s*(?:\\([^)]*\\))?\\s*[-–—:：]\\s*`, "iu"), "")
+      .replace(new RegExp(`^${escapedWord}\\s*(?:\\([^)]*\\))?\\s*`, "iu"), "");
+  }
+
+  const crossLanguageMarkers: Record<DisplayLanguageCode, RegExp> = {
+    zh: /(?:在(?:中文|英语|英文|日语|葡萄牙语)|对应|英语中|日语中|葡语中|Portuguese|English|Japanese|ダイエット|lose weight|perder peso)/iu,
+    en: /(?:in Chinese|in Japanese|in Portuguese|corresponds to|equivalent to|中文|日语|葡萄牙语)/iu,
+    "pt-BR": /(?:em chin[eê]s|em japon[eê]s|em ingl[eê]s|equivale a|corresponde a|中文|日语|英语)/iu,
+    ja: /(?:中国語では|英語では|ポルトガル語では|対応|equivalent|中文|英语|葡萄牙语)/iu
+  };
+  const marker = value.search(crossLanguageMarkers[lang]);
+  if (marker > 0) {
+    value = value.slice(0, marker).trim();
+  }
+
+  value = value.replace(/\s+[-–—]\s*$/u, "").trim();
+  const sentenceLimit = lang === "zh" || lang === "ja" ? 2 : 1;
+  return limitSentences(value, sentenceLimit) || value;
+}
+
+function limitSentences(text: string, maxSentences: number): string {
+  const matches = text.match(/[^。.!！？!?]+[。.!！？!?]?/gu) || [];
+  return matches.slice(0, maxSentences).join("").trim();
 }
 
 function normalizeStringOrText(value: unknown): string {
