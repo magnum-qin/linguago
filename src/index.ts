@@ -525,6 +525,25 @@ const DEEPSEEK_PREVIEW_SYSTEM_PROMPT = `Return valid json only.
 Output this JSON shape exactly:
 {"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}`;
 
+const DASH_SCOPE_SYSTEM_PROMPT = `You are a translation engine. Return valid JSON only.
+The user provides source language, target language, and text.
+Return zh, en, pt-BR, and ja fields in their own languages.
+For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.
+Use the same JSON shape as the translation API schema.`;
+
+const DASH_SCOPE_PREVIEW_SYSTEM_PROMPT = `Return valid JSON only.
+Translate into the requested target language and return:
+{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}`;
+
+const OPENROUTER_SYSTEM_PROMPT = `Translate the input for a mobile language-learning app.
+Follow the JSON schema exactly.
+Use zh, en, pt-BR, and ja fields in their own languages.
+For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.`;
+
+const OPENROUTER_PREVIEW_SYSTEM_PROMPT = `Translate into the requested target language.
+Follow the JSON schema exactly.
+Return a natural translation and one concise explanation only.`;
+
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
@@ -1326,7 +1345,11 @@ function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolea
 }
 
 function isPreviewPrompt(systemPrompt?: string): boolean {
-  return systemPrompt === PREVIEW_SYSTEM_PROMPT || systemPrompt === GEMINI_PREVIEW_SYSTEM_PROMPT || systemPrompt === DEEPSEEK_PREVIEW_SYSTEM_PROMPT;
+  return systemPrompt === PREVIEW_SYSTEM_PROMPT ||
+    systemPrompt === GEMINI_PREVIEW_SYSTEM_PROMPT ||
+    systemPrompt === DEEPSEEK_PREVIEW_SYSTEM_PROMPT ||
+    systemPrompt === DASH_SCOPE_PREVIEW_SYSTEM_PROMPT ||
+    systemPrompt === OPENROUTER_PREVIEW_SYSTEM_PROMPT;
 }
 
 async function translateWithProvider(input: {
@@ -1376,6 +1399,12 @@ function selectProviderSystemPrompt(
   if (provider === "deepseek") {
     return preview ? DEEPSEEK_PREVIEW_SYSTEM_PROMPT : DEEPSEEK_SYSTEM_PROMPT;
   }
+  if (provider === "dashscope") {
+    return preview ? DASH_SCOPE_PREVIEW_SYSTEM_PROMPT : DASH_SCOPE_SYSTEM_PROMPT;
+  }
+  if (provider === "openrouter") {
+    return preview ? OPENROUTER_PREVIEW_SYSTEM_PROMPT : OPENROUTER_SYSTEM_PROMPT;
+  }
   return systemPrompt;
 }
 
@@ -1411,6 +1440,30 @@ function buildJsonRepairPrompt(originalPrompt: string, error: string): string {
     "Return only corrected JSON. Do not include markdown, commentary, or extra text.",
     originalPrompt
   ].join("\n\n");
+}
+
+function withAdditionalPropertiesFalse(schema: unknown): unknown {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    return schema;
+  }
+
+  const source = schema as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...source };
+  if (next.type === "object") {
+    next.additionalProperties = false;
+  }
+  if (source.properties && typeof source.properties === "object" && !Array.isArray(source.properties)) {
+    next.properties = Object.fromEntries(
+      Object.entries(source.properties as Record<string, unknown>).map(([key, value]) => [
+        key,
+        withAdditionalPropertiesFalse(value)
+      ])
+    );
+  }
+  if (source.items) {
+    next.items = withAdditionalPropertiesFalse(source.items);
+  }
+  return next;
 }
 
 async function lookupDictionaryFirst(input: {
@@ -1589,6 +1642,7 @@ async function translateWithDashScope(input: {
         ],
         response_format: { type: "json_object" },
         temperature: 0.2,
+        max_tokens: isPreviewPrompt(input.systemPrompt) ? 512 : 4096,
         enable_thinking: false
       }),
       signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
@@ -1631,23 +1685,11 @@ async function translateWithOpenRouter(input: {
   systemPrompt?: string;
 }): Promise<Record<string, unknown>> {
   const provider = "openrouter";
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "authorization": `Bearer ${input.apiKey}`,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
-      model: input.model,
-      messages: [
-        { role: "system", content: input.systemPrompt || ACTIVE_SYSTEM_PROMPT },
-        { role: "user", content: input.prompt }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2
-    }),
-    signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
-  });
+  let response = await fetchOpenRouter(input, openRouterSchemaResponseFormat(input.systemPrompt));
+
+  if (!response.ok && (await shouldRetryOpenRouterJsonObject(response.clone()))) {
+    response = await fetchOpenRouter(input, { type: "json_object" });
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -1676,6 +1718,59 @@ async function translateWithOpenRouter(input: {
   }
 
   return parseProviderJson(rawText, provider, input.model, isPreviewPrompt(input.systemPrompt));
+}
+
+function fetchOpenRouter(
+  input: {
+    prompt: string;
+    model: string;
+    apiKey: string;
+    systemPrompt?: string;
+  },
+  responseFormat: Record<string, unknown>
+): Promise<Response> {
+  return fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${input.apiKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: input.model,
+      messages: [
+        { role: "system", content: input.systemPrompt || ACTIVE_SYSTEM_PROMPT },
+        { role: "user", content: input.prompt }
+      ],
+      response_format: responseFormat,
+      provider: {
+        require_parameters: responseFormat.type === "json_schema"
+      },
+      temperature: 0.2,
+      max_tokens: isPreviewPrompt(input.systemPrompt) ? 512 : 4096
+    }),
+    signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
+  });
+}
+
+function openRouterSchemaResponseFormat(systemPrompt?: string): Record<string, unknown> {
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: isPreviewPrompt(systemPrompt)
+        ? "linguago_translation_preview"
+        : "linguago_translation",
+      strict: true,
+      schema: withAdditionalPropertiesFalse(
+        isPreviewPrompt(systemPrompt) ? PREVIEW_RESPONSE_SCHEMA : FULL_RESPONSE_SCHEMA
+      )
+    }
+  };
+}
+
+async function shouldRetryOpenRouterJsonObject(response: Response): Promise<boolean> {
+  if (![400, 404, 422].includes(response.status)) return false;
+  const text = await response.text();
+  return /response_format|json_schema|schema|require_parameters|not support|unsupported|provider/i.test(text);
 }
 
 async function translateWithDeepSeek(input: {
