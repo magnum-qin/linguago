@@ -183,30 +183,60 @@ const RATE_LIMIT_MAX_REQUESTS = 30;
 const FULL_RESPONSE_SCHEMA = {
   type: "object",
   properties: {
-    type: { type: "string", enum: ["word", "sentence"] },
-    detected_source_lang: { type: "string" },
-    translation: { type: "string" },
+    type: {
+      type: "string",
+      enum: ["word", "sentence"],
+      description: "Use word for a single lexical item; use sentence for phrases or sentences."
+    },
+    detected_source_lang: {
+      type: "string",
+      description: "Detected source language code, such as zh, en, pt-BR, ja, or auto."
+    },
+    translation: {
+      type: "string",
+      description: "Main translation in the requested target language."
+    },
     translations: {
       type: "object",
       properties: {
         zh: {
           type: "object",
-          properties: { text: { type: "string" } },
+          properties: {
+            text: {
+              type: "string",
+              description: "Simplified Chinese translation text only."
+            }
+          },
           required: ["text"]
         },
         en: {
           type: "object",
-          properties: { text: { type: "string" } },
+          properties: {
+            text: {
+              type: "string",
+              description: "English translation text only."
+            }
+          },
           required: ["text"]
         },
         "pt-BR": {
           type: "object",
-          properties: { text: { type: "string" } },
+          properties: {
+            text: {
+              type: "string",
+              description: "Brazilian Portuguese translation text only."
+            }
+          },
           required: ["text"]
         },
         ja: {
           type: "object",
-          properties: { text: { type: "string" } },
+          properties: {
+            text: {
+              type: "string",
+              description: "Japanese translation text only."
+            }
+          },
           required: ["text"]
         }
       },
@@ -215,10 +245,22 @@ const FULL_RESPONSE_SCHEMA = {
     explanations: {
       type: "object",
       properties: {
-        zh: { type: "string" },
-        en: { type: "string" },
-        "pt-BR": { type: "string" },
-        ja: { type: "string" }
+        zh: {
+          type: "string",
+          description: "Simplified Chinese explanation for this exact sentence. Do not use Japanese kana or Portuguese."
+        },
+        en: {
+          type: "string",
+          description: "English explanation for this exact sentence."
+        },
+        "pt-BR": {
+          type: "string",
+          description: "Brazilian Portuguese explanation for this exact sentence."
+        },
+        ja: {
+          type: "string",
+          description: "Japanese explanation for this exact sentence."
+        }
       }
     },
     word_details: {
@@ -227,29 +269,41 @@ const FULL_RESPONSE_SCHEMA = {
         zh: {
           type: "object",
           properties: {
-            word: { type: "string" },
-            definition: { type: "string" }
+            word: { type: "string", description: "Simplified Chinese word." },
+            definition: {
+              type: "string",
+              description: "Concise Simplified Chinese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents."
+            }
           }
         },
         en: {
           type: "object",
           properties: {
-            word: { type: "string" },
-            definition: { type: "string" }
+            word: { type: "string", description: "English word." },
+            definition: {
+              type: "string",
+              description: "Concise English definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents."
+            }
           }
         },
         "pt-BR": {
           type: "object",
           properties: {
-            word: { type: "string" },
-            definition: { type: "string" }
+            word: { type: "string", description: "Brazilian Portuguese word." },
+            definition: {
+              type: "string",
+              description: "Concise Brazilian Portuguese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents."
+            }
           }
         },
         ja: {
           type: "object",
           properties: {
-            word: { type: "string" },
-            definition: { type: "string" }
+            word: { type: "string", description: "Japanese word." },
+            definition: {
+              type: "string",
+              description: "Concise Japanese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents."
+            }
           }
         }
       }
@@ -280,9 +334,18 @@ const PREVIEW_RESPONSE_SCHEMA = {
   type: "object",
   properties: {
     type: { type: "string", enum: ["sentence"] },
-    detected_source_lang: { type: "string" },
-    translation: { type: "string" },
-    explanation: { type: "string" }
+    detected_source_lang: {
+      type: "string",
+      description: "Detected source language code."
+    },
+    translation: {
+      type: "string",
+      description: "Natural translation in the requested target language."
+    },
+    explanation: {
+      type: "string",
+      description: "One concise explanation in the requested target language."
+    }
   },
   required: ["type", "detected_source_lang", "translation", "explanation"]
 } as const;
@@ -441,6 +504,26 @@ For a sentence or phrase, return:
     "ja": {"text": "<Japanese translation>"}
   }
 }`;
+
+const GEMINI_SYSTEM_PROMPT = `Translate the input for a mobile language-learning app.
+Follow the provided JSON schema exactly.
+Use zh, en, pt-BR, and ja fields in their own languages.
+For word definitions, write concise definitions only; no pronunciation, part-of-speech labels, markdown, or cross-language equivalents.
+Do not copy schema descriptions or placeholder wording.`;
+
+const GEMINI_PREVIEW_SYSTEM_PROMPT = `Translate the input into the requested target language.
+Follow the provided JSON schema exactly.
+Return a natural translation and one concise explanation only.`;
+
+const DEEPSEEK_SYSTEM_PROMPT = `You are a translation engine. Return valid json only.
+The user provides source language, target language, and text.
+Output this JSON shape exactly:
+{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","translations":{"zh":{"text":"简体中文"},"en":{"text":"English"},"pt-BR":{"text":"Português do Brasil"},"ja":{"text":"日本語"}},"explanations":{"zh":"简短中文解释","en":"Brief English explanation","pt-BR":"Breve explicação em português","ja":"短い日本語の説明"}}
+For a single word, set type to "word" and also include word_details and examples. Definitions must be concise and written only in their own language.`;
+
+const DEEPSEEK_PREVIEW_SYSTEM_PROMPT = `Return valid json only.
+Output this JSON shape exactly:
+{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}`;
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -1038,7 +1121,7 @@ function selectModelForProvider(
 }
 
 function modelRequestTimeout(systemPrompt?: string): number {
-  return systemPrompt === PREVIEW_SYSTEM_PROMPT
+  return isPreviewPrompt(systemPrompt)
     ? PREVIEW_TIMEOUT_MS
     : FULL_TRANSLATION_TIMEOUT_MS;
 }
@@ -1243,7 +1326,7 @@ function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolea
 }
 
 function isPreviewPrompt(systemPrompt?: string): boolean {
-  return systemPrompt === PREVIEW_SYSTEM_PROMPT;
+  return systemPrompt === PREVIEW_SYSTEM_PROMPT || systemPrompt === GEMINI_PREVIEW_SYSTEM_PROMPT || systemPrompt === DEEPSEEK_PREVIEW_SYSTEM_PROMPT;
 }
 
 async function translateWithProvider(input: {
@@ -1257,7 +1340,11 @@ async function translateWithProvider(input: {
   systemPrompt?: string;
 }): Promise<Record<string, unknown>> {
   const prompt = input.prompt || buildUserPrompt(input.text, input.sourceLang, input.targetLang);
-  const request = { ...input, prompt };
+  const request = {
+    ...input,
+    prompt,
+    systemPrompt: selectProviderSystemPrompt(input.provider, input.systemPrompt)
+  };
 
   try {
     return await callProvider(request);
@@ -1276,6 +1363,20 @@ async function translateWithProvider(input: {
       systemPrompt: ACTIVE_SYSTEM_PROMPT
     });
   }
+}
+
+function selectProviderSystemPrompt(
+  provider: Exclude<Provider, "auto">,
+  systemPrompt?: string
+): string | undefined {
+  const preview = isPreviewPrompt(systemPrompt);
+  if (provider === "gemini") {
+    return preview ? GEMINI_PREVIEW_SYSTEM_PROMPT : GEMINI_SYSTEM_PROMPT;
+  }
+  if (provider === "deepseek") {
+    return preview ? DEEPSEEK_PREVIEW_SYSTEM_PROMPT : DEEPSEEK_SYSTEM_PROMPT;
+  }
+  return systemPrompt;
 }
 
 async function callProvider(input: {
@@ -1598,6 +1699,7 @@ async function translateWithDeepSeek(input: {
       ],
       response_format: { type: "json_object" },
       temperature: 0.2,
+      max_tokens: isPreviewPrompt(input.systemPrompt) ? 512 : 4096,
       thinking: { type: "disabled" }
     }),
     signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
@@ -1639,31 +1741,11 @@ async function translateWithGemini(input: {
   systemPrompt?: string;
 }): Promise<Record<string, unknown>> {
   const provider = "gemini";
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: input.systemPrompt || ACTIVE_SYSTEM_PROMPT }]
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: input.prompt }]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json"
-        }
-      }),
-      signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
-    }
-  );
+  let response = await fetchGemini(input, geminiStructuredConfig(input.systemPrompt));
+
+  if (!response.ok && (await shouldRetryGeminiLegacySchema(response.clone()))) {
+    response = await fetchGemini(input, geminiLegacyStructuredConfig(input.systemPrompt));
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -1697,6 +1779,69 @@ async function translateWithGemini(input: {
   }
 
   return parseProviderJson(rawText, provider, input.model, isPreviewPrompt(input.systemPrompt));
+}
+
+function fetchGemini(
+  input: {
+    prompt: string;
+    model: string;
+    apiKey: string;
+    systemPrompt?: string;
+  },
+  generationConfig: Record<string, unknown>
+): Promise<Response> {
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: input.systemPrompt || GEMINI_SYSTEM_PROMPT }]
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: input.prompt }]
+          }
+        ],
+        generationConfig
+      }),
+      signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))
+    }
+  );
+}
+
+function geminiStructuredConfig(systemPrompt?: string): Record<string, unknown> {
+  return {
+    temperature: 0.2,
+    responseFormat: {
+      text: {
+        mimeType: "APPLICATION_JSON",
+        schema: isPreviewPrompt(systemPrompt)
+          ? PREVIEW_RESPONSE_SCHEMA
+          : FULL_RESPONSE_SCHEMA
+      }
+    }
+  };
+}
+
+function geminiLegacyStructuredConfig(systemPrompt?: string): Record<string, unknown> {
+  return {
+    temperature: 0.2,
+    responseMimeType: "application/json",
+    responseSchema: isPreviewPrompt(systemPrompt)
+      ? PREVIEW_RESPONSE_SCHEMA
+      : FULL_RESPONSE_SCHEMA
+  };
+}
+
+async function shouldRetryGeminiLegacySchema(response: Response): Promise<boolean> {
+  if (response.status !== 400) return false;
+  const text = await response.text();
+  return /response_format|responseFormat|mime_type|response_schema|responseSchema/i.test(text);
 }
 
 function buildUserPrompt(
