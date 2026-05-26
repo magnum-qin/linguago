@@ -1040,7 +1040,10 @@ async function translateWithProgress(payload) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         const message = JSON.parse(trimmed);
-        if (message.event === "partial" && message.data) {
+        if (message.event === "delta" && message.data) {
+          partialRendered = true;
+          renderStreamingPreview(message.data);
+        } else if (message.event === "partial" && message.data) {
           partialRendered = true;
           renderPartialResult(message.data);
         } else if (message.event === "final" && message.data) {
@@ -1099,6 +1102,21 @@ function renderPartialResult(data) {
   elements.resultCard.setAttribute("aria-busy", "true");
   updateStatus(t("translating"), "...");
   updateProviderBadge(data.provider);
+}
+
+function renderStreamingPreview(data) {
+  const previewData = { ...data, cached: false };
+  if (!latestResultData || latestResultData.original !== previewData.original) {
+    renderResult(previewData);
+  } else {
+    latestResultData = previewData;
+    latestResultText = getSelectedTranslation(previewData);
+    updateTranslationCardStreaming(previewData);
+    updateSentenceExplanationIncrementally(previewData);
+  }
+  elements.resultCard.setAttribute("aria-busy", "true");
+  updateStatus(t("translating"), "...");
+  updateProviderBadge(previewData.provider);
 }
 
 function renderFinalResultIncrementally(data, hasPartial) {
@@ -1168,6 +1186,27 @@ function updateTranslationCardIncrementally(data, options = {}) {
     phoneticNode?.remove();
   }
 
+  button.dataset.speakText = item.audio_text || text;
+  button.dataset.speakLang = selectedResultLang;
+}
+
+function updateTranslationCardStreaming(data) {
+  const text = getSelectedTranslation(data);
+  const item = getLocalized(data.translations || {}, selectedResultLang);
+  const displayText = text || getPendingTranslationText(data);
+  const line = elements.translationCard.querySelector(".compact-line.single");
+  const strong = line?.querySelector("strong");
+  const detailWrap = line?.querySelector("div");
+  const button = line?.querySelector(".line-speak");
+
+  if (!line || !strong || !detailWrap || !button) {
+    renderTranslationCard(data);
+    return;
+  }
+
+  typewriterRunId += 1;
+  strong.textContent = displayText || "-";
+  detailWrap.querySelector("span")?.remove();
   button.dataset.speakText = item.audio_text || text;
   button.dataset.speakLang = selectedResultLang;
 }

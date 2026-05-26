@@ -544,6 +544,9 @@ const OPENROUTER_PREVIEW_SYSTEM_PROMPT = `Translate into the requested target la
 Follow the JSON schema exactly.
 Return a natural translation and one concise explanation only.`;
 
+const STREAMING_PREVIEW_SYSTEM_PROMPT = `Translate into the requested target language.
+Return only the translated text. Do not return JSON, markdown, quotes, explanations, alternatives, or pronunciation.`;
+
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
@@ -752,36 +755,86 @@ async function handleTranslateStream(
 
         try {
           send("status", { stage: "preview" });
-          const preview = await translateWithProvider({
-            text,
-            sourceLang,
-            targetLang,
-            provider: selected.provider,
-            model: selected.model,
-            apiKey: selected.apiKey,
-            systemPrompt: PREVIEW_SYSTEM_PROMPT,
-            prompt: buildUserPrompt(text, sourceLang, targetLang)
-          });
-          send(
-            "partial",
-            normalizePreviewResponse({
-              translated: preview,
+          let previewText = "";
+          await streamTranslationPreview(
+            {
               text,
+              sourceLang,
               targetLang,
               provider: selected.provider,
-              model: selected.model
-            })
+              model: selected.model,
+              apiKey: selected.apiKey
+            },
+            (delta, accumulated) => {
+              previewText = normalizeStreamingPreviewText(accumulated);
+              if (!previewText) return;
+              send(
+                "delta",
+                buildStreamingPreviewResponse({
+                  text,
+                  translation: previewText,
+                  targetLang,
+                  provider: selected.provider,
+                  model: selected.model
+                })
+              );
+            }
           );
+          if (previewText) {
+            send(
+              "partial",
+              buildStreamingPreviewResponse({
+                text,
+                translation: previewText,
+                targetLang,
+                provider: selected.provider,
+                model: selected.model
+              })
+            );
+          }
         } catch (error) {
           console.warn(
             JSON.stringify({
               level: "warn",
-              message: "translate_preview_failed",
+              message: "translate_streaming_preview_failed",
               provider: selected.provider,
               model: selected.model,
               error: error instanceof Error ? error.message : String(error)
             })
           );
+
+          try {
+            const preview = await translateWithProvider({
+              text,
+              sourceLang,
+              targetLang,
+              provider: selected.provider,
+              model: selected.model,
+              apiKey: selected.apiKey,
+              systemPrompt: PREVIEW_SYSTEM_PROMPT,
+              prompt: buildUserPrompt(text, sourceLang, targetLang)
+            });
+            send(
+              "partial",
+              normalizePreviewResponse({
+                translated: preview,
+                text,
+                targetLang,
+                provider: selected.provider,
+                model: selected.model
+              })
+            );
+          } catch (fallbackError) {
+            console.warn(
+              JSON.stringify({
+                level: "warn",
+                message: "translate_preview_failed",
+                provider: selected.provider,
+                model: selected.model,
+                error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+              })
+            );
+          }
         }
 
         send("status", { stage: "full" });
@@ -1229,6 +1282,49 @@ function normalizePreviewResponse(input: {
   };
 }
 
+function buildStreamingPreviewResponse(input: {
+  text: string;
+  translation: string;
+  targetLang: LanguageCode;
+  provider: ResponseProvider;
+  model: string;
+}): SentenceResponse {
+  const translation = normalizeStreamingPreviewText(input.translation);
+  return {
+    type: "sentence",
+    detected_source_lang: "auto",
+    target_lang: input.targetLang,
+    original: input.text,
+    translation,
+    translations: {
+      zh: emptyLocalizedText(),
+      en: emptyLocalizedText(),
+      "pt-BR": emptyLocalizedText(),
+      ja: emptyLocalizedText(),
+      [input.targetLang]: localPronunciationText(input.targetLang, translation)
+    },
+    explanation: "",
+    explanations: {
+      zh: "",
+      en: "",
+      "pt-BR": "",
+      ja: "",
+      [input.targetLang]: ""
+    },
+    provider: input.provider,
+    model: input.model,
+    cached: false
+  };
+}
+
+function normalizeStreamingPreviewText(text: string): string {
+  return text
+    .replace(/```(?:json|text)?/giu, "")
+    .replace(/^\s*["'“”‘’]+/u, "")
+    .replace(/["'“”‘’]+\s*$/u, "")
+    .trimStart();
+}
+
 function emptyLocalizedText(): LocalizedText {
   return { text: "", phonetic: "", audio_text: "" };
 }
@@ -1619,6 +1715,217 @@ function isDictionaryLookupCandidate(text: string): boolean {
   return !/\s/u.test(text.trim());
 }
 
+async function streamTranslationPreview(
+  input: {
+    text: string;
+    sourceLang: TranslateRequest["source_lang"];
+    targetLang: LanguageCode;
+    provider: Exclude<Provider, "auto">;
+    model: string;
+    apiKey: string;
+  },
+  onDelta: (delta: string, accumulated: string) => void
+): Promise<string> {
+  const prompt = buildUserPrompt(input.text, input.sourceLang, input.targetLang);
+  const request = {
+    prompt,
+    model: input.model,
+    apiKey: input.apiKey,
+    systemPrompt: STREAMING_PREVIEW_SYSTEM_PROMPT
+  };
+
+  if (input.provider === "gemini") {
+    return streamGeminiPreview(request, onDelta);
+  }
+
+  if (input.provider === "dashscope") {
+    return streamOpenAiCompatiblePreview(
+      "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "DashScope",
+      request,
+      onDelta
+    );
+  }
+
+  if (input.provider === "openrouter") {
+    return streamOpenAiCompatiblePreview(
+      "https://openrouter.ai/api/v1/chat/completions",
+      "OpenRouter",
+      request,
+      onDelta
+    );
+  }
+
+  return streamOpenAiCompatiblePreview(
+    "https://api.deepseek.com/chat/completions",
+    "DeepSeek",
+    request,
+    onDelta
+  );
+}
+
+async function streamOpenAiCompatiblePreview(
+  url: string,
+  providerName: string,
+  input: {
+    prompt: string;
+    model: string;
+    apiKey: string;
+    systemPrompt: string;
+  },
+  onDelta: (delta: string, accumulated: string) => void
+): Promise<string> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${input.apiKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: input.model,
+      messages: [
+        { role: "system", content: input.systemPrompt },
+        { role: "user", content: input.prompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 512,
+      stream: true,
+      ...(providerName === "DashScope" ? { enable_thinking: false } : {}),
+      ...(providerName === "DeepSeek" ? { thinking: { type: "disabled" } } : {})
+    }),
+    signal: AbortSignal.timeout(PREVIEW_TIMEOUT_MS)
+  });
+
+  if (!response.ok) {
+    throw new TranslateError(
+      "PROVIDER_API_ERROR",
+      `${providerName} streaming preview error: ${response.status} ${await response.text()}`,
+      502,
+      providerName.toLowerCase() as Exclude<Provider, "auto">,
+      input.model
+    );
+  }
+
+  return readSseText(response, onDelta, (payload) => {
+    const choice = payload.choices?.[0];
+    return normalizeStringOrText(choice?.delta?.content) || normalizeStringOrText(choice?.message?.content);
+  });
+}
+
+async function streamGeminiPreview(
+  input: {
+    prompt: string;
+    model: string;
+    apiKey: string;
+    systemPrompt: string;
+  },
+  onDelta: (delta: string, accumulated: string) => void
+): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(input.apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: input.systemPrompt }]
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: input.prompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 512
+        }
+      }),
+      signal: AbortSignal.timeout(PREVIEW_TIMEOUT_MS)
+    }
+  );
+
+  if (!response.ok) {
+    throw new TranslateError(
+      "PROVIDER_API_ERROR",
+      `Gemini streaming preview error: ${response.status} ${await response.text()}`,
+      502,
+      "gemini",
+      input.model
+    );
+  }
+
+  return readSseText(response, onDelta, (payload) =>
+    normalizeStringOrText(payload.candidates?.[0]?.content?.parts?.[0]?.text)
+  );
+}
+
+async function readSseText(
+  response: Response,
+  onDelta: (delta: string, accumulated: string) => void,
+  extractText: (payload: Record<string, any>) => string
+): Promise<string> {
+  if (!response.body) {
+    throw new TranslateError("PROVIDER_EMPTY_RESPONSE", "Provider returned no stream body.", 502);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let accumulated = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split(/\r?\n/u);
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const data = trimmed.slice(5).trim();
+      if (!data || data === "[DONE]") continue;
+
+      try {
+        const payload = JSON.parse(data) as Record<string, any>;
+        const delta = extractText(payload);
+        if (!delta) continue;
+        accumulated += delta;
+        onDelta(delta, accumulated);
+      } catch {
+        // Ignore malformed keep-alive chunks and continue reading the stream.
+      }
+    }
+
+    if (done) break;
+  }
+
+  const trailing = buffer.trim();
+  if (trailing.startsWith("data:")) {
+    const data = trailing.slice(5).trim();
+    if (data && data !== "[DONE]") {
+      try {
+        const payload = JSON.parse(data) as Record<string, any>;
+        const delta = extractText(payload);
+        if (delta) {
+          accumulated += delta;
+          onDelta(delta, accumulated);
+        }
+      } catch {
+        // Ignore malformed trailing chunks.
+      }
+    }
+  }
+
+  if (!accumulated.trim()) {
+    throw new TranslateError("PROVIDER_EMPTY_RESPONSE", "Provider returned an empty streaming preview.", 502);
+  }
+
+  return accumulated;
+}
+
 async function translateWithDashScope(input: {
   prompt: string;
   model: string;
@@ -1947,8 +2254,14 @@ function buildUserPrompt(
   return [
     `Source language: ${sourceLang}`,
     `Target language: ${targetLang}`,
+    `When returning language-keyed JSON, put ${targetLang} first, then ${orderedLanguageCodes(targetLang).filter((lang) => lang !== targetLang).join(", ")}.`,
     `Text: ${text}`
   ].join("\n");
+}
+
+function orderedLanguageCodes(targetLang: LanguageCode): LanguageCode[] {
+  const languages: LanguageCode[] = ["en", "pt-BR", "zh", "ja"];
+  return [targetLang, ...languages.filter((language) => language !== targetLang)];
 }
 
 async function buildCacheKey(
