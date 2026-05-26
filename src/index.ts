@@ -1658,10 +1658,7 @@ async function translateWithGemini(input: {
         ],
         generationConfig: {
           temperature: 0.2,
-          responseMimeType: "application/json",
-          responseSchema: isPreviewPrompt(input.systemPrompt)
-            ? PREVIEW_RESPONSE_SCHEMA
-            : FULL_RESPONSE_SCHEMA
+          responseMimeType: "application/json"
         }
       }),
       signal: AbortSignal.timeout(modelRequestTimeout(input.systemPrompt))

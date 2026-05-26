@@ -192,6 +192,7 @@ let settingsCloseTimer = 0;
 let modelEditorCloseTimer = 0;
 let keyboardScrollTimer = 0;
 let systemThemeQuery = null;
+let typewriterRunId = 0;
 
 bootstrap();
 
@@ -1094,7 +1095,7 @@ async function translateOnce(payload) {
 }
 
 function renderPartialResult(data) {
-  renderResult({ ...data, cached: false });
+  renderResult({ ...data, cached: false }, { typewriter: true });
   elements.resultCard.setAttribute("aria-busy", "true");
   updateStatus(t("translating"), "...");
   updateProviderBadge(data.provider);
@@ -1111,7 +1112,7 @@ function renderFinalResultIncrementally(data, hasPartial) {
   latestDetectedLang = data.detected_source_lang || latestDetectedLang || "en";
   elements.resultCard.setAttribute("aria-busy", "false");
   updateProviderBadge(data.provider);
-  updateTranslationCardIncrementally(data);
+  updateTranslationCardIncrementally(data, { typewriter: true });
 
   if (data.type === "word") {
     elements.wordDetailsWrap.classList.remove("hidden");
@@ -1127,11 +1128,11 @@ function renderFinalResultIncrementally(data, hasPartial) {
   elements.sentenceExplainWrap.classList.remove("hidden");
   elements.wordDetailsList.innerHTML = "";
   elements.examplesList.innerHTML = "";
-  updateSentenceExplanationIncrementally(data);
+  updateSentenceExplanationIncrementally(data, { typewriter: true });
   updateStatus(data.cached ? t("cached") : t("live"), t("sentence"));
 }
 
-function updateTranslationCardIncrementally(data) {
+function updateTranslationCardIncrementally(data, options = {}) {
   const text = getSelectedTranslation(data);
   const item = getLocalized(data.translations || {}, selectedResultLang);
   const phonetic = item.phonetic || "";
@@ -1146,7 +1147,11 @@ function updateTranslationCardIncrementally(data) {
   }
 
   const nextTextHtml = formatPronunciationText(text || "-", selectedResultLang);
-  if (strong.innerHTML !== nextTextHtml) {
+  if (options.typewriter && text && stripHtml(strong.innerHTML) !== text) {
+    runTypewriter(strong, text, () => {
+      strong.innerHTML = formatPronunciationText(text, selectedResultLang);
+    });
+  } else if (strong.innerHTML !== nextTextHtml) {
     strong.innerHTML = nextTextHtml;
   }
 
@@ -1167,9 +1172,11 @@ function updateTranslationCardIncrementally(data) {
   button.dataset.speakLang = selectedResultLang;
 }
 
-function updateSentenceExplanationIncrementally(data) {
+function updateSentenceExplanationIncrementally(data, options = {}) {
   const explanation = getSelectedSentenceExplanation(data);
-  if (elements.sentenceExplainText.textContent !== explanation) {
+  if (options.typewriter && explanation && elements.sentenceExplainText.textContent !== explanation) {
+    runTypewriter(elements.sentenceExplainText, explanation);
+  } else if (elements.sentenceExplainText.textContent !== explanation) {
     elements.sentenceExplainText.textContent = explanation;
   }
 }
@@ -1261,7 +1268,7 @@ function renderErrorResult(message) {
   elements.sentenceExplainWrap.classList.add("hidden");
 }
 
-function renderResult(data) {
+function renderResult(data, options = {}) {
   const wasLoading = elements.resultCard.getAttribute("aria-busy") === "true";
   latestResultData = data;
   latestResultText = getSelectedTranslation(data);
@@ -1282,7 +1289,7 @@ function renderResult(data) {
 
   renderResultLanguageTabs();
   updateProviderBadge(data.provider);
-  renderTranslationCard(data);
+  renderTranslationCard(data, options);
 
   if (data.type === "word") {
     elements.wordDetailsWrap.classList.remove("hidden");
@@ -1386,16 +1393,20 @@ function setResultTabState() {
   });
 }
 
-function renderTranslationCard(data) {
+function renderTranslationCard(data, options = {}) {
   const text = getSelectedTranslation(data);
   const item = getLocalized(data.translations || {}, selectedResultLang);
   const phonetic = item.phonetic || "";
+  const displayText = text || getPendingTranslationText(data);
+  if (!options.typewriter) {
+    typewriterRunId += 1;
+  }
 
   animateSwap(elements.translationCard);
   elements.translationCard.innerHTML = `
     <div class="compact-line single">
       <div>
-        <strong>${formatPronunciationText(text || "-", selectedResultLang)}</strong>
+        <strong>${options.typewriter ? "" : formatPronunciationText(displayText, selectedResultLang)}</strong>
         ${phonetic ? `<span>${escapeHtml(phonetic)}</span>` : ""}
       </div>
       <button class="line-speak" type="button" data-speak-text="${escapeAttribute(
@@ -1414,6 +1425,17 @@ function renderTranslationCard(data) {
     speak(button.dataset.speakText || "", button.dataset.speakLang || "en");
     pulse(button);
   });
+
+  if (options.typewriter) {
+    const strong = elements.translationCard.querySelector(".compact-line.single strong");
+    if (text) {
+      runTypewriter(strong, text, () => {
+        strong.innerHTML = formatPronunciationText(text, selectedResultLang);
+      });
+    } else {
+      strong.textContent = displayText;
+    }
+  }
 }
 
 function formatPronunciationText(text, lang) {
@@ -1424,6 +1446,56 @@ function formatPronunciationText(text, lang) {
     return formatEnglishKeywordPronunciation(text);
   }
   return escapeHtml(text);
+}
+
+function getPendingTranslationText(data) {
+  if (data?.target_lang && selectedResultLang !== data.target_lang) {
+    return t("translating");
+  }
+  return data?.translation || "-";
+}
+
+function runTypewriter(node, text, onDone) {
+  if (!node) return;
+  const value = String(text || "");
+  const runId = ++typewriterRunId;
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (prefersReducedMotion || value.length > 180) {
+    node.textContent = value;
+    onDone?.();
+    return;
+  }
+
+  node.classList.add("typing-text");
+  node.textContent = "";
+  let index = 0;
+  const step = () => {
+    if (runId !== typewriterRunId) return;
+    index += value.codePointAt(index) > 0xffff ? 2 : 1;
+    node.textContent = value.slice(0, index);
+
+    if (index < value.length) {
+      window.setTimeout(step, getTypewriterDelay(value[index - 1]));
+      return;
+    }
+
+    node.classList.remove("typing-text");
+    onDone?.();
+  };
+
+  window.setTimeout(step, 18);
+}
+
+function getTypewriterDelay(char) {
+  if (/[\s,.;:!?，。！？、]/u.test(char || "")) return 34;
+  return 18;
+}
+
+function stripHtml(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html || "";
+  return template.content.textContent || "";
 }
 
 function formatJapaneseFurigana(text) {
@@ -1517,7 +1589,11 @@ function formatEnglishKeywordPronunciation(text) {
 
 function getSelectedTranslation(data) {
   const item = getLocalized(data.translations || {}, selectedResultLang);
-  return item.text || (selectedResultLang === "zh" ? data.translation : "") || data.translation || "";
+  if (item.text) return item.text;
+  if (data.target_lang && selectedResultLang === data.target_lang) {
+    return data.translation || "";
+  }
+  return "";
 }
 
 function renderLanguageScopedSections(data) {
@@ -1547,7 +1623,11 @@ function getSelectedSentenceExplanation(data) {
     }
   }
 
-  return data.explanation || data.sentence_explanation || "-";
+  if (data.target_lang && selectedResultLang === data.target_lang) {
+    return data.explanation || data.sentence_explanation || "-";
+  }
+
+  return data.type === "sentence" ? t("translating") : "-";
 }
 
 function renderWordDetails(data) {

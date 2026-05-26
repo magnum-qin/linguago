@@ -973,6 +973,18 @@
     font-size: clamp(1.12rem, 4vw, 1.55rem);
   }
 
+  .typing-text::after {
+    content: "";
+    display: inline-block;
+    width: 0.12em;
+    height: 0.9em;
+    margin-left: 0.08em;
+    vertical-align: -0.08em;
+    border-radius: 999px;
+    background: currentColor;
+    animation: typing-caret 760ms steps(2, jump-none) infinite;
+  }
+
   .compact-line ruby {
     ruby-align: center;
   }
@@ -1216,6 +1228,17 @@
     }
     to {
       background-position: -210% 0, 0 0;
+    }
+  }
+
+  @keyframes typing-caret {
+    0%,
+    44% {
+      opacity: 1;
+    }
+    45%,
+    100% {
+      opacity: 0;
     }
   }
 
