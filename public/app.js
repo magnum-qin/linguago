@@ -1573,6 +1573,28 @@ function stripHtml(html) {
 
 function formatJapaneseFurigana(text) {
   const readings = {
+    "観光スポット": "かんこうスポット",
+    "観光": "かんこう",
+    "景色": "けしき",
+    "場所": "ばしょ",
+    "美しい": "うつくしい",
+    "綺麗": "きれい",
+    "有名": "ゆうめい",
+    "人気": "にんき",
+    "公園": "こうえん",
+    "散歩": "さんぽ",
+    "旅行": "りょこう",
+    "明日": "あした",
+    "今日": "きょう",
+    "朝": "あさ",
+    "昼": "ひる",
+    "夜": "よる",
+    "勉強": "べんきょう",
+    "練習": "れんしゅう",
+    "葡萄牙語": "ポルトガルご",
+    "英語": "えいご",
+    "中国語": "ちゅうごくご",
+    "日本語": "にほんご",
     "金曜日": "きんようび",
     "月曜日": "げつようび",
     "火曜日": "かようび",
@@ -1625,6 +1647,27 @@ function formatJapaneseFurigana(text) {
 
 function formatEnglishKeywordPronunciation(text) {
   const pronunciations = {
+    scenic: "SEE-nik",
+    beautiful: "BYOO-tuh-ful",
+    tourist: "TOOR-ist",
+    attraction: "uh-TRAK-shun",
+    sightseeing: "SYT-see-ing",
+    popular: "POP-yuh-ler",
+    famous: "FAY-mus",
+    wonderful: "WUN-der-ful",
+    gorgeous: "GOR-jus",
+    amazing: "uh-MAY-zing",
+    exercise: "EK-ser-syz",
+    exercises: "EK-ser-syz-iz",
+    practice: "PRAK-tis",
+    portuguese: "POR-chuh-geez",
+    language: "LANG-gwij",
+    coffee: "KAW-fee",
+    morning: "MOR-ning",
+    tomorrow: "tuh-MOR-oh",
+    tonight: "tuh-NYT",
+    afternoon: "af-ter-NOON",
+    together: "tuh-GEH-ther",
     confirm: "kən-FURM",
     confirmed: "kən-FURMD",
     invoice: "IN-voys",
@@ -1646,18 +1689,46 @@ function formatEnglishKeywordPronunciation(text) {
     document: "DOK-yoo-ment"
   };
   const words = text.match(/\b[A-Za-z][A-Za-z'-]{4,}\b/g) || [];
-  const targets = [...new Set(words.map((word) => word.toLowerCase()).filter((word) => pronunciations[word]))].slice(0, 4);
+  const targets = [...new Set(
+    words
+      .map((word) => word.toLowerCase())
+      .filter((word) => pronunciations[word] || shouldAnnotateEnglishWord(word))
+  )].slice(0, 4);
   let html = escapeHtml(text);
 
   for (const target of targets) {
     const pattern = new RegExp(`\\b${escapeRegExp(target)}\\b`, "i");
     html = html.replace(pattern, (match) => {
-      const pronunciation = pronunciations[target];
+      const pronunciation = pronunciations[target] || approximateEnglishPronunciation(match);
       return `<span class="keyword-pronunciation">${escapeHtml(match)}<small>${escapeHtml(pronunciation)}</small></span>`;
     });
   }
 
   return html;
+}
+
+function shouldAnnotateEnglishWord(word) {
+  const normalized = String(word || "").toLowerCase();
+  if (normalized.length < 7) return false;
+  return /tion|sion|ous|eous|ious|cial|tial|gh|ph|ch|qu|gue|ese|ique|ology|graphy|beautiful|scenic/u.test(normalized);
+}
+
+function approximateEnglishPronunciation(word) {
+  const value = String(word || "").toLowerCase();
+  const syllables = value
+    .replace(/tion\b/g, "shun")
+    .replace(/sion\b/g, "zhun")
+    .replace(/ph/g, "f")
+    .replace(/gh\b/g, "")
+    .replace(/qu/g, "kw")
+    .replace(/c(?=e|i|y)/g, "s")
+    .replace(/c/g, "k")
+    .replace(/([aeiouy]+)(?=[bcdfghjklmnpqrstvwxyz])/g, "$1-")
+    .replace(/-+$/g, "")
+    .split("-")
+    .filter(Boolean)
+    .slice(0, 4);
+  return syllables.length ? syllables.join("-") : value;
 }
 
 function getSelectedTranslation(data) {
