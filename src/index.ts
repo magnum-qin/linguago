@@ -174,7 +174,7 @@ const MODEL_OPTIONS: Record<Provider, string[]> = {
   deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"]
 };
 
-const TRANSLATION_CACHE_VERSION = "v33";
+const TRANSLATION_CACHE_VERSION = "v34";
 const PREVIEW_TIMEOUT_MS = 10_000;
 const FULL_TRANSLATION_TIMEOUT_MS = 30_000;
 const MAX_INPUT_CHARS = 1200;

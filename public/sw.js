@@ -1,4 +1,4 @@
-const CACHE_NAME = "linguago-shell-v31";
+const CACHE_NAME = "linguago-shell-v32";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -47,6 +47,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (url.pathname === "/app.js" || url.pathname === "/styles.css") {
+    event.respondWith(networkFirstAsset(event.request, url.pathname));
+    return;
+  }
+
   if (APP_SHELL_PATHS.has(url.pathname)) {
     event.respondWith(cacheFirstAsset(url.pathname));
     return;
@@ -82,6 +87,15 @@ async function cacheFirstAsset(pathname) {
   });
   const update = fetchAndCache(request).catch(() => cached);
   return cached || update || new Response("", { status: 503, statusText: "Offline" });
+}
+
+async function networkFirstAsset(request, pathname) {
+  try {
+    return await fetchAndCache(request);
+  } catch {
+    const cached = await caches.match(request) || await caches.match(pathname);
+    return cached || new Response("", { status: 503, statusText: "Offline" });
+  }
 }
 
 async function staleWhileRevalidate(request) {
