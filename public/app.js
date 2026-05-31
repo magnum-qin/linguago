@@ -1060,7 +1060,13 @@ async function translateWithProgress(payload) {
 
     if (buffer.trim()) {
       const message = JSON.parse(buffer.trim());
-      if (message.event === "final" && message.data) {
+      if (message.event === "delta" && message.data) {
+        partialRendered = true;
+        renderStreamingPreview(message.data);
+      } else if (message.event === "partial" && message.data) {
+        partialRendered = true;
+        renderPartialResult(message.data);
+      } else if (message.event === "final" && message.data) {
         finalData = message.data;
         renderFinalResultIncrementally(finalData, partialRendered);
         finalRendered = true;
@@ -1201,6 +1207,11 @@ function updateTranslationCardStreaming(data) {
 
   if (!line || !strong || !detailWrap || !button) {
     renderTranslationCard(data);
+    return;
+  }
+
+  if (!text && isResultBusy()) {
+    renderTranslationPendingCard();
     return;
   }
 
@@ -1442,6 +1453,11 @@ function renderTranslationCard(data, options = {}) {
   }
 
   animateSwap(elements.translationCard);
+  if (!text && isResultBusy()) {
+    renderTranslationPendingCard();
+    return;
+  }
+
   elements.translationCard.innerHTML = `
     <div class="compact-line single">
       <div>
@@ -1475,6 +1491,24 @@ function renderTranslationCard(data, options = {}) {
       strong.textContent = displayText;
     }
   }
+}
+
+function renderTranslationPendingCard() {
+  typewriterRunId += 1;
+  elements.translationCard.innerHTML = `
+    <div class="loading-loop" aria-hidden="true">
+      <div class="loading-bubbles">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <p>${escapeHtml(t("translating"))}</p>
+    </div>
+  `;
+}
+
+function isResultBusy() {
+  return elements.resultCard.getAttribute("aria-busy") === "true";
 }
 
 function formatPronunciationText(text, lang) {
