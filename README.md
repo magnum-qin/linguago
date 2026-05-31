@@ -142,6 +142,7 @@ When opening a new Codex conversation, ask it to read:
 
 ```text
 README.md
+docs/PROJECT_OVERVIEW_FOR_AI.md
 docs/ARCHITECTURE.md
 docs/CODEX_HANDOFF.md
 docs/DECISIONS.md
@@ -151,5 +152,5 @@ docs/TODO.md
 The fastest prompt is:
 
 ```text
-Please read README.md and docs/CODEX_HANDOFF.md first, then summarize the architecture and current constraints before making changes.
+Please read README.md, docs/PROJECT_OVERVIEW_FOR_AI.md, and docs/CODEX_HANDOFF.md first, then summarize the architecture and current constraints before making changes.
 ```
