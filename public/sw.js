@@ -1,9 +1,12 @@
-const CACHE_NAME = "linguago-shell-v32";
+const CACHE_NAME = "linguago-shell-v33";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
+  "/js/api.js",
+  "/js/text-utils.js",
+  "/js/pronunciation.js",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/apple-touch-icon.png",

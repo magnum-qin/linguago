@@ -27,6 +27,9 @@ Frontend files live in `public/`.
 
 - `public/index.html`: PWA shell and semantic DOM.
 - `public/app.js`: UI state, settings modal, translation requests, tabs, history, speech synthesis, and motion.
+- `public/js/api.js`: frontend API wrappers for settings, model catalog, dictionary stats, translation, and translation streaming.
+- `public/js/text-utils.js`: shared HTML escaping, attribute escaping, regex escaping, and HTML text extraction helpers.
+- `public/js/pronunciation.js`: local display pronunciation formatting for English keywords and Japanese furigana-style annotations.
 - `public/styles.css`: generated CSS. Do not edit by hand.
 - `public/sw.js`: service worker app-shell cache. It cache-firsts shell/navigation assets, stale-while-revalidates same-origin static files, and sends `/api/*` directly to the network.
 - `public/manifest.webmanifest`: PWA metadata, standalone display settings, and install theme colors.
@@ -42,7 +45,20 @@ npm run style:build
 
 ## Cloudflare Worker
 
-The Worker is implemented in `src/index.ts`.
+The Worker entrypoint is `src/index.ts`. Supporting modules keep shared data and pure selection logic out of the route handler:
+
+- `src/types.ts`: Worker bindings, language/provider types, and normalized response shapes.
+- `src/config.ts`: headers, model catalogs, cache/rate-limit constants, and user-facing backend messages.
+- `src/schemas.ts`: full and preview structured-output JSON schemas.
+- `src/prompts.ts`: provider-specific system prompts plus prompt-selection helpers.
+- `src/provider-selection.ts`: configured provider/model selection for explicit and `auto` routing.
+- `src/provider-clients.ts`: provider HTTP clients for DashScope, OpenRouter, DeepSeek, and Gemini, including streaming provider reads.
+- `src/provider-json.ts`: provider JSON parsing, fence stripping, and payload validation.
+- `src/normalization.ts`: provider/dictionary response normalization, local pronunciation generation, explanation fallback, and word-definition cleanup.
+- `src/dictionary.ts`: Louis dictionary API lookup, dictionary stats fetch, and dictionary-entry conversion to the normalized frontend response shape.
+- `src/streaming.ts`: streaming translation orchestration and incremental partial-response extraction for the frontend.
+- `src/settings.ts`: backend model catalog and persisted provider/model setting handlers.
+- `src/errors.ts`: structured translation error class.
 
 Main responsibilities:
 
@@ -202,5 +218,9 @@ The key UI regression checks are Playwright scripts:
 - `scripts/result-tabs-check.mjs`: checks result tab behavior.
 - `scripts/button-stability-check.mjs`: checks button size stability.
 - `scripts/system-theme-check.mjs`: checks system/default theme and manual theme cycling.
+- `scripts/api-smoke.mjs`: checks health, model catalog, and backend settings; set `RUN_TRANSLATE=1` to include a real translation call.
+- `scripts/check-all.mjs`: local quality gate for TypeScript, service-worker cache coverage, and frontend/script syntax checks.
+- `scripts/stream-benchmark.mjs`: measures first partial and final response timing for comma-separated `BENCHMARK_MODELS`.
+- `scripts/sw-cache-check.mjs`: verifies service-worker shell cache includes required frontend module assets and bypasses `/api/*`.
 
 Use these before changing mobile layout, buttons, tabs, or result cards.

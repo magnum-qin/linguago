@@ -1,3 +1,14 @@
+import { escapeAttribute, escapeHtml, escapeRegExp, stripHtml } from "./js/text-utils.js";
+import { formatPronunciationText } from "./js/pronunciation.js";
+import {
+  fetchDictionaryStats,
+  fetchRemoteModels,
+  fetchRemoteSettings,
+  openTranslationStream,
+  saveRemoteSettings,
+  verifyTranslation
+} from "./js/api.js";
+
 const HISTORY_KEY = "linguago-history-v5";
 const SETTINGS_KEY = "linguago-settings-v1";
 const THEME_SETTINGS_VERSION = 2;
@@ -165,6 +176,7 @@ const elements = {
   saveModelButton: document.querySelector("#saveModelButton"),
   verifyModelButton: document.querySelector("#verifyModelButton"),
   modelStatus: document.querySelector("#modelStatus"),
+  toastContainer: document.querySelector("#toastContainer"),
   dictionaryStats: document.querySelector("#dictionaryStats"),
   clearHistoryButton: document.querySelector("#clearHistoryButton"),
   resultCard: document.querySelector("#resultCard"),
@@ -452,11 +464,7 @@ function saveSettings() {
 
 async function loadRemoteSettings() {
   try {
-    const response = await fetch("/api/settings");
-    if (!response.ok) {
-      return;
-    }
-    const data = await response.json();
+    const data = await fetchRemoteSettings();
     if (data.model) {
       settings.provider = data.provider || settings.provider;
       settings.model = data.model;
@@ -470,12 +478,7 @@ async function loadRemoteSettings() {
 
 async function loadRemoteModels() {
   try {
-    const response = await fetch("/api/models", { cache: "no-store" });
-    if (!response.ok) {
-      return;
-    }
-
-    const data = await response.json();
+    const data = await fetchRemoteModels();
     const remoteVersion = Number(data.version || 0);
     for (const provider of PROVIDERS) {
       const defaultModel = String(data.defaults?.[provider] || "").trim();
@@ -741,6 +744,32 @@ function resetModelList() {
   }
 }
 
+function showToast(message) {
+  const text = String(message || "").trim();
+  if (!text) return;
+
+  let container = elements.toastContainer;
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    container.setAttribute("aria-live", "polite");
+    document.body.append(container);
+    elements.toastContainer = container;
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.setAttribute("role", "status");
+  toast.textContent = text;
+  container.append(toast);
+
+  window.setTimeout(() => {
+    toast.classList.add("toast-out");
+    toast.addEventListener("animationend", () => toast.remove(), { once: true });
+  }, 2400);
+}
+
 function saveModelSetting() {
   settings.provider = elements.providerSelect.value;
   settings.model = getSelectedModel();
@@ -749,32 +778,25 @@ function saveModelSetting() {
   elements.modelStatus.className = "model-status ok";
   elements.modelStatus.textContent = `${t("saved")}...`;
   pulse(elements.saveModelButton);
-  fetch("/api/settings", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      provider: settings.provider,
-      model: settings.model
-    })
+
+  saveRemoteSettings({
+    provider: settings.provider,
+    model: settings.model
   })
-    .then((response) =>
-      response.json().then((data) => {
-        if (!response.ok) {
-          throw new Error(data.error || "error");
-        }
-        settings.provider = data.provider || settings.provider;
-        settings.model = data.model || settings.model;
-        saveSettings();
-        applySettings();
-        elements.modelStatus.className = "model-status ok";
-        elements.modelStatus.textContent = `${t("saved")}：${settings.model}`;
-      })
-    )
+    .then((data) => {
+      settings.provider = data.provider || settings.provider;
+      settings.model = data.model || settings.model;
+      saveSettings();
+      applySettings();
+      elements.modelStatus.className = "model-status ok";
+      elements.modelStatus.textContent = `${t("saved")}?${settings.model}`;
+      showToast(`${t("saved")}?${settings.model}`);
+    })
     .catch((error) => {
+      const message = error instanceof Error ? error.message : "error";
       elements.modelStatus.className = "model-status err";
-      elements.modelStatus.textContent = `${t("saveFailed")}：${
-        error instanceof Error ? error.message : "error"
-      }`;
+      elements.modelStatus.textContent = `${t("saveFailed")}?${message}`;
+      showToast(`${t("saveFailed")}?${message}`);
     });
 }
 
@@ -788,30 +810,19 @@ async function verifyModelSetting() {
   elements.modelStatus.textContent = t("verifying");
 
   try {
-    const response = await fetch("/api/translate", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text: "hello",
-        source_lang: "auto",
-        target_lang: selectedResultLang,
-        provider: settings.provider,
-        model: settings.model
-      })
+    const data = await verifyTranslation({
+      text: "hello",
+      source_lang: "auto",
+      target_lang: selectedResultLang,
+      provider: settings.provider,
+      model: settings.model
     });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "error");
-    }
     elements.modelStatus.className = "model-status ok";
-    elements.modelStatus.textContent = `${t("verified")}：${
-      data.provider || settings.provider
-    } / ${data.model || settings.model}`;
+    elements.modelStatus.textContent = `${t("verified")}?${data.provider || settings.provider} / ${data.model || settings.model}`;
   } catch (error) {
+    const message = error instanceof Error ? error.message : "error";
     elements.modelStatus.className = "model-status err";
-    elements.modelStatus.textContent = `${t("verifyFailed")}：${
-      error instanceof Error ? error.message : "error"
-    }`;
+    elements.modelStatus.textContent = `${t("verifyFailed")}?${message}`;
   } finally {
     elements.verifyModelButton.disabled = false;
   }
@@ -841,10 +852,9 @@ async function loadDictionaryStats() {
   elements.dictionaryStats.textContent = t("dictionarySyncing");
 
   try {
-    const response = await fetch("/api/dictionary/stats");
-    const data = await response.json();
+    const data = await fetchDictionaryStats();
     const count = Number(data.accepted_words);
-    if (!response.ok || !Number.isFinite(count)) {
+    if (!Number.isFinite(count)) {
       throw new Error("unavailable");
     }
     elements.dictionaryStats.textContent = `${t("dictionaryAdded")}: ${count.toLocaleString()}`;
@@ -1014,11 +1024,7 @@ async function translateWithProgress(payload) {
   let partialRendered = false;
 
   try {
-    const response = await fetch("/api/translate-stream", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const response = await openTranslationStream(payload);
 
     if (!response.body) {
       return { data: await translateOnce(payload), rendered: false };
@@ -1039,40 +1045,20 @@ async function translateWithProgress(payload) {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        const message = JSON.parse(trimmed);
-        if (message.event === "delta" && message.data) {
-          partialRendered = true;
-          renderStreamingPreview(message.data);
-        } else if (message.event === "partial" && message.data) {
-          partialRendered = true;
-          renderPartialResult(message.data);
-        } else if (message.event === "final" && message.data) {
-          finalData = message.data;
-          renderFinalResultIncrementally(finalData, partialRendered);
-          finalRendered = true;
-        } else if (message.event === "error") {
-          throw new Error(message.data?.error || t("failed"));
-        }
+        const outcome = processStreamMessage(JSON.parse(trimmed), partialRendered);
+        partialRendered = partialRendered || outcome.partialRendered;
+        finalData = outcome.finalData || finalData;
+        finalRendered = finalRendered || outcome.finalRendered;
       }
 
       if (done) break;
     }
 
     if (buffer.trim()) {
-      const message = JSON.parse(buffer.trim());
-      if (message.event === "delta" && message.data) {
-        partialRendered = true;
-        renderStreamingPreview(message.data);
-      } else if (message.event === "partial" && message.data) {
-        partialRendered = true;
-        renderPartialResult(message.data);
-      } else if (message.event === "final" && message.data) {
-        finalData = message.data;
-        renderFinalResultIncrementally(finalData, partialRendered);
-        finalRendered = true;
-      } else if (message.event === "error") {
-        throw new Error(message.data?.error || t("failed"));
-      }
+      const outcome = processStreamMessage(JSON.parse(buffer.trim()), partialRendered);
+      partialRendered = partialRendered || outcome.partialRendered;
+      finalData = outcome.finalData || finalData;
+      finalRendered = finalRendered || outcome.finalRendered;
     }
 
     if (!finalData) {
@@ -1088,19 +1074,51 @@ async function translateWithProgress(payload) {
   }
 }
 
-async function translateOnce(payload) {
-  const response = await fetch("/api/translate", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || t("failed"));
+function processStreamMessage(message, hasPartial) {
+  if (message.event === "status") {
+    updateStreamStatus(message.data?.stage);
+    return { partialRendered: false, finalData: null, finalRendered: false };
   }
 
-  return data;
+  if (
+    (message.event === "delta" ||
+      message.event === "partial" ||
+      message.event === "partial_translation" ||
+      message.event === "partial_explanation") &&
+    message.data
+  ) {
+    renderStreamingPreview(message.data);
+    return { partialRendered: true, finalData: null, finalRendered: false };
+  }
+
+  if (message.event === "final" && message.data) {
+    renderFinalResultIncrementally(message.data, hasPartial);
+    return { partialRendered: false, finalData: message.data, finalRendered: true };
+  }
+
+  if (message.event === "error") {
+    throw new Error(message.data?.error || t("failed"));
+  }
+
+  return { partialRendered: false, finalData: null, finalRendered: false };
+}
+
+function updateStreamStatus(stage) {
+  if (stage === "provider_connected") {
+    updateStatus(t("translating"), "AI");
+    return;
+  }
+  if (stage === "first_token") {
+    updateStatus(t("translating"), t("live"));
+    return;
+  }
+  if (stage === "started") {
+    updateStatus(t("translating"), "...");
+  }
+}
+
+async function translateOnce(payload) {
+  return verifyTranslation(payload);
 }
 
 function renderPartialResult(data) {
@@ -1511,226 +1529,6 @@ function isResultBusy() {
   return elements.resultCard.getAttribute("aria-busy") === "true";
 }
 
-function formatPronunciationText(text, lang) {
-  if (lang === "ja") {
-    return formatJapaneseFurigana(text);
-  }
-  if (lang === "en") {
-    return formatEnglishKeywordPronunciation(text);
-  }
-  return escapeHtml(text);
-}
-
-function getPendingTranslationText(data) {
-  if (data?.target_lang && selectedResultLang !== data.target_lang) {
-    return t("translating");
-  }
-  return data?.translation || "-";
-}
-
-function runTypewriter(node, text, onDone) {
-  if (!node) return;
-  const value = String(text || "");
-  const runId = ++typewriterRunId;
-  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  if (prefersReducedMotion || value.length > 180) {
-    node.textContent = value;
-    onDone?.();
-    return;
-  }
-
-  node.classList.add("typing-text");
-  node.textContent = "";
-  let index = 0;
-  const step = () => {
-    if (runId !== typewriterRunId) return;
-    index += value.codePointAt(index) > 0xffff ? 2 : 1;
-    node.textContent = value.slice(0, index);
-
-    if (index < value.length) {
-      window.setTimeout(step, getTypewriterDelay(value[index - 1]));
-      return;
-    }
-
-    node.classList.remove("typing-text");
-    onDone?.();
-  };
-
-  window.setTimeout(step, 18);
-}
-
-function getTypewriterDelay(char) {
-  if (/[\s,.;:!?，。！？、]/u.test(char || "")) return 34;
-  return 18;
-}
-
-function stripHtml(html) {
-  const template = document.createElement("template");
-  template.innerHTML = html || "";
-  return template.content.textContent || "";
-}
-
-function formatJapaneseFurigana(text) {
-  const readings = {
-    "観光スポット": "かんこうスポット",
-    "観光": "かんこう",
-    "景色": "けしき",
-    "場所": "ばしょ",
-    "美しい": "うつくしい",
-    "綺麗": "きれい",
-    "有名": "ゆうめい",
-    "人気": "にんき",
-    "公園": "こうえん",
-    "散歩": "さんぽ",
-    "旅行": "りょこう",
-    "明日": "あした",
-    "今日": "きょう",
-    "朝": "あさ",
-    "昼": "ひる",
-    "夜": "よる",
-    "勉強": "べんきょう",
-    "練習": "れんしゅう",
-    "葡萄牙語": "ポルトガルご",
-    "英語": "えいご",
-    "中国語": "ちゅうごくご",
-    "日本語": "にほんご",
-    "金曜日": "きんようび",
-    "月曜日": "げつようび",
-    "火曜日": "かようび",
-    "水曜日": "すいようび",
-    "木曜日": "もくようび",
-    "土曜日": "どようび",
-    "日曜日": "にちようび",
-    "今日": "きょう",
-    "明日": "あした",
-    "昨日": "きのう",
-    "朝": "あさ",
-    "昼": "ひる",
-    "夜": "よる",
-    "確認": "かくにん",
-    "更新": "こうしん",
-    "修正": "しゅうせい",
-    "変更": "へんこう",
-    "送信": "そうしん",
-    "請求書": "せいきゅうしょ",
-    "番号": "ばんごう",
-    "契約": "けいやく",
-    "契約書": "けいやくしょ",
-    "提案": "ていあん",
-    "会議": "かいぎ",
-    "顧客": "こきゃく",
-    "取引先": "とりひきさき",
-    "納期": "のうき",
-    "配送": "はいそう",
-    "配達": "はいたつ",
-    "予定": "よてい",
-    "保証": "ほしょう",
-    "保証書": "ほしょうしょ",
-    "発票": "はっぴょう",
-    "書類": "しょるい",
-    "資料": "しりょう"
-  };
-  const pattern = new RegExp(
-    Object.keys(readings)
-      .sort((a, b) => b.length - a.length)
-      .map(escapeRegExp)
-      .join("|"),
-    "g"
-  );
-
-  return escapeHtml(text).replace(pattern, (match) => {
-    const reading = readings[match];
-    return reading ? `<ruby>${escapeHtml(match)}<rt>${escapeHtml(reading)}</rt></ruby>` : match;
-  });
-}
-
-function formatEnglishKeywordPronunciation(text) {
-  const pronunciations = {
-    scenic: "SEE-nik",
-    beautiful: "BYOO-tuh-ful",
-    tourist: "TOOR-ist",
-    attraction: "uh-TRAK-shun",
-    sightseeing: "SYT-see-ing",
-    popular: "POP-yuh-ler",
-    famous: "FAY-mus",
-    wonderful: "WUN-der-ful",
-    gorgeous: "GOR-jus",
-    amazing: "uh-MAY-zing",
-    exercise: "EK-ser-syz",
-    exercises: "EK-ser-syz-iz",
-    practice: "PRAK-tis",
-    portuguese: "POR-chuh-geez",
-    language: "LANG-gwij",
-    coffee: "KAW-fee",
-    morning: "MOR-ning",
-    tomorrow: "tuh-MOR-oh",
-    tonight: "tuh-NYT",
-    afternoon: "af-ter-NOON",
-    together: "tuh-GEH-ther",
-    confirm: "kən-FURM",
-    confirmed: "kən-FURMD",
-    invoice: "IN-voys",
-    number: "NUM-ber",
-    contract: "KON-trakt",
-    revised: "ri-VYZD",
-    revision: "ri-VIZH-ən",
-    proposal: "prə-POH-zəl",
-    supplier: "sə-PLY-er",
-    vendor: "VEN-der",
-    delivery: "di-LIV-er-ee",
-    schedule: "SKEJ-ool",
-    immediately: "ih-MEE-dee-it-lee",
-    warranty: "WOR-ən-tee",
-    meeting: "MEE-ting",
-    decision: "di-SIZH-ən",
-    client: "KLY-ent",
-    review: "ri-VYOO",
-    document: "DOK-yoo-ment"
-  };
-  const words = text.match(/\b[A-Za-z][A-Za-z'-]{4,}\b/g) || [];
-  const targets = [...new Set(
-    words
-      .map((word) => word.toLowerCase())
-      .filter((word) => pronunciations[word] || shouldAnnotateEnglishWord(word))
-  )].slice(0, 4);
-  let html = escapeHtml(text);
-
-  for (const target of targets) {
-    const pattern = new RegExp(`\\b${escapeRegExp(target)}\\b`, "i");
-    html = html.replace(pattern, (match) => {
-      const pronunciation = pronunciations[target] || approximateEnglishPronunciation(match);
-      return `<span class="keyword-pronunciation">${escapeHtml(match)}<small>${escapeHtml(pronunciation)}</small></span>`;
-    });
-  }
-
-  return html;
-}
-
-function shouldAnnotateEnglishWord(word) {
-  const normalized = String(word || "").toLowerCase();
-  if (normalized.length < 7) return false;
-  return /tion|sion|ous|eous|ious|cial|tial|gh|ph|ch|qu|gue|ese|ique|ology|graphy|beautiful|scenic/u.test(normalized);
-}
-
-function approximateEnglishPronunciation(word) {
-  const value = String(word || "").toLowerCase();
-  const syllables = value
-    .replace(/tion\b/g, "shun")
-    .replace(/sion\b/g, "zhun")
-    .replace(/ph/g, "f")
-    .replace(/gh\b/g, "")
-    .replace(/qu/g, "kw")
-    .replace(/c(?=e|i|y)/g, "s")
-    .replace(/c/g, "k")
-    .replace(/([aeiouy]+)(?=[bcdfghjklmnpqrstvwxyz])/g, "$1-")
-    .replace(/-+$/g, "")
-    .split("-")
-    .filter(Boolean)
-    .slice(0, 4);
-  return syllables.length ? syllables.join("-") : value;
-}
-
 function getSelectedTranslation(data) {
   const item = getLocalized(data.translations || {}, selectedResultLang);
   if (item.text) return item.text;
@@ -1944,10 +1742,6 @@ function mergeHighlightRanges(ranges) {
     merged.push({ ...range });
   }
   return merged;
-}
-
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function getLocalized(translations, lang) {
@@ -2205,19 +1999,6 @@ function animateSwap(node) {
   node.classList.remove("content-swap");
   void node.offsetWidth;
   node.classList.add("content-swap");
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function escapeAttribute(value) {
-  return escapeHtml(value).replaceAll("`", "&#96;");
 }
 
 async function registerServiceWorker() {
