@@ -26,6 +26,19 @@ Rules:
     "pt-BR": {"word": "palavra", "definition": "Definição em português do Brasil"},
     "ja": {"word": "日本語", "definition": "日本語の説明"}
   },
+  "senses": [
+    {
+      "sense_order": 1,
+      "part_of_speech": "NOUN",
+      "gloss_key": "core meaning",
+      "definitions": {
+        "zh": "该义项的中文释义",
+        "en": "English definition for this sense",
+        "pt-BR": "Definição em português para este sentido",
+        "ja": "この意味の日本語の定義"
+      }
+    }
+  ],
   "examples": [
     {
       "sentence": "A concise sentence containing the word.",

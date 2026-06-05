@@ -240,7 +240,7 @@ const submitReport = async () => {
             <div v-if="typeof resultData === 'string'" class="bg-m3-surface-container rounded-[28px] p-6 text-m3-on-surface font-medium mt-6">
               {{ resultData }}
             </div>
-            <div v-else-if="currentWordDetail && currentSenses.length === 0" class="bg-m3-surface-container rounded-[28px] p-6 mt-6 border border-m3-outline-variant/20">
+            <div v-else-if="currentWordDetail && currentWordDetail.definition && currentSenses.length === 0" class="bg-m3-surface-container rounded-[28px] p-6 mt-6 border border-m3-outline-variant/20">
               <p class="text-m3-on-surface text-lg leading-relaxed">{{ currentWordDetail.definition }}</p>
             </div>
 

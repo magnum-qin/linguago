@@ -144,6 +144,28 @@ export const FULL_RESPONSE_SCHEMA = {
         },
         required: ["sentence", "translations"]
       }
+    },
+    senses: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          sense_order: { type: "number", description: "1-based order index of this sense" },
+          part_of_speech: { type: "string", description: "Part of speech (e.g. NOUN, VERB, ADJ, ADV)" },
+          gloss_key: { type: "string", description: "A very short core meaning or concept key" },
+          definitions: {
+            type: "object",
+            properties: {
+              zh: { type: "string", description: "Definition in Simplified Chinese" },
+              en: { type: "string", description: "Definition in English" },
+              "pt-BR": { type: "string", description: "Definition in Brazilian Portuguese" },
+              ja: { type: "string", description: "Definition in Japanese" }
+            },
+            required: ["zh", "en", "pt-BR", "ja"]
+          }
+        },
+        required: ["sense_order", "part_of_speech", "definitions"]
+      }
     }
   },
   required: ["type", "detected_source_lang", "translation", "translations"]
