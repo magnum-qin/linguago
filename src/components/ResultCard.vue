@@ -3,11 +3,20 @@ import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
 import { useTranslation } from '../composables/useTranslation';
 import { useBookmarks } from '../composables/useBookmarks';
 import FuriganaText from './FuriganaText.vue';
+import M3Select from './M3Select.vue';
 import { Star, Flag, AlertTriangle, X, Volume2, Sparkles, Loader2 } from 'lucide-vue-next';
 import { reportTranslationError } from '../utils/api.js';
 
 const { resultData, isTranslating } = useTranslation();
 const { isBookmarked, toggleBookmark } = useBookmarks();
+
+const reportOptions = [
+  { value: "", label: "快速一键报告 / Relatório Rápido" },
+  { value: "拼写错误", label: "拼写错误 / Erro Ortográfico" },
+  { value: "释义不准确", label: "释义不准确 / Definição Imprecisa" },
+  { value: "语境不符", label: "语境不符 / Contexto Inadequado" },
+  { value: "其他", label: "其他... / Outros..." }
+];
 
 const currentWord = computed(() => {
   if (currentWordDetail.value?.word) return currentWordDetail.value.word;
@@ -314,52 +323,49 @@ const submitReport = async () => {
 
     <!-- Error Report Modal -->
     <Teleport to="body">
-      <div v-if="isReportModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity">
-        <div class="bg-m3-surface-container rounded-[28px] shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-xl font-display font-bold text-m3-on-surface flex items-center gap-2">
-              <AlertTriangle class="w-6 h-6 text-m3-primary" /> 纠正当前词条 / Corrigir este termo
-            </h3>
-            <button @click="isReportModalOpen = false" class="w-8 h-8 rounded-full bg-transparent hover:bg-m3-surface-container-high flex items-center justify-center text-m3-on-surface-variant">
-              <X class="w-5 h-5" />
-            </button>
-          </div>
-          
-          <p class="text-m3-on-surface-variant text-sm">
-            发现 <strong>{{ currentWord }}</strong> 的翻译或释义有误？ / Encontrou um erro em <strong>{{ currentWord }}</strong>?<br/>记录后，后台大模型将进行分析和修正。 / Após registrar, o modelo de IA fará análise e correção.
-          </p>
+      <Transition name="modal">
+        <div v-if="isReportModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div class="bg-m3-surface-container rounded-[28px] shadow-2xl w-full max-w-md p-6 sm:p-8 flex flex-col gap-6">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xl font-display font-bold text-m3-on-surface flex items-center gap-3">
+                <AlertTriangle class="w-6 h-6 text-m3-primary" /> 纠正 / Corrigir
+              </h3>
+              <button @click="isReportModalOpen = false" class="w-10 h-10 rounded-full bg-transparent hover:bg-m3-surface-container-high flex items-center justify-center text-m3-on-surface-variant transition-colors">
+                <X class="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p class="text-m3-on-surface-variant text-[0.95rem] leading-relaxed">
+              发现 <strong>{{ currentWord }}</strong> 有误？ / Erro em <strong>{{ currentWord }}</strong>?<br/>
+              后台模型将进行分析修正。 / A IA analisará e fará a correção.
+            </p>
 
-          <div class="flex flex-col gap-2 mt-2">
-            <label class="text-xs font-bold text-m3-on-surface-variant uppercase tracking-wider">错误类型 (可选) / Tipo de erro (Opcional)</label>
-            <select v-model="reportReason" class="bg-m3-surface-container-high border border-m3-outline-variant/30 text-m3-on-surface text-sm rounded-[12px] p-3 outline-none focus:ring-2 focus:ring-m3-primary">
-              <option value="">快速一键报告 / Relatório Rápido</option>
-              <option value="拼写错误">拼写错误 / Erro Ortográfico</option>
-              <option value="释义不准确">释义不准确 / Definição Imprecisa</option>
-              <option value="语境不符">语境不符 / Contexto Inadequado</option>
-              <option value="其他">其他... / Outros...</option>
-            </select>
-          </div>
+            <div class="flex flex-col gap-3">
+              <label class="text-xs font-bold text-m3-on-surface-variant uppercase tracking-wider pl-1">类型 (可选) / Tipo (Opcional)</label>
+              <M3Select v-model="reportReason" :options="reportOptions" />
+            </div>
 
-          <div class="flex items-center justify-end gap-3 mt-4">
-            <button v-if="!isReported && !isReporting" @click="isReportModalOpen = false" class="px-5 py-2.5 rounded-[12px] text-sm font-bold text-m3-on-surface-variant hover:bg-m3-surface-container-high transition-colors">
-              取消 / Cancelar
-            </button>
-            <button 
-              v-if="!isReported"
-              @click="submitReport"
-              :disabled="isReporting"
-              class="px-5 py-2.5 rounded-[12px] text-sm font-bold bg-m3-primary text-m3-on-primary hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2"
-            >
-              <span v-if="isReporting" class="w-4 h-4 border-2 border-m3-on-primary border-t-transparent rounded-full animate-spin"></span>
-              {{ isReporting ? '反馈提交中... / Enviando...' : '提交反馈 / Enviar' }}
-            </button>
-            <div v-else class="px-5 py-2.5 rounded-[12px] bg-[#008053]/10 text-[#008053] text-sm font-bold flex items-center gap-2">
-              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              感谢您的反馈！ / Obrigado pelo seu feedback!
+            <div class="flex items-center justify-end gap-3 mt-2">
+              <button v-if="!isReported && !isReporting" @click="isReportModalOpen = false" class="px-6 py-2.5 rounded-full text-sm font-bold text-m3-on-surface-variant hover:bg-m3-surface-container-high transition-colors">
+                取消 / Cancelar
+              </button>
+              <button 
+                v-if="!isReported"
+                @click="submitReport"
+                :disabled="isReporting"
+                class="px-6 py-2.5 rounded-full text-sm font-bold bg-m3-primary text-m3-on-primary hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2"
+              >
+                <Loader2 v-if="isReporting" class="w-4 h-4 animate-spin" />
+                {{ isReporting ? '提交中... / Enviando...' : '提交 / Enviar' }}
+              </button>
+              <div v-else class="px-6 py-2.5 rounded-full bg-m3-primary/10 text-m3-primary text-sm font-bold flex items-center gap-2">
+                <Check class="w-4 h-4" />
+                感谢反馈！ / Obrigado!
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
   </section>
 </template>
@@ -390,6 +396,26 @@ const submitReport = async () => {
 }
 .animation-delay-1500 {
   animation-delay: 1.5s;
+}
+
+/* Modal Transitions */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+.modal-enter-active .bg-m3-surface-container,
+.modal-leave-active .bg-m3-surface-container {
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-from .bg-m3-surface-container,
+.modal-leave-to .bg-m3-surface-container {
+  transform: scale(0.95) translateY(10px);
+  opacity: 0;
 }
 
 /* Tab Slide Transitions */
