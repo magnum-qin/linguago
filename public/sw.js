@@ -1,12 +1,7 @@
-const CACHE_NAME = "linguago-shell-v33";
+const CACHE_NAME = "linguago-shell-v40-vue";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css",
-  "/app.js",
-  "/js/api.js",
-  "/js/text-utils.js",
-  "/js/pronunciation.js",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/apple-touch-icon.png",
@@ -50,13 +45,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname === "/app.js" || url.pathname === "/styles.css") {
-    event.respondWith(networkFirstAsset(event.request, url.pathname));
+  // Vite assets (hashed) can be cached safely forever
+  if (url.pathname.startsWith("/assets/")) {
+    event.respondWith(cacheFirstAsset(event.request, url.pathname));
     return;
   }
 
   if (APP_SHELL_PATHS.has(url.pathname)) {
-    event.respondWith(cacheFirstAsset(url.pathname));
+    event.respondWith(staleWhileRevalidate(event.request));
     return;
   }
 
@@ -82,14 +78,20 @@ async function networkFirstNavigation(request) {
   }
 }
 
-async function cacheFirstAsset(pathname) {
-  const cached = await caches.match(pathname);
-  const request = new Request(new URL(pathname, self.location.origin), {
-    method: "GET",
-    credentials: "same-origin"
-  });
-  const update = fetchAndCache(request).catch(() => cached);
-  return cached || update || new Response("", { status: 503, statusText: "Offline" });
+async function cacheFirstAsset(request, pathname) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  } catch (error) {
+    return new Response("", { status: 503, statusText: "Offline" });
+  }
 }
 
 async function networkFirstAsset(request, pathname) {

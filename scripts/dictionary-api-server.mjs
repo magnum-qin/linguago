@@ -55,6 +55,27 @@ const server = http.createServer(async (request, response) => {
       return sendJson(response, 200, lookupTerm(term));
     }
 
+    if (url.pathname === "/api/dictionary/report" && request.method === "POST") {
+      let body = "";
+      for await (const chunk of request) { body += chunk; }
+      try {
+        const payload = JSON.parse(body);
+        if (!payload.term) return sendJson(response, 400, { error: "missing term" });
+        
+        const report = {
+          term: payload.term,
+          target_lang: payload.target_lang,
+          reason: payload.reason,
+          reported_at: new Date().toISOString(),
+          status: 'pending'
+        };
+        fs.appendFileSync(path.resolve("data/error_reports.jsonl"), JSON.stringify(report) + "\n");
+        return sendJson(response, 200, { ok: true });
+      } catch (e) {
+        return sendJson(response, 400, { error: "invalid format" });
+      }
+    }
+
     return sendJson(response, 404, { error: "not found" });
   } catch (error) {
     console.error(error);

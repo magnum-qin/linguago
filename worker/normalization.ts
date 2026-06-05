@@ -38,10 +38,7 @@ export function normalizeResponse(input: {
     return {
       ...base,
       type,
-      phonetic: buildLocalPhonetic(
-        normalizeTargetLang(String(input.translated.detected_source_lang || "")),
-        input.text
-      ),
+      phonetic: "",
       audio_text: input.text,
       examples: normalizeExamples(input.translated.examples),
       word_details: normalizeWordDetails(input.translated.word_details)
@@ -293,28 +290,52 @@ function normalizeLocalizedText(value: unknown, lang: DisplayLanguageCode): Loca
   return localPronunciationText(lang, text);
 }
 
+export function stripPronunciationBrackets(text: string): string {
+  return text.replace(/\{([^|{}]+)\|([^|{}]+)\}/g, "$1");
+}
+
 export function localPronunciationText(lang: DisplayLanguageCode, text: string): LocalizedText {
   const normalized = normalizeText(text);
+  const cleanText = (lang === "ja" || lang === "en") ? stripPronunciationBrackets(normalized) : normalized;
+  
+  if (lang === "zh" && /[\u4e00-\u9fff]/u.test(cleanText)) {
+    return {
+      text: applyInlinePinyin(cleanText),
+      phonetic: "", // Clear badge, since we are using inline pinyin
+      audio_text: cleanText
+    };
+  }
+
   return {
     text: normalized,
-    phonetic: buildLocalPhonetic(lang, normalized),
-    audio_text: normalized
+    phonetic: "",
+    audio_text: cleanText
   };
 }
 
-function buildLocalPhonetic(lang: DisplayLanguageCode, text: string): string {
+function applyInlinePinyin(text: string): string {
   if (!text) return "";
-  if (lang !== "zh" || !/[\u4e00-\u9fff]/u.test(text)) {
-    return "";
-  }
-
   try {
-    return pinyin(text, {
+    const pinyins = pinyin(text, {
+      type: "array",
       toneType: "symbol",
-      nonZh: "consecutive"
+      nonZh: "removed"
     });
+    
+    let result = "";
+    let pinyinIdx = 0;
+    for (const char of text) {
+      if (/[\u4e00-\u9fff]/.test(char)) {
+        const py = pinyins[pinyinIdx];
+        result += py ? `{${char}|${py}}` : char;
+        pinyinIdx++;
+      } else {
+        result += char;
+      }
+    }
+    return result;
   } catch {
-    return "";
+    return text;
   }
 }
 

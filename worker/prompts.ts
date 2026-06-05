@@ -59,9 +59,9 @@ Rules:
 }
 7. The language-keyed fields must be written in their own language:
 - zh must be Simplified Chinese only. Do not use Japanese kana or Portuguese.
-- en must be English only.
+- en must be English only. For all English text (including translations, word_details, explanations, and examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate nouns, verbs, and adjectives like "screwdriver", "sewer", "schedule") with their standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}, {sewer|ˈsuː.ər}. Do not annotate extremely basic words like "the", "is", "have", "go", "use", "hard", "good", "bad".
 - pt-BR must be Brazilian Portuguese only.
-- ja must be Japanese only.
+- ja must be Japanese only. For all Japanese text (including translations, word_details, explanations, and examples), annotate kanji terms with their hiragana readings using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}, {美しい|うつくしい}. Do not leave kanji without readings.
 8. Preserve the requested target language exactly and keep all text natural and concise.
 9. Never copy placeholder wording such as "English explanation of meaning, tone, and usage" or "Real English explanation for this exact sentence".`;
 
@@ -76,6 +76,8 @@ Return only this compact shape:
   "explanation": "one concise explanation in the requested target language"
 }
 
+If the target language is Japanese, annotate kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}.
+If the target language is English, annotate English words in the translation and explanation that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
 Keep the translation natural and concise. Do not include other languages, phonetics, examples, or markdown.`;
 
 export const ACTIVE_SYSTEM_PROMPT = `You are a translation engine for a mobile PWA.
@@ -88,9 +90,9 @@ Rules:
 4. The server will generate pronunciation fields separately.
 5. Language-keyed fields must be written in their own language:
 - zh: Simplified Chinese only. Do not use Japanese kana or Portuguese.
-- en: English only.
-- pt-BR: Brazilian Portuguese only.
-- ja: Japanese only.
+- en: English only. For all English text (including translations, word_details, explanations, and examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate nouns, verbs, and adjectives like "screwdriver", "sewer", "schedule") with their standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}, {sewer|ˈsuː.ər}. Do not annotate extremely basic words like "the", "is", "have", "go", "use", "hard", "good", "bad".
+- pt-BR: Brazilian Portuguese only. For all Portuguese text (including translations, word_details, explanations, and examples), annotate difficult or complex words with their standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {exceção|e.seˈsɐ̃w}. Do not annotate basic everyday words.
+- ja: Japanese only. For all Japanese text (including translations, word_details, explanations, and examples), annotate kanji terms with their hiragana readings using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}, {美しい|うつくしい}. Do not leave kanji without readings.
 6. Explanations must be specific to the actual input text. Never copy placeholder wording from this prompt.
 7. For word_details definitions, write only a concise definition in that language. Do not include pronunciation, part-of-speech labels, cross-language equivalents, markdown, bullet points, or comparisons such as "in Japanese/English/Portuguese". Keep each definition under 28 words or 45 Chinese/Japanese characters.
 
@@ -147,40 +149,56 @@ For a sentence or phrase, return:
 export const GEMINI_SYSTEM_PROMPT = `Translate the input for a mobile language-learning app.
 Follow the provided JSON schema exactly.
 Use zh, en, pt-BR, and ja fields in their own languages.
+For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
+For all English text (translations, explanations, definitions, examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
 For word definitions, write concise definitions only; no pronunciation, part-of-speech labels, markdown, or cross-language equivalents.
 Do not copy schema descriptions or placeholder wording.`;
 
 export const GEMINI_PREVIEW_SYSTEM_PROMPT = `Translate the input into the requested target language.
 Follow the provided JSON schema exactly.
+If the target language is Japanese, annotate kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}.
+If the target language is English, annotate English words in the translation and explanation that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
 Return a natural translation and one concise explanation only.`;
 
 export const DEEPSEEK_SYSTEM_PROMPT = `You are a translation engine. Return valid json only.
 The user provides source language, target language, and text.
 Output this JSON shape exactly:
 {"type":"sentence","detected_source_lang":"zh","translation":"target-language text","translations":{"zh":{"text":"简体中文"},"en":{"text":"English"},"pt-BR":{"text":"Português do Brasil"},"ja":{"text":"日本語"}},"explanations":{"zh":"简短中文解释","en":"Brief English explanation","pt-BR":"Breve explicação em português","ja":"短い日本語の説明"}}
+For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
+For all English and Portuguese text (translations, explanations, definitions, examples), annotate difficult words (exceeding high school vocabulary) with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}, {exceção|e.seˈsɐ̃w}. Do not annotate extremely basic everyday words.
 For a single word, set type to "word" and also include word_details and examples. Definitions must be concise and written only in their own language.`;
 
 export const DEEPSEEK_PREVIEW_SYSTEM_PROMPT = `Return valid json only.
 Output this JSON shape exactly:
-{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}`;
+{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}
+If the target language is Japanese, annotate kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}.
+If the target language is English, annotate English words in the translation and explanation that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.`;
 
 export const DASH_SCOPE_SYSTEM_PROMPT = `You are a translation engine. Return valid JSON only.
 The user provides source language, target language, and text.
 Return zh, en, pt-BR, and ja fields in their own languages.
+For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
+For all English text (translations, explanations, definitions, examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
 For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.
 Use the same JSON shape as the translation API schema.`;
 
 export const DASH_SCOPE_PREVIEW_SYSTEM_PROMPT = `Return valid JSON only.
 Translate into the requested target language and return:
-{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}`;
+{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}
+If the target language is Japanese, annotate kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}.
+If the target language is English, annotate English words in the translation and explanation that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.`;
 
 export const OPENROUTER_SYSTEM_PROMPT = `Translate the input for a mobile language-learning app.
 Follow the JSON schema exactly.
 Use zh, en, pt-BR, and ja fields in their own languages.
+For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
+For all English text (translations, explanations, definitions, examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
 For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.`;
 
 export const OPENROUTER_PREVIEW_SYSTEM_PROMPT = `Translate into the requested target language.
 Follow the JSON schema exactly.
+If the target language is Japanese, annotate kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}.
+If the target language is English or Portuguese, annotate difficult words (exceeding high school vocabulary) in the translation and explanation with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}, {exceção|e.seˈsɐ̃w}. Do not annotate extremely basic everyday words.
 Return a natural translation and one concise explanation only.`;
 
 export function isPreviewPrompt(systemPrompt?: string): boolean {

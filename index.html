@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#060606" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="LinguaGo" />
+    <meta name="description" content="AI translation PWA" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <script>
+      (() => {
+        try {
+          const settings = JSON.parse(localStorage.getItem("linguago-settings-v1") || "{}");
+          const themeSettingsVersion = 2;
+          const preference =
+            settings.themeSettingsVersion === themeSettingsVersion &&
+            ["light", "dark", "system"].includes(settings.theme)
+              ? settings.theme
+              : "system";
+          const resolved =
+            preference === "system" && matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : preference === "dark"
+                ? "dark"
+                : "light";
+          document.documentElement.dataset.theme = resolved;
+          document.documentElement.dataset.themePreference = preference;
+          document.documentElement.style.backgroundColor = resolved === "dark" ? "#060606" : "#ffffff";
+        } catch {
+          const resolved = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.dataset.theme = resolved;
+          document.documentElement.dataset.themePreference = "system";
+          document.documentElement.style.backgroundColor = resolved === "dark" ? "#060606" : "#ffffff";
+        }
+      })();
+    </script>
+    <title>LinguaGo</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

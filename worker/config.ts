@@ -22,7 +22,7 @@ export const DEFAULT_MODELS: Record<Provider, string> = {
   auto: "qwen3.6-flash",
   openrouter: "qwen/qwen3-next-80b-a3b-instruct:free",
   dashscope: "qwen3.6-flash",
-  gemini: "gemini-2.5-flash",
+  gemini: "gemini-3.5-flash",
   deepseek: "deepseek-v4-flash"
 };
 
@@ -91,7 +91,7 @@ export const MODEL_OPTIONS: Record<Provider, string[]> = {
   deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"]
 };
 
-export const TRANSLATION_CACHE_VERSION = "v34";
+export const TRANSLATION_CACHE_VERSION = "v38";
 export const PREVIEW_TIMEOUT_MS = 10_000;
 export const FULL_TRANSLATION_TIMEOUT_MS = 30_000;
 export const MAX_INPUT_CHARS = 1200;

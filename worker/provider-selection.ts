@@ -75,14 +75,6 @@ export function selectProvider(
     };
   }
 
-  if (env.DASHSCOPE_API_KEY) {
-    return {
-      provider: "dashscope",
-      model: selectModelForProvider(requestedProvider, "dashscope", requestedModel),
-      apiKey: env.DASHSCOPE_API_KEY
-    };
-  }
-
   if (env.DEEPSEEK_API_KEY) {
     return {
       provider: "deepseek",
@@ -96,6 +88,14 @@ export function selectProvider(
       provider: "gemini",
       model: selectModelForProvider(requestedProvider, "gemini", requestedModel),
       apiKey: env.GEMINI_API_KEY
+    };
+  }
+
+  if (env.DASHSCOPE_API_KEY) {
+    return {
+      provider: "dashscope",
+      model: selectModelForProvider(requestedProvider, "dashscope", requestedModel),
+      apiKey: env.DASHSCOPE_API_KEY
     };
   }
 

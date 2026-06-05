@@ -9,33 +9,144 @@ import type {
   WordSense
 } from "./types";
 
+export interface DictionaryAdapter {
+  name: string;
+  lookup(input: { env: Env; text: string; targetLang: LanguageCode }): Promise<WordResponse | null>;
+}
+
+export class LouisSQLiteAdapter implements DictionaryAdapter {
+  name = "louis-sqlite";
+
+  async lookup(input: { env: Env; text: string; targetLang: LanguageCode }): Promise<WordResponse | null> {
+    if (!input.env.DICTIONARY_API_URL || !input.env.DICTIONARY_API_TOKEN) return null;
+
+    try {
+      const url = new URL("/api/dictionary/lookup", input.env.DICTIONARY_API_URL);
+      url.searchParams.set("term", input.text);
+      const token = input.env.DICTIONARY_API_TOKEN;
+      console.log("Fetching URL:", url.toString());
+      const response = await fetch(url.toString(), {
+        headers: {
+          accept: "application/json",
+          authorization: `Bearer ${token}`
+        },
+        signal: AbortSignal.timeout(1800)
+      });
+
+      if (!response.ok) {
+        console.error("Dictionary API returned not ok:", response.status, await response.text());
+        return null;
+      }
+      const payload = (await response.json()) as { entries?: Array<Record<string, unknown>> };
+      const entry = payload.entries?.[0];
+      if (!entry) {
+        console.log("No entry found for", input.text);
+        return null;
+      }
+      console.log("Dictionary hit for", input.text);
+      return dictionaryEntryToResponse(entry, input.text, input.targetLang);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      return null;
+    }
+  }
+}
+
+export class MockJMDictAdapter implements DictionaryAdapter {
+  name = "mock-jmdict";
+
+  async lookup(input: { env: Env; text: string; targetLang: LanguageCode }): Promise<WordResponse | null> {
+    // Only return mock data if translating 'hello' to Japanese to simulate an external JMDict response
+    if (input.text.toLowerCase() === "hello" && input.targetLang === "ja") {
+      return {
+        detected_source_lang: "en",
+        target_lang: "ja",
+        original: "hello",
+        translation: "こんにちは",
+        translations: {
+          ja: { text: "こんにちは", phonetic: "kon'nichiwa", audio_text: "こんにちは" },
+          zh: { text: "", phonetic: "", audio_text: "" },
+          en: { text: "", phonetic: "", audio_text: "" },
+          "pt-BR": { text: "", phonetic: "", audio_text: "" }
+        },
+        provider: "dictionary",
+        model: "mock-jmdict",
+        cached: true,
+        type: "word",
+        phonetic: "kon'nichiwa",
+        audio_text: "hello",
+        examples: [
+          {
+            sentence: "Hello, how are you today?",
+            translations: { ja: "こんにちは、今日の調子はどうですか？", zh: "", en: "", "pt-BR": "" }
+          }
+        ],
+        senses: [
+          {
+            sense_order: 2,
+            part_of_speech: "interjection (from JMDict)",
+            gloss_key: "greeting",
+            definitions: { ja: "（日中の挨拶）こんにちは。", zh: "", en: "", "pt-BR": "" }
+          }
+        ],
+        word_details: {
+          ja: { word: "こんにちは", definition: "日中に出会った人に対してかける挨拶の言葉。" },
+          zh: { word: "", definition: "" },
+          en: { word: "", definition: "" },
+          "pt-BR": { word: "", definition: "" }
+        }
+      };
+    }
+    return null;
+  }
+}
+
+export class CompositeDictionaryManager {
+  private adapters: DictionaryAdapter[] = [];
+
+  constructor() {
+    this.adapters.push(new LouisSQLiteAdapter());
+    this.adapters.push(new MockJMDictAdapter());
+  }
+
+  async lookupAll(input: { env: Env; text: string; targetLang: LanguageCode }): Promise<WordResponse | null> {
+    if (!isDictionaryLookupCandidate(input.text)) return null;
+
+    const results = await Promise.all(this.adapters.map(adapter => adapter.lookup(input)));
+    const validResults = results.filter((res): res is WordResponse => res !== null);
+
+    if (validResults.length === 0) return null;
+
+    // Merge strategy:
+    // We use the first result as the "base" response, and append senses/examples from others.
+    const base = validResults[0];
+
+    for (let i = 1; i < validResults.length; i++) {
+      const additional = validResults[i];
+      // Merge examples
+      if (additional.examples) {
+        base.examples = [...(base.examples || []), ...additional.examples];
+      }
+      // Merge senses
+      if (additional.senses) {
+        base.senses = [...(base.senses || []), ...additional.senses];
+      }
+      // If we want to enrich phonetic or translations, we could do that here too.
+    }
+
+    base.model = validResults.map(r => r.model).join(" + ");
+    return base;
+  }
+}
+
+const dictionaryManager = new CompositeDictionaryManager();
+
 export async function lookupDictionaryFirst(input: {
   env: Env;
   text: string;
   targetLang: LanguageCode;
 }): Promise<WordResponse | null> {
-  if (!isDictionaryLookupCandidate(input.text)) return null;
-  if (!input.env.DICTIONARY_API_URL || !input.env.DICTIONARY_API_TOKEN) return null;
-
-  try {
-    const url = new URL("/api/dictionary/lookup", input.env.DICTIONARY_API_URL);
-    url.searchParams.set("term", input.text);
-    const response = await fetch(url.toString(), {
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${input.env.DICTIONARY_API_TOKEN}`
-      },
-      signal: AbortSignal.timeout(1800)
-    });
-
-    if (!response.ok) return null;
-    const payload = (await response.json()) as { entries?: Array<Record<string, unknown>> };
-    const entry = payload.entries?.[0];
-    if (!entry) return null;
-    return dictionaryEntryToResponse(entry, input.text, input.targetLang);
-  } catch {
-    return null;
-  }
+  return dictionaryManager.lookupAll(input);
 }
 
 export async function fetchDictionaryStats(env: Env): Promise<Record<string, unknown>> {

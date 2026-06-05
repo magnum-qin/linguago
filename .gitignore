@@ -9,3 +9,9 @@ output
 *.sqlite-shm
 *.sqlite-wal
 *.log
+
+*.zip
+*.tar.gz
+binary_temp/
+temp_sqlite/
+.dev.vars.bak*

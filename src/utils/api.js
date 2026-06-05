@@ -32,6 +32,17 @@ export async function verifyTranslation(payload) {
   return data;
 }
 
+export async function reportTranslationError(payload) {
+  const response = await fetch("/api/report-error", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "error");
+  return data;
+}
+
 export async function fetchDictionaryStats() {
   const response = await fetch("/api/dictionary/stats");
   if (!response.ok) throw new Error("dictionary unavailable");
