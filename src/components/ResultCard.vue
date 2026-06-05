@@ -204,8 +204,8 @@ const submitReport = async () => {
             <!-- Sliding Indicator -->
             <div 
               class="absolute top-1.5 bottom-1.5 bg-m3-primary rounded-[14px] shadow-sm transition-transform duration-300 z-0"
-              style="transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);"
-              :style="{ width: `calc((100% - 12px) / ${langs.length})`, transform: `translateX(calc(${activeTabIndex} * 100%))`, left: '6px' }"
+              style="transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform; backface-visibility: hidden;"
+              :style="{ width: `calc((100% - 12px) / ${langs.length})`, transform: `translate3d(${activeTabIndex * 100}%, 0, 0)`, left: '6px' }"
             ></div>
 
             <button 
