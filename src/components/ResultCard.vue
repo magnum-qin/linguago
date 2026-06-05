@@ -200,11 +200,11 @@ const submitReport = async () => {
         </div>
         <!-- Segmented Tab Bar -->
         <div class="pb-6 mb-4 border-b border-m3-outline-variant/25">
-          <div class="relative flex bg-m3-surface-container-high/40 rounded-[18px] p-1.5 shadow-inner border border-m3-outline-variant/10">
+          <div class="relative grid grid-cols-4 bg-m3-surface-container-high/40 rounded-[18px] p-1.5 shadow-inner border border-m3-outline-variant/10">
             <!-- Sliding Indicator -->
             <div 
               class="absolute top-1.5 bottom-1.5 bg-m3-primary rounded-[14px] shadow-sm transition-transform duration-300 z-0"
-              style="transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform; backface-visibility: hidden;"
+              style="transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform;"
               :style="{ width: `calc((100% - 12px) / ${langs.length})`, transform: `translate3d(${activeTabIndex * 100}%, 0, 0)`, left: '6px' }"
             ></div>
 
@@ -212,7 +212,7 @@ const submitReport = async () => {
               v-for="(lang, i) in langs" 
               :key="lang.code"
               @click="selectLang(i, lang.code)"
-              class="flex-1 rounded-[14px] py-2.5 text-[0.95rem] font-bold outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-m3-primary relative z-10 transition-colors duration-200"
+              class="rounded-[14px] py-2.5 text-[0.95rem] font-bold outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-m3-primary relative z-10 transition-colors duration-200"
               :class="activeLang === lang.code ? 'text-m3-on-primary' : 'text-m3-on-surface-variant hover:text-m3-on-surface'"
             >
               {{ lang.label }}
