@@ -56,6 +56,13 @@ const handleClear = () => {
   clear();
   textareaRef.value?.focus();
 };
+
+const handleTranslate = () => {
+  if (inputText.value.trim()) {
+    textareaRef.value?.blur();
+    translate();
+  }
+};
 </script>
 
 <template>
@@ -95,7 +102,7 @@ const handleClear = () => {
         autocomplete="off"
         :placeholder="'单词或句子...\nPalavra ou frase...'"
         class="w-full resize-none border-0 outline-none min-h-[56px] bg-transparent text-m3-on-surface text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] placeholder:text-m3-on-surface-variant/50 overflow-hidden font-display font-medium"
-        @keydown.enter.prevent="translate"
+        @keydown.enter.prevent="handleTranslate"
         @input="autoResize"
       ></textarea>
 
@@ -112,7 +119,7 @@ const handleClear = () => {
         
         <button 
           class="flex h-11 items-center justify-center gap-2 rounded-full px-5 sm:px-6 text-[0.85rem] font-bold text-m3-on-primary bg-m3-primary hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-m3-surface-container focus-visible:ring-m3-primary ml-auto z-10 relative shrink-0 whitespace-nowrap"
-          @click="translate"
+          @click="handleTranslate"
           :disabled="!inputText.trim()"
         >
           <Languages class="w-3.5 h-3.5" />翻译 / Traduzir

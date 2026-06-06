@@ -421,11 +421,11 @@ const submitReport = async () => {
 /* Tab Slide Transitions */
 .slide-left-enter-active,
 .slide-right-enter-active {
-  transition: all 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+  transition: opacity 0.2s cubic-bezier(0.1, 0.9, 0.2, 1), transform 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
 }
 .slide-left-leave-active,
 .slide-right-leave-active {
-  transition: all 0.1s ease-in;
+  transition: opacity 0.1s ease-in, transform 0.1s ease-in;
 }
 
 .slide-left-enter-from {
