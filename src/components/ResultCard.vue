@@ -168,7 +168,7 @@ const submitReport = async () => {
 
 <template>
   <section class="flex flex-col w-full relative z-0">
-    <Transition mode="out-in" name="fade">
+    <Transition mode="out-in" name="fade" @enter="updateIndicator">
       <!-- Loading State -->
       <div v-if="isTranslating" class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10">
         <div class="relative flex items-center justify-center w-24 h-24 animate-float">
