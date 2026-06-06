@@ -73,6 +73,11 @@ watch(activeTabIndex, async () => {
   updateIndicator();
 });
 
+watch(resultData, async () => {
+  await nextTick();
+  setTimeout(updateIndicator, 50);
+});
+
 onMounted(() => {
   setTimeout(updateIndicator, 50);
   window.addEventListener('resize', updateIndicator);
