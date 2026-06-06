@@ -26,16 +26,16 @@
     "check:theme": "node scripts/system-theme-check.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260410.0",
-    "@tailwindcss/cli": "^4.2.4",
+    "@cloudflare/workers-types": "^4.20260606.1",
+    "@tailwindcss/cli": "^4.3.0",
     "@tailwindcss/vite": "^4.3.0",
     "@vitejs/plugin-vue": "^6.0.7",
-    "playwright": "^1.59.1",
+    "playwright": "^1.60.0",
     "sql.js": "^1.14.1",
     "tailwindcss": "^4.3.0",
-    "typescript": "^5.8.3",
+    "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "wrangler": "^4.13.2"
+    "wrangler": "^4.98.0"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
