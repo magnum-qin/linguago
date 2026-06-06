@@ -134,7 +134,11 @@ async function handleTranslate(
     const cached = await env.CACHE.get<TranslateResponse>(cacheKey, "json");
 
     if (cached) {
-      return json({ ...cached, cached: true });
+      const isLegacyWordCache = cached.type === "word" && (!cached.senses || cached.senses.length === 0);
+      if (!isLegacyWordCache) {
+        return json({ ...cached, cached: true });
+      }
+      console.log(`Ignoring legacy cache for ${text}`);
     }
 
     const translated = await translateWithProvider({
@@ -250,10 +254,14 @@ async function handleTranslateStream(
         const cached = await env.CACHE.get<TranslateResponse>(cacheKey, "json");
 
         if (cached) {
-          send("final", { ...cached, cached: true });
-          send("done", { ok: true });
-          controller.close();
-          return;
+          const isLegacyWordCache = cached.type === "word" && (!cached.senses || cached.senses.length === 0);
+          if (!isLegacyWordCache) {
+            send("final", { ...cached, cached: true });
+            send("done", { ok: true });
+            controller.close();
+            return;
+          }
+          console.log(`Ignoring legacy cache for ${text} in stream`);
         }
 
         send("status", {
