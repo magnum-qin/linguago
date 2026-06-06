@@ -297,7 +297,6 @@
     min-width: 0;
     touch-action: manipulation;
     transition-property: box-shadow, background, color, opacity, border-color, filter;
-    will-change: filter;
   }
 
   button:disabled {
