@@ -43,17 +43,44 @@ const activeTabIndex = computed(() => {
   return Math.max(0, langs.findIndex(l => l.code === activeLang.value));
 });
 
+const transitionName = ref('slide-left');
+
 const selectLang = (index: number, code: string) => {
-  if (!document.startViewTransition) {
-    activeLang.value = code;
-    return;
-  }
-  
-  document.startViewTransition(async () => {
-    activeLang.value = code;
-    await nextTick();
-  });
+  if (activeLang.value === code) return;
+  const isSlideRight = index > activeTabIndex.value;
+  transitionName.value = isSlideRight ? 'slide-left' : 'slide-right';
+  activeLang.value = code;
 };
+
+const tabContainerRef = ref<HTMLElement | null>(null);
+const indicatorStyle = ref({ width: '25%', transform: 'translate3d(0,0,0)', left: '6px' });
+
+const updateIndicator = () => {
+  if (!tabContainerRef.value) return;
+  // +1 because the first child is the indicator div itself
+  const activeBtn = tabContainerRef.value.children[activeTabIndex.value + 1] as HTMLElement;
+  if (activeBtn) {
+    indicatorStyle.value = {
+      width: `${activeBtn.offsetWidth}px`,
+      transform: `translate3d(${activeBtn.offsetLeft}px, 0, 0)`,
+      left: '0px'
+    };
+  }
+};
+
+watch(activeTabIndex, async () => {
+  await nextTick();
+  updateIndicator();
+});
+
+onMounted(() => {
+  setTimeout(updateIndicator, 50);
+  window.addEventListener('resize', updateIndicator);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateIndicator);
+});
 
 const currentTranslation = computed(() => {
   if (!resultData.value || !resultData.value.translations) return null;
@@ -200,12 +227,12 @@ const submitReport = async () => {
         </div>
         <!-- Segmented Tab Bar -->
         <div class="pb-6 mb-4 border-b border-m3-outline-variant/25">
-          <div class="relative grid grid-cols-4 bg-m3-surface-container-high/40 rounded-[18px] p-1.5 shadow-inner border border-m3-outline-variant/10">
+          <div ref="tabContainerRef" class="relative grid grid-cols-4 bg-m3-surface-container-high/40 rounded-[18px] p-1.5 shadow-inner border border-m3-outline-variant/10">
             <!-- Sliding Indicator -->
             <div 
-              class="absolute top-1.5 bottom-1.5 bg-m3-primary rounded-[14px] shadow-sm transition-transform duration-300 z-0"
-              style="transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform;"
-              :style="{ width: `calc((100% - 12px) / ${langs.length})`, transform: `translate3d(${activeTabIndex * 100}%, 0, 0)`, left: '6px' }"
+              class="absolute top-1.5 bottom-1.5 bg-m3-primary rounded-[14px] shadow-sm transition-all duration-300 z-0"
+              style="transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform, width;"
+              :style="indicatorStyle"
             ></div>
 
             <button 
