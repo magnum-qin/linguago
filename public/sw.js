@@ -1,4 +1,4 @@
-const CACHE_NAME = "linguago-shell-v40-vue";
+const CACHE_NAME = "linguago-shell-v41-vue";
 const APP_SHELL = [
   "/",
   "/index.html",
