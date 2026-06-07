@@ -255,7 +255,7 @@
 
   html,
   body {
-    @apply m-0 min-h-full overscroll-y-none;
+    @apply m-0 min-h-full;
     background: var(--bg);
   }
 
@@ -264,7 +264,7 @@
   }
 
   body {
-    @apply font-sans antialiased transition-colors duration-200 overflow-x-hidden;
+    @apply font-sans antialiased transition-colors duration-200;
     color: var(--ink);
     background: var(--bg);
     padding: calc(env(safe-area-inset-top) + 14px) 16px
@@ -2013,4 +2013,34 @@
 
 @keyframes toast-out {
   to { opacity: 0; transform: translateY(-10px); }
+}
+
+@layer components {
+  .v-application {
+    font-family: inherit !important;
+    background: transparent !important;
+  }
+}
+
+.m3-select-menu-content {
+  border-radius: 16px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1) !important;
+  background: var(--m3-surface) !important;
+  border: 1px solid color-mix(in srgb, var(--m3-outline-variant) 30%, transparent) !important;
+  overflow: hidden !important;
+}
+:root[data-theme='dark'] .m3-select-menu-content {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
+}
+.m3-select-menu-content .v-list {
+  padding: 6px !important;
+  background: transparent !important;
+}
+.m3-select-menu-content .v-list-item {
+  border-radius: 10px !important;
+  margin-bottom: 2px !important;
+}
+.m3-select-menu-content .v-list-item--active {
+  background: color-mix(in srgb, var(--m3-primary) 15%, transparent) !important;
+  color: var(--m3-primary) !important;
 }

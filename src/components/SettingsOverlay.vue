@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { X } from 'lucide-vue-next';
+import { X, ChevronDown, Loader2, Check } from 'lucide-vue-next';
 import { settings, providerOptions, getModelsForProvider } from '../composables/useSettings';
 import { verifyTranslation } from '../utils/api.js';
-import M3Select from './M3Select.vue';
 
 const isOpen = ref(false);
 const isVerifying = ref(false);
@@ -40,6 +39,19 @@ const close = () => {
   isOpen.value = false;
   verifyStatus.value = 'idle';
 };
+
+const onDialogUpdate = (val: boolean) => {
+  if (!val) close();
+};
+
+import { onMounted, onUnmounted } from 'vue';
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && isOpen.value) {
+    close();
+  }
+};
+onMounted(() => window.addEventListener('keydown', handleKeydown));
+onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
 
 const saveAndClose = () => {
   isOpen.value = false;
@@ -120,22 +132,40 @@ watch(() => settings.provider, (newProvider) => {
 </script>
 
 <template>
-  <Transition name="fade">
-    <div v-if="isOpen" class="settings-overlay fixed inset-0 grid h-dvh w-screen place-items-center bg-black/40 z-[2000]" @click.self="close">
-      <section 
-        class="settings-panel grid w-full max-w-[420px] grid-cols-1 gap-4 rounded-[26px] p-5 bg-m3-surface-container shadow-2xl transition-all duration-200"
-        :class="isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'"
-      >
+  <v-dialog 
+    :model-value="isOpen" 
+    @update:model-value="onDialogUpdate"
+    max-width="420" 
+    scrim="black" 
+    :scrim-opacity="0.4"
+    transition="dialog-bottom-transition"
+  >
+    <v-card class="settings-panel w-full max-w-[420px] mx-auto grid grid-cols-1 gap-4 !rounded-[26px] !p-5 !bg-m3-surface-container !shadow-2xl">
       <div class="settings-head flex items-center justify-between px-1 pb-2">
         <strong class="text-lg font-bold text-m3-on-surface">设置 / Configurações</strong>
-        <button type="button" class="modal-close flex place-items-center justify-center h-10 w-10 shrink-0 rounded-[14px] bg-m3-surface-container text-m3-on-surface transition-colors hover:bg-m3-surface-container-highest" @click="close">
+        <v-btn icon variant="text" class="!h-10 !w-10 !rounded-[14px] !text-m3-on-surface hover:!bg-m3-surface-container-highest" @click="close">
           <X class="w-5 h-5" />
-        </button>
+        </v-btn>
       </div>
       
       <div class="setting-field grid gap-2">
         <label class="text-xs font-black uppercase tracking-[0.08em] text-m3-on-surface-variant">翻译服务 / Provedor</label>
-        <M3Select v-model="settings.provider" :options="providerOptions" />
+        <v-select 
+          v-model="settings.provider" 
+          :items="providerOptions" 
+          item-title="label" 
+          item-value="value"
+          variant="solo"
+          flat
+          hide-details
+          class="m3-native-select"
+          menu-icon="none"
+          :menu-props="{ contentClass: 'm3-select-menu-content' }"
+        >
+          <template v-slot:append-inner>
+            <ChevronDown class="w-5 h-5 text-m3-on-surface-variant opacity-70" />
+          </template>
+        </v-select>
       </div>
 
       <div class="setting-field grid gap-2">
@@ -143,7 +173,21 @@ watch(() => settings.provider, (newProvider) => {
         
         <Transition mode="out-in" name="fade">
           <div v-if="!isEditingModels">
-            <M3Select v-model="settings.model" :options="currentModels" :status="verifyStatus" />
+            <v-select 
+              v-model="settings.model" 
+              :items="currentModels" 
+              variant="solo"
+              flat
+              hide-details
+              class="m3-native-select"
+              menu-icon="none"
+              :loading="verifyStatus === 'loading'"
+              :menu-props="{ contentClass: 'm3-select-menu-content' }"
+            >
+              <template v-slot:append-inner>
+                <ChevronDown class="w-5 h-5 text-m3-on-surface-variant opacity-70" />
+              </template>
+            </v-select>
           </div>
           <div v-else class="model-list-editor grid gap-3 rounded-[20px] border border-m3-outline-variant/30 bg-m3-surface-container p-3.5">
             <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
@@ -182,22 +226,33 @@ watch(() => settings.provider, (newProvider) => {
         </Transition>
 
         <div class="grid grid-cols-2 gap-2 mt-1">
-          <button 
-            type="button"
+          <v-btn 
+            variant="flat"
             @click="verifyModelSetting" 
             :disabled="isVerifying"
-            class="flex items-center justify-center font-bold text-m3-on-secondary-container bg-m3-secondary-container h-[44px] rounded-[16px] transition hover:opacity-80 disabled:opacity-50 text-[0.85rem] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
+            class="!h-[44px] !rounded-[16px] !bg-m3-secondary-container !text-m3-on-secondary-container !font-bold !text-[0.8rem] !normal-case !tracking-normal focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
           >
-            {{ isVerifying ? '验证中 / Verificando...' : '测试连接 / Testar' }}
-          </button>
-          <button 
-            type="button"
+            <template v-if="verifyStatus === 'loading'">
+              <Loader2 class="w-4 h-4 animate-spin mr-1 shrink-0" /> <span class="truncate">验证 / Validando</span>
+            </template>
+            <template v-else-if="verifyStatus === 'success'">
+              <Check class="w-4 h-4 mr-1 shrink-0" /> <span class="truncate">成功 / OK</span>
+            </template>
+            <template v-else-if="verifyStatus === 'error'">
+              <X class="w-4 h-4 mr-1 shrink-0" /> <span class="truncate">失败 / Erro</span>
+            </template>
+            <template v-else>
+              <span class="truncate">测试连接 / Testar</span>
+            </template>
+          </v-btn>
+          <v-btn 
+            variant="flat"
             v-if="isEditableProvider" 
             @click="isEditingModels = !isEditingModels" 
-            class="flex items-center justify-center font-bold text-m3-primary bg-m3-primary/10 h-[44px] rounded-[16px] transition hover:opacity-80 text-[0.85rem] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
+            class="!h-[44px] !rounded-[16px] !bg-m3-primary/10 !text-m3-primary !font-bold !text-[0.85rem] !normal-case !tracking-normal focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
           >
             {{ isEditingModels ? '完成 / Concluído' : '编辑 / Editar' }}
-          </button>
+          </v-btn>
           <div v-else></div>
         </div>
       </div>
@@ -227,24 +282,42 @@ watch(() => settings.provider, (newProvider) => {
       </div>
       
       <div class="model-tools grid grid-cols-2 gap-2.5 mt-2">
-        <button 
-          type="button"
-          class="flex flex-col items-center justify-center font-black h-[58px] rounded-[18px] text-m3-on-surface-variant bg-m3-surface-container-highest transition-opacity hover:bg-m3-outline-variant/20 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
+        <v-btn 
+          variant="flat"
+          class="!h-[58px] !rounded-[18px] !bg-m3-surface-container-highest !text-m3-on-surface-variant hover:!bg-m3-outline-variant/20 flex flex-col items-center justify-center font-black !normal-case !tracking-normal focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
           @click="close"
         >
-          <span class="text-[1.02rem] leading-[1.06] mb-[0.12rem]">取消</span>
-          <span class="text-[0.94rem] leading-[1.06]">Cancelar</span>
-        </button>
-        <button 
-          type="button"
-          class="flex flex-col items-center justify-center font-black h-[58px] rounded-[18px] text-m3-on-primary bg-m3-primary transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
+          <div class="flex flex-col items-center justify-center">
+            <span class="text-[1.02rem] leading-[1.06] mb-[0.12rem]">取消</span>
+            <span class="text-[0.94rem] leading-[1.06]">Cancelar</span>
+          </div>
+        </v-btn>
+        <v-btn 
+          variant="flat"
+          class="!h-[58px] !rounded-[18px] !bg-m3-primary !text-m3-on-primary hover:opacity-90 flex flex-col items-center justify-center font-black !normal-case !tracking-normal focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
           @click="saveAndClose"
         >
-          <span class="text-[1.02rem] leading-[1.06] mb-[0.12rem]">确认</span>
-          <span class="text-[0.94rem] leading-[1.06]">Confirmar</span>
-        </button>
+          <div class="flex flex-col items-center justify-center">
+            <span class="text-[1.02rem] leading-[1.06] mb-[0.12rem]">确认</span>
+            <span class="text-[0.94rem] leading-[1.06]">Confirmar</span>
+          </div>
+        </v-btn>
       </div>
-    </section>
-  </div>
-  </Transition>
+    </v-card>
+  </v-dialog>
 </template>
+
+<style scoped>
+:deep(.m3-native-select .v-field) {
+  background: var(--color-m3-surface) !important;
+  border: 1px solid color-mix(in srgb, var(--color-m3-outline-variant) 50%, transparent) !important;
+  border-radius: 16px !important;
+  min-height: 48px !important;
+  color: var(--color-m3-on-surface) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+:deep(.m3-native-select .v-field__input) {
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+}
+</style>

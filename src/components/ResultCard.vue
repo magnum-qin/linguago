@@ -3,8 +3,7 @@ import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
 import { useTranslation } from '../composables/useTranslation';
 import { useBookmarks } from '../composables/useBookmarks';
 import FuriganaText from './FuriganaText.vue';
-import M3Select from './M3Select.vue';
-import { Star, Flag, AlertTriangle, X, Volume2, Sparkles, Loader2 } from 'lucide-vue-next';
+import { Star, Flag, AlertTriangle, X, Volume2, Sparkles, Loader2, ChevronDown, Check } from 'lucide-vue-next';
 import { reportTranslationError } from '../utils/api.js';
 
 const { resultData, isTranslating } = useTranslation();
@@ -57,13 +56,16 @@ const indicatorStyle = ref({ width: '25%', transform: 'translate3d(0,0,0)', left
 
 const updateIndicator = () => {
   if (!tabContainerRef.value) return;
-  // +1 because the first child is the indicator div itself
-  const activeBtn = tabContainerRef.value.children[activeTabIndex.value + 1] as HTMLElement;
+  const content = tabContainerRef.value.querySelector('.v-slide-group__content');
+  if (!content) return;
+  
+  const tabs = content.querySelectorAll('.v-tab');
+  const activeBtn = tabs[activeTabIndex.value] as HTMLElement;
   if (activeBtn) {
     indicatorStyle.value = {
       width: `${activeBtn.offsetWidth}px`,
       transform: `translate3d(${activeBtn.offsetLeft}px, 0, 0)`,
-      left: '0px'
+      left: '6px'
     };
   }
 };
@@ -109,10 +111,43 @@ const currentExamples = computed(() => {
 
 const speak = (text: string, lang: string) => {
   if (!window.speechSynthesis) return;
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang === 'zh' ? 'zh-CN' : lang === 'en' ? 'en-US' : lang;
+  
+  // Pre-warm voices if not loaded
+  window.speechSynthesis.getVoices();
+  
+  // Strip any inline Furigana or IPA brackets (e.g. {漢字|かんじ} -> 漢字)
+  const cleanTextForSpeech = text.replace(/\{([^|{}]+)\|([^|{}]+)\}/g, "$1");
+  const utterance = new SpeechSynthesisUtterance(cleanTextForSpeech);
+  
+  // Strict locale mapping to prevent fallback to system default voice
+  const localeMap: Record<string, string> = {
+    'zh': 'zh-CN',
+    'en': 'en-US',
+    'ja': 'ja-JP',
+    'pt': 'pt-BR',
+    'pt-BR': 'pt-BR'
+  };
+  const targetLangCode = localeMap[lang] || lang;
+  utterance.lang = targetLangCode;
+  
+  // Explicitly assign a matching voice. If not set, macOS/Windows might use the default English voice,
+  // which will automatically transliterate Chinese/Japanese characters to Pinyin/Romaji and read them with a strong foreign accent.
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    const voice = voices.find(v => v.lang.replace('_', '-') === targetLangCode) || 
+                  voices.find(v => v.lang.startsWith(targetLangCode.split('-')[0]));
+    if (voice) {
+      utterance.voice = voice;
+    }
+  }
+  
   window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  
+  // A slight delay after cancel() fixes a known browser bug 
+  // where synchronous cancel + speak causes a 1-2 second delay or dropped audio
+  setTimeout(() => {
+    window.speechSynthesis.speak(utterance);
+  }, 50);
 };
 
 const updateDesktopState = () => {
@@ -134,14 +169,22 @@ const syncBodyClasses = () => {
 
 watch([resultData, isTranslating, isDesktop], syncBodyClasses);
 
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && isReportModalOpen.value) {
+    isReportModalOpen.value = false;
+  }
+};
+
 onMounted(() => {
   updateDesktopState();
   syncBodyClasses();
   window.addEventListener('resize', updateDesktopState);
+  window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateDesktopState);
+  window.removeEventListener('keydown', handleKeydown);
 });
 const submitReport = async () => {
   if (!currentWord.value) return;
@@ -169,28 +212,8 @@ const submitReport = async () => {
 <template>
   <section class="flex flex-col w-full relative z-0">
     <Transition mode="out-in" name="fade" @enter="updateIndicator">
-      <!-- Loading State -->
-      <div v-if="isTranslating" class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10">
-        <div class="relative flex items-center justify-center w-24 h-24 animate-float">
-          <div class="absolute inset-0 border-[3px] border-m3-primary/20 rounded-full animate-pulse-ring"></div>
-          <div class="absolute inset-0 border-[3px] border-m3-primary/20 rounded-full animate-pulse-ring animation-delay-1500"></div>
-          
-          <div class="relative bg-m3-surface-container w-16 h-16 rounded-full flex items-center justify-center shadow-sm border border-m3-outline-variant/10 z-10 text-m3-primary/70">
-            <Loader2 class="w-7 h-7 animate-spin" />
-          </div>
-        </div>
-        <div class="flex flex-col items-center gap-1.5 opacity-80 animate-float" style="animation-delay: 0.2s;">
-          <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center">
-            解析中<br/><span class="text-[0.7rem] opacity-70 tracking-normal mt-0.5 inline-block">Analisando</span>
-          </p>
-          <p class="text-m3-outline text-[0.85rem] font-medium text-center">
-            正在加载翻译结果...<br/><span class="text-[0.75rem] opacity-70 mt-0.5 inline-block">Carregando...</span>
-          </p>
-        </div>
-      </div>
-      
       <!-- Result State -->
-      <div v-else-if="resultData" class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative">
+      <div v-if="resultData && !isTranslating" class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative">
         <div class="flex items-center justify-between w-full mb-6">
           <span class="text-[0.7rem] font-bold uppercase tracking-widest text-m3-on-surface-variant flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full" :class="resultData.provider === 'dictionary' ? 'bg-[#ff9800]' : (resultData.cached ? 'bg-m3-primary' : 'bg-[#008053]')"></span>
@@ -203,36 +226,41 @@ const submitReport = async () => {
           </span>
           
           <div class="flex gap-2 items-center shrink-0">
-            <button 
+            <v-btn 
               v-if="currentWord && resultData?.type !== 'sentence'" 
+              icon
+              variant="flat"
               @click="toggleBookmark(currentWord)" 
-              class="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full hover:-translate-y-0.5 transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
-              :class="isBookmarked(currentWord) ? 'bg-[#FFD9E2]/80 text-[#82284D] shadow-md hover:bg-[#FFD9E2]' : 'bg-m3-surface-container-highest text-m3-on-surface-variant hover:bg-m3-primary hover:text-m3-on-primary hover:shadow-md'"
+              class="!w-[44px] !h-[44px] shrink-0 hover:-translate-y-0.5 transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
+              :class="isBookmarked(currentWord) ? '!bg-[#FFD9E2]/80 !text-[#82284D] !shadow-md hover:!bg-[#FFD9E2]' : '!bg-m3-surface-container-highest !text-m3-on-surface-variant hover:!bg-m3-primary hover:!text-m3-on-primary hover:!shadow-md'"
               aria-label="收藏单词 / Salvar palavra"
             >
               <Star :class="{ 'fill-current': isBookmarked(currentWord) }" class="w-5 h-5" />
-            </button>
-            <button 
+            </v-btn>
+            <v-btn 
               v-if="currentWord && resultData?.type !== 'sentence'" 
+              icon
+              variant="flat"
               @click="isReportModalOpen = true; reportReason = ''"
-              class="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-m3-surface-container-highest text-m3-on-surface-variant hover:bg-[#FFD9E2] hover:text-[#82284D] hover:shadow-md hover:-translate-y-0.5 transition-all outline-none"
+              class="!w-[44px] !h-[44px] shrink-0 !bg-m3-surface-container-highest !text-m3-on-surface-variant hover:!bg-[#FFD9E2] hover:!text-[#82284D] hover:!shadow-md hover:-translate-y-0.5 transition-all"
               aria-label="纠错反馈 / Enviar feedback"
             >
               <Flag class="w-5 h-5" />
-            </button>
-            <button 
+            </v-btn>
+            <v-btn 
               v-if="currentTranslation" 
+              icon
+              variant="flat"
               @click="speak(currentTranslation.audio_text || currentTranslation.text, activeLang)" 
-              class="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-m3-surface-container-highest text-m3-on-surface-variant hover:bg-m3-primary hover:text-m3-on-primary hover:shadow-md hover:-translate-y-0.5 transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
+              class="!w-[44px] !h-[44px] shrink-0 !bg-m3-surface-container-highest !text-m3-on-surface-variant hover:!bg-m3-primary hover:!text-m3-on-primary hover:!shadow-md hover:-translate-y-0.5 transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary"
               aria-label="朗读发音 / Pronunciar"
             >
               <Volume2 class="w-5 h-5" />
-            </button>
+            </v-btn>
           </div>
         </div>
-        <!-- Segmented Tab Bar -->
-        <div class="pb-6 mb-4 border-b border-m3-outline-variant/25">
-          <div ref="tabContainerRef" class="relative grid grid-cols-4 bg-m3-surface-container-high/40 rounded-[18px] p-1.5 shadow-inner border border-m3-outline-variant/10">
+        <div class="mb-6">
+          <div class="relative bg-m3-surface-container-high/40 rounded-[18px] p-1.5 shadow-inner border border-m3-outline-variant/10">
             <!-- Sliding Indicator -->
             <div 
               class="absolute top-1.5 bottom-1.5 bg-m3-primary rounded-[14px] shadow-sm transition-all duration-300 z-0"
@@ -240,15 +268,25 @@ const submitReport = async () => {
               :style="indicatorStyle"
             ></div>
 
-            <button 
-              v-for="(lang, i) in langs" 
-              :key="lang.code"
-              @click="selectLang(i, lang.code)"
-              class="rounded-[14px] py-2.5 text-[0.95rem] font-bold outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-m3-primary relative z-10 transition-colors duration-200"
-              :class="activeLang === lang.code ? 'text-m3-on-primary' : 'text-m3-on-surface-variant hover:text-m3-on-surface'"
-            >
-              {{ lang.label }}
-            </button>
+            <div ref="tabContainerRef" class="w-full">
+              <v-tabs
+                v-model="activeLang"
+                hide-slider
+                height="auto"
+                class="custom-tabs relative z-10 !bg-transparent"
+              >
+              <v-tab 
+                v-for="(lang, i) in langs" 
+                :key="lang.code"
+                :value="lang.code"
+                :ripple="false"
+                class="!rounded-[14px] !py-2.5 !text-[0.95rem] !font-bold outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-m3-primary relative z-10 transition-colors duration-200 !min-w-0 !normal-case !tracking-normal"
+                :class="activeLang === lang.code ? '!text-m3-on-primary' : '!text-m3-on-surface-variant hover:!text-m3-on-surface'"
+              >
+                {{ lang.label }}
+              </v-tab>
+            </v-tabs>
+            </div>
           </div>
         </div>
 
@@ -261,9 +299,14 @@ const submitReport = async () => {
         
         <!-- Phonetics -->
         <div v-if="currentTranslation?.phonetic" class="flex flex-wrap gap-2 mb-6">
-          <span class="inline-flex items-center px-4 py-1.5 rounded-full border border-m3-outline-variant/30 bg-m3-surface text-m3-on-surface-variant text-[0.95rem] font-medium tracking-wide shadow-sm">
+          <button 
+            @click="speak(currentTranslation.audio_text || currentTranslation.text, activeLang)"
+            class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-m3-outline-variant/30 bg-m3-surface text-m3-on-surface-variant text-[0.95rem] font-medium tracking-wide shadow-sm cursor-pointer hover:bg-m3-primary hover:text-m3-on-primary hover:border-transparent hover:shadow-md transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary active:scale-95"
+            aria-label="朗读音标发音 / Pronunciar"
+          >
+            <Volume2 class="w-3.5 h-3.5 opacity-70" />
             {{ currentTranslation.phonetic }}
-          </span>
+          </button>
         </div>
 
         <!-- Content Area -->
@@ -328,27 +371,38 @@ const submitReport = async () => {
           
         <!-- Footer Reference -->
         <p class="text-center text-[0.7rem] text-m3-on-surface-variant/50 mt-6 mb-1 font-medium tracking-widest uppercase" v-if="resultData.provider">
-          翻译服务由 {{ resultData.provider }} 提供 / Serviço fornecido por {{ resultData.provider }}
+          {{ resultData.provider }}<template v-if="resultData.model && resultData.provider !== 'dictionary'"> / {{ resultData.model }}</template>
         </p>
       </div>
-      
-      <!-- Empty State -->
+
+      <!-- Shared Loading / Empty State -->
       <div v-else class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10">
         <div class="relative flex items-center justify-center w-24 h-24 animate-float">
           <div class="absolute inset-0 border-[3px] border-m3-primary/20 rounded-full animate-pulse-ring"></div>
           <div class="absolute inset-0 border-[3px] border-m3-primary/20 rounded-full animate-pulse-ring animation-delay-1500"></div>
           
-          <div class="relative bg-m3-surface-container w-16 h-16 rounded-full flex items-center justify-center shadow-sm border border-m3-outline-variant/10 z-10 text-m3-primary/70">
-            <Sparkles class="w-7 h-7" />
+          <div class="relative bg-m3-surface-container w-16 h-16 rounded-full flex items-center justify-center shadow-sm border border-m3-outline-variant/10 z-10 text-m3-primary/70 transition-colors duration-300">
+            <Loader2 v-if="isTranslating" class="w-7 h-7 animate-spin" />
+            <Sparkles v-else class="w-7 h-7" />
           </div>
         </div>
         <div class="flex flex-col items-center gap-1.5 opacity-80 animate-float" style="animation-delay: 0.2s;">
-          <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center">
-            等待输入<br/><span class="text-[0.7rem] opacity-70 tracking-normal mt-0.5 inline-block">Aguardando</span>
-          </p>
-          <p class="text-m3-outline text-[0.85rem] font-medium text-center">
-            支持中 / 英 / 葡 / 日 自动识别<br/><span class="text-[0.75rem] opacity-70 mt-0.5 inline-block">Suporta detecção auto ZH/EN/PT/JA</span>
-          </p>
+          <template v-if="isTranslating">
+            <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center">
+              解析中<br/><span class="text-[0.7rem] opacity-70 tracking-normal mt-0.5 inline-block">Analisando</span>
+            </p>
+            <p class="text-m3-outline text-[0.85rem] font-medium text-center">
+              正在加载翻译结果...<br/><span class="text-[0.75rem] opacity-70 mt-0.5 inline-block">Carregando...</span>
+            </p>
+          </template>
+          <template v-else>
+            <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center">
+              等待输入<br/><span class="text-[0.7rem] opacity-70 tracking-normal mt-0.5 inline-block">Aguardando</span>
+            </p>
+            <p class="text-m3-outline text-[0.85rem] font-medium text-center">
+              支持中 / 英 / 葡 / 日 自动识别<br/><span class="text-[0.75rem] opacity-70 mt-0.5 inline-block">Suporta detecção auto ZH/EN/PT/JA</span>
+            </p>
+          </template>
         </div>
       </div>
     </Transition>
@@ -374,7 +428,22 @@ const submitReport = async () => {
 
             <div class="flex flex-col gap-3">
               <label class="text-xs font-bold text-m3-on-surface-variant uppercase tracking-wider pl-1">类型 (可选) / Tipo (Opcional)</label>
-              <M3Select v-model="reportReason" :options="reportOptions" />
+              <v-select 
+                v-model="reportReason" 
+                :items="reportOptions" 
+                item-title="label" 
+                item-value="value"
+                variant="solo"
+                flat
+                hide-details
+                class="m3-native-select"
+                menu-icon="none"
+                :menu-props="{ contentClass: 'm3-select-menu-content' }"
+              >
+                <template v-slot:append-inner>
+                  <ChevronDown class="w-5 h-5 text-m3-on-surface-variant opacity-70" />
+                </template>
+              </v-select>
             </div>
 
             <div class="flex items-center justify-end gap-3 mt-2">
@@ -403,6 +472,19 @@ const submitReport = async () => {
 </template>
 
 <style scoped>
+:deep(.m3-native-select .v-field) {
+  background: var(--color-m3-surface) !important;
+  border: 1px solid color-mix(in srgb, var(--color-m3-outline-variant) 50%, transparent) !important;
+  border-radius: 16px !important;
+  min-height: 48px !important;
+  color: var(--color-m3-on-surface) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+:deep(.m3-native-select .v-field__input) {
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
@@ -477,4 +559,12 @@ const submitReport = async () => {
   opacity: 0;
   transform: translateX(10px);
 }
+
+:deep(.custom-tabs .v-slide-group__content) {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  position: relative;
+}
+
 </style>

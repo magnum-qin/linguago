@@ -74,7 +74,7 @@ const highlightParts = (str: string) => {
         <template v-for="(node, nidx) in highlightParts(segment.text)" :key="nidx">
           <span :class="node.isHighlight ? 'text-m3-primary font-bold' : ''">{{ node.text }}</span>
         </template>
-        <rp>(</rp><rt class="text-[0.6em] text-m3-on-surface-variant/80 font-medium tracking-normal select-none">{{ segment.ruby }}</rt><rp>)</rp>
+        <rp>(</rp><rt class="text-[0.6em] text-m3-on-surface-variant/80 font-medium tracking-wide select-none px-[0.25em]">{{ segment.ruby }}</rt><rp>)</rp>
       </ruby>
       <span v-else>
         <template v-for="(node, nidx) in highlightParts(segment.text)" :key="nidx">

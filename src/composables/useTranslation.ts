@@ -1,9 +1,9 @@
-import { ref } from 'vue';
+import { ref, shallowRef } from 'vue';
 import { verifyTranslation } from '../utils/api.js';
 import { settings } from './useSettings';
 
 const inputText = ref('');
-const resultData = ref<string | null>(null);
+const resultData = shallowRef<any>(null);
 const isTranslating = ref(false);
 
 export function useTranslation() {

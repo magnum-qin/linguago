@@ -177,9 +177,10 @@ export const DEEPSEEK_SYSTEM_PROMPT = `You are a translation engine. Return vali
 The user provides source language, target language, and text.
 Output this JSON shape exactly:
 {"type":"sentence","detected_source_lang":"zh","translation":"target-language text","translations":{"zh":{"text":"简体中文"},"en":{"text":"English"},"pt-BR":{"text":"Português do Brasil"},"ja":{"text":"日本語"}},"explanations":{"zh":"简短中文解释","en":"Brief English explanation","pt-BR":"Breve explicação em português","ja":"短い日本語の説明"}}
-For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
-For all English and Portuguese text (translations, explanations, definitions, examples), annotate difficult words (exceeding high school vocabulary) with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}, {exceção|e.seˈsɐ̃w}. Do not annotate extremely basic everyday words.
-For a single word, set type to "word" and also include word_details and examples. Definitions must be concise and written only in their own language.`;
+CRITICAL RULES:
+1. For ALL Japanese text (translations, explanations), you MUST annotate every single kanji with hiragana using {kanji|hiragana}, e.g., {観光|かんこう}, {昼ご飯|ひるごはん}, {何|なに}. DO NOT leave any kanji without readings!
+2. For all English and Portuguese text, annotate difficult words (exceeding high school vocabulary) with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}.
+For a single word, set type to "word" and also include word_details and examples.`;
 
 export const DEEPSEEK_PREVIEW_SYSTEM_PROMPT = `Return valid json only.
 Output this JSON shape exactly:
@@ -190,16 +191,17 @@ If the target language is English, annotate English words in the translation and
 export const DASH_SCOPE_SYSTEM_PROMPT = `You are a translation engine. Return valid JSON only.
 The user provides source language, target language, and text.
 Return zh, en, pt-BR, and ja fields in their own languages.
-For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
-For all English text (translations, explanations, definitions, examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
+CRITICAL RULES:
+1. For ALL Japanese text (translations, explanations), you MUST annotate every single kanji with hiragana using {kanji|hiragana}, e.g., {観光|かんこう}, {昼ご飯|ひるごはん}, {何|なに}. DO NOT leave any kanji without readings!
+2. For all English text, annotate words that exceed high school vocabulary with IPA using {word|IPA}.
 For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.
 Use the same JSON shape as the translation API schema.`;
 
 export const DASH_SCOPE_PREVIEW_SYSTEM_PROMPT = `Return valid JSON only.
 Translate into the requested target language and return:
 {"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}
-If the target language is Japanese, annotate kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}.
-If the target language is English, annotate English words in the translation and explanation that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.`;
+CRITICAL: If the target language is Japanese, you MUST annotate every single kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {昼ご飯|ひるごはん}, {何|なに}. Do NOT skip this rule!
+If the target language is English, annotate difficult English words with IPA: {word|IPA}.`;
 
 export const OPENROUTER_SYSTEM_PROMPT = `Translate the input for a mobile language-learning app.
 Follow the JSON schema exactly.
