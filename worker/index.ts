@@ -111,17 +111,7 @@ async function handleTranslate(
     }
 
     validateInputLength(text);
-    await assertRateLimit(request, env);
-
-    const dictionaryResponse = await lookupDictionaryFirst({
-      env,
-      text,
-      targetLang
-    });
-
-    if (dictionaryResponse) {
-      return json(dictionaryResponse);
-    }
+    await assertRateLimit(request, env, ctx);
 
     const selected = selectProvider(env, provider, requestedModel);
     const cacheKey = await buildCacheKey(
@@ -139,6 +129,21 @@ async function handleTranslate(
         return json({ ...cached, cached: true });
       }
       console.log(`Ignoring legacy cache for ${text}`);
+    }
+
+    const dictionaryResponse = await lookupDictionaryFirst({
+      env,
+      text,
+      targetLang
+    });
+
+    if (dictionaryResponse) {
+      ctx.waitUntil(
+        env.CACHE.put(cacheKey, JSON.stringify(dictionaryResponse), {
+          expirationTtl: 60 * 60 * 24 * 30
+        })
+      );
+      return json(dictionaryResponse);
     }
 
     const translated = await translateWithProvider({
@@ -226,22 +231,9 @@ async function handleTranslateStream(
         }
 
         validateInputLength(text);
-        await assertRateLimit(request, env);
+        await assertRateLimit(request, env, ctx);
 
         send("status", { stage: "started" });
-
-        const dictionaryResponse = await lookupDictionaryFirst({
-          env,
-          text,
-          targetLang
-        });
-
-        if (dictionaryResponse) {
-          send("final", dictionaryResponse);
-          send("done", { ok: true });
-          controller.close();
-          return;
-        }
 
         const selected = selectProvider(env, provider, requestedModel);
         const cacheKey = await buildCacheKey(
@@ -262,6 +254,24 @@ async function handleTranslateStream(
             return;
           }
           console.log(`Ignoring legacy cache for ${text} in stream`);
+        }
+
+        const dictionaryResponse = await lookupDictionaryFirst({
+          env,
+          text,
+          targetLang
+        });
+
+        if (dictionaryResponse) {
+          ctx.waitUntil(
+            env.CACHE.put(cacheKey, JSON.stringify(dictionaryResponse), {
+              expirationTtl: 60 * 60 * 24 * 30
+            })
+          );
+          send("final", dictionaryResponse);
+          send("done", { ok: true });
+          controller.close();
+          return;
         }
 
         send("status", {
@@ -432,7 +442,7 @@ function validateInputLength(text: string) {
   }
 }
 
-async function assertRateLimit(request: Request, env: Env): Promise<void> {
+async function assertRateLimit(request: Request, env: Env, ctx: ExecutionContext): Promise<void> {
   try {
     const clientId = await getRateLimitClientId(request);
     const bucket = Math.floor(Date.now() / (RATE_LIMIT_WINDOW_SECONDS * 1000));
@@ -443,9 +453,11 @@ async function assertRateLimit(request: Request, env: Env): Promise<void> {
       throw new TranslateError("RATE_LIMITED", MESSAGES.rateLimited, 429);
     }
 
-    await env.CACHE.put(key, String(current + 1), {
-      expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2
-    });
+    ctx.waitUntil(
+      env.CACHE.put(key, String(current + 1), {
+        expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2
+      })
+    );
   } catch (error) {
     if (error instanceof TranslateError) {
       throw error;
