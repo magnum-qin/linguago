@@ -1,5 +1,5 @@
 import { ref, shallowRef } from 'vue';
-import { verifyTranslation } from '../utils/api.js';
+import { openTranslationStream } from '../utils/api.js';
 import { settings } from './useSettings';
 
 const inputText = ref('');
@@ -22,8 +22,35 @@ export function useTranslation() {
         model: settings.model,
       };
       
-      const response = await verifyTranslation(payload);
-      resultData.value = response;
+      const response = await openTranslationStream(payload);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No stream available');
+      
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.event === 'partial_translation' || parsed.event === 'partial_explanation' || parsed.event === 'final') {
+              resultData.value = parsed.data;
+            } else if (parsed.event === 'error') {
+              throw new Error(parsed.data.message || 'Translation failed');
+            }
+          } catch (e) {
+            // Ignore parse errors for incomplete JSON lines
+          }
+        }
+      }
     } catch (e: any) {
       console.error(e);
       resultData.value = `Error: ${e.message || 'Translation failed'}`;

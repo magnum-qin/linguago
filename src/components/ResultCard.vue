@@ -213,7 +213,7 @@ const submitReport = async () => {
   <section class="flex flex-col w-full relative z-0">
     <Transition mode="out-in" name="fade" @enter="updateIndicator">
       <!-- Result State -->
-      <div v-if="resultData && !isTranslating" class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative">
+      <div v-if="resultData" class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative">
         <div class="flex items-center justify-between w-full mb-6">
           <span class="text-[0.7rem] font-bold uppercase tracking-widest text-m3-on-surface-variant flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full" :class="resultData.provider === 'dictionary' ? 'bg-[#ff9800]' : (resultData.cached ? 'bg-m3-primary' : 'bg-[#008053]')"></span>
