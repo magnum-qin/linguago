@@ -1,5 +1,6 @@
 export interface Env {
   ASSETS: Fetcher;
+  DB: D1Database;
   CACHE: KVNamespace;
   OPENROUTER_API_KEY?: string;
   DASHSCOPE_API_KEY?: string;
@@ -7,6 +8,7 @@ export interface Env {
   DEEPSEEK_API_KEY?: string;
   DICTIONARY_API_URL?: string;
   DICTIONARY_API_TOKEN?: string;
+  DICTIONARY_ENABLE_LEGACY_SOURCES?: string;
 }
 
 export type LanguageCode = "en" | "zh" | "pt-BR" | "ja";
@@ -40,6 +42,12 @@ export interface TranslateRequest {
 export interface WordExample {
   sentence: string;
   translations: Record<LanguageCode, string>;
+  source_lang?: string;
+  source_reading?: string;
+  localizations?: Partial<Record<LanguageCode, {
+    text: string;
+    reading?: string;
+  }>>;
 }
 
 export interface WordDetail {
@@ -52,6 +60,17 @@ export interface WordSense {
   part_of_speech: string;
   gloss_key: string;
   definitions: Record<DisplayLanguageCode, string>;
+  domain?: string;
+  register_label?: string;
+  localizations?: Partial<Record<DisplayLanguageCode, {
+    term: string;
+    reading: string;
+    reading_system: string;
+    pronunciation: string;
+    pronunciation_system: string;
+    definition: string;
+    usage_note: string;
+  }>>;
 }
 
 export interface BaseResponse {

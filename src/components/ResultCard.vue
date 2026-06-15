@@ -101,13 +101,25 @@ const currentWordDetail = computed(() => {
 
 const currentSenses = computed(() => {
   if (!resultData.value || !resultData.value.senses) return [];
-  return resultData.value.senses.filter((s: any) => s.definitions && s.definitions[activeLang.value]);
+  return resultData.value.senses.filter((s: any) => senseDefinition(s, activeLang.value));
 });
 
 const currentExamples = computed(() => {
   if (!resultData.value || !resultData.value.examples) return [];
-  return resultData.value.examples.filter((e: any) => e.translations && e.translations[activeLang.value]);
+  return resultData.value.examples.filter((e: any) => exampleTranslation(e, activeLang.value));
 });
+
+const senseDefinition = (sense: any, lang: string) => {
+  return sense?.localizations?.[lang]?.definition || sense?.definitions?.[lang] || '';
+};
+
+const senseTerm = (sense: any, lang: string) => {
+  return sense?.localizations?.[lang]?.term || '';
+};
+
+const exampleTranslation = (example: any, lang: string) => {
+  return example?.localizations?.[lang]?.text || example?.translations?.[lang] || '';
+};
 
 const speak = (text: string, lang: string) => {
   if (!window.speechSynthesis) return;
@@ -332,12 +344,13 @@ const submitReport = async () => {
                 </h4>
                 <div v-for="(sense, i) in currentSenses" :key="i" class="py-4">
                   <div class="flex gap-4 items-start">
-                    <span class="flex items-center justify-center w-[26px] h-[26px] rounded-[8px] bg-m3-primary/10 text-m3-primary text-[0.85rem] font-black shrink-0 mt-1">{{ sense.sense_order }}</span>
+                    <span class="flex items-center justify-center w-[26px] h-[26px] rounded-[8px] bg-m3-primary/10 text-m3-primary text-[0.85rem] font-black shrink-0 mt-1">{{ i + 1 }}</span>
                     <div class="flex flex-col gap-1.5 w-full pt-0.5">
                       <div class="flex flex-wrap items-center gap-2 mb-0.5">
                         <span v-if="sense.part_of_speech" class="px-2 py-0.5 rounded-[6px] bg-m3-surface-variant/60 text-m3-on-surface-variant text-[0.65rem] font-bold uppercase tracking-widest">{{ sense.part_of_speech }}</span>
                       </div>
-                      <span class="text-m3-on-surface text-[1.15rem] sm:text-[1.25rem] font-medium leading-relaxed"><FuriganaText :text="sense.definitions[activeLang]" /></span>
+                      <span v-if="senseTerm(sense, activeLang)" class="text-m3-on-surface text-[1.05rem] sm:text-[1.15rem] font-bold leading-relaxed"><FuriganaText :text="senseTerm(sense, activeLang)" /></span>
+                      <span class="text-m3-on-surface text-[1rem] sm:text-[1.1rem] font-medium leading-relaxed"><FuriganaText :text="senseDefinition(sense, activeLang)" /></span>
                     </div>
                   </div>
                 </div>
@@ -360,7 +373,7 @@ const submitReport = async () => {
                       </span>
                       <div class="flex flex-col gap-1.5 w-full pt-0.5">
                         <p class="text-m3-on-surface text-[1.05rem] font-medium leading-relaxed"><FuriganaText :text="example.sentence" :highlight="currentWord" /></p>
-                        <p class="text-m3-on-surface-variant text-[0.95rem] leading-relaxed"><FuriganaText :text="example.translations[activeLang]" :highlight="currentWord" /></p>
+                        <p class="text-m3-on-surface-variant text-[0.95rem] leading-relaxed"><FuriganaText :text="exampleTranslation(example, activeLang)" :highlight="currentWord" /></p>
                       </div>
                     </div>
                   </div>

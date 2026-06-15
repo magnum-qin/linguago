@@ -1,41 +1,22 @@
 # LinguaGo Project Overview For AI
 
-This document is a high-signal briefing for AI coding agents that need to understand the project quickly before making changes.
+This is the high-signal briefing for AI coding agents working in this repository.
 
 ## One-Sentence Summary
 
-LinguaGo is a Cloudflare-hosted Progressive Web App for fast multilingual translation and dictionary lookup, optimized for mobile use, four-language result tabs, provider/model switching, dictionary-first word lookup, and progressive structured streaming.
+LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and dictionary lookup, with dictionary-first word lookup, provider/model switching, KV caching, and structured streaming translation.
 
-## Product Goal
+## Current Architecture
 
-The product should feel like a lightweight native translator/dictionary app:
+- Frontend: Vue 3 + Vuetify + Tailwind CSS built by Vite.
+- Frontend entry: `index.html` -> `src/main.ts` -> `src/App.vue`.
+- Backend: Cloudflare Worker in `worker/index.ts`.
+- Static hosting: Workers Assets from `dist/`.
+- Cache/settings/rate limits: Cloudflare KV binding `CACHE`.
+- Dictionary: Cloudflare D1 binding `DB`, plus optional Louis SQLite API through `DICTIONARY_API_URL` and `DICTIONARY_API_TOKEN`.
+- Deployment: Wrangler via `npm run deploy`.
 
-- The user enters a Chinese, English, Portuguese, or Japanese word/sentence.
-- The app returns translations across English, Brazilian Portuguese, Simplified Chinese, and Japanese.
-- Word-like input is checked against the Louis dictionary first.
-- Sentence input uses the selected AI provider/model.
-- Results are shown in one selected language tab at a time.
-- The UI should feel stable: no card jumps, no button resizing, no blank tab content during loading.
-
-## Current Production URL
-
-```text
-https://translation-pwa.qhzggzh-linguago.workers.dev
-```
-
-## Tech Stack
-
-- Frontend: plain HTML, CSS, and JavaScript in `public/`.
-- Styling source: `src/styles.css`, compiled into `public/styles.css`.
-- Backend: Cloudflare Worker in `src/index.ts`.
-- Hosting: Cloudflare Workers Assets.
-- Cache: Cloudflare KV binding named `CACHE`.
-- Dictionary: external Louis dictionary API backed by SQLite.
-- Deployment: Wrangler through `npm run deploy`.
-
-## Important Files
-
-Read these first:
+## Read These First
 
 ```text
 README.md
@@ -43,138 +24,108 @@ docs/PROJECT_OVERVIEW_FOR_AI.md
 docs/ARCHITECTURE.md
 docs/CODEX_HANDOFF.md
 docs/DECISIONS.md
-public/index.html
-public/app.js
-src/index.ts
-src/styles.css
+docs/TODO.md
+package.json
+wrangler.jsonc
+src/App.vue
+src/composables/useTranslation.ts
+src/composables/useSettings.ts
+worker/index.ts
+worker/dictionary.ts
+worker/config.ts
 ```
 
-Key responsibilities:
+## Important Current Paths
 
-- `public/index.html`: DOM shell for input, results, settings, model editor, history.
-- `public/app.js`: UI state, settings, streaming request handling, language tabs, history, speech synthesis, pronunciation hints.
-- `src/styles.css`: source stylesheet. Edit this, then run `npm run style:build`.
-- `public/styles.css`: generated CSS. Do not edit directly.
-- `public/sw.js`: service worker app shell cache. `/api/*` must stay network-only.
-- `src/index.ts`: Worker routes, provider routing, streaming, JSON validation, dictionary lookup, KV cache.
-- `docs/CODEX_HANDOFF.md`: operational handoff and UI constraints.
+- `src/components/TranslatorCard.vue`: input UI.
+- `src/components/ResultCard.vue`: result tabs, dictionary/model badge, report action.
+- `src/components/SettingsOverlay.vue`: provider/model settings and dictionary stats.
+- `src/composables/useTranslation.ts`: streaming translation loop.
+- `src/composables/useSettings.ts`: local settings, model defaults, language labels.
+- `src/utils/api.js`: frontend API calls.
+- `src/assets/tailwind.css`: app styling source.
+- `public/sw.js`: PWA service worker.
+- `worker/index.ts`: Worker route dispatch and translation orchestration.
+- `worker/dictionary.ts`: D1/Louis/mock dictionary adapter stack.
+- `worker/config.ts`: backend model catalog and cache version.
 
-## Runtime Architecture
+## Stale Historical Paths
+
+The project used to be a plain frontend. These references are stale unless a migration task explicitly restores them:
+
+- `public/index.html`
+- `public/app.js`
+- `public/styles.css`
+- `src/index.ts`
+- `src/styles.css`
+- `npm run style:build`
+
+If you see those in docs or scripts, update them to the Vue/Vite structure before relying on them.
+
+## Runtime Flow
 
 ```text
 Browser / installed PWA
   |
-  | static assets + POST /api/*
+  | Vite assets + POST /api/*
   v
-Cloudflare Worker + Workers Assets
+Cloudflare Worker
   |
-  +-- Cloudflare KV cache
-  |
-  +-- Louis dictionary API
-  |
-  +-- Model providers
-      +-- DeepSeek
-      +-- Gemini
-      +-- DashScope / Alibaba Cloud Bailian
-      +-- OpenRouter
+  +-- KV cache/settings/rate-limit
+  +-- D1 dictionary lookup
+  +-- Louis dictionary API fallback
+  +-- selected model provider
 ```
 
 ## API Routes
 
-Implemented in `src/index.ts`:
+Implemented in `worker/index.ts`:
 
-- `POST /api/translate`: one-shot translation.
-- `POST /api/translate-stream`: NDJSON progressive translation.
-- `GET /api/models`: provider/model catalog for the settings UI.
-- `GET/POST /api/settings`: backend provider/model settings.
-- `GET /api/health` and `/health`: safe runtime status.
-- `GET /api/dictionary/stats`: dictionary stats proxy.
+- `POST /api/translate`
+- `POST /api/translate-stream`
+- `POST /api/report-error`
+- `GET /api/models`
+- `GET/POST /api/settings`
+- `GET /api/dictionary/stats`
+- `GET /api/health`
+- `GET /health`
 
-The browser should never see provider API keys or the dictionary token.
+Unknown routes are served through `env.ASSETS`.
 
 ## Translation Flow
-
-Normal one-shot flow:
 
 ```text
 request
   |
   +-- normalize input and target language
   +-- rate-limit
-  +-- if word-like: try Louis dictionary API
-  |     +-- hit: return dictionary result
-  |     +-- miss: continue to model
   +-- select provider/model
   +-- check KV translation cache
-  +-- call provider
-  +-- parse and validate JSON
+  +-- if word-like: try dictionary adapters
+  |     +-- D1
+  |     +-- Louis SQLite API
+  |     +-- mock JMDict test adapter
+  +-- if dictionary miss: call model provider
+  +-- parse and validate provider JSON
   +-- normalize frontend response
   +-- write KV cache
-  +-- return JSON
+  +-- return final response
 ```
 
-Streaming flow:
+Streaming uses newline-delimited JSON events:
 
-```text
-request
-  |
-  +-- dictionary and KV cache can still short-circuit to final
-  +-- otherwise call the selected model once with structured JSON streaming
-  +-- read provider SSE chunks
-  +-- accumulate raw JSON text
-  +-- opportunistically parse completed fields
-  +-- emit NDJSON delta events as fields become available
-  +-- parse final full JSON
-  +-- normalize and cache final response
-  +-- emit final and done
-```
+- `status`
+- `partial_translation`
+- `partial_explanation`
+- `final`
+- `done`
+- `error`
 
-Important: the current streaming design is single-request structured streaming. It intentionally avoids the older two-request `preview + full` design because that could produce different translations.
+Dictionary and cache hits can return only `status`, `final`, and `done`.
 
-## Streaming Event Shape
+## Result Model
 
-`POST /api/translate-stream` returns newline-delimited JSON events:
-
-```text
-status: started
-status: stream
-delta: partial structured response
-delta: more fields
-final: complete normalized response
-done: ok
-```
-
-If KV cache or dictionary hits, the route may return:
-
-```text
-status: started
-final
-done
-```
-
-That is expected and means no model streaming happened.
-
-## Provider Behavior
-
-Supported providers:
-
-- `auto`
-- `deepseek`
-- `gemini`
-- `dashscope`
-- `openrouter`
-
-Observed behavior from recent tests:
-
-- DeepSeek direct `deepseek-v4-flash`: fastest and best true streaming experience in current structured workflow.
-- DeepSeek direct `deepseek-v4-pro`: also true streaming, slightly slower final output.
-- Gemini `gemini-3.1-flash-lite` and `gemini-3.5-flash`: can stream structured fields, but first delta is slower than DeepSeek in this project.
-- DashScope: supports `stream: true`, but JSON mode often buffers until complete JSON, so UI may receive no `delta`.
-- OpenRouter free models: unstable; many fail, timeout, or return invalid JSON. Do not make OpenRouter free models the default without fallback logic.
-
-## Result Data Model
-
-Frontend-compatible response:
+The normalized response includes:
 
 ```ts
 {
@@ -183,166 +134,64 @@ Frontend-compatible response:
   target_lang: "en" | "zh" | "pt-BR" | "ja";
   original: string;
   translation: string;
-  translations: {
-    en: { text: string; phonetic: string; audio_text: string };
-    zh: { text: string; phonetic: string; audio_text: string };
-    "pt-BR": { text: string; phonetic: string; audio_text: string };
-    ja: { text: string; phonetic: string; audio_text: string };
-  };
+  translations: Record<"en" | "zh" | "pt-BR" | "ja", {
+    text: string;
+    phonetic: string;
+    audio_text: string;
+  }>;
   provider: "dictionary" | "deepseek" | "gemini" | "dashscope" | "openrouter";
   model: string;
   cached: boolean;
 }
 ```
 
-Sentence responses also include:
+Sentence responses also include `explanation` and language-keyed `explanations`.
 
-```ts
-{
-  explanation: string;
-  explanations: Record<"en" | "zh" | "pt-BR" | "ja", string>;
-}
-```
+Word responses also include `phonetic`, `audio_text`, `word_details`, `senses`, and `examples`.
 
-Word responses also include:
+## Current New/Old Mix Risks
 
-```ts
-{
-  phonetic: string;
-  audio_text: string;
-  word_details: Record<"en" | "zh" | "pt-BR" | "ja", { word: string; definition: string }>;
-  senses?: Array<{
-    sense_order: number;
-    part_of_speech: string;
-    gloss_key: string;
-    definitions: Record<"en" | "zh" | "pt-BR" | "ja", string>;
-  }>;
-  examples: Array<{
-    sentence: string;
-    translations: Record<"en" | "zh" | "pt-BR" | "ja", string>;
-  }>;
-}
-```
-
-## Frontend Behavior
-
-The result card has four tabs:
-
-```text
-EN | PT | 中 | 日
-```
-
-Only the selected tab is shown at one time:
-
-- Translation card displays selected language text.
-- Sentence explanation displays selected language explanation.
-- Word details/examples display selected language definitions/examples.
-- During streaming, if a tab has not arrived yet, show loading animation rather than blank content.
-
-The user wanted English pronunciation hints only for key/difficult words, not every word. Japanese should show furigana for known kanji terms. This is currently handled in `public/app.js` with local rules, not by the model.
-
-## Pronunciation And Reading Hints
-
-Implemented locally in `public/app.js`:
-
-- `formatEnglishKeywordPronunciation(text)`: adds small pronunciation hints for selected difficult English words such as `scenic`, `beautiful`, `Portuguese`, etc.
-- `formatJapaneseFurigana(text)`: adds ruby/furigana for known Japanese kanji terms such as `観光`, `景色`, `美しい`, `公園`, `散歩`.
-- Chinese pinyin is generated server-side through `pinyin-pro` in `src/index.ts`.
-- Portuguese currently does not show phonetics because Portuguese spelling is generally more directly pronounceable for this product’s use case.
-
-When adding more hints, keep the UI compact. Do not annotate every English word.
+- Documentation had many plain-frontend references after the Vue/Vite migration.
+- `scripts/sw-cache-check.mjs` was still checking for removed `public/index.html`, `/app.js`, and `/styles.css`.
+- `npm run check` needed Vue and JS API declaration files after the migration.
+- `worker/dictionary.ts` now mixes D1, Louis SQLite API, and mock JMDict adapters; clarify production source-of-truth before deeper dictionary work.
+- Many untracked root files are SQL dumps, logs, transfer archives, and scratch scripts. Review before staging anything.
 
 ## Cache Rules
 
-There are two cache layers:
+- Worker translation cache version is `TRANSLATION_CACHE_VERSION` in `worker/config.ts`.
+- Service worker shell cache name is `CACHE_NAME` in `public/sw.js`.
+- `/api/*` must stay network-only in the service worker.
+- Vite hashed `/assets/*` can be cache-first.
+- Navigations should stay network-first with cached `index.html` fallback.
 
-1. Worker KV translation cache.
-2. PWA service worker app-shell cache.
-
-Important rules:
-
-- Bump `TRANSLATION_CACHE_VERSION` in `src/index.ts` when response shape or normalization changes.
-- Bump `CACHE_NAME` in `public/sw.js` when app-shell assets or cache behavior changes.
-- `/api/*` must be network-only in the service worker.
-- `app.js` and `styles.css` should stay network-first so UI fixes reach installed PWAs quickly.
-
-## Settings And Models
-
-The settings UI supports:
-
-- Provider selection.
-- Model dropdown for selected provider.
-- Editable provider-specific model list.
-- Model verification.
-- Dictionary stats display.
-
-Frontend defaults live in `public/app.js`.
-Backend defaults/model catalog live in `src/index.ts`.
-
-Keep them aligned when adding or removing model names.
-
-## Environment Variables
-
-Cloudflare Worker variables/secrets:
-
-```text
-DICTIONARY_API_URL
-DICTIONARY_API_TOKEN
-OPENROUTER_API_KEY
-DASHSCOPE_API_KEY
-GEMINI_API_KEY
-DEEPSEEK_API_KEY
-```
-
-Never expose secrets in frontend code or health responses.
-
-## Common Commands
+## Commands
 
 ```bash
 npm install
-npm run style:build
+npm run dev
+npm run dev:worker
+npm run build
 npm run check
+npm run check:all
 npm run deploy
 ```
 
-Useful UI checks:
-
-```bash
-node scripts/mobile-devtools-jump-audit.mjs
-node scripts/mobile-translate-height-check.mjs
-node scripts/interaction-motion-check.mjs
-node scripts/result-tabs-check.mjs
-npm run check:theme
-```
+PowerShell may block `npm.ps1`; use `npm.cmd run <script>` if needed.
 
 ## UI Constraints
 
 Preserve these unless explicitly asked to redesign:
 
-- Do not cause layout jumps when loading turns into results.
-- Do not let result tab switching change card height.
-- Do not resize buttons between idle/loading states.
-- Do not use `transform: scale()` on buttons for feedback.
-- Provider badge must keep stable dimensions.
-- Settings and model editor overlays must cover the viewport and stay above result cards.
-- Desktop layout is three columns: history, input, result.
-- Mobile layout must remain stable during keyboard open/close.
-
-## Common Pitfalls
-
-- Do not edit `public/styles.css` directly.
-- Do not let stale KV cache make streaming tests look non-streaming.
-- Do not forget app-shell cache invalidation after changing `public/app.js`.
-- Do not assume every provider streams the same way; DashScope may buffer JSON mode.
-- Do not assume OpenRouter free models are reliable.
-- Do not use a two-request preview/full translation flow unless the user accepts possible inconsistency.
-- Do not add model output fields without updating validation, normalization, frontend rendering, and cache version.
+- Result tabs should keep stable layout.
+- Loading and final results should not create avoidable card jumps.
+- Settings overlay must stay above app content.
+- Theme should apply before first paint via the head bootstrap script.
+- Service worker must not cache API responses.
+- Keep model defaults aligned between `worker/config.ts` and `src/composables/useSettings.ts`.
 
 ## Recommended AI Onboarding Prompt
 
-Use this prompt for a fresh AI coding session:
-
 ```text
-Read README.md, docs/PROJECT_OVERVIEW_FOR_AI.md, docs/ARCHITECTURE.md, and docs/CODEX_HANDOFF.md. Summarize the runtime architecture, streaming translation flow, cache rules, UI constraints, and deployment workflow before editing files.
+Read README.md, docs/PROJECT_OVERVIEW_FOR_AI.md, docs/ARCHITECTURE.md, and docs/CODEX_HANDOFF.md. Summarize the current Vue/Vite frontend, Worker API, dictionary adapter stack, cache rules, and known migration cleanup items before editing files.
 ```
-

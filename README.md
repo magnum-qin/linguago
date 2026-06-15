@@ -1,55 +1,63 @@
 # LinguaGo Translation PWA
 
-LinguaGo is an iPhone-friendly Progressive Web App for fast multilingual translation and dictionary lookup.
+LinguaGo is an iPhone-friendly Progressive Web App for multilingual translation and dictionary lookup.
 
-The app is designed around a simple flow:
+The current app flow is:
 
-1. Enter a word or sentence.
-2. The Cloudflare Worker receives `/api/translate`.
-3. Single-word input is looked up in the Louis dictionary API first.
-4. If the dictionary misses, the Worker falls back to the configured model provider.
-5. The UI shows results in language tabs: EN, PT-BR, Chinese, and Japanese.
+1. The Vue frontend sends text to the Cloudflare Worker.
+2. The Worker handles `/api/translate` or `/api/translate-stream`.
+3. Single-word input is looked up in the dictionary layer first.
+4. Dictionary misses and sentence input fall back to the selected model provider.
+5. The UI renders English, Brazilian Portuguese, Chinese, and Japanese result tabs.
 
 ## Features
 
 - Installable PWA for iPhone Safari and desktop browsers.
-- System-aware theme with manual light/dark/system cycling.
-- Four-language result tabs: English, Brazilian Portuguese, Chinese, and Japanese.
-- Dictionary-first lookup for accepted word entries.
+- Vue 3 + Vuetify frontend with Tailwind CSS utilities.
+- Four-language result tabs: EN, PT-BR, Chinese, and Japanese.
+- Dictionary-first lookup through Cloudflare D1 and/or the Louis dictionary API.
 - Model fallback through OpenRouter, Alibaba Cloud Bailian, Gemini, DeepSeek, or automatic routing.
-- Backend-stored model settings exposed through the settings modal.
-- Cloudflare KV cache for repeated translation results.
+- Backend-stored provider/model settings exposed through the settings overlay.
+- Cloudflare KV cache for repeated translation results and backend settings.
 - Structured provider errors and `/api/health` observability for KV, dictionary, and provider configuration.
-- Stable provider badge showing dictionary hits or the selected model provider without changing result card dimensions.
-- Mobile-first UI with stable button sizes, smooth tab transitions, and no layout jump during loading-to-result changes.
-- Service worker app-shell caching that keeps the PWA fast while bypassing cache for `/api/*` requests.
+- Service worker app-shell caching that bypasses `/api/*` requests and caches Vite hashed assets.
 - Dictionary pipeline scripts for downloading, cleaning, validating, importing, and syncing generated word entries.
 
 ## Tech Stack
 
-- Frontend: plain HTML, CSS, and JavaScript in `public/`.
-- Styling source: Tailwind CSS v4 entry file at `src/styles.css`.
-- Backend: Cloudflare Worker in `src/index.ts`.
-- Static hosting: Cloudflare Workers Assets.
-- Cache: Cloudflare KV binding `CACHE`.
-- Dictionary API: Louis server running `scripts/dictionary-api-server.mjs`.
-- Dictionary storage: SQLite-compatible `dictionary.sqlite`.
+- Frontend: Vue 3, Vuetify, Tailwind CSS, Vite.
+- Frontend entry: `src/main.ts`, `src/App.vue`, `src/components/`, `src/composables/`, `src/utils/`.
+- Backend: Cloudflare Worker modules in `worker/`.
+- Static hosting: Cloudflare Workers Assets served from `dist/`.
+- Cache/settings: Cloudflare KV binding `CACHE`.
+- Dictionary storage: Cloudflare D1 binding `DB`, with Louis SQLite API as an external fallback/source.
+- Deployment: Wrangler through `npm run deploy`.
 
 ## Project Layout
 
 ```text
-public/
-  index.html         PWA shell and settings/model editor DOM
-  app.js             Frontend state, streaming translation UI, tabs, history, speech
-  styles.css         Generated CSS; do not edit directly
-  sw.js              App-shell service worker
-  icons/             PWA icons
+index.html                Vite HTML entry and PWA head bootstrap
 src/
-  index.ts           Cloudflare Worker API, provider routing, cache, validation
-  styles.css         Source stylesheet compiled into public/styles.css
-scripts/             Dictionary pipeline, remote helpers, smoke tests, Playwright checks
-docs/                Architecture, handoff, decisions, TODO, dictionary pipeline notes
-wrangler.jsonc       Cloudflare Worker configuration
+  main.ts                 Vue app entry
+  App.vue                 Main app shell
+  assets/tailwind.css     Tailwind and app styling source
+  components/             Translator, result, bookmarks, settings, furigana UI
+  composables/            Shared settings, theme, translation, bookmarks state
+  utils/                  Frontend API, text, and pronunciation helpers
+worker/
+  index.ts                Cloudflare Worker routes and orchestration
+  config.ts               Model catalog, messages, cache/rate-limit constants
+  dictionary.ts           D1/Louis/mock dictionary adapters and normalization
+  provider-*.ts           Provider calls, selection, JSON parsing
+  streaming.ts            Structured streaming orchestration
+  settings.ts             `/api/models` and `/api/settings`
+public/
+  sw.js                   Service worker
+  manifest.webmanifest    PWA manifest
+  icons/                  PWA icons
+scripts/                  Dictionary pipeline, checks, smoke tests, remote helpers
+docs/                     Architecture, handoff, decisions, TODO, pipeline notes
+wrangler.jsonc            Cloudflare Worker, Assets, KV, and D1 configuration
 ```
 
 ## Local Development
@@ -60,22 +68,28 @@ Install dependencies:
 npm install
 ```
 
-Build CSS:
+Run the Vite frontend:
 
 ```bash
-npm run style:build
-```
-
-Type-check the Worker:
-
-```bash
-npm run check
+npm run dev
 ```
 
 Run the Worker locally:
 
 ```bash
-npm run dev
+npm run dev:worker
+```
+
+Build:
+
+```bash
+npm run build
+```
+
+Type-check:
+
+```bash
+npm run check
 ```
 
 Deploy:
@@ -99,19 +113,26 @@ Configure these as Cloudflare Worker secrets or variables where applicable:
 - `OPENROUTER_API_KEY`: OpenRouter API key.
 - `DASHSCOPE_API_KEY`: Alibaba Cloud Bailian API key.
 - `GEMINI_API_KEY`: Gemini API key.
-- `DEEPSEEK_API_KEY`: DeepSeek API key. The default model is `deepseek-v4-flash`.
+- `DEEPSEEK_API_KEY`: DeepSeek API key.
 
-## Health And Errors
+Cloudflare bindings are configured in `wrangler.jsonc`:
 
-The Worker exposes:
+- `ASSETS`: Workers Assets from `./dist`.
+- `CACHE`: KV namespace for translation cache, rate limit counters, and model settings.
+- `DB`: D1 database for dictionary lookup.
 
-- `GET /api/health`: reports Worker time, KV reachability, dictionary reachability/stats, and provider configuration booleans without exposing secrets.
-- `GET /health`: compatibility alias for the same health payload.
-- `GET /api/models`: returns the backend model catalog used by the settings UI.
+## Worker API
+
+- `GET /api/health`: Worker, KV, dictionary, and provider configuration status.
+- `GET /health`: compatibility alias for `/api/health`.
+- `GET /api/models`: backend provider/model catalog.
+- `GET/POST /api/settings`: persisted backend provider/model settings.
+- `GET /api/dictionary/stats`: dictionary stats proxy.
 - `POST /api/translate`: one-shot translation response.
 - `POST /api/translate-stream`: NDJSON progressive translation events.
+- `POST /api/report-error`: edge-side logging endpoint for frontend translation reports.
 
-`POST /api/translate` returns structured error responses:
+`POST /api/translate` returns structured errors:
 
 ```json
 {
@@ -122,19 +143,24 @@ The Worker exposes:
 }
 ```
 
-Model responses are requested in JSON mode where supported, then validated by the Worker before they are normalized for the frontend. Invalid complete responses are retried once with a JSON repair prompt.
-
 ## Useful Checks
 
 ```bash
-node scripts/mobile-devtools-jump-audit.mjs
-node scripts/mobile-translate-height-check.mjs
-node scripts/interaction-motion-check.mjs
+npm run build
+npm run check
+npm run check:all
+node scripts/api-smoke.mjs
 node scripts/result-tabs-check.mjs
-npm run check:theme
+node scripts/system-theme-check.mjs
 ```
 
-These checks verify the mobile layout, tab animation, button size stability, loading-to-result layout stability, and system/manual theme behavior.
+Use the Playwright layout scripts before and after changing mobile layout, result cards, tabs, settings overlays, or service worker behavior.
+
+## Current Cleanup Notes
+
+The project recently moved from a plain `public/app.js` frontend to a Vue/Vite frontend. Treat old references to `public/index.html`, `public/app.js`, `public/styles.css`, `src/index.ts`, or `npm run style:build` as stale unless a migration task explicitly restores those files.
+
+Several large SQL dumps, logs, scratch scripts, and transfer archives are currently present as untracked files in the repository root. They should be reviewed before committing; most look operational or temporary rather than source code.
 
 ## Documentation For New Codex Sessions
 
@@ -147,10 +173,4 @@ docs/ARCHITECTURE.md
 docs/CODEX_HANDOFF.md
 docs/DECISIONS.md
 docs/TODO.md
-```
-
-The fastest prompt is:
-
-```text
-Please read README.md, docs/PROJECT_OVERVIEW_FOR_AI.md, and docs/CODEX_HANDOFF.md first, then summarize the architecture and current constraints before making changes.
 ```

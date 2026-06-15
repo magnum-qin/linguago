@@ -7,8 +7,8 @@ Return valid JSON only. Never wrap JSON in markdown fences.
 Rules:
 1. Detect whether the input is a single word or a sentence/phrase.
 2. Every response must include translations for zh, en, pt-BR, and ja.
-3. Each translation entry should include only text. Do not generate phonetic or audio_text fields.
-4. The server will generate pronunciation fields separately.
+3. For word or lexical phrase results, every translation entry should include text, phonetic, and audio_text.
+4. For sentence results, translation entries may include only text.
 5. If it is a single word, return:
 {
   "type": "word",
@@ -99,8 +99,8 @@ Return valid JSON only. Never wrap JSON in markdown fences.
 Rules:
 1. Detect whether the input is a single word or a sentence/phrase.
 2. Always provide translations for zh, en, pt-BR, and ja.
-3. Translation entries must include only "text". Do not generate phonetic or audio_text fields.
-4. The server will generate pronunciation fields separately.
+3. For word or lexical phrase results, every translation entry must include "text", "phonetic", and "audio_text".
+4. For sentence results, translation entries may include only "text".
 5. Language-keyed fields must be written in their own language:
 - zh: Simplified Chinese only. Do not use Japanese kana or Portuguese.
 - en: English only. For all English text (including translations, word_details, explanations, and examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate nouns, verbs, and adjectives like "screwdriver", "sewer", "schedule") with their standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}, {sewer|ˈsuː.ər}. Do not annotate extremely basic words like "the", "is", "have", "go", "use", "hard", "good", "bad".
@@ -115,10 +115,10 @@ For a single word, return:
   "detected_source_lang": "en",
   "translation": "<target-language word>",
   "translations": {
-    "zh": {"text": "<Simplified Chinese word>"},
-    "en": {"text": "<English word>"},
-    "pt-BR": {"text": "<Brazilian Portuguese word>"},
-    "ja": {"text": "<Japanese word>"}
+    "zh": {"text": "<Simplified Chinese word>", "phonetic": "<pinyin with tone marks>", "audio_text": "<plain Chinese word>"},
+    "en": {"text": "<English word>", "phonetic": "<IPA for the full English term, wrapped in slashes>", "audio_text": "<plain English word>"},
+    "pt-BR": {"text": "<Brazilian Portuguese word>", "phonetic": "<IPA for the full Brazilian Portuguese term, wrapped in slashes>", "audio_text": "<plain Brazilian Portuguese word>"},
+    "ja": {"text": "<Japanese word>", "phonetic": "<hiragana reading>", "audio_text": "<plain Japanese word>"}
   },
   "word_details": {
     "zh": {"word": "<Simplified Chinese word>", "definition": "<concise Simplified Chinese definition only>"},
@@ -134,6 +134,19 @@ For a single word, return:
         "en": "<English example translation>",
         "pt-BR": "<Brazilian Portuguese example translation>",
         "ja": "<Japanese example translation>"
+      }
+    }
+  ],
+  "senses": [
+    {
+      "sense_order": 1,
+      "part_of_speech": "<concise part of speech, or empty string>",
+      "gloss_key": "<short English meaning key>",
+      "definitions": {
+        "zh": "<Simplified Chinese definition for this sense>",
+        "en": "<English definition for this sense>",
+        "pt-BR": "<Brazilian Portuguese definition for this sense>",
+        "ja": "<Japanese definition for this sense>"
       }
     }
   ]
@@ -165,6 +178,7 @@ Use zh, en, pt-BR, and ja fields in their own languages.
 For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
 For all English text (translations, explanations, definitions, examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
 For word definitions, write concise definitions only; no pronunciation, part-of-speech labels, markdown, or cross-language equivalents.
+For single words or lexical phrases, return the same structure as dictionary lookup: translations, word_details, senses with four-language definitions, and examples with four-language translations. In word translations, include phonetic and audio_text for zh, en, pt-BR, and ja.
 Do not copy schema descriptions or placeholder wording.`;
 
 export const GEMINI_PREVIEW_SYSTEM_PROMPT = `Translate the input into the requested target language.
@@ -180,7 +194,7 @@ Output this JSON shape exactly:
 CRITICAL RULES:
 1. For ALL Japanese text (translations, explanations), you MUST annotate every single kanji with hiragana using {kanji|hiragana}, e.g., {観光|かんこう}, {昼ご飯|ひるごはん}, {何|なに}. DO NOT leave any kanji without readings!
 2. For all English and Portuguese text, annotate difficult words (exceeding high school vocabulary) with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}.
-For a single word, set type to "word" and also include word_details and examples.`;
+For a single word or lexical phrase, set type to "word" and include the same structure as dictionary lookup: translations, word_details, senses with four-language definitions, and examples with four-language translations. In word translations, include phonetic and audio_text for zh, en, pt-BR, and ja.`;
 
 export const DEEPSEEK_PREVIEW_SYSTEM_PROMPT = `Return valid json only.
 Output this JSON shape exactly:
@@ -195,6 +209,7 @@ CRITICAL RULES:
 1. For ALL Japanese text (translations, explanations), you MUST annotate every single kanji with hiragana using {kanji|hiragana}, e.g., {観光|かんこう}, {昼ご飯|ひるごはん}, {何|なに}. DO NOT leave any kanji without readings!
 2. For all English text, annotate words that exceed high school vocabulary with IPA using {word|IPA}.
 For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.
+For single words or lexical phrases, return the same structure as dictionary lookup: translations, word_details, senses with four-language definitions, and examples with four-language translations. In word translations, include phonetic and audio_text for zh, en, pt-BR, and ja.
 Use the same JSON shape as the translation API schema.`;
 
 export const DASH_SCOPE_PREVIEW_SYSTEM_PROMPT = `Return valid JSON only.
@@ -208,7 +223,8 @@ Follow the JSON schema exactly.
 Use zh, en, pt-BR, and ja fields in their own languages.
 For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
 For all English text (translations, explanations, definitions, examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
-For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.`;
+For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.
+For single words or lexical phrases, return the same structure as dictionary lookup: translations, word_details, senses with four-language definitions, and examples with four-language translations. In word translations, include phonetic and audio_text for zh, en, pt-BR, and ja.`;
 
 export const OPENROUTER_PREVIEW_SYSTEM_PROMPT = `Translate into the requested target language.
 Follow the JSON schema exactly.

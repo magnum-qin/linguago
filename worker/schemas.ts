@@ -23,6 +23,14 @@ export const FULL_RESPONSE_SCHEMA = {
             text: {
               type: "string",
               description: "Simplified Chinese translation text only."
+            },
+            phonetic: {
+              type: "string",
+              description: "Pinyin reading for the whole Chinese term or phrase, with tone marks."
+            },
+            audio_text: {
+              type: "string",
+              description: "Plain text suitable for text-to-speech, without inline reading markup."
             }
           },
           required: ["text"]
@@ -33,6 +41,14 @@ export const FULL_RESPONSE_SCHEMA = {
             text: {
               type: "string",
               description: "English translation text only."
+            },
+            phonetic: {
+              type: "string",
+              description: "IPA pronunciation for the whole English term or phrase, wrapped in slashes."
+            },
+            audio_text: {
+              type: "string",
+              description: "Plain text suitable for text-to-speech, without inline IPA markup."
             }
           },
           required: ["text"]
@@ -43,6 +59,14 @@ export const FULL_RESPONSE_SCHEMA = {
             text: {
               type: "string",
               description: "Brazilian Portuguese translation text only."
+            },
+            phonetic: {
+              type: "string",
+              description: "IPA pronunciation for the whole Brazilian Portuguese term or phrase, wrapped in slashes."
+            },
+            audio_text: {
+              type: "string",
+              description: "Plain text suitable for text-to-speech, without inline IPA markup."
             }
           },
           required: ["text"]
@@ -53,6 +77,14 @@ export const FULL_RESPONSE_SCHEMA = {
             text: {
               type: "string",
               description: "Japanese translation text only."
+            },
+            phonetic: {
+              type: "string",
+              description: "Hiragana reading for the whole Japanese term or phrase."
+            },
+            audio_text: {
+              type: "string",
+              description: "Plain text suitable for text-to-speech, without inline reading markup."
             }
           },
           required: ["text"]

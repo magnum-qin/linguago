@@ -2,97 +2,111 @@
 
 This document records important decisions so future sessions do not repeat old mistakes.
 
-## 1. Plain Frontend Instead Of A Framework
+## 1. Vue/Vite Frontend Is Current
 
-The app currently uses plain HTML, CSS, and JavaScript.
-
-Reason:
-
-- The app is small and performance-sensitive.
-- Cloudflare Workers Assets can serve it directly.
-- The current UI behavior is highly custom and easier to tune without a component framework.
-
-Decision:
-
-- Keep plain frontend unless the app grows enough to justify React/Vue/Svelte.
-- If a framework is introduced later, preserve the existing UX constraints first.
-
-## 2. Tailwind Source CSS, Generated Public CSS
-
-`src/styles.css` is the source file. `public/styles.css` is generated.
+The app currently uses Vue 3, Vuetify, Tailwind CSS, and Vite.
 
 Reason:
 
-- Tailwind v4 gives design-token utilities while still allowing custom CSS.
-- The generated file is deployed as a static asset.
+- The previous plain frontend was replaced by componentized Vue code.
+- Vite now owns build output, hashed assets, and development server behavior.
+- Wrangler serves `dist/` through Workers Assets.
 
 Decision:
 
-- Edit `src/styles.css`.
-- Run `npm run style:build`.
-- Do not hand-edit `public/styles.css`.
+- Treat `src/main.ts`, `src/App.vue`, `src/components/`, and `src/composables/` as the active frontend.
+- Treat references to `public/app.js`, `public/index.html`, `public/styles.css`, `src/index.ts`, and `src/styles.css` as stale migration residue.
+
+## 2. Styling Source Lives In The Vue App
+
+`src/assets/tailwind.css` is imported by `src/main.ts` and bundled by Vite.
+
+Reason:
+
+- Tailwind is integrated through `@tailwindcss/vite`.
+- The deployed CSS is a hashed file in `dist/assets/`, not a hand-maintained public CSS file.
+
+Decision:
+
+- Edit `src/assets/tailwind.css` and Vue component classes.
+- Run `npm run build` for production assets.
+- Do not reintroduce generated `public/styles.css`.
 
 ## 3. Dictionary First, Model Second
 
-Single-word input checks the Louis dictionary API before calling a model.
+Single-word input checks dictionary adapters before calling a model.
 
 Reason:
 
 - Word lookup should be fast and cheap.
-- Dictionary entries can be curated and cached.
+- Curated dictionary entries are more consistent than model output.
 - Model calls remain useful for misses and sentences.
 
 Decision:
 
 - Keep dictionary lookup silent and resilient.
-- If Louis is unavailable, the Worker should fall back to model providers instead of failing.
+- If dictionary sources are unavailable or miss, the Worker should fall back to model providers.
 
-## 4. Worker Proxies Dictionary Stats
+## 4. Dictionary Source Is In Migration
+
+The Worker currently composes D1, Louis SQLite API, and mock JMDict adapters.
+
+Reason:
+
+- D1 enables Cloudflare-native dictionary lookup.
+- Louis remains useful for stats and legacy/remote data.
+- The mock adapter appears to be test/migration residue.
+
+Decision:
+
+- Be explicit about adapter ordering and model labels.
+- Do not assume Louis is the only dictionary source anymore.
+- Clean up the mock adapter when a real test fixture or production source replaces it.
+
+## 5. Worker Proxies Dictionary Stats
 
 The frontend calls the Worker for dictionary stats instead of calling Louis directly.
 
 Reason:
 
 - The Louis API token must not be exposed to browsers.
-- The Worker can normalize errors and keep the UI simple.
+- The Worker can normalize failures and keep the UI simple.
 
 Decision:
 
-- Keep `DICTIONARY_API_TOKEN` in Cloudflare Worker secrets.
+- Keep `DICTIONARY_API_TOKEN` in Worker secrets.
 - Keep browser calls token-free.
 
-## 5. Backend-Stored Model Settings
+## 6. Backend-Stored Model Settings
 
-The settings modal can save provider/model name to the backend.
+The settings overlay can save provider/model name to the backend.
 
 Reason:
 
-- The user should not need to edit code to switch models.
-- PWA instances should share the backend's current preferred model.
+- Users should not need to edit code to switch models.
+- Installed PWA instances can share the backend preferred model.
 
 Decision:
 
 - Use `/api/settings` for persisted provider/model settings.
-- The frontend can keep local settings as a convenience, but backend settings are authoritative.
+- Keep frontend local settings as a convenience, but keep backend settings authoritative for Worker calls.
 
-## 5a. Provider Support And Health
+## 7. Provider Support And Health
 
-The Worker supports OpenRouter, DashScope, Gemini, and automatic routing.
+The Worker supports OpenRouter, DashScope, Gemini, DeepSeek, and automatic routing.
 
 Reason:
 
 - The settings UI exposes these providers.
-- Silent normalization of an explicit provider hides configuration mistakes.
-- Health checks should help diagnose missing keys without leaking secrets.
+- Explicit provider errors help diagnose missing keys.
+- Health checks should diagnose configuration without leaking secrets.
 
 Decision:
 
-- Keep `openrouter` as a first-class provider.
-- Keep `auto` conservative: DashScope, then Gemini, then OpenRouter.
-- Use structured translation error codes for provider configuration, API, and empty-response failures.
+- Keep structured translation error codes.
 - `/api/health` may expose configured/reachable booleans and dictionary stats, but never secret values.
 
-## 6. EN / PT / Chinese / Japanese Tab Order
+## 8. EN / PT / Chinese / Japanese Tab Order
 
 Result tabs are ordered:
 
@@ -108,57 +122,32 @@ Decision:
 
 - Preserve this order unless the user explicitly changes it.
 
-## 7. One Language Per Tab
+## 9. Stable Button And Card Dimensions
 
-Each selected language tab should show only that language's result.
-
-Reason:
-
-- The user wanted less clutter than showing all languages at once.
-
-Decision:
-
-- Do not show four languages inside one selected tab.
-- Word, explanation, and example sections should all scope to the selected tab.
-
-## 8. Stable Button And Card Dimensions
-
-Buttons and result cards must not change height when labels or loading state change.
+Buttons and result cards should not change height when labels, loading state, or tab content changes.
 
 Reason:
 
-- iPhone UI felt jumpy when bilingual labels wrapped or when loading changed card height.
+- The mobile PWA feels poor when cards jump or bilingual labels wrap unexpectedly.
 
 Decision:
 
-- Buttons use fixed heights.
-- Bilingual button labels are constrained.
-- Loading and result states share stable dimensions.
+- Keep controls dimension-stable.
 - Avoid button `scale()` feedback.
-- The provider badge in the result header keeps a fixed width and height.
+- Keep provider badge dimensions stable.
 
-## 9. Safe Motion Over Layout Motion
+## 10. Service Worker Matches Vite
 
-The interaction system prefers visual-only animations.
-
-Reason:
-
-- Layout-affecting motion caused repeated mobile jumps.
-
-Decision:
-
-- Prefer `opacity`, `filter`, `background-color`, `color`, and `box-shadow`.
-- Use `transform` only when it does not affect layout, such as tab pseudo-element indicators.
-- Avoid animating `height`, `padding`, `margin`, or button scale.
-
-## 10. Playwright Checks Are Part Of The Design Process
-
-Several scripts exist to verify layout stability.
+The service worker caches app-shell files and Vite hashed assets.
 
 Reason:
 
-- Visual regressions were hard to judge by screenshots alone.
+- Vite outputs hashed JS/CSS under `/assets/`.
+- API responses must remain live.
 
 Decision:
 
-- Run Playwright checks after changing mobile layout, result cards, tabs, settings modal, or buttons.
+- Keep `/api/*` network-only.
+- Cache `/assets/*` cache-first.
+- Keep navigations network-first with cached index fallback.
+- Bump `CACHE_NAME` when service worker behavior changes.

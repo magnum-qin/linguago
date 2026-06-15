@@ -14,10 +14,10 @@ const checks = [
     args: ["scripts/sw-cache-check.mjs"]
   },
   ...[
-    "public/app.js",
-    "public/js/api.js",
-    "public/js/text-utils.js",
-    "public/js/pronunciation.js",
+    "src/utils/api.js",
+    "src/utils/text-utils.js",
+    "src/utils/pronunciation.js",
+    "public/sw.js",
     "scripts/api-smoke.mjs",
     "scripts/stream-benchmark.mjs",
     "scripts/sw-cache-check.mjs"

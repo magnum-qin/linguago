@@ -15,6 +15,13 @@
       "id": "dd1cac03419b418dab1300a6bd318e08"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "linguago-dictionary",
+      "database_id": "ee613260-5c1f-4bb5-8959-c54118174e0e"
+    }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1

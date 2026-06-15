@@ -2,6 +2,7 @@ import { localPronunciationText, normalizeStringOrText } from "./normalization";
 import { parseProviderJson } from "./provider-json";
 import { streamProviderJson } from "./provider-clients";
 import { buildUserPrompt, selectProviderSystemPrompt } from "./prompts";
+import { TranslateError } from "./errors";
 import type { LanguageCode, LocalizedText, Provider, ResponseProvider, SentenceResponse, TranslateRequest } from "./types";
 
 interface StreamTranslationInput {
@@ -55,7 +56,7 @@ export async function streamStructuredTranslation(
 
     return parseProviderJson(rawText, input.provider, input.model, false);
   } catch (error) {
-    if (emittedPartial) {
+    if (emittedPartial && !(error instanceof TranslateError && error.code === "PROVIDER_INVALID_JSON")) {
       throw error;
     }
     return fallback(input);

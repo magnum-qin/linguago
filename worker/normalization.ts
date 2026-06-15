@@ -10,7 +10,8 @@ import type {
   SentenceResponse,
   TranslateResponse,
   WordDetail,
-  WordExample
+  WordExample,
+  WordSense
 } from "./types";
 
 export function normalizeResponse(input: {
@@ -20,7 +21,7 @@ export function normalizeResponse(input: {
   provider: ResponseProvider;
   model: string;
 }): TranslateResponse {
-  const type = input.translated.type === "word" ? "word" : "sentence";
+  const type = input.translated.type === "word" || isLikelyLexicalInput(input.text) ? "word" : "sentence";
   const translations = normalizeLocalizedTranslations(input.translated.translations);
   const targetTranslation = translations[input.targetLang]?.text;
   const base = {
@@ -35,13 +36,16 @@ export function normalizeResponse(input: {
   };
 
   if (type === "word") {
+    const wordDetails = normalizeWordDetails(input.translated.word_details, translations, input.translated);
+    const senses = normalizeWordSenses(input.translated.senses, translations, wordDetails);
     return {
       ...base,
       type,
       phonetic: "",
       audio_text: input.text,
       examples: normalizeExamples(input.translated.examples),
-      word_details: normalizeWordDetails(input.translated.word_details)
+      word_details: wordDetails,
+      senses
     };
   }
 
@@ -213,6 +217,22 @@ export function normalizeText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+export function isLikelyLexicalInput(text: string): boolean {
+  const value = normalizeText(text);
+  if (!value) return false;
+  if (/[。！？!?;；:：,，、\n\r]/u.test(value)) return false;
+
+  const words = value.split(/\s+/u).filter(Boolean);
+  if (words.length > 4) return false;
+
+  const cjkChars = value.match(/[\u3400-\u9fff]/gu)?.length || 0;
+  if (cjkChars > 0) {
+    return cjkChars <= 8 && value.length <= 16;
+  }
+
+  return value.length <= 40;
+}
+
 export function normalizeTargetLang(target?: string): LanguageCode {
   if (target === "en" || target === "zh" || target === "pt-BR" || target === "ja") {
     return target;
@@ -247,7 +267,8 @@ export function normalizeExamples(value: unknown): WordExample[] {
       item && typeof item === "object" ? (item as Record<string, unknown>) : {};
     return {
       sentence: String(example.sentence ?? ""),
-      translations: normalizeExampleTranslations(example.translations)
+      translations: normalizeExampleTranslations(example.translations),
+      localizations: normalizeExampleLocalizations(example.translations)
     };
   });
 }
@@ -286,8 +307,123 @@ function normalizeLocalizedText(value: unknown, lang: DisplayLanguageCode): Loca
   const item =
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const text = normalizeStringOrText(item.text);
+  const generated = localPronunciationText(lang, text);
+  const phonetic =
+    normalizeStringOrText(item.phonetic) ||
+    normalizeStringOrText(item.pronunciation) ||
+    normalizeStringOrText(item.reading);
+  const audioText = normalizeStringOrText(item.audio_text);
 
-  return localPronunciationText(lang, text);
+  return {
+    text: generated.text,
+    phonetic: phonetic || generated.phonetic,
+    audio_text: audioText || generated.audio_text
+  };
+}
+
+function normalizeWordSenses(
+  value: unknown,
+  translations: Record<DisplayLanguageCode, LocalizedText>,
+  wordDetails: Record<DisplayLanguageCode, WordDetail>
+): WordSense[] {
+  const items = Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
+  const senses = items
+    .slice(0, 8)
+    .map((sense, index) => {
+      const definitionsValue =
+        sense.definitions && typeof sense.definitions === "object"
+          ? (sense.definitions as Record<string, unknown>)
+          : {};
+      const senseOrder = Number(sense.sense_order || index + 1);
+      const definitions = {
+        zh: cleanWordDefinition("zh", translations.zh.text, normalizeStringOrText(definitionsValue.zh)),
+        en: cleanWordDefinition("en", translations.en.text, normalizeStringOrText(definitionsValue.en)),
+        "pt-BR": cleanWordDefinition("pt-BR", translations["pt-BR"].text, normalizeStringOrText(definitionsValue["pt-BR"])),
+        ja: cleanWordDefinition("ja", translations.ja.text, normalizeStringOrText(definitionsValue.ja))
+      };
+
+      return {
+        sense_order: Number.isFinite(senseOrder) && senseOrder > 0 ? senseOrder : index + 1,
+        part_of_speech: normalizeStringOrText(sense.part_of_speech),
+        gloss_key: normalizeStringOrText(sense.gloss_key) || definitions.en || translations.en.text,
+        definitions,
+        localizations: senseLocalizationsFromDefinitions(translations, definitions)
+      };
+    })
+    .filter((sense) => Object.values(sense.definitions).some(Boolean));
+
+  if (senses.length > 0) return senses;
+
+  const fallbackDefinitions = {
+    zh: wordDetails.zh.definition,
+    en: wordDetails.en.definition,
+    "pt-BR": wordDetails["pt-BR"].definition,
+    ja: wordDetails.ja.definition
+  };
+
+  return [
+    {
+      sense_order: 1,
+      part_of_speech: "",
+      gloss_key: fallbackDefinitions.en || translations.en.text,
+      definitions: fallbackDefinitions,
+      localizations: senseLocalizationsFromDefinitions(translations, fallbackDefinitions)
+    }
+  ].filter((sense) => Object.values(sense.definitions).some(Boolean));
+}
+
+function senseLocalizationsFromDefinitions(
+  translations: Record<DisplayLanguageCode, LocalizedText>,
+  definitions: Record<DisplayLanguageCode, string>
+): NonNullable<WordSense["localizations"]> {
+  return {
+    zh: {
+      term: translations.zh.text,
+      reading: "",
+      reading_system: "",
+      pronunciation: translations.zh.phonetic,
+      pronunciation_system: "",
+      definition: definitions.zh,
+      usage_note: ""
+    },
+    en: {
+      term: translations.en.text,
+      reading: "",
+      reading_system: "",
+      pronunciation: translations.en.phonetic,
+      pronunciation_system: "",
+      definition: definitions.en,
+      usage_note: ""
+    },
+    "pt-BR": {
+      term: translations["pt-BR"].text,
+      reading: "",
+      reading_system: "",
+      pronunciation: translations["pt-BR"].phonetic,
+      pronunciation_system: "",
+      definition: definitions["pt-BR"],
+      usage_note: ""
+    },
+    ja: {
+      term: translations.ja.text,
+      reading: "",
+      reading_system: "",
+      pronunciation: translations.ja.phonetic,
+      pronunciation_system: "",
+      definition: definitions.ja,
+      usage_note: ""
+    }
+  };
+}
+
+function normalizeExampleLocalizations(value: unknown): NonNullable<WordExample["localizations"]> {
+  const translations = normalizeExampleTranslations(value);
+  return {
+    zh: { text: translations.zh, reading: "" },
+    en: { text: translations.en, reading: "" },
+    "pt-BR": { text: translations["pt-BR"], reading: "" },
+    ja: { text: translations.ja, reading: "" }
+  };
 }
 
 export function stripPronunciationBrackets(text: string): string {
@@ -339,27 +475,45 @@ function applyInlinePinyin(text: string): string {
   }
 }
 
-function normalizeWordDetails(value: unknown): Record<DisplayLanguageCode, WordDetail> {
+function normalizeWordDetails(
+  value: unknown,
+  translations: Record<DisplayLanguageCode, LocalizedText>,
+  translated: Record<string, unknown>
+): Record<DisplayLanguageCode, WordDetail> {
   const details =
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 
   return {
-    zh: normalizeWordDetail(details.zh, "zh"),
-    en: normalizeWordDetail(details.en, "en"),
-    "pt-BR": normalizeWordDetail(details["pt-BR"], "pt-BR"),
-    ja: normalizeWordDetail(details.ja, "ja")
+    zh: normalizeWordDetail(details.zh, "zh", translations.zh.text, translated),
+    en: normalizeWordDetail(details.en, "en", translations.en.text, translated),
+    "pt-BR": normalizeWordDetail(details["pt-BR"], "pt-BR", translations["pt-BR"].text, translated),
+    ja: normalizeWordDetail(details.ja, "ja", translations.ja.text, translated)
   };
 }
 
-function normalizeWordDetail(value: unknown, lang: DisplayLanguageCode): WordDetail {
+function normalizeWordDetail(
+  value: unknown,
+  lang: DisplayLanguageCode,
+  fallbackWord: string,
+  translated: Record<string, unknown>
+): WordDetail {
   const detail =
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const word = normalizeStringOrText(detail.word);
+  const word = normalizeStringOrText(detail.word) || fallbackWord;
+  const fallbackDefinition = wordDefinitionFallback(lang, translated);
 
   return {
     word,
-    definition: cleanWordDefinition(lang, word, normalizeStringOrText(detail.definition))
+    definition: cleanWordDefinition(lang, word, normalizeStringOrText(detail.definition) || fallbackDefinition)
   };
+}
+
+function wordDefinitionFallback(
+  lang: DisplayLanguageCode,
+  translated: Record<string, unknown>
+): string {
+  const explanations = normalizeSentenceExplanations(translated, lang);
+  return explanations[lang] || normalizeStringOrText(translated.explanation);
 }
 
 function cleanWordDefinition(

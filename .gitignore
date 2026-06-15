@@ -12,6 +12,25 @@ output
 
 *.zip
 *.tar.gz
+*.sql
 binary_temp/
 temp_sqlite/
 .dev.vars.bak*
+outputs/
+state/
+*_logs.txt
+debug_*.cjs
+temp_*.cjs
+fix_*.cjs
+patch_*.cjs
+sample_*.cjs
+test_*.cjs
+tail_log.cjs
+stuck_words.cjs
+to_word.json
+audit_temp.md
+check_remote_node.ps1
+find_db*.ps1
+start_wmi.ps1
+start_worker.bat
+start_worker*.ps1

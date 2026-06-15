@@ -68,16 +68,108 @@ function validateProviderPayload(payload: unknown, preview: boolean): string[] {
   }
 
   if (type === "word") {
+    validateWordTranslationPronunciations(item.translations, errors);
+
     const details =
       item.word_details && typeof item.word_details === "object"
         ? (item.word_details as Record<string, unknown>)
         : null;
     if (!details) {
       errors.push("word requires word_details");
+    } else {
+      validateWordDetails(details, errors);
     }
+
+    validateWordSenses(item.senses, errors);
+    validateWordExamples(item.examples, errors);
   }
 
   return errors;
+}
+
+function validateWordTranslationPronunciations(value: unknown, errors: string[]) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return;
+  }
+
+  const translations = value as Record<string, unknown>;
+  for (const lang of ["zh", "en", "pt-BR", "ja"]) {
+    const translation = translations[lang];
+    if (!translation || typeof translation !== "object" || Array.isArray(translation)) {
+      continue;
+    }
+    requireString(translation as Record<string, unknown>, "phonetic", errors, `translations.${lang}`);
+  }
+}
+
+function validateWordDetails(value: Record<string, unknown>, errors: string[]) {
+  for (const lang of ["zh", "en", "pt-BR", "ja"]) {
+    const detail = value[lang];
+    if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+      errors.push(`word_details.${lang} must be an object`);
+      continue;
+    }
+    requireString(detail as Record<string, unknown>, "word", errors, `word_details.${lang}`);
+    requireString(detail as Record<string, unknown>, "definition", errors, `word_details.${lang}`);
+  }
+}
+
+function validateWordSenses(value: unknown, errors: string[]) {
+  if (!Array.isArray(value) || value.length === 0) {
+    errors.push("word requires at least one sense");
+    return;
+  }
+
+  for (const [index, sense] of value.entries()) {
+    if (!sense || typeof sense !== "object" || Array.isArray(sense)) {
+      errors.push(`senses.${index} must be an object`);
+      continue;
+    }
+
+    const item = sense as Record<string, unknown>;
+    const definitions =
+      item.definitions && typeof item.definitions === "object"
+        ? (item.definitions as Record<string, unknown>)
+        : null;
+    if (!definitions) {
+      errors.push(`senses.${index}.definitions must be an object`);
+      continue;
+    }
+
+    for (const lang of ["zh", "en", "pt-BR", "ja"]) {
+      requireString(definitions, lang, errors, `senses.${index}.definitions`);
+    }
+  }
+}
+
+function validateWordExamples(value: unknown, errors: string[]) {
+  if (!Array.isArray(value) || value.length === 0) {
+    errors.push("word requires at least one example");
+    return;
+  }
+
+  for (const [index, example] of value.entries()) {
+    if (!example || typeof example !== "object" || Array.isArray(example)) {
+      errors.push(`examples.${index} must be an object`);
+      continue;
+    }
+
+    const item = example as Record<string, unknown>;
+    requireString(item, "sentence", errors, `examples.${index}`);
+    validateTranslationsAsStrings(item.translations, errors, `examples.${index}.translations`);
+  }
+}
+
+function validateTranslationsAsStrings(value: unknown, errors: string[], prefix: string) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    errors.push(`${prefix} must be an object`);
+    return;
+  }
+
+  const translations = value as Record<string, unknown>;
+  for (const lang of ["zh", "en", "pt-BR", "ja"]) {
+    requireString(translations, lang, errors, prefix);
+  }
 }
 
 function validateTranslations(value: unknown, errors: string[]) {
