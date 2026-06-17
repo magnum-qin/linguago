@@ -234,6 +234,14 @@ Create product-layer LLM completion jobs after split plans are applied:
 npm run dict:v2:create:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --model qwen3.6:latest --limit 200
 ```
 
+If a product sense already has all four localizations but one localization is still marked `needs_review = 1`, create repair jobs for those existing rows instead of missing-language jobs:
+
+```powershell
+npm run dict:v2:create:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --model qwen3.6:latest --target-langs en --repair-needs-review true
+```
+
+This mode is useful for old source-imported rows such as English `ecdict` localizations that block publishing even though the sense is otherwise four-language complete. Accepted repair jobs update the existing localization row, clear `needs_review`, and allow the sense/entry to become `accepted`.
+
 Run a small real batch before scaling:
 
 ```powershell

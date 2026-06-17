@@ -15,6 +15,7 @@ const promptVersion = args["prompt-version"] || DEFAULT_PROMPT_VERSION;
 const limit = args.limit ? Number(args.limit) : 0;
 const dryRun = args["dry-run"] === "true";
 const includeExamples = args["include-examples"] !== "false";
+const repairNeedsReview = args["repair-needs-review"] === "true";
 const targetLangs = String(args["target-langs"] || LANGS.join(","))
   .split(",")
   .map((lang) => lang.trim())
@@ -32,7 +33,7 @@ db.pragma("busy_timeout = 10000");
 ensureSchema(db);
 
 const statements = {
-  missingLocalizations: db.prepare(`
+  candidates: db.prepare(`
     WITH target_langs(lang) AS (${targetLangCte})
     SELECT ps.id AS product_sense_id, tl.lang
     FROM product_senses ps
@@ -40,7 +41,7 @@ const statements = {
     CROSS JOIN target_langs tl
     LEFT JOIN product_localizations pl ON pl.product_sense_id = ps.id AND pl.lang = tl.lang
     WHERE ps.status = 'ready_for_llm'
-      AND pl.id IS NULL
+      AND ${repairNeedsReview ? "pl.id IS NOT NULL AND pl.needs_review = 1" : "pl.id IS NULL"}
     ORDER BY
       pe.frequency_rank IS NULL,
       pe.frequency_rank,
@@ -112,7 +113,8 @@ const statements = {
 };
 
 const stats = {
-  scanned_missing: 0,
+  mode: repairNeedsReview ? "repair_needs_review" : "missing_localizations",
+  scanned_candidates: 0,
   skipped_existing_job: 0,
   jobs_created: 0,
   dry_run: dryRun,
@@ -120,12 +122,12 @@ const stats = {
 };
 
 const candidates = limit
-  ? statements.missingLocalizations.all(...targetLangs, limit)
-  : statements.missingLocalizations.all(...targetLangs);
+  ? statements.candidates.all(...targetLangs, limit)
+  : statements.candidates.all(...targetLangs);
 const jobs = [];
 
 for (const candidate of candidates) {
-  stats.scanned_missing++;
+  stats.scanned_candidates++;
   if (
     statements.existingJob.get(
       candidate.product_sense_id,
