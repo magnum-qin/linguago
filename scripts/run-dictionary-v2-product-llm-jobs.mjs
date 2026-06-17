@@ -18,6 +18,7 @@ const limit = Number(args.limit || 10);
 const timeoutMs = Number(args["timeout-ms"] || args.timeout || 180_000);
 const prewarmTimeoutMs = Number(args["prewarm-timeout-ms"] || 180_000);
 const maxTokens = Number(args["max-tokens"] || 900);
+const streamResponse = args.stream === "true";
 const dryRun = args["dry-run"] === "true";
 const prewarm = args.prewarm !== "false";
 const retryNeedsReview = args["retry-needs-review"] === "true";
@@ -126,6 +127,7 @@ console.log(`Ollama endpoint: ${endpoint}`);
 console.log(`Model: ${model}`);
 console.log(`Queued jobs selected: ${jobs.length}`);
 console.log(`Dry run: ${dryRun}`);
+console.log(`Stream response: ${streamResponse}`);
 console.log(`Target langs: ${targetLangs.length ? targetLangs.join(",") : "all"}`);
 
 if (prewarm && jobs.length) {
@@ -179,7 +181,8 @@ for (const job of jobs) {
     if (validation.errors.length) console.log(`  errors: ${validation.errors.join("; ")}`);
   } catch (error) {
     stats.failed++;
-    const message = `${error.name || "Error"}: ${error.message || String(error)}`;
+    const cause = error.cause?.code || error.cause?.message;
+    const message = `${error.name || "Error"}: ${error.message || String(error)}${cause ? ` (${cause})` : ""}`;
     if (!dryRun) statements.markDone.run("failed", null, message, job.id);
     console.log(`[failed] job=${job.id} sense=${job.target_id} lang=${job.lang}: ${message}`);
   }
@@ -311,7 +314,7 @@ async function callOllama(input) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         model,
-        stream: false,
+        stream: streamResponse,
         think: false,
         keep_alive: "20m",
         format:
@@ -353,11 +356,56 @@ async function callOllama(input) {
         }
       })
     });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`HTTP ${response.status}: ${text.slice(0, 500)}`);
+    }
+    if (streamResponse) return await readOllamaChatStream(response);
     const text = await response.text();
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${text.slice(0, 500)}`);
     return JSON.parse(text);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function readOllamaChatStream(response) {
+  const reader = response.body?.getReader();
+  if (!reader) return JSON.parse(await response.text());
+
+  const decoder = new TextDecoder();
+  const envelope = { message: { role: "assistant", content: "" } };
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || "";
+    for (const line of lines) consumeOllamaStreamLine(line, envelope);
+  }
+
+  buffer += decoder.decode();
+  if (buffer.trim()) consumeOllamaStreamLine(buffer, envelope);
+  return envelope;
+}
+
+function consumeOllamaStreamLine(line, envelope) {
+  const trimmed = line.trim();
+  if (!trimmed) return;
+  const chunk = JSON.parse(trimmed);
+  if (chunk.message?.content) {
+    envelope.message.content += chunk.message.content;
+  }
+  if (chunk.message?.thinking) {
+    envelope.message.thinking = `${envelope.message.thinking || ""}${chunk.message.thinking}`;
+  }
+  if (chunk.response) {
+    envelope.response = `${envelope.response || ""}${chunk.response}`;
+  }
+  if (chunk.done) {
+    envelope.done = true;
+    envelope.done_reason = chunk.done_reason;
   }
 }
 

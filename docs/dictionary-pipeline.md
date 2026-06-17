@@ -240,6 +240,14 @@ Run a small real batch before scaling:
 npm run dict:v2:run:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --endpoint http://100.99.99.99:11441 --model qwen3.6:latest --limit 20
 ```
 
+When running through the Tailscale jump-host portproxy, prefer streaming responses for longer product prompts:
+
+```powershell
+npm run dict:v2:run:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --endpoint http://100.99.99.99:11448 --model qwen3.6:latest --limit 20 --stream true
+```
+
+The streaming mode reads Ollama's NDJSON chunks and avoids idle HTTP connections being reset before a long non-streaming response returns its first byte. This is especially useful for `qwen3.6:latest` product-localization jobs through `100.99.99.99`.
+
 Product completion uses `product_llm_completion_jobs`, not the canonical `llm_completion_jobs` table. Accepted jobs write to `product_localizations` and `product_example_localizations`. When a product sense reaches four localizations, the runner marks it `accepted`; when every sense under an entry is accepted, the entry is marked `accepted`.
 
 Merge duplicate product entries after split/application batches:
