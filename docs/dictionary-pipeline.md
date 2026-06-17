@@ -242,6 +242,14 @@ npm run dict:v2:create:product-llm-jobs -- --db data/processed/linguago_v2_produ
 
 This mode is useful for old source-imported rows such as English `ecdict` localizations that block publishing even though the sense is otherwise four-language complete. Accepted repair jobs update the existing localization row, clear `needs_review`, and allow the sense/entry to become `accepted`.
 
+To repair only publishable complete `needs_review` senses, add explicit source-status and completeness filters:
+
+```powershell
+npm run dict:v2:create:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --model qwen3.6:latest --target-langs en --repair-needs-review true --source-statuses needs_review --complete-only true
+```
+
+Use this before broader incomplete-sense repair, because it converts already-complete four-language entries into publishable entries without generating missing-language jobs.
+
 Run a small real batch before scaling:
 
 ```powershell

@@ -16,6 +16,13 @@ const limit = args.limit ? Number(args.limit) : 0;
 const dryRun = args["dry-run"] === "true";
 const includeExamples = args["include-examples"] !== "false";
 const repairNeedsReview = args["repair-needs-review"] === "true";
+const completeOnly = args["complete-only"] === "true";
+const sourceStatuses = String(
+  args["source-statuses"] || (repairNeedsReview ? "ready_for_llm,needs_review" : "ready_for_llm")
+)
+  .split(",")
+  .map((status) => status.trim())
+  .filter(Boolean);
 const targetLangs = String(args["target-langs"] || LANGS.join(","))
   .split(",")
   .map((lang) => lang.trim())
@@ -25,7 +32,13 @@ for (const lang of targetLangs) {
   if (!LANGS.includes(lang)) throw new Error(`Unknown target language: ${lang}`);
 }
 if (limit && (!Number.isInteger(limit) || limit < 1)) throw new Error(`Invalid --limit: ${args.limit}`);
+for (const status of sourceStatuses) {
+  if (!["ready_for_llm", "needs_review", "draft_fused", "draft_single_source"].includes(status)) {
+    throw new Error(`Unknown source status: ${status}`);
+  }
+}
 const targetLangCte = targetLangs.map((_, index) => (index === 0 ? "SELECT ? AS lang" : "UNION ALL SELECT ?")).join(" ");
+const sourceStatusClause = sourceStatuses.map(() => "?").join(", ");
 
 const db = new Database(dbPath);
 db.pragma("foreign_keys = ON");
@@ -40,8 +53,16 @@ const statements = {
     JOIN product_entries pe ON pe.id = ps.product_entry_id
     CROSS JOIN target_langs tl
     LEFT JOIN product_localizations pl ON pl.product_sense_id = ps.id AND pl.lang = tl.lang
-    WHERE ps.status = 'ready_for_llm'
+    WHERE ps.status IN (${sourceStatusClause})
       AND ${repairNeedsReview ? "pl.id IS NOT NULL AND pl.needs_review = 1" : "pl.id IS NULL"}
+      AND (
+        ? = 0
+        OR (
+          SELECT COUNT(DISTINCT pl_all.lang)
+          FROM product_localizations pl_all
+          WHERE pl_all.product_sense_id = ps.id
+        ) = 4
+      )
     ORDER BY
       pe.frequency_rank IS NULL,
       pe.frequency_rank,
@@ -122,8 +143,8 @@ const stats = {
 };
 
 const candidates = limit
-  ? statements.candidates.all(...targetLangs, limit)
-  : statements.candidates.all(...targetLangs);
+  ? statements.candidates.all(...targetLangs, ...sourceStatuses, completeOnly ? 1 : 0, limit)
+  : statements.candidates.all(...targetLangs, ...sourceStatuses, completeOnly ? 1 : 0);
 const jobs = [];
 
 for (const candidate of candidates) {
@@ -181,6 +202,7 @@ console.log(
       model,
       prompt_version: promptVersion,
       target_langs: targetLangs,
+      source_statuses: sourceStatuses,
       stats,
       queued_by_lang: queuedByLang
     },

@@ -97,6 +97,12 @@ const statements = {
     FROM product_localizations
     WHERE product_sense_id = ?
   `),
+  reviewLocalizationCount: db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM product_localizations
+    WHERE product_sense_id = ?
+      AND needs_review = 1
+  `),
   senseEntry: db.prepare(`
     SELECT product_entry_id
     FROM product_senses
@@ -105,7 +111,7 @@ const statements = {
   markSenseAccepted: db.prepare(`
     UPDATE product_senses
     SET status = 'accepted'
-    WHERE id = ? AND status = 'ready_for_llm'
+    WHERE id = ? AND status IN ('ready_for_llm', 'needs_review')
   `),
   entryStatusCounts: db.prepare(`
     SELECT status, COUNT(*) AS count
@@ -253,7 +259,10 @@ function applyAcceptedJob({ job, output }) {
     });
   }
 
-  if (statements.completedLangCount.get(job.target_id).count >= 4) {
+  if (
+    statements.completedLangCount.get(job.target_id).count >= 4 &&
+    statements.reviewLocalizationCount.get(job.target_id).count === 0
+  ) {
     statements.markSenseAccepted.run(job.target_id);
     const entry = statements.senseEntry.get(job.target_id);
     if (entry) updateEntryStatus(entry.product_entry_id);
