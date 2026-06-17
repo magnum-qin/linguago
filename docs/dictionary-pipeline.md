@@ -157,6 +157,177 @@ Current frequency matches:
 - `ja`: 22,668 ranked entries.
 - `pt-BR`: 0 ranked source entries because the current open-source inputs do not include a Portuguese lemma source; Portuguese is generated as a target localization.
 
+## Product-Layer Fusion Pilot
+
+The full v2 database is a source/staging pool, not the final product dictionary. Do not run unattended LLM completion against all 1.3M source entries. Build a smaller product-layer pilot first, then use LLM only to judge/complete the fused product senses.
+
+Create a top-5000 frequency pilot:
+
+```powershell
+npm run dict:v2:build:product-pilot -- --db data/processed/linguago_v2_full.db --out data/processed/linguago_v2_product_top5000_pilot.db --max-rank 5000 --max-senses-per-entry 3
+```
+
+This writes ignored local artifacts:
+
+- `data/processed/linguago_v2_product_top5000_pilot.db`
+- `data/processed/linguago_v2_product_top5000_pilot.summary.json`
+
+The pilot schema creates product-facing tables:
+
+- `product_entries`
+- `product_senses`
+- `product_sense_source_links`
+- `product_localizations`
+- `product_examples`
+- `product_example_localizations`
+
+The first pass is deliberately rule-based. It groups source senses by English headword, direct gloss-to-English-headword matches, normalized gloss text, and source-headword fallback. This is not the final semantic merge; it is a cheap compression layer that gives the LLM a smaller and better-scoped target.
+
+Use the summary JSON to inspect compression before creating any new LLM jobs. The next stage should sample product groups with multiple source links, verify whether they represent the same sense, and only then generate missing four-language localizations.
+
+Review product fusion candidates with the selected Ollama model:
+
+```powershell
+npm run dict:v2:review:product-fusion -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --endpoint http://100.99.99.99:11441 --model qwen3.6:latest --limit 100
+```
+
+This creates `product_fusion_reviews` in the pilot database and writes:
+
+- `decision = keep`: the source links can remain under one product sense.
+- `decision = split`: the group mixes distinct meanings and should be split before completion.
+- `decision = needs_review`: evidence is too broad or ambiguous.
+
+The review step does not mutate `product_entries`, `product_senses`, or source links. It only stores model judgments, confidence, rationale, and suggested source-link groups. Apply split/keep decisions in a later deterministic step after sampling the review output.
+
+Apply accepted review decisions safely:
+
+```powershell
+npm run dict:v2:apply:product-fusion-reviews -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --model qwen3.6:latest --keep-threshold 0.8 --split-threshold 0.8
+```
+
+The apply step is intentionally conservative:
+
+- `accepted + keep + confidence >= keep-threshold` sets `product_senses.status = ready_for_llm`.
+- `accepted + split + confidence >= split-threshold` sets the sense/entry to `needs_review` and writes `product_fusion_split_plans`.
+- `accepted + needs_review` marks the sense/entry as `needs_review`.
+- It does not split senses or delete source links. Splits should be sampled and applied later with a deterministic splitter.
+
+Inspect pending split plans before mutating the product tables. A valid split plan must contain structured `source_link_ids` groups that fully cover the current source links for that product sense. The deterministic splitter does not infer meaning from prose rationale; it only applies these checked source-link groups.
+
+Dry run the splitter first:
+
+```powershell
+npm run dict:v2:apply:product-split-plans -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --confidence-threshold 0.8 --dry-run true
+```
+
+Then back up the pilot database and apply:
+
+```powershell
+npm run dict:v2:apply:product-split-plans -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --confidence-threshold 0.8
+```
+
+The splitter keeps the first group on the original `product_senses.id`, creates one new product sense for each additional group, moves `product_sense_source_links`, renumbers entry senses to `1..n`, and marks applied plans as `applied`. By default it also clears generated `product_localizations` and `product_examples` for the split senses, because those rows were selected from the pre-split fused group and may no longer belong to the correct meaning. The later LLM completion step should generate fresh four-language terms, readings/pronunciations, definitions, and examples for each split sense.
+
+Create product-layer LLM completion jobs after split plans are applied:
+
+```powershell
+npm run dict:v2:create:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --model qwen3.6:latest --limit 200
+```
+
+Run a small real batch before scaling:
+
+```powershell
+npm run dict:v2:run:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --endpoint http://100.99.99.99:11441 --model qwen3.6:latest --limit 20
+```
+
+Product completion uses `product_llm_completion_jobs`, not the canonical `llm_completion_jobs` table. Accepted jobs write to `product_localizations` and `product_example_localizations`. When a product sense reaches four localizations, the runner marks it `accepted`; when every sense under an entry is accepted, the entry is marked `accepted`.
+
+Merge duplicate product entries after split/application batches:
+
+```powershell
+npm run dict:v2:merge:product-entries -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --dry-run true
+npm run dict:v2:merge:product-entries -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db
+```
+
+This deterministic merge only combines entries with the same `normalized_key` and the same `primary_lang`. It moves all product senses under the best-ranked keeper entry, renumbers `sense_order` to `1..n`, updates review/split-plan entry references, refreshes entry status/counts, and deletes the duplicate entry rows. It does not merge senses or cross language boundaries.
+
+Run the conservative product sense deduper after entry merge:
+
+```powershell
+npm run dict:v2:merge:product-senses -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --dry-run true
+npm run dict:v2:merge:product-senses -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db
+```
+
+This step only merges rule-obvious duplicates inside the same product entry: exact normalized `gloss_key` duplicates, or identical four-language term signatures with overlapping source words. It moves non-duplicate source links, localizations, examples, and product LLM jobs to the keeper sense, deletes conflicting duplicates, renumbers `sense_order`, and refreshes entry status. It deliberately does not attempt broad semantic dedupe; ambiguous near-duplicates should be reviewed by a model or by sampling.
+
+Flag source/headword mismatches before export:
+
+```powershell
+npm run dict:v2:flag:product-source-mismatches -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --dry-run true
+npm run dict:v2:flag:product-source-mismatches -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --apply true
+```
+
+This deterministic cleaner catches product senses where a one-character Chinese product entry was created from a different one-character Chinese source word, for example entry `單` with source word `簡`. These rows are too risky for automatic publishing because the UI would show a dictionary sense for a different character under the queried headword. The cleaner marks the affected product sense, localizations, examples, and accepted LLM jobs as `needs_review`; it does not delete data.
+
+After sampling the mismatch report, relocate single-source-word mismatches into the correct product entry:
+
+```powershell
+npm run dict:v2:relocate:product-source-mismatches -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --dry-run true
+npm run dict:v2:relocate:product-source-mismatches -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --apply true
+```
+
+The relocator moves each affected `product_senses` row from the incorrect one-character Chinese entry to the entry matching its Chinese `source_word`, creating that target entry when needed. By default it deletes old generated localizations and product LLM jobs for the moved sense, keeps source examples, clears old example translations, renumbers source and target entries, and leaves the moved sense as `ready_for_llm`. Run `dict:v2:create:product-llm-jobs` again afterwards so the prompt is regenerated with the corrected headword/source context.
+
+For the smaller set of one-character Chinese mismatch senses that contain multiple distinct Chinese `source_word` values, split the mixed sense first:
+
+```powershell
+npm run dict:v2:split:product-multi-source-mismatches -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --dry-run true
+npm run dict:v2:split:product-multi-source-mismatches -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --apply true
+```
+
+This splitter groups the current source links by `source_word`, moves the original sense to the first target entry, creates a new product sense for each additional source-word group, clears old generated localizations/examples/jobs, renumbers touched entries, and leaves all split senses as `ready_for_llm`. Create and run product LLM jobs again after this step.
+
+Clean duplicate product examples before export:
+
+```powershell
+npm run dict:v2:clean:product-examples -- --dry-run true
+npm run dict:v2:clean:product-examples
+```
+
+This example cleaner is intentionally conservative. It only deduplicates Chinese-source examples under the same product sense when the accepted English example text and Chinese reading match, then keeps the row with fewer traditional-Chinese characters. This preserves the simplified Chinese example as the published version and removes the paired traditional duplicate.
+
+Repair deterministic product quality warnings before export:
+
+```powershell
+npm run dict:v2:repair:product-quality-warnings -- --dry-run true
+npm run dict:v2:repair:product-quality-warnings
+```
+
+This narrow repair step fixes known product-layer quality warnings that are better handled deterministically than by another LLM pass: Japanese particles copied into Chinese `term` fields, Japanese source terms left inside Chinese definitions, and English function-word terms left as plain Latin text in Japanese localizations. It updates only the explicitly mapped `product_sense_id + lang` rows and writes `source = manual:deterministic-quality-repair`.
+
+Export the cleaned product pilot to the Worker-native `v2_*` D1 shape:
+
+```powershell
+npm run dict:v2:export:product-d1-native
+npm run dict:v2:audit:product-export
+```
+
+This exporter reads `product_*` tables and writes `outputs/d1-v2-product-native-export`. It keeps the same `v2_entries`, `v2_senses`, `v2_sense_localizations`, `v2_examples`, and `v2_example_localizations` table shape used by the Worker, but only includes product senses that are `accepted` and have complete four-language localizations with `needs_review = 0`.
+
+The export audit imports the generated SQL into `outputs/d1-v2-product-native-export/audit-import.db`, then writes `audit.json` and `audit-samples.json`. It is a publish gate for structural problems: manifest/count mismatches, missing four-language sense localizations, duplicate published sense order, empty required fields, orphan rows, duplicate simplified/traditional Chinese examples, and failed key sample lookups. It also records non-blocking product quality warnings such as Chinese terms containing kana or Japanese terms that are still pure Latin text; review those warnings before expanding the batch, but they do not block a structurally valid D1 push.
+
+For a normal product D1 release, use the combined release command instead of running each publish step manually:
+
+```powershell
+npm run dict:v2:release:product-d1
+```
+
+This runs product example dedupe, deterministic quality-warning repair, product-native D1 export, product export audit, TypeScript check, Cloudflare D1 push, and online UI smoke in sequence. Use the script directly with `-SkipPush` when you want a local release rehearsal without touching remote D1:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release-dictionary-v2-product-d1.ps1 -SkipPush
+```
+
 The first full-database completion batches used `qwen3.6:latest` with `profile core` and `--max-senses-per-entry 1`, then moved to the A6000 cluster behind `100.99.99.99`. Current production nodes:
 
 - `a6000-143`: `http://100.99.99.99:11441`
