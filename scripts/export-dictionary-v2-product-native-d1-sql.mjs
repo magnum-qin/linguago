@@ -173,11 +173,20 @@ for (const row of db
       s.part_of_speech,
       s.gloss_key,
       s.confidence,
+      e.primary_lang,
+      src.reading AS source_reading,
+      src.reading_system AS source_reading_system,
+      src.pronunciation AS source_pronunciation,
+      src.pronunciation_system AS source_pronunciation_system,
       zh.term AS zh_term,
       zh.reading AS zh_reading,
       zh.reading_system AS zh_reading_system
     FROM product_senses s
     JOIN product_entries e ON e.id = s.product_entry_id
+    LEFT JOIN product_localizations src
+      ON src.product_sense_id = s.id
+      AND src.lang = e.primary_lang
+      AND src.needs_review = 0
     LEFT JOIN product_localizations zh
       ON zh.product_sense_id = s.id
       AND zh.lang = 'zh'
@@ -192,11 +201,11 @@ for (const row of db
   senseIds.add(row.id);
   const pronunciationGroup = ensurePronunciationGroup({
     entryId: row.product_entry_id,
-    lang: "zh",
-    reading: row.zh_reading,
-    readingSystem: row.zh_reading_system,
+    lang: row.primary_lang,
+    reading: row.source_reading || row.source_pronunciation,
+    readingSystem: row.source_reading_system || row.source_pronunciation_system,
     displayOrder: row.publish_sense_order,
-    source: "product-localization",
+    source: "product-source-localization",
     confidence: row.confidence
   });
   append(`INSERT INTO v2_senses (id, entry_id, pronunciation_group_id, sense_order, part_of_speech, domain, register_label, gloss_key, source, confidence) VALUES (${n(row.id)}, ${n(row.product_entry_id)}, ${n(pronunciationGroup?.id)}, ${n(row.publish_sense_order)}, ${q(cleanPartOfSpeech(row.part_of_speech))}, NULL, NULL, ${q(row.gloss_key)}, 'product-layer', ${n(row.confidence)});\n`);
@@ -334,10 +343,10 @@ function readingKeyFor(lang, reading) {
 function pinyinToneKey(value) {
   return String(value || "")
     .normalize("NFC")
-    .split(/(\s+|[^A-Za-z\u00C0-\u024FǖǘǚǜüÜ]+)/u)
+    .split(/(\s+|[^A-Za-z0-9\u00C0-\u024FǖǘǚǜüÜ]+)/u)
     .map((part) => {
       if (!part.trim()) return " ";
-      if (!/[A-Za-z\u00C0-\u024FǖǘǚǜüÜ]/u.test(part)) return " ";
+      if (!/[A-Za-z0-9\u00C0-\u024FǖǘǚǜüÜ]/u.test(part)) return " ";
       let tone = "";
       let output = "";
       for (const char of part) {
