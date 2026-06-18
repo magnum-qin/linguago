@@ -4,6 +4,13 @@ import zlib from "node:zlib";
 
 const RAW_DIR = path.resolve("data/raw");
 const MANIFEST_FILE = path.join(RAW_DIR, "manifest.json");
+const args = parseArgs(process.argv.slice(2));
+const requestedSources = new Set(
+  String(args.sources || "")
+    .split(",")
+    .map((source) => source.trim())
+    .filter(Boolean)
+);
 
 const sources = [
   {
@@ -77,8 +84,26 @@ async function download(source) {
 }
 
 for (const source of sources) {
+  if (requestedSources.size && !requestedSources.has(source.id)) continue;
   await download(source);
 }
 
 fs.writeFileSync(MANIFEST_FILE, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`[done] wrote ${path.relative(process.cwd(), MANIFEST_FILE)}`);
+
+function parseArgs(argv) {
+  const result = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (!arg.startsWith("--")) continue;
+    const key = arg.slice(2);
+    const next = argv[i + 1];
+    if (!next || next.startsWith("--")) {
+      result[key] = "true";
+    } else {
+      result[key] = next;
+      i++;
+    }
+  }
+  return result;
+}

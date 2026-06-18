@@ -8,7 +8,7 @@ import zlib from "node:zlib";
 
 const LANGUAGE_CODES = new Set(["en", "zh", "ja", "pt-BR"]);
 const DEFAULT_DB = "data/processed/linguago_v2_staging.db";
-const DEFAULT_SOURCES = ["ecdict", "kaikki-zh", "cedict", "jmdict"];
+const DEFAULT_SOURCES = ["ecdict", "kaikki-zh", "cedict", "jmdict", "freedict-eng-por", "freedict-por-eng"];
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
@@ -58,7 +58,27 @@ const importers = {
   ecdict: importEcDict,
   "kaikki-zh": importKaikkiChinese,
   cedict: importCcCedict,
-  jmdict: importJmDict
+  jmdict: importJmDict,
+  "freedict-eng-por": (options) =>
+    importFreeDict({
+      ...options,
+      sourceKey: "freedict-eng-por",
+      sourceName: "FreeDict English-Portuguese",
+      sourceUrl: "https://github.com/freedict/fd-dictionaries/tree/master/eng-por",
+      file: "data/raw/freedict-eng-por.tei",
+      sourceLang: "en",
+      targetLang: "pt-BR"
+    }),
+  "freedict-por-eng": (options) =>
+    importFreeDict({
+      ...options,
+      sourceKey: "freedict-por-eng",
+      sourceName: "FreeDict Portuguese-English",
+      sourceUrl: "https://github.com/freedict/fd-dictionaries/tree/master/por-eng",
+      file: "data/raw/freedict-por-eng.tei",
+      sourceLang: "pt-BR",
+      targetLang: "en"
+    })
 };
 
 const summary = [];
@@ -316,6 +336,66 @@ async function importJmDict({ limit }) {
   return { entries, senses };
 }
 
+async function importFreeDict({ limit, sourceKey, sourceName, sourceUrl, file, sourceLang, targetLang }) {
+  const sourceId = ensureSource({
+    source_key: sourceKey,
+    source_name: sourceName,
+    source_url: sourceUrl,
+    license: "FreeDict project license; verify dictionary metadata before redistribution",
+    metadata_json: JSON.stringify({ file, target_lang: targetLang })
+  });
+  const filePath = path.resolve(file);
+  if (!fs.existsSync(filePath)) return { skipped: true, reason: `missing ${file}` };
+
+  const xml = fs.readFileSync(filePath, "utf8");
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    parseTagValue: false,
+    processEntities: false,
+    trimValues: true
+  });
+  const parsed = parser.parse(xml);
+  const entriesRaw = collectTeiNodes(parsed, "entry").filter((entry) => firstText(collectTeiText(entry, "orth")));
+
+  let entries = 0;
+  let senses = 0;
+  const insertMany = db.transaction((items) => {
+    for (const item of items) {
+      if (limit && entries >= limit) break;
+      const word = firstText(collectTeiText(item, "orth"));
+      if (!word) continue;
+
+      const sourceEntryKey = getXmlId(item) || `${sourceKey}:${entries + 1}:${word}`;
+      insertSourceEntry({
+        source_id: sourceId,
+        source_entry_key: sourceEntryKey,
+        word,
+        normalized_key: normalizeKey(word),
+        lang: sourceLang,
+        raw_json: compactJson(pruneFreeDictEntry(item))
+      });
+      const entryId = getSourceEntryId(sourceId, sourceEntryKey);
+
+      const parsedSenses = extractFreeDictSenses(item, targetLang);
+      parsedSenses.forEach((sense, index) => {
+        insertSourceSense({
+          source_entry_id: entryId,
+          source_sense_key: `${sourceEntryKey}:${index + 1}`,
+          sense_order: index + 1,
+          part_of_speech: sense.part_of_speech,
+          gloss: sense.gloss,
+          raw_json: compactJson(sense.raw)
+        });
+        senses++;
+      });
+      entries++;
+    }
+  });
+
+  insertMany(entriesRaw);
+  return { entries, senses, target_lang: targetLang };
+}
+
 function ensureSource(source) {
   statements.upsertSource.run(source);
   return statements.getSource.get(source.source_key).id;
@@ -387,6 +467,137 @@ function firstText(values) {
     if (text) return text;
   }
   return null;
+}
+
+function extractFreeDictSenses(entry, targetLang) {
+  const senseNodes = collectDirectTeiNodes(entry, "sense");
+  const sourceNodes = senseNodes.length ? senseNodes : [entry];
+  const senses = sourceNodes
+    .map((sense) => {
+      const definitions = collectTeiText(sense, "def");
+      const translations = extractFreeDictTranslations(sense);
+      const gloss = firstText([...translations, ...definitions]);
+      return {
+        part_of_speech: firstText(collectTeiText(sense, "pos")) || firstText(collectTeiText(entry, "pos")),
+        gloss,
+        raw: {
+          target_lang: targetLang,
+          translations,
+          definitions,
+          xml_id: getXmlId(sense)
+        }
+      };
+    })
+    .filter((sense) => sense.gloss);
+
+  return senses.length
+    ? senses
+    : [
+        {
+          part_of_speech: firstText(collectTeiText(entry, "pos")),
+          gloss: firstText(extractFreeDictTranslations(entry)) || "missing definition",
+          raw: {
+            target_lang: targetLang,
+            translations: extractFreeDictTranslations(entry),
+            definitions: collectTeiText(entry, "def"),
+            xml_id: getXmlId(entry)
+          }
+        }
+      ];
+}
+
+function extractFreeDictTranslations(node) {
+  const translations = [];
+  for (const cit of collectTeiNodes(node, "cit")) {
+    const type = String(cit?.["@_type"] || cit?.type || "").toLocaleLowerCase();
+    if (type && !["trans", "translation"].includes(type)) continue;
+    translations.push(...collectTeiText(cit, "quote"));
+    translations.push(...collectTeiText(cit, "q"));
+  }
+  translations.push(...collectTeiText(node, "trans"));
+  return uniqueStrings(translations);
+}
+
+function collectTeiNodes(node, tagName) {
+  const results = [];
+  visitTei(node, (key, value) => {
+    if (localName(key) === tagName) {
+      for (const item of asArray(value)) {
+        if (item && typeof item === "object") results.push(item);
+      }
+    }
+  });
+  return results;
+}
+
+function collectDirectTeiNodes(node, tagName) {
+  const results = [];
+  if (!node || typeof node !== "object") return results;
+  for (const [key, value] of Object.entries(node)) {
+    if (localName(key) !== tagName) continue;
+    for (const item of asArray(value)) {
+      if (item && typeof item === "object") results.push(item);
+    }
+  }
+  return results;
+}
+
+function collectTeiText(node, tagName) {
+  const results = [];
+  visitTei(node, (key, value) => {
+    if (localName(key) !== tagName) return;
+    for (const item of asArray(value)) {
+      const text = textContent(item);
+      if (text) results.push(text);
+    }
+  });
+  return uniqueStrings(results);
+}
+
+function visitTei(node, visitor) {
+  if (!node || typeof node !== "object") return;
+  for (const [key, value] of Object.entries(node)) {
+    visitor(key, value);
+    for (const item of asArray(value)) {
+      if (item && typeof item === "object") visitTei(item, visitor);
+    }
+  }
+}
+
+function textContent(value) {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string" || typeof value === "number") return cleanText(value);
+  if (Array.isArray(value)) return cleanText(value.map(textContent).filter(Boolean).join("; "));
+  if (typeof value !== "object") return "";
+  if (value["#text"]) return cleanText(value["#text"]);
+  return cleanText(
+    Object.entries(value)
+      .filter(([key]) => !key.startsWith("@_"))
+      .map(([, child]) => textContent(child))
+      .filter(Boolean)
+      .join("; ")
+  );
+}
+
+function getXmlId(node) {
+  return cleanText(node?.["@_xml:id"] || node?.["@_id"] || node?.["@_n"]);
+}
+
+function localName(key) {
+  return String(key || "").replace(/^.*:/u, "");
+}
+
+function uniqueStrings(values) {
+  return [...new Set(values.map(cleanText).filter(Boolean))];
+}
+
+function pruneFreeDictEntry(entry) {
+  return {
+    xml_id: getXmlId(entry),
+    orth: collectTeiText(entry, "orth").slice(0, 6),
+    pos: firstText(collectTeiText(entry, "pos")),
+    translations: extractFreeDictTranslations(entry).slice(0, 12)
+  };
 }
 
 function asArray(value) {

@@ -39,14 +39,14 @@ npm run dict:v2:init
 Import open-source dictionary rows into the v2 source/staging tables:
 
 ```powershell
-npm run dict:v2:import:sources -- --sources ecdict,kaikki-zh,cedict,jmdict
+npm run dict:v2:import:sources -- --sources ecdict,kaikki-zh,cedict,jmdict,freedict-eng-por,freedict-por-eng
 ```
 
 For a quick validation sample, use a small limit per source:
 
 ```powershell
 npm run dict:v2:init -- --db data/processed/linguago_v2_sample.db --reset
-npm run dict:v2:import:sources -- --db data/processed/linguago_v2_sample.db --sources ecdict,kaikki-zh,cedict,jmdict --limit 25
+npm run dict:v2:import:sources -- --db data/processed/linguago_v2_sample.db --sources ecdict,kaikki-zh,cedict,jmdict,freedict-eng-por,freedict-por-eng --limit 25
 ```
 
 These commands only populate `dictionary_sources`, `source_entries`, and `source_senses`. They do not create canonical `entries/senses/sense_localizations` yet.
@@ -135,8 +135,12 @@ Full-source import counts:
 
 - `ecdict`: 770,611 source entries / 770,611 source senses.
 - `kaikki-zh`: 321,277 source entries / 383,856 source senses.
-- `cc-cedict`: 125,006 source entries / 200,408 source senses.
+- `cc-cedict`: 122,496 source entries / 197,122 source senses.
 - `jmdict`: 217,352 source entries / 251,486 source senses.
+- `freedict-eng-por`: 15,773 source entries / 19,092 source senses.
+- `freedict-por-eng`: 10,661 source entries / 12,792 source senses.
+
+FreeDict is now available in the source/staging layer for English-Portuguese and Portuguese-English evidence. It is not automatically reflected in the product D1 export until the product fusion stage is rebuilt or extended to use these source links.
 
 After canonical build and strict duplicate-sense merge plus the current accepted completion batches:
 
@@ -155,7 +159,7 @@ Current frequency matches:
 - `en`: 46,320 ranked entries.
 - `zh`: 35,545 ranked entries.
 - `ja`: 22,668 ranked entries.
-- `pt-BR`: 0 ranked source entries because the current open-source inputs do not include a Portuguese lemma source; Portuguese is generated as a target localization.
+- `pt-BR`: Portuguese source entries are now available through `freedict-por-eng`, but product-layer frequency ranking still needs a Portuguese frequency pass before they should drive priority order.
 
 ## Product-Layer Fusion Pilot
 
