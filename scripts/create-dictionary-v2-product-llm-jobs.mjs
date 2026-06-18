@@ -17,6 +17,7 @@ const dryRun = args["dry-run"] === "true";
 const includeExamples = args["include-examples"] !== "false";
 const repairNeedsReview = args["repair-needs-review"] === "true";
 const completeOnly = args["complete-only"] === "true";
+const excludeReviewLocalizations = args["exclude-review-localizations"] === "true";
 const sourceStatuses = String(
   args["source-statuses"] || (repairNeedsReview ? "ready_for_llm,needs_review" : "ready_for_llm")
 )
@@ -62,6 +63,15 @@ const statements = {
           FROM product_localizations pl_all
           WHERE pl_all.product_sense_id = ps.id
         ) = 4
+      )
+      AND (
+        ? = 0
+        OR NOT EXISTS (
+          SELECT 1
+          FROM product_localizations pl_review
+          WHERE pl_review.product_sense_id = ps.id
+            AND pl_review.needs_review = 1
+        )
       )
     ORDER BY
       pe.frequency_rank IS NULL,
@@ -143,8 +153,19 @@ const stats = {
 };
 
 const candidates = limit
-  ? statements.candidates.all(...targetLangs, ...sourceStatuses, completeOnly ? 1 : 0, limit)
-  : statements.candidates.all(...targetLangs, ...sourceStatuses, completeOnly ? 1 : 0);
+  ? statements.candidates.all(
+      ...targetLangs,
+      ...sourceStatuses,
+      completeOnly ? 1 : 0,
+      excludeReviewLocalizations ? 1 : 0,
+      limit
+    )
+  : statements.candidates.all(
+      ...targetLangs,
+      ...sourceStatuses,
+      completeOnly ? 1 : 0,
+      excludeReviewLocalizations ? 1 : 0
+    );
 const jobs = [];
 
 for (const candidate of candidates) {

@@ -250,6 +250,14 @@ npm run dict:v2:create:product-llm-jobs -- --db data/processed/linguago_v2_produ
 
 Use this before broader incomplete-sense repair, because it converts already-complete four-language entries into publishable entries without generating missing-language jobs.
 
+For incomplete `needs_review` senses that do not have any localization row currently marked `needs_review`, create missing-language jobs with the review-localization exclusion filter:
+
+```powershell
+npm run dict:v2:create:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --model qwen3.6:latest --source-statuses needs_review --exclude-review-localizations true
+```
+
+This is the safest next expansion batch after complete-sense repair: it avoids senses that still require fixing a bad localization, and only fills languages that are absent.
+
 Run a small real batch before scaling:
 
 ```powershell
