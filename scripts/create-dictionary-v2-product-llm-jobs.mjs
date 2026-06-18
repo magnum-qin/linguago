@@ -34,7 +34,7 @@ for (const lang of targetLangs) {
 }
 if (limit && (!Number.isInteger(limit) || limit < 1)) throw new Error(`Invalid --limit: ${args.limit}`);
 for (const status of sourceStatuses) {
-  if (!["ready_for_llm", "needs_review", "draft_fused", "draft_single_source"].includes(status)) {
+  if (!["ready_for_llm", "needs_review", "draft_fused", "draft_single_source", "accepted"].includes(status)) {
     throw new Error(`Unknown source status: ${status}`);
   }
 }
