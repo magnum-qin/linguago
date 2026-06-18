@@ -140,6 +140,52 @@ function buildAudit(database, exportManifest) {
         `SELECT COUNT(*) AS n FROM v2_example_localizations xl LEFT JOIN v2_examples x ON x.id=xl.example_id WHERE x.id IS NULL`
       )
     },
+    lookup_integrity: {
+      non_source_reading_forms: scalar(
+        database,
+        `
+          SELECT COUNT(*) AS n
+          FROM v2_entry_forms f
+          JOIN v2_entries e ON e.id=f.entry_id
+          WHERE f.form_type IN ('reading', 'reading_key')
+            AND f.lang <> e.source_lang
+        `
+      ),
+      pronunciation_group_lang_mismatches: scalar(
+        database,
+        `
+          SELECT COUNT(*) AS n
+          FROM v2_pronunciation_groups g
+          JOIN v2_entries e ON e.id=g.entry_id
+          WHERE g.lang <> e.source_lang
+        `
+      ),
+      non_source_reading_form_samples: database
+        .prepare(
+          `
+            SELECT e.id AS entry_id, e.word, e.source_lang, f.lang AS form_lang, f.form, f.form_type, f.normalized_form
+            FROM v2_entry_forms f
+            JOIN v2_entries e ON e.id=f.entry_id
+            WHERE f.form_type IN ('reading', 'reading_key')
+              AND f.lang <> e.source_lang
+            ORDER BY e.frequency_rank IS NULL, e.frequency_rank, e.id, f.id
+            LIMIT 20
+          `
+        )
+        .all(),
+      pronunciation_group_lang_mismatch_samples: database
+        .prepare(
+          `
+            SELECT e.id AS entry_id, e.word, e.source_lang, g.lang AS group_lang, g.reading, g.reading_key
+            FROM v2_pronunciation_groups g
+            JOIN v2_entries e ON e.id=g.entry_id
+            WHERE g.lang <> e.source_lang
+            ORDER BY e.frequency_rank IS NULL, e.frequency_rank, e.id, g.id
+            LIMIT 20
+          `
+        )
+        .all()
+    },
     duplicate_zh_examples_by_en_reading: scalar(
       database,
       `
@@ -272,6 +318,8 @@ function isAuditOk(audit) {
     audit.duplicate_sense_orders === 0 &&
     Object.values(audit.empty_required).every((value) => value === 0) &&
     Object.values(audit.orphans).every((value) => value === 0) &&
+    audit.lookup_integrity.non_source_reading_forms === 0 &&
+    audit.lookup_integrity.pronunciation_group_lang_mismatches === 0 &&
     audit.duplicate_zh_examples_by_en_reading === 0 &&
     audit.sample_failures.length === 0
   );
