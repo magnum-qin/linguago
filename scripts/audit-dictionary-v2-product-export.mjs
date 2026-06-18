@@ -245,6 +245,20 @@ function buildAudit(database, exportManifest) {
       `
     ),
     warnings: {
+      duplicate_sense_localizations: scalar(
+        database,
+        `
+          SELECT COUNT(*) AS n
+          FROM (
+            SELECT e.id, l.lang, lower(trim(l.term)) AS term_key, lower(trim(l.definition)) AS definition_key
+            FROM v2_entries e
+            JOIN v2_senses s ON s.entry_id=e.id
+            JOIN v2_sense_localizations l ON l.sense_id=s.id
+            GROUP BY e.id, l.lang, term_key, definition_key
+            HAVING COUNT(*) > 1
+          )
+        `
+      ),
       zh_terms_with_kana: scalar(
         database,
         `SELECT COUNT(*) AS n FROM v2_sense_localizations WHERE lang='zh' AND (term GLOB '*[ぁ-んァ-ン]*' OR definition GLOB '*[ぁ-んァ-ン]*')`
@@ -276,6 +290,22 @@ function buildAudit(database, exportManifest) {
             WHERE l.lang='ja' AND l.term GLOB '*[A-Za-z]*' AND l.term NOT GLOB '*[ぁ-んァ-ン一-龯]*'
             ORDER BY e.frequency_rank IS NULL, e.frequency_rank, e.id
             LIMIT 10
+          `
+        )
+        .all(),
+      duplicate_sense_localization_samples: database
+        .prepare(
+          `
+            SELECT e.id AS entry_id, e.word, l.lang, lower(trim(l.term)) AS term_key,
+              lower(trim(l.definition)) AS definition_key, COUNT(*) AS duplicate_count,
+              GROUP_CONCAT(s.sense_order) AS sense_orders
+            FROM v2_entries e
+            JOIN v2_senses s ON s.entry_id=e.id
+            JOIN v2_sense_localizations l ON l.sense_id=s.id
+            GROUP BY e.id, l.lang, term_key, definition_key
+            HAVING COUNT(*) > 1
+            ORDER BY duplicate_count DESC, e.frequency_rank IS NULL, e.frequency_rank, e.id, l.lang
+            LIMIT 20
           `
         )
         .all()
