@@ -147,6 +147,7 @@ const entryRows = db
   .all();
 
 const entryIds = new Set(entryRows.map((row) => row.id));
+const entryPrimaryLangById = new Map(entryRows.map((row) => [row.id, row.primary_lang]));
 const senseIds = new Set();
 const exampleIds = new Set();
 const entryFormKeys = new Set();
@@ -229,7 +230,7 @@ for (const row of db
   const entryId = db.prepare("SELECT product_entry_id FROM product_senses WHERE id = ?").get(row.product_sense_id)?.product_entry_id;
   if (entryId && entryIds.has(entryId)) {
     addEntryForm(entryId, row.lang, row.term, "localized_term", row.source, row.confidence);
-    if (row.lang === "zh") {
+    if (row.lang === entryPrimaryLangById.get(entryId)) {
       addReadingEntryForms(entryId, row.lang, row.reading, row.source, row.confidence);
     }
   }
