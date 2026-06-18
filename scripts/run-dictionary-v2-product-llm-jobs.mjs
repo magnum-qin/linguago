@@ -111,7 +111,7 @@ const statements = {
   markSenseAccepted: db.prepare(`
     UPDATE product_senses
     SET status = 'accepted'
-    WHERE id = ? AND status IN ('ready_for_llm', 'needs_review')
+    WHERE id = ? AND status IN ('ready_for_llm', 'needs_review', 'draft_fused', 'draft_single_source')
   `),
   entryStatusCounts: db.prepare(`
     SELECT status, COUNT(*) AS count
