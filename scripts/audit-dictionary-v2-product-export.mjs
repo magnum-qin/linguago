@@ -23,6 +23,8 @@ if (fs.existsSync(auditDbPath)) fs.unlinkSync(auditDbPath);
 
 const db = new Database(auditDbPath);
 db.pragma("foreign_keys = ON");
+db.function("invalid_pos", invalidPartOfSpeech);
+db.function("source_script_mismatch", sourceScriptMismatch);
 
 for (const relativeFile of [manifest.schema, ...(manifest.chunks || [])]) {
   const sqlPath = path.resolve(relativeFile);
@@ -186,6 +188,47 @@ function buildAudit(database, exportManifest) {
         )
         .all()
     },
+    content_integrity: {
+      invalid_part_of_speech: scalar(
+        database,
+        `
+          SELECT COUNT(*) AS n
+          FROM v2_senses
+          WHERE invalid_pos(part_of_speech)
+        `
+      ),
+      source_script_mismatches: scalar(
+        database,
+        `
+          SELECT COUNT(*) AS n
+          FROM v2_entries
+          WHERE source_script_mismatch(word, source_lang)
+        `
+      ),
+      invalid_part_of_speech_samples: database
+        .prepare(
+          `
+            SELECT e.id AS entry_id, e.word, e.source_lang, s.id AS sense_id, s.sense_order, s.part_of_speech
+            FROM v2_senses s
+            JOIN v2_entries e ON e.id=s.entry_id
+            WHERE invalid_pos(s.part_of_speech)
+            ORDER BY e.frequency_rank IS NULL, e.frequency_rank, e.id, s.sense_order
+            LIMIT 20
+          `
+        )
+        .all(),
+      source_script_mismatch_samples: database
+        .prepare(
+          `
+            SELECT id AS entry_id, word, source_lang, normalized_key
+            FROM v2_entries
+            WHERE source_script_mismatch(word, source_lang)
+            ORDER BY frequency_rank IS NULL, frequency_rank, id
+            LIMIT 20
+          `
+        )
+        .all()
+    },
     duplicate_zh_examples_by_en_reading: scalar(
       database,
       `
@@ -320,6 +363,8 @@ function isAuditOk(audit) {
     Object.values(audit.orphans).every((value) => value === 0) &&
     audit.lookup_integrity.non_source_reading_forms === 0 &&
     audit.lookup_integrity.pronunciation_group_lang_mismatches === 0 &&
+    audit.content_integrity.invalid_part_of_speech === 0 &&
+    audit.content_integrity.source_script_mismatches === 0 &&
     audit.duplicate_zh_examples_by_en_reading === 0 &&
     audit.sample_failures.length === 0
   );
@@ -337,6 +382,31 @@ function scalar(database, sql) {
 
 function normalizeKey(value) {
   return String(value || "").trim().toLocaleLowerCase();
+}
+
+function invalidPartOfSpeech(value) {
+  const text = normalizeKey(value);
+  if (!text) return 0;
+  if (/[&;]/.test(text)) return 1;
+  if (["n", "v", "adj", "adv"].includes(text)) return 1;
+  return 0;
+}
+
+function sourceScriptMismatch(word, sourceLang) {
+  const text = String(word || "").trim();
+  const lang = String(sourceLang || "").trim();
+  if (!text || !lang) return 1;
+
+  const hasLatin = /\p{Script=Latin}/u.test(text);
+  const hasHan = /\p{Script=Han}/u.test(text);
+  const hasHiragana = /\p{Script=Hiragana}/u.test(text);
+  const hasKatakana = /\p{Script=Katakana}/u.test(text);
+  const hasKana = hasHiragana || hasKatakana;
+
+  if (lang === "zh") return hasLatin || hasKana || !hasHan ? 1 : 0;
+  if (lang === "ja") return hasHan || hasKana ? 0 : 1;
+  if (lang === "en" || lang === "pt-BR") return hasHan || hasKana ? 1 : 0;
+  return 0;
 }
 
 function parseArgs(argv) {
