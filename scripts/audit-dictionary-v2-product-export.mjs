@@ -8,6 +8,10 @@ const manifestPath = path.join(outDir, "manifest.json");
 const auditDbPath = path.join(outDir, "audit-import.db");
 const auditPath = path.join(outDir, "audit.json");
 const samplesPath = path.join(outDir, "audit-samples.json");
+const HTML_ENTITY_RE = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#x[0-9a-fA-F]{1,6});/u;
+const REPLACEMENT_CHAR_RE = /[\uFFFD]/u;
+const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
+const JAPANESE_MOJIBAKE_RE = /[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u;
 
 const sampleTerms = (args.samples || "hello,\u4f60\u597d,\u600e,\u5565,appearance")
   .split(",")
@@ -25,6 +29,8 @@ const db = new Database(auditDbPath);
 db.pragma("foreign_keys = ON");
 db.function("invalid_pos", invalidPartOfSpeech);
 db.function("source_script_mismatch", sourceScriptMismatch);
+db.function("text_has_mojibake", textHasMojibake);
+db.function("text_has_html_artifact", textHasHtmlArtifact);
 
 for (const relativeFile of [manifest.schema, ...(manifest.chunks || [])]) {
   const sqlPath = path.resolve(relativeFile);
@@ -227,6 +233,132 @@ function buildAudit(database, exportManifest) {
             LIMIT 20
           `
         )
+        .all(),
+      mojibake_texts: scalar(
+        database,
+        `
+          SELECT COUNT(*) AS n
+          FROM (
+            SELECT e.id
+            FROM v2_entries e
+            WHERE text_has_mojibake(e.word, e.source_lang)
+               OR text_has_mojibake(e.normalized_key, e.source_lang)
+            UNION ALL
+            SELECT l.id
+            FROM v2_sense_localizations l
+            WHERE text_has_mojibake(l.term, l.lang)
+               OR text_has_mojibake(l.reading, l.lang)
+               OR text_has_mojibake(l.pronunciation, l.lang)
+               OR text_has_mojibake(l.definition, l.lang)
+            UNION ALL
+            SELECT x.id
+            FROM v2_examples x
+            WHERE text_has_mojibake(x.source_text, x.source_lang)
+            UNION ALL
+            SELECT xl.id
+            FROM v2_example_localizations xl
+            WHERE text_has_mojibake(xl.text, xl.lang)
+               OR text_has_mojibake(xl.reading, xl.lang)
+          )
+        `
+      ),
+      html_artifacts: scalar(
+        database,
+        `
+          SELECT COUNT(*) AS n
+          FROM (
+            SELECT s.id
+            FROM v2_senses s
+            WHERE text_has_html_artifact(s.part_of_speech, 'meta')
+               OR text_has_html_artifact(s.gloss_key, 'meta')
+            UNION ALL
+            SELECT l.id
+            FROM v2_sense_localizations l
+            WHERE text_has_html_artifact(l.term, l.lang)
+               OR text_has_html_artifact(l.definition, l.lang)
+            UNION ALL
+            SELECT x.id
+            FROM v2_examples x
+            WHERE text_has_html_artifact(x.source_text, x.source_lang)
+            UNION ALL
+            SELECT xl.id
+            FROM v2_example_localizations xl
+            WHERE text_has_html_artifact(xl.text, xl.lang)
+          )
+        `
+      ),
+      mojibake_text_samples: database
+        .prepare(
+          `
+            SELECT kind, entry_id, word, lang, field, value
+            FROM (
+              SELECT 'entry' AS kind, e.id AS entry_id, e.word, e.source_lang AS lang, 'word' AS field, e.word AS value,
+                     e.frequency_rank AS rank
+              FROM v2_entries e
+              WHERE text_has_mojibake(e.word, e.source_lang)
+              UNION ALL
+              SELECT 'localization' AS kind, e.id AS entry_id, e.word, l.lang, 'term' AS field, l.term AS value,
+                     e.frequency_rank AS rank
+              FROM v2_sense_localizations l
+              JOIN v2_senses s ON s.id=l.sense_id
+              JOIN v2_entries e ON e.id=s.entry_id
+              WHERE text_has_mojibake(l.term, l.lang)
+              UNION ALL
+              SELECT 'localization' AS kind, e.id AS entry_id, e.word, l.lang, 'definition' AS field, l.definition AS value,
+                     e.frequency_rank AS rank
+              FROM v2_sense_localizations l
+              JOIN v2_senses s ON s.id=l.sense_id
+              JOIN v2_entries e ON e.id=s.entry_id
+              WHERE text_has_mojibake(l.definition, l.lang)
+              UNION ALL
+              SELECT 'example' AS kind, e.id AS entry_id, e.word, xl.lang, 'text' AS field, xl.text AS value,
+                     e.frequency_rank AS rank
+              FROM v2_example_localizations xl
+              JOIN v2_examples x ON x.id=xl.example_id
+              JOIN v2_senses s ON s.id=x.sense_id
+              JOIN v2_entries e ON e.id=s.entry_id
+              WHERE text_has_mojibake(xl.text, xl.lang)
+            )
+            ORDER BY rank IS NULL, rank, entry_id
+            LIMIT 30
+          `
+        )
+        .all(),
+      html_artifact_samples: database
+        .prepare(
+          `
+            SELECT kind, entry_id, word, lang, field, value
+            FROM (
+              SELECT 'sense' AS kind, e.id AS entry_id, e.word, e.source_lang AS lang, 'part_of_speech' AS field, s.part_of_speech AS value,
+                     e.frequency_rank AS rank
+              FROM v2_senses s
+              JOIN v2_entries e ON e.id=s.entry_id
+              WHERE text_has_html_artifact(s.part_of_speech, 'meta')
+              UNION ALL
+              SELECT 'sense' AS kind, e.id AS entry_id, e.word, e.source_lang AS lang, 'gloss_key' AS field, s.gloss_key AS value,
+                     e.frequency_rank AS rank
+              FROM v2_senses s
+              JOIN v2_entries e ON e.id=s.entry_id
+              WHERE text_has_html_artifact(s.gloss_key, 'meta')
+              UNION ALL
+              SELECT 'localization' AS kind, e.id AS entry_id, e.word, l.lang, 'term' AS field, l.term AS value,
+                     e.frequency_rank AS rank
+              FROM v2_sense_localizations l
+              JOIN v2_senses s ON s.id=l.sense_id
+              JOIN v2_entries e ON e.id=s.entry_id
+              WHERE text_has_html_artifact(l.term, l.lang)
+              UNION ALL
+              SELECT 'localization' AS kind, e.id AS entry_id, e.word, l.lang, 'definition' AS field, l.definition AS value,
+                     e.frequency_rank AS rank
+              FROM v2_sense_localizations l
+              JOIN v2_senses s ON s.id=l.sense_id
+              JOIN v2_entries e ON e.id=s.entry_id
+              WHERE text_has_html_artifact(l.definition, l.lang)
+            )
+            ORDER BY rank IS NULL, rank, entry_id
+            LIMIT 30
+          `
+        )
         .all()
     },
     duplicate_zh_examples_by_en_reading: scalar(
@@ -395,6 +527,8 @@ function isAuditOk(audit) {
     audit.lookup_integrity.pronunciation_group_lang_mismatches === 0 &&
     audit.content_integrity.invalid_part_of_speech === 0 &&
     audit.content_integrity.source_script_mismatches === 0 &&
+    audit.content_integrity.mojibake_texts === 0 &&
+    audit.content_integrity.html_artifacts === 0 &&
     audit.duplicate_zh_examples_by_en_reading === 0 &&
     audit.sample_failures.length === 0
   );
@@ -436,6 +570,23 @@ function sourceScriptMismatch(word, sourceLang) {
   if (lang === "zh") return hasLatin || hasKana || !hasHan ? 1 : 0;
   if (lang === "ja") return hasHan || hasKana ? 0 : 1;
   if (lang === "en" || lang === "pt-BR") return hasHan || hasKana ? 1 : 0;
+  return 0;
+}
+
+function textHasHtmlArtifact(value, _lang) {
+  const text = String(value || "").trim();
+  if (!text) return 0;
+  return HTML_ENTITY_RE.test(text) ? 1 : 0;
+}
+
+function textHasMojibake(value, lang) {
+  const text = String(value || "").trim();
+  if (!text) return 0;
+
+  if (REPLACEMENT_CHAR_RE.test(text)) return 1;
+  if (LATIN1_MOJIBAKE_RE.test(text)) return 1;
+  if (JAPANESE_MOJIBAKE_RE.test(text)) return 1;
+
   return 0;
 }
 

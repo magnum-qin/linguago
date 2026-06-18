@@ -36,6 +36,7 @@
     "dict:v2:clean:product-examples": "node scripts/clean-dictionary-v2-product-examples.mjs",
     "dict:v2:merge:product-entries": "node scripts/merge-dictionary-v2-product-entries.mjs",
     "dict:v2:merge:product-senses": "node scripts/merge-dictionary-v2-product-senses.mjs",
+    "dict:v2:report:product-duplicate-senses": "node scripts/report-dictionary-v2-product-duplicate-senses.mjs",
     "dict:v2:create:product-llm-jobs": "node scripts/create-dictionary-v2-product-llm-jobs.mjs",
     "dict:v2:create:product-quality-repair-jobs": "node scripts/create-dictionary-v2-product-quality-repair-jobs.mjs",
     "dict:v2:run:product-llm-jobs": "node scripts/run-dictionary-v2-product-llm-jobs.mjs",
