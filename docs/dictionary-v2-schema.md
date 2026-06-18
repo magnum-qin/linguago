@@ -29,6 +29,7 @@ source/staging
 canonical
   entries
   entry_forms
+  pronunciation_groups
   senses
   sense_source_links
   sense_localizations
@@ -41,6 +42,7 @@ canonical
 ## Canonical Shape
 
 Each entry contains one or more senses. Each sense contains one localization per language.
+For polyphonic or homographic entries, senses should be attached to a pronunciation group before localization rendering. For example, Chinese `中` should keep `zhōng` senses and `zhòng` senses in separate groups instead of flattening all definitions under one character.
 
 ```json
 {
@@ -101,7 +103,10 @@ Each entry contains one or more senses. Each sense contains one localization per
 The SQL stores this JSON shape across normalized tables:
 
 - `entries`: lookup key and source language.
+- `entry_forms`: searchable written forms, localized terms, readings, and normalized reading keys.
+- `pronunciation_groups`: optional entry-level reading groups such as Chinese pinyin with tone keys; published D1 uses `v2_pronunciation_groups`.
 - `senses`: sense identity, order, part of speech, domain, register, and `gloss_key`.
+- `senses.pronunciation_group_id`: optional link from a sense to the reading group that owns it.
 - `sense_localizations`: one row per `sense_id + lang`, with `term`, `reading`, `pronunciation`, and `definition`.
 - `examples`: one row per example attached to a sense.
 - `example_localizations`: one row per `example_id + lang`.

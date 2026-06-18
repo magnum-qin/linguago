@@ -344,9 +344,11 @@ npm run dict:v2:export:product-d1-native
 npm run dict:v2:audit:product-export
 ```
 
-This exporter reads `product_*` tables and writes `outputs/d1-v2-product-native-export`. It keeps the same `v2_entries`, `v2_senses`, `v2_sense_localizations`, `v2_examples`, and `v2_example_localizations` table shape used by the Worker, but only includes product senses that are `accepted` and have complete four-language localizations with `needs_review = 0`.
+This exporter reads `product_*` tables and writes `outputs/d1-v2-product-native-export`. It publishes `v2_entries`, `v2_entry_forms`, `v2_pronunciation_groups`, `v2_senses`, `v2_sense_localizations`, `v2_examples`, and `v2_example_localizations` for the Worker. It only includes product senses that are `accepted` and have complete four-language localizations with `needs_review = 0`.
 
-The export audit imports the generated SQL into `outputs/d1-v2-product-native-export/audit-import.db`, then writes `audit.json` and `audit-samples.json`. It is a publish gate for structural problems: manifest/count mismatches, missing four-language sense localizations, duplicate published sense order, empty required fields, orphan rows, duplicate simplified/traditional Chinese examples, and failed key sample lookups. It also records non-blocking product quality warnings such as Chinese terms containing kana or Japanese terms that are still pure Latin text; review those warnings before expanding the batch, but they do not block a structurally valid D1 push.
+`v2_pronunciation_groups` is the publish-time bridge for polyphonic headwords. Each accepted sense can point to one pronunciation group through `v2_senses.pronunciation_group_id`; the current product exporter derives the group from the accepted Chinese localization reading, normalizes tone-marked pinyin into a searchable `reading_key`, and adds both the written form and reading form to `v2_entry_forms`. This lets one visible entry group meanings by readings such as `zhong1` and `zhong4` instead of flattening all senses under the same character.
+
+The export audit imports the generated SQL into `outputs/d1-v2-product-native-export/audit-import.db`, then writes `audit.json` and `audit-samples.json`. It is a publish gate for structural problems: manifest/count mismatches, missing four-language sense localizations, duplicate published sense order, empty required fields, orphan rows including broken pronunciation-group links, duplicate simplified/traditional Chinese examples, and failed key sample lookups. It also records non-blocking product quality warnings such as Chinese terms containing kana or Japanese terms that are still pure Latin text; review those warnings before expanding the batch, but they do not block a structurally valid D1 push.
 
 For a normal product D1 release, use the combined release command instead of running each publish step manually:
 
@@ -423,6 +425,7 @@ The v2 schema keeps these layers separate:
 
 - `dictionary_sources`, `source_entries`, `source_senses`: source/staging data from public dictionaries.
 - `entries`, `entry_forms`, `senses`: canonical lookup entries and sense identity.
+- `pronunciation_groups`: optional headword reading groups for polyphonic or homographic entries; published D1 uses `v2_pronunciation_groups` and `v2_senses.pronunciation_group_id`.
 - `sense_localizations`: four-language term, reading, pronunciation, definition, and usage note rows keyed by `sense_id + lang`.
 - `examples`, `example_localizations`: sense-attached examples with four-language text keyed by `example_id + lang`.
 - `llm_completion_jobs`, `quality_issues`: generated-data tracking and validation results.

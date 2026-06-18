@@ -58,6 +58,7 @@ function buildAudit(database, exportManifest) {
     counts: {
       entries: count("v2_entries"),
       entry_forms: count("v2_entry_forms"),
+      pronunciation_groups: count("v2_pronunciation_groups"),
       senses: count("v2_senses"),
       sense_localizations: count("v2_sense_localizations"),
       examples: count("v2_examples"),
@@ -66,6 +67,7 @@ function buildAudit(database, exportManifest) {
     count_mismatches: compareCounts(exportManifest.stats || {}, {
       entries: count("v2_entries"),
       entry_forms: count("v2_entry_forms"),
+      pronunciation_groups: count("v2_pronunciation_groups"),
       senses: count("v2_senses"),
       sense_localizations: count("v2_sense_localizations"),
       examples: count("v2_examples"),
@@ -113,9 +115,17 @@ function buildAudit(database, exportManifest) {
         database,
         `SELECT COUNT(*) AS n FROM v2_entry_forms f LEFT JOIN v2_entries e ON e.id=f.entry_id WHERE e.id IS NULL`
       ),
+      orphan_pronunciation_groups: scalar(
+        database,
+        `SELECT COUNT(*) AS n FROM v2_pronunciation_groups g LEFT JOIN v2_entries e ON e.id=g.entry_id WHERE e.id IS NULL`
+      ),
       orphan_senses: scalar(
         database,
         `SELECT COUNT(*) AS n FROM v2_senses s LEFT JOIN v2_entries e ON e.id=s.entry_id WHERE e.id IS NULL`
+      ),
+      orphan_sense_pronunciation_groups: scalar(
+        database,
+        `SELECT COUNT(*) AS n FROM v2_senses s LEFT JOIN v2_pronunciation_groups g ON g.id=s.pronunciation_group_id WHERE s.pronunciation_group_id IS NOT NULL AND g.id IS NULL`
       ),
       orphan_localizations: scalar(
         database,
@@ -212,7 +222,17 @@ function lookupSample(database, term) {
   if (!entry) return { term, ok: false, reason: "no_match" };
 
   const senses = database
-    .prepare(`SELECT id, sense_order, part_of_speech, gloss_key FROM v2_senses WHERE entry_id=? ORDER BY sense_order`)
+    .prepare(`
+      SELECT s.id, s.sense_order, s.part_of_speech, s.gloss_key,
+        g.lang AS pronunciation_group_lang,
+        g.reading AS pronunciation_group_reading,
+        g.reading_key AS pronunciation_group_reading_key,
+        g.reading_system AS pronunciation_group_reading_system
+      FROM v2_senses s
+      LEFT JOIN v2_pronunciation_groups g ON g.id=s.pronunciation_group_id
+      WHERE s.entry_id=?
+      ORDER BY s.sense_order
+    `)
     .all(entry.id)
     .map((sense) => ({
       ...sense,

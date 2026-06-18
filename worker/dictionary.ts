@@ -63,6 +63,13 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
               'domain', s.domain,
               'register_label', s.register_label,
               'gloss_key', s.gloss_key,
+              'pronunciation_group', CASE WHEN s.pronunciation_group_id IS NOT NULL THEN json_object(
+                'id', s.pronunciation_group_id,
+                'lang', s.group_lang,
+                'reading', s.group_reading,
+                'reading_key', s.group_reading_key,
+                'reading_system', s.group_reading_system
+              ) ELSE NULL END,
               'localizations', (
                 SELECT json_group_object(sl.lang, json_object(
                   'term', sl.term,
@@ -97,8 +104,13 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
               )
             ))
             FROM (
-              SELECT s.*
+              SELECT s.*,
+                g.lang AS group_lang,
+                g.reading AS group_reading,
+                g.reading_key AS group_reading_key,
+                g.reading_system AS group_reading_system
               FROM v2_senses s
+              LEFT JOIN v2_pronunciation_groups g ON g.id=s.pronunciation_group_id
               WHERE s.entry_id = e.id
               ORDER BY
                 CASE WHEN EXISTS (
@@ -502,11 +514,27 @@ function normalizeV2Sense(sense: Record<string, unknown>, index: number): V2Word
     sense_order: Number.isFinite(senseOrder) && senseOrder > 0 ? senseOrder : index + 1,
     part_of_speech: normalizeStringOrText(sense.part_of_speech),
     gloss_key: normalizeStringOrText(sense.gloss_key),
+    pronunciation_group: normalizeV2PronunciationGroup(sense.pronunciation_group),
     domain: normalizeStringOrText(sense.domain),
     register_label: normalizeStringOrText(sense.register_label),
     definitions,
     localizations,
     examples
+  };
+}
+
+function normalizeV2PronunciationGroup(value: unknown): WordSense["pronunciation_group"] {
+  const parsed = parseJsonValue(value);
+  if (!parsed || typeof parsed !== "object") return undefined;
+  const source = parsed as Record<string, unknown>;
+  const reading = normalizeStringOrText(source.reading);
+  const readingKey = normalizeStringOrText(source.reading_key);
+  if (!reading && !readingKey) return undefined;
+  return {
+    lang: normalizeStringOrText(source.lang),
+    reading,
+    reading_key: readingKey,
+    reading_system: normalizeStringOrText(source.reading_system)
   };
 }
 

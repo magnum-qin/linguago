@@ -59,6 +59,12 @@ export interface WordSense {
   sense_order: number;
   part_of_speech: string;
   gloss_key: string;
+  pronunciation_group?: {
+    lang: string;
+    reading: string;
+    reading_key: string;
+    reading_system: string;
+  };
   definitions: Record<DisplayLanguageCode, string>;
   domain?: string;
   register_label?: string;
