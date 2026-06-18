@@ -59,6 +59,14 @@ npm run dict:v2:build:canonical -- --db data/processed/linguago_v2_sample.db
 
 The first-pass builder is deliberately conservative: each source sense becomes one canonical sense with one `sense_localizations` row in the source language. It records missing-language `quality_issues` instead of trying to guess cross-language alignment. Later pipeline stages should merge equivalent senses across sources and use LLM jobs only for missing localizations.
 
+The canonical builder also supports source-scoped incremental imports. Use this when adding new source dictionaries to an existing full database:
+
+```powershell
+npm run dict:v2:build:canonical -- --db data/processed/linguago_v2_full.db --sources freedict-eng-por,freedict-por-eng --reset-canonical false
+```
+
+For FreeDict bilingual sources, the source entry language remains the lookup language (`en` for `freedict-eng-por`, `pt-BR` for `freedict-por-eng`), while the TEI translation is imported as a target-language `sense_localization`. This adds Portuguese and English evidence without deleting the existing canonical build.
+
 Merge exact duplicate senses within the same canonical entry:
 
 ```powershell
@@ -142,6 +150,14 @@ Full-source import counts:
 
 FreeDict is now available in the source/staging layer for English-Portuguese and Portuguese-English evidence. It is not automatically reflected in the product D1 export until the product fusion stage is rebuilt or extended to use these source links.
 
+After the incremental canonical FreeDict import:
+
+- `entries`: 1,339,417.
+- `senses`: 1,617,729.
+- `sense_localizations`: 374,777.
+- `freedict-eng-por`: 19,092 canonical English-source senses with Portuguese localizations.
+- `freedict-por-eng`: 12,792 canonical Portuguese-source senses with English localizations.
+
 After canonical build and strict duplicate-sense merge plus the current accepted completion batches:
 
 - `entries`: 1,328,115.
@@ -159,7 +175,9 @@ Current frequency matches:
 - `en`: 46,320 ranked entries.
 - `zh`: 35,545 ranked entries.
 - `ja`: 22,668 ranked entries.
-- `pt-BR`: Portuguese source entries are now available through `freedict-por-eng`, but product-layer frequency ranking still needs a Portuguese frequency pass before they should drive priority order.
+- `pt-BR`: 6,619 ranked entries after importing `freedict-por-eng` and rerunning frequency ranking.
+
+A top-1000 product rebuild smoke test with FreeDict evidence produced 881 Portuguese source links across 740 product senses, and 2,477 fully localized product senses. Treat this as fusion evidence, not as a release artifact: high-frequency function words still need review because bilingual FreeDict glosses can over-group broad words like `it`, `of`, `on`, and `por`.
 
 ## Product-Layer Fusion Pilot
 

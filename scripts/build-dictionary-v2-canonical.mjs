@@ -9,6 +9,14 @@ const dbPath = path.resolve(args.db || DEFAULT_DB);
 const limit = args.limit ? Number(args.limit) : 0;
 const batchSize = args["batch-size"] ? Number(args["batch-size"]) : 5000;
 const resetCanonical = args["reset-canonical"] !== "false";
+const sourceNames = (args.sources || "")
+  .split(",")
+  .map((source) => source.trim())
+  .filter(Boolean);
+const sourceParams = Object.fromEntries(sourceNames.map((source, index) => [`source${index}`, source]));
+const sourceFilterSql = sourceNames.length
+  ? `AND ds.source_key IN (${sourceNames.map((_, index) => `@source${index}`).join(", ")})`
+  : "";
 
 const db = new Database(dbPath);
 db.pragma("foreign_keys = ON");
@@ -49,6 +57,7 @@ const statements = {
     JOIN dictionary_sources ds ON ds.id = se.source_id
     JOIN source_senses ss ON ss.source_entry_id = se.id
     WHERE ss.id > @afterSenseId
+      ${sourceFilterSql}
     ORDER BY ss.id
     LIMIT @batchSize
   `),
@@ -120,6 +129,11 @@ const stats = {
 };
 
 const nextSenseOrderByEntry = new Map();
+if (!resetCanonical) {
+  for (const row of db.prepare(`SELECT entry_id, MAX(sense_order) + 1 AS next_order FROM senses GROUP BY entry_id`).all()) {
+    nextSenseOrderByEntry.set(row.entry_id, row.next_order || 1);
+  }
+}
 
 const buildRows = db.transaction((rows) => {
   for (const row of rows) {
@@ -204,7 +218,8 @@ while (!limit || stats.source_senses_seen < limit) {
   const remaining = limit ? limit - stats.source_senses_seen : batchSize;
   const rows = statements.sourceRows.all({
     afterSenseId,
-    batchSize: Math.min(batchSize, remaining)
+    batchSize: Math.min(batchSize, remaining),
+    ...sourceParams
   });
   if (!rows.length) break;
   buildRows(rows);
@@ -251,6 +266,9 @@ function toSenseLocalization(row, senseId) {
   const entryRaw = parseJson(row.entry_raw_json);
   const senseRaw = parseJson(row.sense_raw_json);
   const lang = normalizeLang(row.lang);
+  const translatedLocalization = toTranslatedSenseLocalization(row, senseId, senseRaw);
+  if (translatedLocalization) return translatedLocalization;
+
   const definition = cleanText(row.gloss);
   if (!definition || !definitionMatchesLang(definition, lang)) {
     return null;
@@ -270,6 +288,30 @@ function toSenseLocalization(row, senseId) {
     source: row.source_key,
     confidence: defaultConfidence(row.source_key),
     needs_review: row.source_key === "ecdict" ? 1 : 0
+  };
+}
+
+function toTranslatedSenseLocalization(row, senseId, senseRaw) {
+  if (!row.source_key.startsWith("freedict-")) return null;
+  const targetLang = normalizeLang(senseRaw.target_lang);
+  const translations = asArray(senseRaw.translations).map(cleanText).filter(Boolean);
+  const term = firstText(translations);
+  if (!term) return null;
+
+  return {
+    sense_id: senseId,
+    lang: targetLang,
+    term,
+    normalized_term: normalizeKey(term),
+    reading: null,
+    reading_system: null,
+    pronunciation: null,
+    pronunciation_system: null,
+    definition: translations.join("; "),
+    usage_note: null,
+    source: row.source_key,
+    confidence: defaultConfidence(row.source_key),
+    needs_review: 0
   };
 }
 
