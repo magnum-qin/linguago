@@ -179,6 +179,24 @@ Current frequency matches:
 
 A top-1000 product rebuild smoke test with FreeDict evidence produced 881 Portuguese source links across 740 product senses, and 2,477 fully localized product senses. Treat this as fusion evidence, not as a release artifact: high-frequency function words still need review because bilingual FreeDict glosses can over-group broad words like `it`, `of`, `on`, and `por`.
 
+For a read-only report on a product candidate database:
+
+```powershell
+npm run dict:v2:report:product-candidate -- --db data/processed/linguago_v2_product_top5000_freedict_candidate.db --out data/processed/product-candidate-freedict-report.json
+```
+
+Current top-5000 FreeDict candidate report:
+
+- `product_entries`: 18,209.
+- `product_senses`: 18,209.
+- `fully_localized_senses`: 2,478.
+- `freedict_localizations`: 4,535.
+- `freedict_localization_senses`: 3,798.
+- `pt_source_linked_senses`: 2,272.
+- Risk counters: 263 high-source-count senses, 330 short-gloss senses, 71 FreeDict short-gloss senses.
+
+Do not promote this candidate directly to D1 until high-risk short gloss/function-word groups have been reviewed or filtered.
+
 ## Product-Layer Fusion Pilot
 
 The full v2 database is a source/staging pool, not the final product dictionary. Do not run unattended LLM completion against all 1.3M source entries. Build a smaller product-layer pilot first, then use LLM only to judge/complete the fused product senses.
