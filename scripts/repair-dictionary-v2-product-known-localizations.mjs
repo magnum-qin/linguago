@@ -32,6 +32,26 @@ const fixes = [
     reading: "nǐ hǎo",
     reading_system: "pinyin",
     definition: "用于问候或开始电话对话的致意语。"
+  },
+  {
+    headword: "shall",
+    primary_lang: "en",
+    sense_order: 1,
+    lang: "ja",
+    term: "〜するものとする",
+    reading: "〜するものとする",
+    reading_system: "kana",
+    definition: "英語の助動詞で、未来、義務、命令、約束などを表す。"
+  },
+  {
+    headword: "should",
+    primary_lang: "en",
+    sense_order: 1,
+    lang: "ja",
+    term: "〜すべきだ",
+    reading: "〜すべきだ",
+    reading_system: "kana",
+    definition: "英語の助動詞で、義務、助言、推量、条件などを表す。"
   }
 ];
 
@@ -42,6 +62,17 @@ const getSense = db.prepare(`
   WHERE pe.headword = ?
     AND pe.primary_lang = ?
     AND ps.gloss_key = ?
+  ORDER BY ps.id
+  LIMIT 1
+`);
+
+const getSenseByOrder = db.prepare(`
+  SELECT ps.id
+  FROM product_senses ps
+  JOIN product_entries pe ON pe.id = ps.product_entry_id
+  WHERE pe.headword = ?
+    AND pe.primary_lang = ?
+    AND ps.sense_order = ?
   ORDER BY ps.id
   LIMIT 1
 `);
@@ -84,9 +115,13 @@ const stats = {
 
 db.transaction(() => {
   for (const fix of fixes) {
-    const sense = getSense.get(fix.headword, fix.primary_lang, fix.gloss_key);
+    const sense = fix.gloss_key
+      ? getSense.get(fix.headword, fix.primary_lang, fix.gloss_key)
+      : getSenseByOrder.get(fix.headword, fix.primary_lang, fix.sense_order);
     if (!sense) {
-      stats.missing_senses.push(`${fix.primary_lang}:${fix.headword}:${fix.gloss_key}`);
+      stats.missing_senses.push(
+        `${fix.primary_lang}:${fix.headword}:${fix.gloss_key || `sense_order:${fix.sense_order}`}`
+      );
       continue;
     }
 

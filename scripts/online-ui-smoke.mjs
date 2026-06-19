@@ -146,13 +146,19 @@ async function collectState(page) {
     const tabs = Array.from(document.querySelectorAll('[role="tab"], .v-tab')).map((node) =>
       node.textContent?.trim()
     );
-    const provider = bodyText.includes("Dicion") || bodyText.includes("词典") || bodyText.includes("詞典")
+    const lines = bodyText
+      .split(/\n/g)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const provider = lines.some((line) => line === "DICIONÁRIO PRINCIPAL" || line === "Dicionário Principal")
       ? "dictionary"
-      : bodyText.includes("AI")
-        ? "ai"
-        : bodyText.includes("Error:")
-          ? "error"
-          : "unknown";
+      : lines.some((line) => line === "EM CACHE" || line === "Em cache")
+        ? "cached"
+        : lines.includes("AI")
+          ? "ai"
+          : bodyText.includes("Error:")
+            ? "error"
+            : "unknown";
     return {
       provider,
       title: document.querySelector("h1")?.textContent?.trim() || "",

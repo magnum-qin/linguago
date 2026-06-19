@@ -183,6 +183,19 @@ const exampleTranslation = (example: any, lang: string) => {
   return example?.localizations?.[lang]?.text || example?.translations?.[lang] || '';
 };
 
+const shouldShowExampleTranslation = (example: any, lang: string) => {
+  const translation = exampleTranslation(example, lang);
+  if (!translation) return false;
+  return normalizeComparableText(example?.sentence) !== normalizeComparableText(translation);
+};
+
+const normalizeComparableText = (value: any) => {
+  return String(value || '')
+    .replace(/\{([^|{}]+)\|([^|{}]+)\}/g, '$1')
+    .replace(/\s+/g, '')
+    .trim();
+};
+
 const speak = (text: string, lang: string) => {
   if (!window.speechSynthesis) return;
   
@@ -444,7 +457,7 @@ const submitReport = async () => {
                       </span>
                       <div class="flex flex-col gap-1.5 w-full pt-0.5">
                         <p class="text-m3-on-surface text-[1.05rem] font-medium leading-relaxed"><FuriganaText :text="example.sentence" :highlight="currentWord" /></p>
-                        <p class="text-m3-on-surface-variant text-[0.95rem] leading-relaxed"><FuriganaText :text="exampleTranslation(example, activeLang)" :highlight="currentWord" /></p>
+                        <p v-if="shouldShowExampleTranslation(example, activeLang)" class="text-m3-on-surface-variant text-[0.95rem] leading-relaxed"><FuriganaText :text="exampleTranslation(example, activeLang)" :highlight="currentWord" /></p>
                       </div>
                     </div>
                   </div>

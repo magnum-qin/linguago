@@ -393,11 +393,19 @@ function buildAudit(database, exportManifest) {
       ),
       zh_terms_with_kana: scalar(
         database,
-        `SELECT COUNT(*) AS n FROM v2_sense_localizations WHERE lang='zh' AND (term GLOB '*[ぁ-んァ-ン]*' OR definition GLOB '*[ぁ-んァ-ン]*')`
+        `SELECT COUNT(*) AS n FROM v2_sense_localizations WHERE lang='zh' AND term GLOB '*[\u3040-\u30ff]*'`
       ),
       ja_terms_with_latin_only: scalar(
         database,
-        `SELECT COUNT(*) AS n FROM v2_sense_localizations WHERE lang='ja' AND term GLOB '*[A-Za-z]*' AND term NOT GLOB '*[ぁ-んァ-ン一-龯]*'`
+        `
+          SELECT COUNT(*) AS n
+          FROM v2_sense_localizations
+          WHERE lang='ja'
+            AND term GLOB '*[A-Za-z]*'
+            AND term NOT GLOB '*[\u3040-\u30ff\u4e00-\u9fff]*'
+            AND NOT (length(term) = 1 AND term = upper(term))
+            AND NOT (length(term) BETWEEN 2 AND 8 AND term = upper(term))
+        `
       ),
       zh_terms_with_kana_samples: database
         .prepare(
@@ -406,7 +414,7 @@ function buildAudit(database, exportManifest) {
             FROM v2_sense_localizations l
             JOIN v2_senses s ON s.id=l.sense_id
             JOIN v2_entries e ON e.id=s.entry_id
-            WHERE l.lang='zh' AND (l.term GLOB '*[ぁ-んァ-ン]*' OR l.definition GLOB '*[ぁ-んァ-ン]*')
+            WHERE l.lang='zh' AND l.term GLOB '*[\u3040-\u30ff]*'
             ORDER BY e.frequency_rank IS NULL, e.frequency_rank, e.id
             LIMIT 10
           `
@@ -419,7 +427,11 @@ function buildAudit(database, exportManifest) {
             FROM v2_sense_localizations l
             JOIN v2_senses s ON s.id=l.sense_id
             JOIN v2_entries e ON e.id=s.entry_id
-            WHERE l.lang='ja' AND l.term GLOB '*[A-Za-z]*' AND l.term NOT GLOB '*[ぁ-んァ-ン一-龯]*'
+            WHERE l.lang='ja'
+              AND l.term GLOB '*[A-Za-z]*'
+              AND l.term NOT GLOB '*[\u3040-\u30ff\u4e00-\u9fff]*'
+              AND NOT (length(l.term) = 1 AND l.term = upper(l.term))
+              AND NOT (length(l.term) BETWEEN 2 AND 8 AND l.term = upper(l.term))
             ORDER BY e.frequency_rank IS NULL, e.frequency_rank, e.id
             LIMIT 10
           `
