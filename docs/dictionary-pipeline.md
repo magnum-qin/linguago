@@ -249,6 +249,14 @@ This creates `product_fusion_reviews` in the pilot database and writes:
 
 The review step does not mutate `product_entries`, `product_senses`, or source links. It only stores model judgments, confidence, rationale, and suggested source-link groups. Apply split/keep decisions in a later deterministic step after sampling the review output.
 
+Before spending model time on a new candidate build, extract the high-risk review queue without calling Ollama:
+
+```powershell
+npm run dict:v2:review:product-fusion -- --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db --candidate-filter high-risk --risk-source-count 6 --max-short-gloss-length 3 --limit 40 --select-only true
+```
+
+This writes `*.fusion-review-candidates.json` next to the database. `candidate-filter=high-risk` selects groups with many source links or very short gloss keys, which catches the remaining broad/function-word fusion risks after the FreeDict short-gloss filter. Use `candidate-filter=short-gloss` to inspect only short-gloss groups, or the default `source-count` mode for the older source-count-only queue.
+
 Apply accepted review decisions safely:
 
 ```powershell

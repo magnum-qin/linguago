@@ -21,11 +21,27 @@ const prewarmTimeoutMs = Number(args["prewarm-timeout-ms"] || 180_000);
 const dryRun = args["dry-run"] === "true";
 const retryNeedsReview = args["retry-needs-review"] === "true";
 const maxTokens = Number(args["max-tokens"] || 1200);
+const candidateFilter = args["candidate-filter"] || "source-count";
+const riskSourceCount = Number(args["risk-source-count"] || 6);
+const maxShortGlossLength = Number(args["max-short-gloss-length"] || 3);
+const selectOnly = args["select-only"] === "true";
+const candidatesOutPath = path.resolve(
+  args["candidates-out"] || dbPath.replace(/\.db$/u, ".fusion-review-candidates.json")
+);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!Number.isInteger(shardCount) || shardCount < 1) throw new Error("--shard-count must be a positive integer");
 if (!Number.isInteger(shardIndex) || shardIndex < 0 || shardIndex >= shardCount) {
   throw new Error("--shard-index must be between 0 and shard-count - 1");
+}
+if (!["source-count", "high-risk", "short-gloss"].includes(candidateFilter)) {
+  throw new Error("--candidate-filter must be one of: source-count, high-risk, short-gloss");
+}
+if (!Number.isFinite(riskSourceCount) || riskSourceCount < 1) {
+  throw new Error("--risk-source-count must be a positive number");
+}
+if (!Number.isFinite(maxShortGlossLength) || maxShortGlossLength < 1) {
+  throw new Error("--max-short-gloss-length must be a positive number");
 }
 
 const db = new Database(dbPath);
@@ -33,6 +49,7 @@ db.pragma("foreign_keys = ON");
 db.pragma("busy_timeout = 10000");
 ensureReviewSchema(db);
 
+const candidateWhere = candidateFilterClause(candidateFilter);
 const candidates = db
   .prepare(
     `
@@ -49,34 +66,87 @@ const candidates = db
       ps.gloss_key
     FROM product_entries pe
     JOIN product_senses ps ON ps.product_entry_id = pe.id
-    WHERE pe.source_count >= ?
-      AND (pe.id % ?) = ?
+    WHERE ${candidateWhere}
+      AND (pe.id % @shardCount) = @shardIndex
       AND (
-        ? = 1
+        @retryNeedsReview = 1
         OR NOT EXISTS (
           SELECT 1 FROM product_fusion_reviews r
           WHERE r.product_sense_id = ps.id
-            AND r.model = ?
-            AND r.prompt_version = ?
+            AND r.model = @model
+            AND r.prompt_version = @promptVersion
             AND r.status IN ('accepted', 'needs_review')
         )
       )
     ORDER BY
-      pe.lang_count DESC,
+      CASE WHEN pe.source_count >= @riskSourceCount THEN 0 ELSE 1 END,
+      CASE WHEN length(trim(ps.gloss_key)) <= @maxShortGlossLength THEN 0 ELSE 1 END,
       pe.source_count DESC,
+      pe.lang_count DESC,
       pe.frequency_rank ASC,
       pe.id ASC
-    LIMIT ?
+    LIMIT @limit
   `
   )
-  .all(minSourceCount, shardCount, shardIndex, retryNeedsReview ? 1 : 0, model, PROMPT_VERSION, limit);
+  .all({
+    minSourceCount,
+    riskSourceCount,
+    maxShortGlossLength,
+    shardCount,
+    shardIndex,
+    retryNeedsReview: retryNeedsReview ? 1 : 0,
+    model,
+    promptVersion: PROMPT_VERSION,
+    limit
+  });
 
 console.log(`DB: ${path.relative(process.cwd(), dbPath)}`);
 console.log(`Endpoint: ${endpoint}`);
 console.log(`Model: ${model}`);
 console.log(`Candidates selected: ${candidates.length}`);
+console.log(`Candidate filter: ${candidateFilter}`);
 console.log(`Dry run: ${dryRun}`);
+console.log(`Select only: ${selectOnly}`);
 console.log(`Shard: ${shardIndex}/${shardCount}`);
+
+if (selectOnly) {
+  const selection = {
+    ok: true,
+    db: path.relative(process.cwd(), dbPath),
+    prompt_version: PROMPT_VERSION,
+    candidate_filter: candidateFilter,
+    min_source_count: minSourceCount,
+    risk_source_count: riskSourceCount,
+    max_short_gloss_length: maxShortGlossLength,
+    shard: {
+      index: shardIndex,
+      count: shardCount
+    },
+    selected: candidates.length,
+    candidates: candidates.map((candidate) => {
+      const input = buildReviewInput(candidate);
+      return {
+        product_entry_id: candidate.product_entry_id,
+        product_sense_id: candidate.product_sense_id,
+        headword: candidate.headword,
+        primary_lang: candidate.primary_lang,
+        frequency_rank: candidate.frequency_rank,
+        group_method: candidate.group_method,
+        source_count: candidate.source_count,
+        lang_count: candidate.lang_count,
+        part_of_speech: candidate.part_of_speech,
+        gloss_key: candidate.gloss_key,
+        source_links: input.source_links,
+        current_localizations: input.current_localizations
+      };
+    })
+  };
+  fs.writeFileSync(candidatesOutPath, JSON.stringify(selection, null, 2));
+  db.close();
+  console.log(`Wrote candidate selection: ${path.relative(process.cwd(), candidatesOutPath)}`);
+  console.log(JSON.stringify({ ok: true, selected: selection.selected, out: path.relative(process.cwd(), candidatesOutPath) }));
+  process.exit(0);
+}
 
 const insertReview = db.prepare(`
   INSERT INTO product_fusion_reviews
@@ -177,6 +247,10 @@ const summary = {
   endpoint,
   model,
   prompt_version: PROMPT_VERSION,
+  candidate_filter: candidateFilter,
+  min_source_count: minSourceCount,
+  risk_source_count: riskSourceCount,
+  max_short_gloss_length: maxShortGlossLength,
   stats,
   shard: {
     index: shardIndex,
@@ -238,6 +312,16 @@ function ensureReviewSchema(database) {
     CREATE INDEX IF NOT EXISTS idx_product_fusion_reviews_decision
       ON product_fusion_reviews(model, prompt_version, decision, confidence);
   `);
+}
+
+function candidateFilterClause(filter) {
+  if (filter === "high-risk") {
+    return "(pe.source_count >= @riskSourceCount OR length(trim(ps.gloss_key)) <= @maxShortGlossLength)";
+  }
+  if (filter === "short-gloss") {
+    return "length(trim(ps.gloss_key)) <= @maxShortGlossLength";
+  }
+  return "pe.source_count >= @minSourceCount";
 }
 
 function buildReviewInput(candidate) {
