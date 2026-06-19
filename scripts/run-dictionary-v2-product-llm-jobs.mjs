@@ -656,7 +656,7 @@ function deterministicQualityErrors(loc, input) {
 
 function hasGenericSplitGloss(value) {
   const text = String(value || "").trim().toLowerCase();
-  return /^group\s+for\b/u.test(text) || /^split\s+group\b/u.test(text) || text === "group";
+  return /^group\s+for\b/u.test(text) || /^split\s+group\b/u.test(text);
 }
 
 function looksLikeShortLatinTerm(value) {

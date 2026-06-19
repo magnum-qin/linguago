@@ -318,7 +318,13 @@ function rejectOrSkip(plan, reason, write) {
 
 function normalizeGlossKey(originalGlossKey, group) {
   const label = group.label || group.reason || originalGlossKey || "split sense";
-  return truncateText(label.replace(/\s+/gu, " ").trim(), 180) || "split sense";
+  return truncateText(cleanSplitGroupLabel(label).replace(/\s+/gu, " ").trim(), 180) || "split sense";
+}
+
+function cleanSplitGroupLabel(value) {
+  return String(value || "")
+    .replace(/^Group\s+[A-Z0-9]+:\s*/iu, "")
+    .replace(/^Split\s+group\s+[A-Z0-9]+:\s*/iu, "");
 }
 
 function normalizePartOfSpeech(originalPartOfSpeech, group) {

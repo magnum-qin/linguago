@@ -11,21 +11,46 @@ const outPath = path.resolve(args.out || DEFAULT_OUT);
 const dryRun = args["dry-run"] === "true";
 const apply = args.apply === "true";
 const clearGeneratedContent = args["clear-generated-content"] !== "false";
+const langs = String(args.langs || "zh")
+  .split(",")
+  .map((lang) => lang.trim())
+  .filter(Boolean);
+const maxHeadwordLength = Number(args["max-headword-length"] || 1);
+const maxSourceWordLength = Number(args["max-source-word-length"] || maxHeadwordLength || 1);
+const singleSourceOnly = args["single-source-only"] === "true";
+const sourceStatuses = String(args["source-statuses"] || "")
+  .split(",")
+  .map((status) => status.trim())
+  .filter(Boolean);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!dryRun && !apply) {
   throw new Error("Pass --dry-run true to inspect or --apply true to relocate mismatches.");
+}
+if (!langs.length) throw new Error("--langs must include at least one language");
+if (!Number.isFinite(maxHeadwordLength) || maxHeadwordLength < 0) {
+  throw new Error("--max-headword-length must be a non-negative number");
+}
+if (!Number.isFinite(maxSourceWordLength) || maxSourceWordLength < 0) {
+  throw new Error("--max-source-word-length must be a non-negative number");
 }
 
 const db = new Database(dbPath);
 db.pragma("foreign_keys = ON");
 db.pragma("busy_timeout = 10000");
 
+const langClause = langs.map(() => "?").join(", ");
+const statusClause = sourceStatuses.length ? `AND ps.status IN (${sourceStatuses.map(() => "?").join(", ")})` : "";
+const headwordLengthClause = maxHeadwordLength ? "AND length(pe.headword) <= ?" : "";
+const sourceWordLengthClause = maxSourceWordLength ? "AND length(l.source_word) <= ?" : "";
+const singleSourceOnlyHaving = singleSourceOnly ? "AND COUNT(l.id) = 1" : "";
+
 const statements = {
   candidates: db.prepare(`
     SELECT
       pe.id AS source_entry_id,
       pe.headword AS source_headword,
+      pe.primary_lang AS target_lang,
       pe.normalized_key AS source_normalized_key,
       pe.frequency_rank AS source_frequency_rank,
       ps.id AS sense_id,
@@ -40,18 +65,21 @@ const statements = {
     FROM product_entries pe
     JOIN product_senses ps ON ps.product_entry_id = pe.id
     JOIN product_sense_source_links l ON l.product_sense_id = ps.id
-    WHERE pe.primary_lang = 'zh'
-      AND length(pe.headword) = 1
-      AND l.source_lang = 'zh'
-      AND length(l.source_word) = 1
+    WHERE pe.primary_lang IN (${langClause})
+      AND l.source_lang = pe.primary_lang
+      ${statusClause}
+      ${headwordLengthClause}
+      ${sourceWordLengthClause}
       AND pe.headword <> l.source_word
     GROUP BY pe.id, ps.id
+    HAVING COUNT(DISTINCT l.source_word) = 1
+      ${singleSourceOnlyHaving}
     ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.headword, ps.sense_order, ps.id
   `),
   findTargetEntry: db.prepare(`
     SELECT id, headword, normalized_key, primary_lang, frequency_rank, group_key, group_method, status
     FROM product_entries
-    WHERE primary_lang = 'zh'
+    WHERE primary_lang = ?
       AND normalized_key = ?
     ORDER BY frequency_rank IS NULL, frequency_rank, id
     LIMIT 1
@@ -61,7 +89,7 @@ const statements = {
       (headword, normalized_key, primary_lang, frequency_rank, group_key, group_method,
        status, source_count, lang_count)
     VALUES
-      (@headword, @normalized_key, 'zh', @frequency_rank, @group_key, 'relocated_source_mismatch',
+      (@headword, @normalized_key, @primary_lang, @frequency_rank, @group_key, 'relocated_source_mismatch',
        'ready_for_llm', 0, 0)
   `),
   tempSenseOrder: db.prepare(`
@@ -71,8 +99,7 @@ const statements = {
   `),
   moveSense: db.prepare(`
     UPDATE product_senses
-    SET product_entry_id = ?,
-        status = 'ready_for_llm'
+    SET product_entry_id = ?
     WHERE id = ?
   `),
   deleteLocalizations: db.prepare(`
@@ -161,7 +188,13 @@ const statements = {
   `)
 };
 
-const rawCandidates = statements.candidates.all();
+const candidateParams = [
+  ...langs,
+  ...sourceStatuses,
+  ...(maxHeadwordLength ? [maxHeadwordLength] : []),
+  ...(maxSourceWordLength ? [maxSourceWordLength] : [])
+];
+const rawCandidates = statements.candidates.all(...candidateParams);
 const relocations = [];
 const skipped = [];
 
@@ -184,6 +217,11 @@ const stats = {
   dry_run: dryRun,
   apply,
   clear_generated_content: clearGeneratedContent,
+  langs,
+  max_headword_length: maxHeadwordLength,
+  max_source_word_length: maxSourceWordLength,
+  single_source_only: singleSourceOnly,
+  source_statuses: sourceStatuses,
   candidates_seen: rawCandidates.length,
   relocations_planned: relocations.length,
   skipped: skipped.length,
@@ -245,31 +283,32 @@ function applyRelocation(row) {
 }
 
 function getOrPlanTargetEntry(row) {
-  const existing = statements.findTargetEntry.get(row.target_headword);
+  const existing = statements.findTargetEntry.get(row.target_lang, row.target_headword);
   if (existing) return { id: existing.id, created: false, group_key: existing.group_key };
   return {
     id: null,
     created: true,
-    group_key: buildGroupKey(row.target_headword)
+    group_key: buildGroupKey(row.target_lang, row.target_headword)
   };
 }
 
 function getOrCreateTargetEntry(row) {
-  const existing = statements.findTargetEntry.get(row.target_headword);
+  const existing = statements.findTargetEntry.get(row.target_lang, row.target_headword);
   if (existing) return { id: existing.id, created: false };
 
   const result = statements.insertTargetEntry.run({
     headword: row.target_headword,
     normalized_key: row.target_headword,
+    primary_lang: row.target_lang,
     frequency_rank: row.target_frequency_rank,
-    group_key: buildGroupKey(row.target_headword)
+    group_key: buildGroupKey(row.target_lang, row.target_headword)
   });
   stats.entries_created++;
   return { id: Number(result.lastInsertRowid), created: true };
 }
 
-function buildGroupKey(headword) {
-  return `relocated:zh:${headword}`;
+function buildGroupKey(lang, headword) {
+  return `relocated:${lang}:${headword}`;
 }
 
 function renumberEntry(productEntryId) {

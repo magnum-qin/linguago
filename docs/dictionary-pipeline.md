@@ -370,6 +370,14 @@ npm run dict:v2:relocate:product-source-mismatches -- --db data/processed/lingua
 
 The relocator moves each affected `product_senses` row from the incorrect one-character Chinese entry to the entry matching its Chinese `source_word`, creating that target entry when needed. By default it deletes old generated localizations and product LLM jobs for the moved sense, keeps source examples, clears old example translations, renumbers source and target entries, and leaves the moved sense as `ready_for_llm`. Run `dict:v2:create:product-llm-jobs` again afterwards so the prompt is regenerated with the corrected headword/source context.
 
+For split-pilot cleanup, the relocator can also be scoped to multilingual single-source ready rows:
+
+```powershell
+npm run dict:v2:relocate:product-source-mismatches -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --dry-run true --langs zh,ja,en,pt-BR --max-headword-length 0 --max-source-word-length 0 --single-source-only true --source-statuses ready_for_llm
+```
+
+Use this only after split plans have been sampled: it moves one-source senses whose entry headword no longer matches their sole same-language source word. Keep `clear-generated-content` enabled for `ready_for_llm` rows so stale queued jobs are deleted and regenerated. For already accepted rows, use `--source-statuses accepted --clear-generated-content false` only after spot-checking, so accepted four-language localizations can move with the corrected product entry.
+
 For the smaller set of one-character Chinese mismatch senses that contain multiple distinct Chinese `source_word` values, split the mixed sense first:
 
 ```powershell
