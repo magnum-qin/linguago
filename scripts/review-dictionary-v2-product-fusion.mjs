@@ -34,8 +34,8 @@ if (!Number.isInteger(shardCount) || shardCount < 1) throw new Error("--shard-co
 if (!Number.isInteger(shardIndex) || shardIndex < 0 || shardIndex >= shardCount) {
   throw new Error("--shard-index must be between 0 and shard-count - 1");
 }
-if (!["source-count", "high-risk", "short-gloss"].includes(candidateFilter)) {
-  throw new Error("--candidate-filter must be one of: source-count, high-risk, short-gloss");
+if (!["source-count", "high-risk", "short-gloss", "same-lang-mismatch"].includes(candidateFilter)) {
+  throw new Error("--candidate-filter must be one of: source-count, high-risk, short-gloss, same-lang-mismatch");
 }
 if (!Number.isFinite(riskSourceCount) || riskSourceCount < 1) {
   throw new Error("--risk-source-count must be a positive number");
@@ -315,6 +315,23 @@ function ensureReviewSchema(database) {
 }
 
 function candidateFilterClause(filter) {
+  if (filter === "same-lang-mismatch") {
+    return `
+      ps.status IN ('accepted', 'ready_for_llm')
+      AND EXISTS (
+        SELECT 1
+        FROM product_sense_source_links mismatch_link
+        WHERE mismatch_link.product_sense_id = ps.id
+          AND mismatch_link.source_lang = pe.primary_lang
+          AND mismatch_link.source_word <> pe.headword
+      )
+      AND (
+        SELECT COUNT(*)
+        FROM product_sense_source_links count_link
+        WHERE count_link.product_sense_id = ps.id
+      ) > 1
+    `;
+  }
   if (filter === "high-risk") {
     return "(pe.source_count >= @riskSourceCount OR length(trim(ps.gloss_key)) <= @maxShortGlossLength)";
   }
