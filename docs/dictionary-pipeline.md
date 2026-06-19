@@ -292,6 +292,8 @@ Create product-layer LLM completion jobs after split plans are applied:
 npm run dict:v2:create:product-llm-jobs -- --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --model qwen3.6:latest --limit 200
 ```
 
+The product localization runner has deterministic quality gates beyond JSON schema validation. A split sense with a generic gloss such as `Group for ...` or `split group` stays `needs_review`, because that label is not enough evidence for automatic four-language localization. For single-source split senses, the sole `source_word` is the sense anchor; if the target language is the same as that source language, the generated `term` must exactly match it. Short Portuguese terms also get a basic pronunciation/term mismatch check so an obviously unrelated pronunciation is rejected before publication.
+
 If a product sense already has all four localizations but one localization is still marked `needs_review = 1`, create repair jobs for those existing rows instead of missing-language jobs:
 
 ```powershell

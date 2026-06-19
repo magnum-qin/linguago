@@ -340,6 +340,9 @@ async function callOllama(input) {
                     "You complete one product dictionary localization.",
                     "Return JSON only and complete only the requested target language.",
                     "Keep the exact product sense. Do not merge senses and do not invent another sense.",
+                    "When source_links has exactly one row, treat that source_word as the anchor for this sense, even when it differs from product_entry.headword after a split.",
+                    "If target language equals the only source_link language, sense_localization.term must exactly be that source_word.",
+                    "For split function words, particles, short words, or one-character source words, translate the source_word and product_sense.gloss_key together; do not translate the old product_entry.headword.",
                     "The sense_localization.term must be a natural dictionary headword in the target language, not the source word copied from source_links.",
                     "For en and pt-BR, term must not contain Chinese characters, Japanese kana, or parenthesized source-word notes.",
                     "For zh, term must be simplified Chinese when possible and must not contain Japanese kana.",
@@ -550,6 +553,8 @@ function validateOutput(output, input) {
   if (definitionLanguageLooksRight(loc?.definition, lang)) score++;
   else errors.push("definition language looks suspicious");
 
+  for (const error of deterministicQualityErrors(loc, input)) errors.push(error);
+
   if (Array.isArray(output?.example_localizations)) score++;
   else errors.push("missing example_localizations array");
 
@@ -615,6 +620,67 @@ function definitionLanguageLooksRight(value, lang) {
   if (lang === "pt-BR") return /[\p{Script=Latin}]/u.test(text);
   if (lang === "en") return /[A-Za-z]/u.test(text);
   return false;
+}
+
+function deterministicQualityErrors(loc, input) {
+  const errors = [];
+  if (!loc || typeof loc !== "object") return errors;
+
+  const lang = input.target_lang;
+  const sourceLinks = Array.isArray(input.source_links) ? input.source_links : [];
+  const soleSource = sourceLinks.length === 1 ? sourceLinks[0] : null;
+  const term = String(loc.term || "").trim();
+
+  if (soleSource?.source_lang === lang && normalizeLoose(term) !== normalizeLoose(soleSource.source_word)) {
+    errors.push("term must match sole source_word when target language is the source language");
+  }
+
+  if (lang === "pt-BR" && looksLikeShortLatinTerm(term) && nonEmpty(loc.pronunciation)) {
+    const termLetters = normalizeLatinLetters(term);
+    const pronunciationLetters = normalizeLatinLetters(loc.pronunciation);
+    if (termLetters.length <= 3 && pronunciationLetters && !sharesAnyLetter(termLetters, pronunciationLetters)) {
+      errors.push("pt-BR pronunciation looks unrelated to short term");
+    }
+  }
+
+  if ((lang === "zh" || lang === "ja") && nonEmpty(loc.pronunciation)) {
+    errors.push("zh/ja localizations should use reading, not pronunciation");
+  }
+
+  if (hasGenericSplitGloss(input.product_sense?.gloss_key)) {
+    errors.push("generic split gloss is insufficient for automatic localization");
+  }
+
+  return errors;
+}
+
+function hasGenericSplitGloss(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return /^group\s+for\b/u.test(text) || /^split\s+group\b/u.test(text) || text === "group";
+}
+
+function looksLikeShortLatinTerm(value) {
+  const text = String(value || "").trim();
+  return /^[\p{Script=Latin}\s'’-]{1,12}$/u.test(text) && normalizeLatinLetters(text).length <= 3;
+}
+
+function sharesAnyLetter(left, right) {
+  return [...new Set(left)].some((letter) => right.includes(letter));
+}
+
+function normalizeLoose(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeLatinLetters(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z]/gu, "");
 }
 
 function parseArgs(argv) {
