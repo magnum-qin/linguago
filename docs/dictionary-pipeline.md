@@ -197,6 +197,16 @@ Current top-5000 FreeDict candidate report:
 
 Do not promote this candidate directly to D1 until high-risk short gloss/function-word groups have been reviewed or filtered.
 
+The product pilot builder now filters risky FreeDict short gloss rows before grouping. The filtered top-5000 candidate keeps the same four-language coverage while removing the FreeDict short-gloss risk:
+
+- `skipped_risky_freedict`: 224 source rows.
+- `product_senses`: 18,181, down 28 from the unfiltered candidate.
+- `fully_localized_senses`: 2,478, unchanged.
+- `freedict_localizations`: 4,408, down 127.
+- `freedict_localization_senses`: 3,703, down 95.
+- `pt_source_linked_senses`: 2,120, down 152.
+- Risk delta: high-source-count senses 263 -> 242, broad short-gloss senses 330 -> 263, FreeDict short-gloss senses 71 -> 0.
+
 ## Product-Layer Fusion Pilot
 
 The full v2 database is a source/staging pool, not the final product dictionary. Do not run unattended LLM completion against all 1.3M source entries. Build a smaller product-layer pilot first, then use LLM only to judge/complete the fused product senses.

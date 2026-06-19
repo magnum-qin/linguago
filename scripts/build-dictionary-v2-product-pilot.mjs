@@ -5,6 +5,29 @@ import path from "node:path";
 const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
 const DEFAULT_OUT_DB = "data/processed/linguago_v2_product_top5000_pilot.db";
 const LANGS = ["zh", "en", "pt-BR", "ja"];
+const RISKY_FREEDICT_SHORT_GLOSSES = new Set([
+  "a",
+  "an",
+  "the",
+  "of",
+  "at",
+  "by",
+  "as",
+  "if",
+  "in",
+  "on",
+  "or",
+  "to",
+  "no",
+  "it",
+  "us",
+  "he",
+  "we",
+  "my",
+  "her",
+  "his",
+  "its"
+]);
 
 const args = parseArgs(process.argv.slice(2));
 const sourceDbPath = path.resolve(args.db || DEFAULT_SOURCE_DB);
@@ -82,6 +105,7 @@ const stats = {
   max_senses_per_source_entry: maxSensesPerSourceEntry,
   source_senses_scanned: sourceRows.length,
   skipped_profile: 0,
+  skipped_risky_freedict: 0,
   skipped_no_group_key: 0,
   grouped_source_senses: 0,
   product_entries: 0,
@@ -94,6 +118,10 @@ const stats = {
 for (const row of sourceRows) {
   if (!matchesProductProfile(row)) {
     stats.skipped_profile++;
+    continue;
+  }
+  if (isRiskyFreeDictRow(row)) {
+    stats.skipped_risky_freedict++;
     continue;
   }
   const group = buildGroupKey(row, topEnglishEntries);
@@ -569,6 +597,15 @@ function matchesProductProfile(row) {
   if (row.source_lang === "zh") return /^[\u3400-\u9fff]{1,8}$/u.test(word);
   if (row.source_lang === "ja") return /^[\u3040-\u30ff\u3400-\u9fff]{1,12}$/u.test(word);
   if (row.source_lang === "pt-BR") return /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ-]{1,31}$/u.test(word);
+  return false;
+}
+
+function isRiskyFreeDictRow(row) {
+  if (!String(row.source || "").startsWith("freedict-")) return false;
+  const glossSignature = normalizeGlossSignature(row.gloss_key);
+  if (!glossSignature) return true;
+  if (RISKY_FREEDICT_SHORT_GLOSSES.has(glossSignature)) return true;
+  if (row.source_lang === "pt-BR" && row.frequency_rank <= 5000 && glossSignature.length <= 3) return true;
   return false;
 }
 
