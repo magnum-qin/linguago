@@ -44,6 +44,7 @@
     "dict:v2:promote:product-complete-senses": "node scripts/promote-dictionary-v2-product-complete-senses.mjs",
     "dict:v2:complete:product-audit-samples": "node scripts/complete-dictionary-v2-product-audit-samples.mjs",
     "dict:v2:repair:product-needs-review-localizations": "node scripts/repair-dictionary-v2-product-needs-review-localizations.mjs",
+    "dict:v2:supplement:product-polyphones": "node scripts/supplement-dictionary-v2-product-polyphones.mjs",
     "dict:v2:repair:product-quality-warnings": "node scripts/repair-dictionary-v2-product-quality-warnings.mjs",
     "dict:v2:merge:senses": "node scripts/merge-dictionary-v2-senses.mjs",
     "dict:v2:create-llm-jobs": "node scripts/create-dictionary-v2-llm-jobs.mjs",

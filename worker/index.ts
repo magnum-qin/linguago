@@ -115,6 +115,31 @@ async function handleTranslate(
     validateInputLength(text);
     await assertRateLimit(request, env, ctx);
 
+    const dictionaryCacheKey = await buildDictionaryCacheKey(text, sourceLang, targetLang);
+    const dictionaryCached = await env.CACHE.get<TranslateResponse>(dictionaryCacheKey, "json");
+    if (dictionaryCached && dictionaryCached.type === "word" && dictionaryCached.provider === "dictionary") {
+      const isLegacyWordCache = !dictionaryCached.senses || dictionaryCached.senses.length === 0;
+      if (!isLegacyWordCache) {
+        return json({ ...dictionaryCached, cached: true });
+      }
+      console.log(`Ignoring legacy dictionary cache for ${text}`);
+    }
+
+    const dictionaryResponse = await lookupDictionaryFirst({
+      env,
+      text,
+      targetLang
+    });
+
+    if (dictionaryResponse) {
+      ctx.waitUntil(
+        env.CACHE.put(dictionaryCacheKey, JSON.stringify(dictionaryResponse), {
+          expirationTtl: 60 * 60 * 24 * 30
+        })
+      );
+      return json(dictionaryResponse);
+    }
+
     const selected = selectProvider(env, provider, requestedModel);
     const cacheKey = await buildCacheKey(
       text,
@@ -131,21 +156,6 @@ async function handleTranslate(
         return json({ ...cached, cached: true });
       }
       console.log(`Ignoring legacy cache for ${text}`);
-    }
-
-    const dictionaryResponse = await lookupDictionaryFirst({
-      env,
-      text,
-      targetLang
-    });
-
-    if (dictionaryResponse) {
-      ctx.waitUntil(
-        env.CACHE.put(cacheKey, JSON.stringify(dictionaryResponse), {
-          expirationTtl: 60 * 60 * 24 * 30
-        })
-      );
-      return json(dictionaryResponse);
     }
 
     const providerResult = await translateWithProviderFallback({
@@ -238,6 +248,37 @@ async function handleTranslateStream(
 
         send("status", { stage: "started" });
 
+        const dictionaryCacheKey = await buildDictionaryCacheKey(text, sourceLang, targetLang);
+        const dictionaryCached = await env.CACHE.get<TranslateResponse>(dictionaryCacheKey, "json");
+        if (dictionaryCached && dictionaryCached.type === "word" && dictionaryCached.provider === "dictionary") {
+          const isLegacyWordCache = !dictionaryCached.senses || dictionaryCached.senses.length === 0;
+          if (!isLegacyWordCache) {
+            send("final", { ...dictionaryCached, cached: true });
+            send("done", { ok: true });
+            controller.close();
+            return;
+          }
+          console.log(`Ignoring legacy dictionary cache for ${text} in stream`);
+        }
+
+        const dictionaryResponse = await lookupDictionaryFirst({
+          env,
+          text,
+          targetLang
+        });
+
+        if (dictionaryResponse) {
+          ctx.waitUntil(
+            env.CACHE.put(dictionaryCacheKey, JSON.stringify(dictionaryResponse), {
+              expirationTtl: 60 * 60 * 24 * 30
+            })
+          );
+          send("final", dictionaryResponse);
+          send("done", { ok: true });
+          controller.close();
+          return;
+        }
+
         const selected = selectProvider(env, provider, requestedModel);
         const cacheKey = await buildCacheKey(
           text,
@@ -257,24 +298,6 @@ async function handleTranslateStream(
             return;
           }
           console.log(`Ignoring legacy cache for ${text} in stream`);
-        }
-
-        const dictionaryResponse = await lookupDictionaryFirst({
-          env,
-          text,
-          targetLang
-        });
-
-        if (dictionaryResponse) {
-          ctx.waitUntil(
-            env.CACHE.put(cacheKey, JSON.stringify(dictionaryResponse), {
-              expirationTtl: 60 * 60 * 24 * 30
-            })
-          );
-          send("final", dictionaryResponse);
-          send("done", { ok: true });
-          controller.close();
-          return;
         }
 
         send("status", {
@@ -746,6 +769,18 @@ async function buildCacheKey(
   model: string
 ): Promise<string> {
   const normalized = `${TRANSLATION_CACHE_VERSION}::${provider}::${model}::${text.toLowerCase()}::${sourceLang ?? "auto"}::${targetLang}`;
+  const data = new TextEncoder().encode(normalized);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  const bytes = Array.from(new Uint8Array(digest));
+  return bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function buildDictionaryCacheKey(
+  text: string,
+  sourceLang: TranslateRequest["source_lang"],
+  targetLang: LanguageCode
+): Promise<string> {
+  const normalized = `${TRANSLATION_CACHE_VERSION}::dictionary::v2::${text.toLowerCase()}::${sourceLang ?? "auto"}::${targetLang}`;
   const data = new TextEncoder().encode(normalized);
   const digest = await crypto.subtle.digest("SHA-256", data);
   const bytes = Array.from(new Uint8Array(digest));

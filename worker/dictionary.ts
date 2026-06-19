@@ -6,6 +6,7 @@ import type {
   LocalizedText,
   WordExample,
   WordDetail,
+  WordPronunciationGroup,
   WordResponse,
   WordSense
 } from "./types";
@@ -24,41 +25,60 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
     if (!input.env.DB) return null;
 
     const normalized = normalizeDictionaryKey(input.text);
+    const preferredSourceLang = preferredDictionarySourceLang(input.text, input.targetLang);
 
     try {
       const sql = `
         WITH matched_entries AS (
           SELECT id, matched_lang
           FROM (
-            SELECT e.id, e.source_lang AS matched_lang, 0 AS match_rank, e.frequency_rank
+            SELECT e.id, e.source_lang, e.source_lang AS matched_lang, 0 AS match_rank, e.frequency_rank
             FROM v2_entries e
             WHERE e.normalized_key = ? OR lower(e.word) = ?
             UNION
-            SELECT e.id, ef.lang AS matched_lang, 1 AS match_rank, e.frequency_rank
+            SELECT e.id, e.source_lang, ef.lang AS matched_lang, 1 AS match_rank, e.frequency_rank
             FROM v2_entries e
             JOIN v2_entry_forms ef ON ef.entry_id = e.id
             WHERE ef.normalized_form = ?
             UNION
-            SELECT e.id, sl.lang AS matched_lang, 2 AS match_rank, e.frequency_rank
+            SELECT e.id, e.source_lang, sl.lang AS matched_lang, 2 AS match_rank, e.frequency_rank
             FROM v2_entries e
             JOIN v2_senses s_match ON s_match.entry_id = e.id
             JOIN v2_sense_localizations sl ON sl.sense_id = s_match.id
             WHERE lower(sl.term) = ? OR sl.normalized_term = ?
           )
-          ORDER BY match_rank, frequency_rank IS NULL, frequency_rank, id
+          ORDER BY
+            match_rank,
+            CASE WHEN source_lang = ? THEN 0 ELSE 1 END,
+            CASE WHEN matched_lang = ? THEN 0 ELSE 1 END,
+            frequency_rank IS NULL,
+            frequency_rank,
+            id
           LIMIT 1
+        ),
+        base_entry AS (
+          SELECT e.*, me.matched_lang
+          FROM v2_entries e
+          JOIN matched_entries me ON me.id = e.id
+        ),
+        selected_entries AS (
+          SELECT e2.id
+          FROM v2_entries e2
+          CROSS JOIN base_entry b
+          WHERE e2.normalized_key = b.normalized_key
+            AND e2.source_lang = b.source_lang
         )
         SELECT json_object(
           'id', e.id,
           'word', e.word,
           'normalized_key', e.normalized_key,
           'source_lang', e.source_lang,
-          'matched_lang', me.matched_lang,
+          'matched_lang', e.matched_lang,
           'frequency_rank', e.frequency_rank,
           'senses', (
             SELECT json_group_array(json_object(
               'id', s.id,
-              'sense_order', s.sense_order,
+              'sense_order', s.publish_sense_order,
               'part_of_speech', s.part_of_speech,
               'domain', s.domain,
               'register_label', s.register_label,
@@ -105,13 +125,20 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
             ))
             FROM (
               SELECT s.*,
+                ROW_NUMBER() OVER (
+                  ORDER BY
+                    COALESCE(g.display_order, s.sense_order),
+                    s.sense_order,
+                    s.id
+                ) AS publish_sense_order,
+                COALESCE(g.display_order, s.sense_order) AS group_display_order,
                 g.lang AS group_lang,
                 g.reading AS group_reading,
                 g.reading_key AS group_reading_key,
                 g.reading_system AS group_reading_system
               FROM v2_senses s
               LEFT JOIN v2_pronunciation_groups g ON g.id=s.pronunciation_group_id
-              WHERE s.entry_id = e.id
+              WHERE s.entry_id IN (SELECT id FROM selected_entries)
               ORDER BY
                 CASE WHEN EXISTS (
                   SELECT 1
@@ -119,25 +146,38 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
                   WHERE sl_order.sense_id = s.id
                     AND (lower(sl_order.term) = ? OR sl_order.normalized_term = ?)
                 ) THEN 0 ELSE 1 END,
-                s.sense_order
+                COALESCE(g.display_order, s.sense_order),
+                s.sense_order,
+                s.id
               LIMIT 8
             ) s
           )
         ) AS data
-        FROM v2_entries e
-        JOIN matched_entries me ON me.id = e.id
+        FROM base_entry e
         ORDER BY e.frequency_rank IS NULL, e.frequency_rank, e.id
         LIMIT 1
       `;
 
       const row = await input.env.DB.prepare(sql)
-        .bind(normalized, normalized, normalized, normalized, normalized, normalized, normalized)
+        .bind(
+          normalized,
+          normalized,
+          normalized,
+          normalized,
+          normalized,
+          preferredSourceLang,
+          preferredSourceLang,
+          normalized,
+          normalized
+        )
         .first<{ data: string }>();
 
       if (!row?.data) return null;
       const entry = parseJsonValue(row.data) as Record<string, unknown>;
-      const senses = Array.isArray(entry.senses) ? entry.senses : [];
+      const parsedSenses = parseJsonValue(entry.senses);
+      const senses = Array.isArray(parsedSenses) ? parsedSenses : [];
       if (senses.length === 0) return null;
+      entry.senses = senses;
 
       console.log("D1 v2 Dictionary hit for", input.text);
       return v2DictionaryEntryToResponse(entry, input.text, input.targetLang);
@@ -464,10 +504,12 @@ function v2DictionaryEntryToResponse(
   original: string,
   targetLang: LanguageCode
 ): WordResponse {
-  const rawSenses = Array.isArray(entry.senses) ? (entry.senses as Array<Record<string, unknown>>) : [];
+  const parsedSenses = parseJsonValue(entry.senses);
+  const rawSenses = Array.isArray(parsedSenses) ? (parsedSenses as Array<Record<string, unknown>>) : [];
   const senses = rawSenses.map((sense, index) => normalizeV2Sense(sense, index));
   const firstSense = senses[0] || null;
   const translations = v2PrimaryTranslations(senses);
+  const pronunciationGroups = v2PronunciationGroups(senses, String(entry.word || original));
   const targetText =
     translations[targetLang]?.text ||
     translations[String(entry.source_lang || "en") as LanguageCode]?.text ||
@@ -490,6 +532,7 @@ function v2DictionaryEntryToResponse(
     audio_text: translations[String(entry.matched_lang || entry.source_lang || "en") as LanguageCode]?.audio_text || String(entry.word || original),
     examples,
     senses,
+    pronunciation_groups: pronunciationGroups,
     word_details: {
       zh: dictionaryWordDetail(translations.zh?.text, firstSense?.definitions.zh),
       en: dictionaryWordDetail(translations.en?.text, firstSense?.definitions.en),
@@ -497,6 +540,34 @@ function v2DictionaryEntryToResponse(
       ja: dictionaryWordDetail(translations.ja?.text, firstSense?.definitions.ja)
     }
   };
+}
+
+function v2PronunciationGroups(senses: V2WordSense[], headword: string): WordPronunciationGroup[] {
+  const groups: WordPronunciationGroup[] = [];
+  const groupIndex = new Map<string, WordPronunciationGroup>();
+  const ungroupedKey = "__ungrouped";
+
+  for (const sense of senses) {
+    const group = sense.pronunciation_group;
+    const key = group?.reading_key || group?.reading || ungroupedKey;
+    let item = groupIndex.get(key);
+    if (!item) {
+      item = {
+        lang: group?.lang || "",
+        reading: group?.reading || "",
+        reading_key: group?.reading_key || key,
+        reading_system: group?.reading_system || "",
+        group_order: groups.length + 1,
+        audio_text: headword,
+        senses: []
+      };
+      groupIndex.set(key, item);
+      groups.push(item);
+    }
+    item.senses.push(sense);
+  }
+
+  return groups;
 }
 
 function normalizeV2Sense(sense: Record<string, unknown>, index: number): V2WordSense {
@@ -751,4 +822,12 @@ function isDictionaryLookupCandidate(text: string): boolean {
 
 function normalizeDictionaryKey(value: string): string {
   return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+}
+
+function preferredDictionarySourceLang(text: string, targetLang: LanguageCode): LanguageCode {
+  const value = String(text || "");
+  if (/[\u3040-\u30ff]/u.test(value)) return "ja";
+  if (/[\u4e00-\u9fff]/u.test(value)) return "zh";
+  if (/[ãõáàâêéíóôúç]/iu.test(value)) return "pt-BR";
+  return targetLang === "pt-BR" ? "pt-BR" : "en";
 }

@@ -100,13 +100,33 @@ const currentWordDetail = computed(() => {
 });
 
 const currentSenses = computed(() => {
-  if (!resultData.value || !resultData.value.senses) return [];
-  return resultData.value.senses.filter((s: any) => senseDefinition(s, activeLang.value));
+  if (!resultData.value) return [];
+  const groupedSenses = Array.isArray(resultData.value.pronunciation_groups)
+    ? resultData.value.pronunciation_groups.flatMap((group: any) => Array.isArray(group.senses) ? group.senses : [])
+    : [];
+  const source = groupedSenses.length > 0 ? groupedSenses : (resultData.value.senses || []);
+  return source.filter((s: any) => senseDefinition(s, activeLang.value));
 });
 
 const currentSenseGroups = computed(() => {
   const groups: Array<{ key: string; label: string; system: string; senses: any[] }> = [];
   const index = new Map<string, { key: string; label: string; system: string; senses: any[] }>();
+
+  if (resultData.value && Array.isArray(resultData.value.pronunciation_groups)) {
+    for (const group of resultData.value.pronunciation_groups) {
+      const senses = Array.isArray(group.senses)
+        ? group.senses.filter((sense: any) => senseDefinition(sense, activeLang.value))
+        : [];
+      if (senses.length === 0) continue;
+      groups.push({
+        key: group.reading_key || group.reading || `group-${groups.length + 1}`,
+        label: group.reading || '',
+        system: group.reading_system || '',
+        senses
+      });
+    }
+    if (groups.length > 0) return groups;
+  }
 
   for (const sense of currentSenses.value) {
     const reading = senseReading(sense, activeLang.value);
@@ -392,7 +412,7 @@ const submitReport = async () => {
                       <span v-if="group.system" class="text-[0.62rem] uppercase tracking-widest opacity-70">{{ group.system }}</span>
                     </span>
                   </div>
-                  <div v-for="sense in group.senses" :key="sense.sense_order" class="py-4">
+                  <div v-for="sense in group.senses" :key="`${group.key}-${sense.sense_order}-${sense.gloss_key}`" class="py-4">
                     <div class="flex gap-4 items-start">
                       <span class="flex items-center justify-center w-[26px] h-[26px] rounded-[8px] bg-m3-primary/10 text-m3-primary text-[0.85rem] font-black shrink-0 mt-1">{{ sense.sense_order }}</span>
                       <div class="flex flex-col gap-1.5 w-full pt-0.5">

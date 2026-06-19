@@ -59,12 +59,7 @@ export interface WordSense {
   sense_order: number;
   part_of_speech: string;
   gloss_key: string;
-  pronunciation_group?: {
-    lang: string;
-    reading: string;
-    reading_key: string;
-    reading_system: string;
-  };
+  pronunciation_group?: PronunciationGroupSummary;
   definitions: Record<DisplayLanguageCode, string>;
   domain?: string;
   register_label?: string;
@@ -77,6 +72,19 @@ export interface WordSense {
     definition: string;
     usage_note: string;
   }>>;
+}
+
+export interface PronunciationGroupSummary {
+  lang: string;
+  reading: string;
+  reading_key: string;
+  reading_system: string;
+}
+
+export interface WordPronunciationGroup extends PronunciationGroupSummary {
+  group_order: number;
+  audio_text: string;
+  senses: WordSense[];
 }
 
 export interface BaseResponse {
@@ -97,6 +105,13 @@ export interface WordResponse extends BaseResponse {
   examples: WordExample[];
   word_details: Record<DisplayLanguageCode, WordDetail>;
   senses?: WordSense[];
+  pronunciation_groups?: WordPronunciationGroup[];
+  related_entries?: Array<{
+    headword: string;
+    source_lang: string;
+    reading?: string;
+    summary?: string;
+  }>;
 }
 
 export interface SentenceResponse extends BaseResponse {
