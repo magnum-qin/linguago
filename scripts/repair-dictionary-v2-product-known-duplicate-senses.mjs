@@ -16,7 +16,7 @@ const merges = [
     headword: "箱",
     primary_lang: "ja",
     keep_gloss_key: "box",
-    remove_gloss_key: "Container sense"
+    remove_gloss_key: "shamisen case"
   }
 ];
 
@@ -50,8 +50,20 @@ const statements = {
   updateEntryStatus: db.prepare(`
     UPDATE product_entries
     SET status = @status,
-        source_count = (SELECT COUNT(*) FROM product_sense_source_links WHERE product_sense_id IN (SELECT id FROM product_senses WHERE product_entry_id = @entry_id)),
-        lang_count = (SELECT COUNT(DISTINCT lang) FROM product_localizations WHERE product_sense_id IN (SELECT id FROM product_senses WHERE product_entry_id = @entry_id))
+        source_count = (
+          SELECT COUNT(*)
+          FROM product_sense_source_links
+          WHERE product_sense_id IN (
+            SELECT id FROM product_senses WHERE product_entry_id = @entry_id
+          )
+        ),
+        lang_count = (
+          SELECT COUNT(DISTINCT lang)
+          FROM product_localizations
+          WHERE product_sense_id IN (
+            SELECT id FROM product_senses WHERE product_entry_id = @entry_id
+          )
+        )
     WHERE id = @entry_id
   `)
 };
@@ -63,6 +75,7 @@ const stats = {
   source_links_moved: 0,
   source_links_deleted: 0,
   localizations_deleted: 0,
+  example_localizations_deleted: 0,
   examples_deleted: 0,
   senses_deleted: 0,
   missing: []
@@ -93,8 +106,8 @@ db.transaction(() => {
     stats.localizations_deleted += locResult.changes;
     const exLocResult = statements.deleteExampleLocalizations.run(remove.id);
     const exResult = statements.deleteExamples.run(remove.id);
+    stats.example_localizations_deleted += exLocResult.changes;
     stats.examples_deleted += exResult.changes;
-    stats.example_localizations_deleted = (stats.example_localizations_deleted || 0) + exLocResult.changes;
     const senseResult = statements.deleteSense.run(remove.id);
     stats.senses_deleted += senseResult.changes;
 
@@ -109,8 +122,8 @@ console.log(JSON.stringify(stats, null, 2));
 
 function renumberSenses(entryId) {
   const senses = statements.sensesForEntry.all(entryId);
-  for (let i = 0; i < senses.length; i++) {
-    statements.setSenseOrder.run(i + 1, senses[i].id);
+  for (let index = 0; index < senses.length; index++) {
+    statements.setSenseOrder.run(index + 1, senses[index].id);
   }
 }
 
@@ -128,13 +141,13 @@ function updateEntry(entryId) {
 
 function parseArgs(argv) {
   const output = {};
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index];
     if (!arg.startsWith("--")) continue;
     const key = arg.slice(2);
-    const next = argv[i + 1];
+    const next = argv[index + 1];
     output[key] = next && !next.startsWith("--") ? next : "1";
-    if (next && !next.startsWith("--")) i++;
+    if (next && !next.startsWith("--")) index++;
   }
   return output;
 }

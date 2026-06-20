@@ -22,6 +22,7 @@ const streamResponse = args.stream === "true";
 const dryRun = args["dry-run"] === "true";
 const prewarm = args.prewarm !== "false";
 const retryNeedsReview = args["retry-needs-review"] === "true";
+const quiet = args.quiet === "true";
 const targetLangs = String(args["target-langs"] || "")
   .split(",")
   .map((lang) => lang.trim())
@@ -162,7 +163,7 @@ for (const job of jobs) {
     const claim = statements.markRunning.run(job.id);
     if (claim.changes === 0) {
       stats.skipped_claimed++;
-      console.log(`[skipped] job=${job.id} already claimed`);
+      if (!quiet) console.log(`[skipped] job=${job.id} already claimed`);
       continue;
     }
   }
@@ -181,16 +182,18 @@ for (const job of jobs) {
     }
 
     stats[status]++;
-    console.log(
-      `[${status}] job=${job.id} sense=${job.target_id} lang=${job.lang} entry=${input.product_entry?.headword} seconds=${seconds} score=${validation.score}/${validation.max_score}`
-    );
-    if (validation.errors.length) console.log(`  errors: ${validation.errors.join("; ")}`);
+    if (!quiet) {
+      console.log(
+        `[${status}] job=${job.id} sense=${job.target_id} lang=${job.lang} entry=${input.product_entry?.headword} seconds=${seconds} score=${validation.score}/${validation.max_score}`
+      );
+      if (validation.errors.length) console.log(`  errors: ${validation.errors.join("; ")}`);
+    }
   } catch (error) {
     stats.failed++;
     const cause = error.cause?.code || error.cause?.message;
     const message = `${error.name || "Error"}: ${error.message || String(error)}${cause ? ` (${cause})` : ""}`;
     if (!dryRun) statements.markDone.run("failed", null, message, job.id);
-    console.log(`[failed] job=${job.id} sense=${job.target_id} lang=${job.lang}: ${message}`);
+    if (!quiet) console.log(`[failed] job=${job.id} sense=${job.target_id} lang=${job.lang}: ${message}`);
   }
 }
 
@@ -326,10 +329,7 @@ async function callOllama(input) {
         stream: streamResponse,
         think: false,
         keep_alive: "20m",
-        format:
-          input.task === "repair_product_sense_localization_quality_warning"
-            ? "json"
-            : outputSchema(input.target_lang),
+        format: outputSchema(input.target_lang),
         messages: [
           {
             role: "system",
@@ -360,10 +360,10 @@ async function callOllama(input) {
         options: {
           temperature: 0,
           top_p: 0.8,
-          num_ctx: input.task === "repair_product_sense_localization_quality_warning" ? 1024 : 4096,
+          num_ctx: input.task === "repair_product_sense_localization_quality_warning" ? 2048 : 4096,
           num_predict:
             input.task === "repair_product_sense_localization_quality_warning"
-              ? Math.min(maxTokens, 260)
+              ? Math.min(maxTokens, 420)
               : maxTokens
         }
       })
@@ -429,14 +429,28 @@ function buildPrompt(input) {
     const sense = input.product_sense || {};
     const targetRule =
       input.target_lang === "zh"
-        ? "Use Simplified Chinese. The term must not contain Japanese kana. Use pinyin reading."
+        ? "Use Simplified Chinese. The term must contain Chinese characters, must not contain Japanese kana, and must not be a Latin-script source word. Use pinyin reading."
         : input.target_lang === "ja"
-          ? "Use natural Japanese. The term should not be plain English unless it is an official acronym or proper name. Use kana reading."
-          : "Use the target language naturally.";
+          ? "Use natural Japanese. The term must contain kana or kanji and must not be a plain Latin-script English/Portuguese source word unless it is an official acronym or proper name. Use kana reading."
+          : input.target_lang === "pt-BR"
+            ? "Use natural Brazilian Portuguese. The term must not contain Chinese or Japanese characters. Include a matching Portuguese pronunciation."
+            : "Use the target language naturally. Include a matching pronunciation.";
+    const readingValue =
+      input.target_lang === "zh" || input.target_lang === "ja" ? '"..."' : "null";
+    const readingSystemValue =
+      input.target_lang === "zh" ? '"pinyin"' : input.target_lang === "ja" ? '"kana"' : "null";
+    const pronunciationValue =
+      input.target_lang === "en" || input.target_lang === "pt-BR" ? '"..."' : "null";
+    const pronunciationSystemValue =
+      input.target_lang === "en" || input.target_lang === "pt-BR" ? '"IPA"' : "null";
 
     return `Repair one dictionary localization.
 Target language: ${input.target_lang}
 Rule: ${targetRule}
+The current term/definition below is bad output to repair. Do not copy an English current definition into zh or ja.
+Translate the meaning into the target language's definition field. The definition must be a short dictionary explanation written in the target language.
+If the validation error says "term language looks suspicious", treat Current bad term as invalid and do not reuse it unchanged.
+If the current term is already a good target-language term, keep the term and only fix the reading or definition.
 Entry headword: ${entry.headword}
 Entry language: ${entry.primary_lang}
 Part of speech: ${sense.part_of_speech || ""}
@@ -444,16 +458,18 @@ Sense gloss: ${sense.gloss_key}
 Current bad term: ${current.current_term || known.term || ""}
 Current reading: ${current.current_reading || known.reading || ""}
 Current definition: ${current.current_definition || known.definition || ""}
+Validation error to fix: ${current.validation_error || current.code || ""}
+Specific instruction: ${current.instruction || ""}
 
 Return exactly this JSON shape:
 {
   "sense_localization": {
     "lang": "${input.target_lang}",
     "term": "...",
-    "reading": "...",
-    "reading_system": "${input.target_lang === "zh" ? "pinyin" : input.target_lang === "ja" ? "kana" : ""}",
-    "pronunciation": null,
-    "pronunciation_system": null,
+    "reading": ${readingValue},
+    "reading_system": ${readingSystemValue},
+    "pronunciation": ${pronunciationValue},
+    "pronunciation_system": ${pronunciationSystemValue},
     "definition": "..."
   },
   "example_localizations": []
