@@ -100,7 +100,19 @@ db.close();
 
 function simplify(value) {
   if (value === null || value === undefined) return value;
-  return converter(String(value));
+  return normalizeMainlandParticles(converter(String(value)));
+}
+
+function normalizeMainlandParticles(value) {
+  return String(value)
+    .replaceAll("什幺", "什么")
+    .replaceAll("为什幺", "为什么")
+    .replaceAll("那幺", "那么")
+    .replaceAll("这幺", "这么")
+    .replaceAll("怎幺", "怎么")
+    .replaceAll("多幺", "多么")
+    .replace(/幺([？?])/gu, "吗$1")
+    .replace(/幺([，,。.!！\s]|$)/gu, "么$1");
 }
 
 function parseArgs(argv) {

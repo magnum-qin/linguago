@@ -1,10 +1,13 @@
 param(
-  [string]$DbPath = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db",
-  [string]$OutDir = "outputs/d1-v2-product-native-export",
+  [string]$DbPath = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db",
+  [string]$OutDir = "outputs/d1-v2-product-native-export-latest",
   [string]$DatabaseName = "linguago-dictionary",
   [switch]$SkipPush,
-  [switch]$SkipOnlineUi,
-  [switch]$SkipTypecheck
+  [switch]$SkipDeploy,
+  [switch]$SkipOnlineChecks,
+  [switch]$SkipTypecheck,
+  [switch]$SkipSimplifyZhExamples,
+  [string]$AuditSamples = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,21 +27,30 @@ function Invoke-Step {
 }
 
 Set-Location $root
-
-Invoke-Step "Clean duplicate product examples" {
-  & npm.cmd run dict:v2:clean:product-examples
+if ([string]::IsNullOrWhiteSpace($AuditSamples)) {
+  $AuditSamples = "hello,$([char]0x4F60)$([char]0x597D),$([char]0x4E2D),although,breaks,cor"
 }
 
-Invoke-Step "Repair deterministic product quality warnings" {
-  & npm.cmd run dict:v2:repair:product-quality-warnings
+if (-not $SkipSimplifyZhExamples) {
+  Invoke-Step "Simplify Chinese product examples" {
+    & node scripts/simplify-dictionary-v2-product-zh-examples.mjs --db $DbPath
+  }
+}
+
+Invoke-Step "Product dictionary regression check" {
+  & node scripts/dictionary-v2-product-regression-check.mjs --db $DbPath
+}
+
+Invoke-Step "Product candidate report" {
+  & node scripts/report-dictionary-v2-product-candidate.mjs --db $DbPath
 }
 
 Invoke-Step "Export product D1 native SQL" {
-  & npm.cmd run dict:v2:export:product-d1-native
+  & node scripts/export-dictionary-v2-product-native-d1-sql.mjs --db $DbPath --out-dir $OutDir
 }
 
-Invoke-Step "Audit product D1 native export" {
-  & npm.cmd run dict:v2:audit:product-export
+Invoke-Step "Fast audit product D1 native export" {
+  & node scripts/audit-dictionary-v2-product-export-fast.mjs --out-dir $OutDir --samples $AuditSamples
 }
 
 if (-not $SkipTypecheck) {
@@ -53,11 +65,21 @@ if (-not $SkipPush) {
   }
 }
 
-if (-not $SkipOnlineUi) {
-  Invoke-Step "Online UI smoke" {
-    & npm.cmd run check:online-ui
+if (-not $SkipDeploy) {
+  Invoke-Step "Deploy Worker" {
+    & npm.cmd run deploy
+  }
+}
+
+if (-not $SkipOnlineChecks) {
+  Invoke-Step "Online dictionary API focused check" {
+    & node scripts/online-dictionary-focused-check.mjs
+  }
+
+  Invoke-Step "Online dictionary render focused check" {
+    & node scripts/online-dictionary-render-focused-check.mjs
   }
 }
 
 Write-Host ""
-Write-Host "Product D1 release pipeline complete."
+Write-Host "Product D1 release preflight complete."
