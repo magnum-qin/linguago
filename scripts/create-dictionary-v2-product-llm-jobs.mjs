@@ -28,6 +28,11 @@ const targetLangs = String(args["target-langs"] || LANGS.join(","))
   .split(",")
   .map((lang) => lang.trim())
   .filter(Boolean);
+const senseIds = String(args["sense-ids"] || "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean)
+  .map((id) => Number(id));
 
 for (const lang of targetLangs) {
   if (!LANGS.includes(lang)) throw new Error(`Unknown target language: ${lang}`);
@@ -38,8 +43,12 @@ for (const status of sourceStatuses) {
     throw new Error(`Unknown source status: ${status}`);
   }
 }
+for (const senseId of senseIds) {
+  if (!Number.isInteger(senseId) || senseId < 1) throw new Error(`Invalid --sense-ids value: ${senseId}`);
+}
 const targetLangCte = targetLangs.map((_, index) => (index === 0 ? "SELECT ? AS lang" : "UNION ALL SELECT ?")).join(" ");
 const sourceStatusClause = sourceStatuses.map(() => "?").join(", ");
+const senseIdClause = senseIds.length ? `AND ps.id IN (${senseIds.map(() => "?").join(", ")})` : "";
 
 const db = new Database(dbPath);
 db.pragma("foreign_keys = ON");
@@ -55,6 +64,7 @@ const statements = {
     CROSS JOIN target_langs tl
     LEFT JOIN product_localizations pl ON pl.product_sense_id = ps.id AND pl.lang = tl.lang
     WHERE ps.status IN (${sourceStatusClause})
+      ${senseIdClause}
       AND ${repairNeedsReview ? "pl.id IS NOT NULL AND pl.needs_review = 1" : "pl.id IS NULL"}
       AND (
         ? = 0
@@ -156,6 +166,7 @@ const candidates = limit
   ? statements.candidates.all(
       ...targetLangs,
       ...sourceStatuses,
+      ...senseIds,
       completeOnly ? 1 : 0,
       excludeReviewLocalizations ? 1 : 0,
       limit
@@ -163,6 +174,7 @@ const candidates = limit
   : statements.candidates.all(
       ...targetLangs,
       ...sourceStatuses,
+      ...senseIds,
       completeOnly ? 1 : 0,
       excludeReviewLocalizations ? 1 : 0
     );
@@ -224,6 +236,7 @@ console.log(
       prompt_version: promptVersion,
       target_langs: targetLangs,
       source_statuses: sourceStatuses,
+      sense_ids: senseIds,
       stats,
       queued_by_lang: queuedByLang
     },
