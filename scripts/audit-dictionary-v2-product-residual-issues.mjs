@@ -11,6 +11,9 @@ if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath, { readonly: true });
 db.pragma("busy_timeout = 30000");
+const hasPublicationBlocks = Boolean(
+  db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'product_sense_publication_blocks'").get()
+);
 
 const jobs = db
   .prepare(
@@ -31,12 +34,22 @@ const jobs = db
       ps.sense_order,
       ps.part_of_speech,
       ps.gloss_key,
-      ps.status AS sense_status
+      ps.status AS sense_status,
+      ${hasPublicationBlocks ? "b.block_code" : "NULL AS block_code"}
     FROM product_llm_completion_jobs j
     JOIN product_senses ps ON ps.id = j.target_id
     JOIN product_entries pe ON pe.id = ps.product_entry_id
+    ${hasPublicationBlocks ? "LEFT JOIN product_sense_publication_blocks b ON b.product_sense_id = ps.id" : ""}
     WHERE j.status IN ('failed', 'needs_review')
       AND j.target_type = 'product_sense_localization'
+      AND ps.status IN ('needs_review', 'ready_for_llm')
+      AND j.id = (
+        SELECT MAX(j2.id)
+        FROM product_llm_completion_jobs j2
+        WHERE j2.target_type = j.target_type
+          AND j2.target_id = j.target_id
+          AND j2.lang = j.lang
+      )
     ORDER BY j.status, j.lang, j.id
   `
   )
@@ -54,6 +67,7 @@ const senseRows = db
       ps.part_of_speech,
       ps.gloss_key,
       ps.status,
+      ${hasPublicationBlocks ? "b.block_code" : "NULL AS block_code"},
       (
         SELECT COUNT(DISTINCT pl.lang)
         FROM product_localizations pl
@@ -62,6 +76,7 @@ const senseRows = db
       ) AS clean_langs
     FROM product_senses ps
     JOIN product_entries pe ON pe.id = ps.product_entry_id
+    ${hasPublicationBlocks ? "LEFT JOIN product_sense_publication_blocks b ON b.product_sense_id = ps.id" : ""}
     WHERE ps.status IN ('needs_review', 'ready_for_llm')
     ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.headword, ps.sense_order
   `
@@ -69,25 +84,16 @@ const senseRows = db
   .all();
 
 const jobBuckets = new Map();
+const blockedJobBuckets = new Map();
 for (const row of jobs) {
   const parsed = parseJobOutput(row.output_json);
+  if (row.block_code) {
+    pushBucket(blockedJobBuckets, "blocked_publication_job", buildJobSample(row, parsed));
+    continue;
+  }
+
   const bucket = classifyJob(row, parsed);
-  pushBucket(jobBuckets, bucket, {
-    job_id: row.id,
-    target_id: row.target_id,
-    lang: row.lang,
-    status: row.status,
-    prompt_version: row.prompt_version,
-    error: row.error,
-    headword: row.headword,
-    primary_lang: row.primary_lang,
-    frequency_rank: row.frequency_rank,
-    sense_order: row.sense_order,
-    part_of_speech: row.part_of_speech,
-    gloss_key: abbreviate(row.gloss_key, 180),
-    output_term: abbreviate(parsed.localization?.term, 120),
-    output_definition: abbreviate(parsed.localization?.definition, 180)
-  });
+  pushBucket(jobBuckets, bucket, buildJobSample(row, parsed));
 }
 
 const senseBuckets = new Map();
@@ -109,13 +115,9 @@ for (const row of senseRows) {
 const result = {
   db: path.relative(process.cwd(), dbPath),
   job_issues: summarizeBuckets(jobBuckets, sampleLimit),
+  blocked_publication_jobs: summarizeBuckets(blockedJobBuckets, sampleLimit),
   sense_issues: summarizeBuckets(senseBuckets, sampleLimit),
-  recommended_next_steps: [
-    "rule-repair source_leak_term when a reliable target term can be extracted from existing clean localizations",
-    "create a stricter retry prompt for json_parse_failed jobs only",
-    "mark variant_or_cross_reference_only senses as non-publishable when they have no stable lexical equivalent",
-    "rerun regression and D1 export after residual issue count is stable"
-  ]
+  recommended_next_steps: buildRecommendedNextSteps(jobBuckets, senseBuckets)
 };
 
 console.log(JSON.stringify(result, null, 2));
@@ -157,7 +159,27 @@ function classifyJob(row, parsed) {
   return "needs_review_other";
 }
 
+function buildJobSample(row, parsed) {
+  return {
+    job_id: row.id,
+    target_id: row.target_id,
+    lang: row.lang,
+    status: row.status,
+    prompt_version: row.prompt_version,
+    error: row.error,
+    headword: row.headword,
+    primary_lang: row.primary_lang,
+    frequency_rank: row.frequency_rank,
+    sense_order: row.sense_order,
+    part_of_speech: row.part_of_speech,
+    gloss_key: abbreviate(row.gloss_key, 180),
+    output_term: abbreviate(parsed.localization?.term, 120),
+    output_definition: abbreviate(parsed.localization?.definition, 180)
+  };
+}
+
 function classifySense(row) {
+  if (row.block_code) return "blocked_publication";
   const gloss = row.gloss_key || "";
   if (/alternative form|variant of|only used in/i.test(gloss)) return "variant_or_cross_reference_only";
   if (row.clean_langs >= 3) return "mostly_complete_needs_one_slot";
@@ -195,6 +217,25 @@ function summarizeBuckets(map, sampleLimit) {
   );
 }
 
+function buildRecommendedNextSteps(jobBuckets, senseBuckets) {
+  const hasActionableJobs = jobBuckets.size > 0;
+  const hasActionableSenses = [...senseBuckets.keys()].some((key) => key !== "blocked_publication");
+  if (!hasActionableJobs && !hasActionableSenses) {
+    return [
+      "no actionable residual jobs remain under the current audit policy",
+      "keep blocked_publication senses excluded from D1 export unless better source data is added",
+      "run release preflight and deploy only if export inputs changed"
+    ];
+  }
+
+  return [
+    "rule-repair source_leak_term when a reliable target term can be extracted from existing clean localizations",
+    "create a stricter retry prompt for json_parse_failed jobs only",
+    "mark variant_or_cross_reference_only senses as non-publishable when they have no stable lexical equivalent",
+    "rerun regression and D1 export after residual issue count is stable"
+  ];
+}
+
 function containsCjk(value) {
   return /[\u3400-\u9fff]/u.test(String(value || ""));
 }
@@ -206,7 +247,7 @@ function containsKana(value) {
 function abbreviate(value, maxLength) {
   if (value == null) return null;
   const text = String(value).replace(/\s+/g, " ").trim();
-  return text.length <= maxLength ? text : `${text.slice(0, maxLength - 1)}…`;
+  return text.length <= maxLength ? text : `${text.slice(0, maxLength - 1)}...`;
 }
 
 function parseArgs(argv) {

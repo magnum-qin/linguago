@@ -17,6 +17,9 @@ const db = new Database(dbPath, { readonly: true });
 
 const count = (sql) => db.prepare(sql).get().n;
 const rows = (sql) => db.prepare(sql).all();
+const hasTable = (name) =>
+  Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
+const hasPublicationBlocks = hasTable("product_sense_publication_blocks");
 
 const totalSenses = count(`SELECT COUNT(*) AS n FROM product_senses`);
 const fullyLocalized = count(`
@@ -54,7 +57,34 @@ const report = {
       SELECT COUNT(*) AS n
       FROM product_localizations
       WHERE source LIKE 'freedict-%'
-    `)
+    `),
+    needs_review_senses: count(`
+      SELECT COUNT(*) AS n
+      FROM product_senses
+      WHERE status = 'needs_review'
+    `),
+    blocked_publication_senses: hasPublicationBlocks
+      ? count(`
+        SELECT COUNT(*) AS n
+        FROM product_sense_publication_blocks
+      `)
+      : 0,
+    actionable_needs_review_senses: hasPublicationBlocks
+      ? count(`
+        SELECT COUNT(*) AS n
+        FROM product_senses ps
+        WHERE ps.status = 'needs_review'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM product_sense_publication_blocks b
+            WHERE b.product_sense_id = ps.id
+          )
+      `)
+      : count(`
+        SELECT COUNT(*) AS n
+        FROM product_senses
+        WHERE status = 'needs_review'
+      `)
   },
   coverage: {
     localizations_by_lang: rows(`
@@ -104,7 +134,24 @@ const report = {
       GROUP BY source, lang
       ORDER BY rows DESC, source, lang
       LIMIT 50
-    `)
+    `),
+    publication_blocks: hasPublicationBlocks
+      ? rows(`
+        SELECT
+          b.product_sense_id,
+          b.block_code,
+          pe.headword,
+          pe.primary_lang,
+          pe.frequency_rank,
+          ps.gloss_key,
+          b.rationale,
+          b.recommendation
+        FROM product_sense_publication_blocks b
+        JOIN product_senses ps ON ps.id = b.product_sense_id
+        JOIN product_entries pe ON pe.id = ps.product_entry_id
+        ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.headword
+      `)
+      : []
   },
   risk: {
     high_source_count_senses: count(`
