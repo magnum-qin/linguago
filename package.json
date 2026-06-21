@@ -49,6 +49,7 @@
     "dict:v2:repair:product-known-localizations": "node scripts/repair-dictionary-v2-product-known-localizations.mjs",
     "dict:v2:repair:product-known-duplicate-senses": "node scripts/repair-dictionary-v2-product-known-duplicate-senses.mjs",
     "dict:v2:repair:product-quality-warnings": "node scripts/repair-dictionary-v2-product-quality-warnings.mjs",
+    "dict:v2:audit:product-published-risk": "node scripts/audit-dictionary-v2-product-published-risk.mjs",
     "dict:v2:merge:senses": "node scripts/merge-dictionary-v2-senses.mjs",
     "dict:v2:create-llm-jobs": "node scripts/create-dictionary-v2-llm-jobs.mjs",
     "dict:v2:benchmark:ollama": "node scripts/benchmark-dictionary-v2-ollama.mjs",
