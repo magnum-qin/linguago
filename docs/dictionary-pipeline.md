@@ -797,6 +797,74 @@ Deployment status:
   cancels a previous streaming request during navigation; all captured API
   responses were `200`.
 
+## 2026-06-24 Residual POS Duplicate Repair
+
+After the Step 6 checkpoint, the remaining duplicate-localization warning queue
+still contained one deterministic encoding/semantic repair and seven POS-style
+residual pairs that were previously marked for LLM semantic review. These were
+handled without a remote model because they were clear keep-separate cases:
+
+- `ペット`: kept `pet` and repaired the second sense to `trumpet` /
+  `トランペット` / `小号` / `trompete`.
+- `評価`: kept `appreciation` separate from monetary `valuation`.
+- `耐心`: separated adjective `patient`, noun `patience`, and verb
+  `be patient`.
+- `发明`: separated verb `invent` from noun `invention`.
+- `詩`: separated general `poem` from `Chinese poem`.
+- `摄影`: separated noun `photography` from verb `take a photograph`.
+- `相似`: separated adjective `similar` from verb `be similar`.
+- `無礼`: separated adjective `rude` from noun `rudeness`.
+
+Scripts added:
+
+- `scripts/repair-dictionary-v2-product-pet-trumpet-20260624.mjs`
+- `scripts/repair-dictionary-v2-product-residual-pos-duplicates-20260624.mjs`
+
+Warning report after the repair:
+
+```text
+logs/product-semantic-duplicate-review-after-residual-pos-repair-20260624.json
+```
+
+Summary:
+
+- `duplicate_sense_localizations`: `135`
+- `llm_semantic_review`: `0`
+- `encoding_repair_first`: `0`
+- remaining warnings are `manual_keep_or_merge_review` (`95`) and
+  `likely_keep_separate` (`40`), which are not publish blockers.
+
+Published export:
+
+```text
+outputs/d1-v2-product-native-export-residual-repair-20260624
+```
+
+Final export counts:
+
+| Table | Rows |
+| --- | ---: |
+| `v2_entries` | 23070 |
+| `v2_entry_forms` | 161074 |
+| `v2_pronunciation_groups` | 24881 |
+| `v2_senses` | 28582 |
+| `v2_sense_localizations` | 114328 |
+| `v2_examples` | 3030 |
+| `v2_example_localizations` | 11898 |
+
+Full export audit passed with no blocking structural errors:
+
+- `bad_sense_localization_counts`: `0`
+- `duplicate_sense_orders`: `0`
+- empty required fields: `0`
+- orphan rows: `0`
+- `mojibake_texts`: `0`
+- `html_artifacts`: `0`
+
+Remote D1 push succeeded. `/health` reported `published_at` as
+`2026-06-24T11:01:40.008Z`. Online API spot checks passed for `ペット`,
+`评价`, `耐心`, `摄影`, `相似`, and `無礼`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
