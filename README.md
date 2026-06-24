@@ -114,6 +114,7 @@ Configure these as Cloudflare Worker secrets or variables where applicable:
 - `DASHSCOPE_API_KEY`: Alibaba Cloud Bailian API key.
 - `GEMINI_API_KEY`: Gemini API key.
 - `DEEPSEEK_API_KEY`: DeepSeek API key.
+- `UNSLOTH_API_KEY`: local Unsloth Studio bearer token for dictionary-generation scripts. Do not commit the token value.
 
 Cloudflare bindings are configured in `wrangler.jsonc`:
 
@@ -155,6 +156,66 @@ node scripts/system-theme-check.mjs
 ```
 
 Use the Playwright layout scripts before and after changing mobile layout, result cards, tabs, settings overlays, or service worker behavior.
+
+## Local LLM Cluster: Unsloth Studio
+
+Dictionary generation now targets Unsloth Studio's OpenAI-compatible API instead of Ollama. The service uses:
+
+- `GET /v1/models` to list loaded models.
+- `GET /v1/status` to inspect active/loading models and runtime capabilities.
+- `POST /v1/load` to load a local model.
+- `POST /v1/chat/completions` for non-streaming or streaming chat completion.
+
+Every request must include:
+
+```text
+Authorization: Bearer <UNSLOTH_API_KEY>
+```
+
+Current jump-host forwarding for the nodes used by this project:
+
+| Node | Base URL | Target |
+| --- | --- | --- |
+| `a6000-143` | `http://100.99.99.99:11441` | `192.168.2.143:8888` |
+| `a6000-147` | `http://100.99.99.99:11444` | `172.23.4.53:8888` |
+| `rtx4090-47` | `http://100.99.99.99:11448` | `172.23.4.47:8888` |
+| `rtx4090-56` | `http://100.99.99.99:11447` | `172.23.4.56:8888` |
+
+Smoke-test the cluster with:
+
+```bash
+UNSLOTH_API_KEY=sk-unsloth-... npm run dict:v2:test:unsloth -- --out logs/unsloth-studio-cluster-test.json
+```
+
+PowerShell:
+
+```powershell
+$env:UNSLOTH_API_KEY = "sk-unsloth-..."
+npm run dict:v2:test:unsloth -- --out logs\unsloth-studio-cluster-test.json
+```
+
+The test script loads `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` where needed, then runs a compact four-language dictionary JSON task. It automatically disables MTP speculation on nodes whose `/v1/status` reports that MTP is unsupported.
+
+Latest smoke result on 2026-06-22: `a6000-143`, `a6000-147`, `rtx4090-47`, and `rtx4090-56` all loaded or reused `Qwen3.6-35B-A3B-MTP-GGUF` successfully and returned `10/10` structured dictionary smoke-test output. Detailed output is in `logs/unsloth-studio-cluster-test-20260622.json`.
+
+Current dictionary-generation model choice, verified on 2026-06-23:
+
+- Model: `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`.
+- Preferred GGUF quantization: `UD-IQ4_NL`.
+- Runtime parameters: `max_seq_length=8192`, `speculative_type=mtp`, `batch-size=1`, one concurrent worker per GPU endpoint.
+- `UD-IQ4_NL` is preferred over `UD-Q4_K_XL`, `MXFP4_MOE`, and `UD-Q4_K_S` for this project because it kept the same validation pass rate in the source-gap task while reducing VRAM pressure and improving speed.
+- The repo is detected as a vision model by Unsloth Studio and currently auto-loads `mmproj-F16.gguf`. The `/v1/load` OpenAPI schema exposes `gguf_variant`, `max_seq_length`, `speculative_type`, `spec_draft_n_max`, `tensor_parallel`, and `llama_extra_args`, but no documented `vision=false` or `mmproj=false` switch. Plan capacity assuming `mmproj` remains loaded.
+
+Verified source-gap dry-run benchmarks:
+
+| Node(s) | Variant | Result | Throughput |
+| --- | --- | --- | --- |
+| `a6000-155` | `UD-IQ4_NL` | 48/50 accepted | 38.96 accepted/min |
+| `rtx4090-56` | `UD-IQ4_NL` | 47/50 accepted | 51.66 accepted/min |
+| `rtx4090-47` | `UD-IQ4_NL` | 47/50 accepted | 46.64 accepted/min |
+| `rtx4090-56` + `rtx4090-47` | `UD-IQ4_NL` | 96/100 accepted | about 90-100 accepted/min wall-clock |
+
+On both 4090 nodes, `UD-IQ4_NL` loaded with `-ngl -1`, `--flash-attn on`, `--spec-type draft-mtp`, and about 19.8 GB / 24.6 GB VRAM used. This is effectively full GPU offload for the model layers; observed CPU usage is normal llama-server scheduling, tokenization, HTTP, and sampling overhead.
 
 ## Current Cleanup Notes
 

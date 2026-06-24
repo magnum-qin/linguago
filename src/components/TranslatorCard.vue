@@ -1,17 +1,33 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue';
-import { Sun, Moon, Settings, X, Languages, Bookmark } from 'lucide-vue-next';
+import { Sun, Moon, Settings, X, Languages, Bookmark, Clipboard, History } from 'lucide-vue-next';
 import { useTheme } from '../composables/useTheme';
 import { useTranslation } from '../composables/useTranslation';
 import { useBookmarks } from '../composables/useBookmarks';
+import { useHistory } from '../composables/useHistory';
 
 const { currentTheme, toggleTheme } = useTheme();
-const { inputText, translate, clear, resultData, isTranslating } = useTranslation();
+const { inputText, sourceLangPreference, translate, clear, resultData, isTranslating } = useTranslation();
 const { isBookmarksOpen } = useBookmarks();
+const { isHistoryOpen } = useHistory();
 
 const hasResult = computed(() => !!resultData.value || isTranslating.value);
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const lastDetectedCjkMode = ref<'zh' | 'ja' | 'hidden'>('hidden');
+
+const detectCjkMode = (text: string): 'zh' | 'ja' | 'hidden' => {
+  const trimmed = text.trim();
+  if (!trimmed) return 'hidden';
+  if (/[\u3040-\u30ff]/u.test(trimmed)) return 'ja';
+
+  const comparable = trimmed.replace(/[\s\p{P}\p{S}]/gu, '');
+  if (!comparable) return 'hidden';
+  return /^\p{Script=Han}+$/u.test(comparable) ? 'zh' : 'hidden';
+};
+
+const sourceToggleVisible = computed(() => detectCjkMode(inputText.value) !== 'hidden');
+const sourceToggleLabel = computed(() => sourceLangPreference.value === 'ja' ? '日' : '中');
 
 const autoResize = () => {
   if (!textareaRef.value) return;
@@ -39,7 +55,13 @@ const autoResize = () => {
   el.style.overflowY = 'hidden';
 };
 
-watch(inputText, async () => {
+watch(inputText, async (value) => {
+  const detected = detectCjkMode(value);
+  if (detected !== lastDetectedCjkMode.value) {
+    sourceLangPreference.value = detected === 'hidden' ? 'auto' : detected;
+    lastDetectedCjkMode.value = detected;
+  }
+
   await nextTick();
   autoResize();
 });
@@ -67,6 +89,25 @@ const openSettings = () => {
   window.dispatchEvent(new CustomEvent('open-settings'));
 };
 
+const handlePaste = async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) return;
+    inputText.value = text;
+    await nextTick();
+    autoResize();
+    textareaRef.value?.focus();
+  } catch (e) {
+    console.error('Failed to read clipboard', e);
+    textareaRef.value?.focus();
+  }
+};
+
+const toggleSourceLang = () => {
+  if (!sourceToggleVisible.value) return;
+  sourceLangPreference.value = sourceLangPreference.value === 'ja' ? 'zh' : 'ja';
+};
+
 const handleClear = () => {
   clear();
   textareaRef.value?.focus();
@@ -82,37 +123,71 @@ const handleTranslate = () => {
 
 <template>
   <section class="flex flex-col gap-3 enter">
-    <div class="flex items-center justify-end gap-2 px-1 mb-1">
-      <v-btn 
-        icon
-        variant="text"
-        class="!w-10 !h-10 !text-m3-on-surface-variant hover:!bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary"
-        @click="toggleTheme" 
-        aria-label="Toggle Theme"
-      >
-        <Sun v-if="currentTheme === 'dark'" class="w-5 h-5" />
-        <Moon v-else class="w-5 h-5" />
-      </v-btn>
+    <div class="flex items-center justify-between gap-2 px-1 mb-1 min-h-10">
+      <Transition name="fade-up">
+        <v-btn
+          v-if="sourceToggleVisible"
+          variant="flat"
+          class="!h-10 !min-w-10 !rounded-full !px-4 !text-[0.9rem] !font-bold !text-m3-on-primary !bg-m3-primary hover:!opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-m3-primary !tracking-normal !normal-case"
+          @click="toggleSourceLang"
+          :aria-label="sourceLangPreference === 'ja' ? 'Japanese source' : 'Chinese source'"
+        >
+          {{ sourceToggleLabel }}
+        </v-btn>
+      </Transition>
 
-      <v-btn 
-        icon
-        variant="text"
-        class="!w-10 !h-10 !text-m3-on-surface-variant hover:!bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary"
-        @click="isBookmarksOpen = true" 
-        aria-label="Bookmarks"
-      >
-        <Bookmark class="w-5 h-5" />
-      </v-btn>
-      
-      <v-btn 
-        icon
-        variant="text"
-        class="!w-10 !h-10 !text-m3-on-surface-variant hover:!bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary"
-        @click="openSettings" 
-        aria-label="Settings"
-      >
-        <Settings class="w-5 h-5" />
-      </v-btn>
+      <div class="flex items-center justify-end gap-2 ml-auto">
+        <v-btn
+          icon
+          variant="text"
+          class="!w-10 !h-10 !text-m3-on-surface-variant hover:!bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary"
+          @click="handlePaste"
+          aria-label="Paste"
+        >
+          <Clipboard class="w-5 h-5" />
+        </v-btn>
+
+        <v-btn
+          icon
+          variant="text"
+          class="!w-10 !h-10 !text-m3-on-surface-variant hover:!bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary"
+          @click="toggleTheme"
+          aria-label="Toggle Theme"
+        >
+          <Sun v-if="currentTheme === 'dark'" class="w-5 h-5" />
+          <Moon v-else class="w-5 h-5" />
+        </v-btn>
+
+        <v-btn
+          icon
+          variant="text"
+          class="!w-10 !h-10 !text-m3-on-surface-variant hover:!bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary"
+          @click="isHistoryOpen = true"
+          aria-label="Search History"
+        >
+          <History class="w-5 h-5" />
+        </v-btn>
+
+        <v-btn
+          icon
+          variant="text"
+          class="!w-10 !h-10 !text-m3-on-surface-variant hover:!bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary"
+          @click="isBookmarksOpen = true"
+          aria-label="Bookmarks"
+        >
+          <Bookmark class="w-5 h-5" />
+        </v-btn>
+
+        <v-btn
+          icon
+          variant="text"
+          class="!w-10 !h-10 !text-m3-on-surface-variant hover:!bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary"
+          @click="openSettings"
+          aria-label="Settings"
+        >
+          <Settings class="w-5 h-5" />
+        </v-btn>
+      </div>
     </div>
 
     <v-card elevation="0" class="!bg-m3-surface-container !rounded-[28px] !p-4 sm:!p-5 flex flex-col gap-4 !shadow-sm transition-all focus-within:!shadow-md focus-within:!bg-m3-surface-container-high !border !border-m3-outline-variant/20 relative z-10">

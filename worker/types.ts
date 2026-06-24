@@ -96,6 +96,7 @@ export interface BaseResponse {
   provider: ResponseProvider;
   model: string;
   cached: boolean;
+  cache_hit?: boolean;
 }
 
 export interface WordResponse extends BaseResponse {

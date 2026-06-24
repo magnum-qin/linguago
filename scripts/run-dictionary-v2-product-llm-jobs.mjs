@@ -23,11 +23,18 @@ const dryRun = args["dry-run"] === "true";
 const prewarm = args.prewarm !== "false";
 const retryNeedsReview = args["retry-needs-review"] === "true";
 const quiet = args.quiet === "true";
+const jobIdMin = args["job-id-min"] ? Number(args["job-id-min"]) : 0;
+const jobIdMax = args["job-id-max"] ? Number(args["job-id-max"]) : 0;
 const targetLangs = String(args["target-langs"] || "")
   .split(",")
   .map((lang) => lang.trim())
   .filter(Boolean);
 const targetLangClause = targetLangs.length ? `AND lang IN (${targetLangs.map(() => "?").join(", ")})` : "";
+const jobIdMinClause = jobIdMin ? "AND id >= ?" : "";
+const jobIdMaxClause = jobIdMax ? "AND id <= ?" : "";
+if (jobIdMin && (!Number.isInteger(jobIdMin) || jobIdMin < 1)) throw new Error(`Invalid --job-id-min: ${args["job-id-min"]}`);
+if (jobIdMax && (!Number.isInteger(jobIdMax) || jobIdMax < 1)) throw new Error(`Invalid --job-id-max: ${args["job-id-max"]}`);
+if (jobIdMin && jobIdMax && jobIdMin > jobIdMax) throw new Error(`Invalid job id range: ${jobIdMin} > ${jobIdMax}`);
 
 const db = new Database(dbPath);
 db.pragma("foreign_keys = ON");
@@ -43,6 +50,8 @@ const statements = {
       AND prompt_version = ?
       AND status IN (${retryNeedsReview ? "'queued', 'needs_review'" : "'queued'"})
       ${targetLangClause}
+      ${jobIdMinClause}
+      ${jobIdMaxClause}
     ORDER BY id
     LIMIT ?
   `),
@@ -127,12 +136,17 @@ const statements = {
   `)
 };
 
-const jobs = statements.queuedJobs.all(provider, model, promptVersion, ...targetLangs, limit);
+const jobQueryParams = [provider, model, promptVersion, ...targetLangs];
+if (jobIdMin) jobQueryParams.push(jobIdMin);
+if (jobIdMax) jobQueryParams.push(jobIdMax);
+jobQueryParams.push(limit);
+const jobs = statements.queuedJobs.all(...jobQueryParams);
 
 console.log(`DB: ${path.relative(process.cwd(), dbPath)}`);
 console.log(`Ollama endpoint: ${endpoint}`);
 console.log(`Model: ${model}`);
 console.log(`Queued jobs selected: ${jobs.length}`);
+console.log(`Job id range: ${jobIdMin || "-"}..${jobIdMax || "-"}`);
 console.log(`Dry run: ${dryRun}`);
 console.log(`Stream response: ${streamResponse}`);
 console.log(`Target langs: ${targetLangs.length ? targetLangs.join(",") : "all"}`);
@@ -227,15 +241,20 @@ console.log(JSON.stringify(summary, null, 2));
 
 function applyAcceptedJob({ job, output }) {
   const loc = output.sense_localization;
+  const input = JSON.parse(job.input_json);
+  const currentLocalization = input.current_localization || {};
+  const preserveTerm = input.requirements?.preserve_current_term === true;
+  const preserveDefinition = input.requirements?.preserve_current_definition === true;
+  const preserveReading = input.requirements?.preserve_current_reading === true || preserveTerm || preserveDefinition;
   const localizationPayload = {
     product_sense_id: job.target_id,
     lang: job.lang,
-    term: cleanText(loc.term),
-    reading: cleanNullable(loc.reading),
-    reading_system: cleanNullable(loc.reading_system),
+    term: preserveTerm ? cleanText(currentLocalization.term) : cleanText(loc.term),
+    reading: preserveReading ? cleanNullable(currentLocalization.reading) : cleanNullable(loc.reading),
+    reading_system: preserveReading ? cleanNullable(currentLocalization.reading_system) : cleanNullable(loc.reading_system),
     pronunciation: cleanNullable(loc.pronunciation),
     pronunciation_system: cleanNullable(loc.pronunciation_system),
-    definition: cleanText(loc.definition),
+    definition: preserveDefinition ? cleanText(currentLocalization.definition) : cleanText(loc.definition),
     source: `${provider}:${model}`,
     confidence: 0.78,
     needs_review: 0
@@ -646,6 +665,22 @@ function deterministicQualityErrors(loc, input) {
   const sourceLinks = Array.isArray(input.source_links) ? input.source_links : [];
   const soleSource = sourceLinks.length === 1 ? sourceLinks[0] : null;
   const term = String(loc.term || "").trim();
+  const currentLocalization = input.current_localization || {};
+
+  if (input.requirements?.preserve_current_term === true) {
+    const currentTerm = String(currentLocalization.term || "").trim();
+    if (currentTerm && normalizeLoose(term) !== normalizeLoose(currentTerm)) {
+      errors.push("term must match current localization for pronunciation-only repair");
+    }
+  }
+
+  if (input.requirements?.preserve_current_definition === true) {
+    const currentDefinition = String(currentLocalization.definition || "").trim();
+    const definition = String(loc.definition || "").trim();
+    if (currentDefinition && normalizeLoose(definition) !== normalizeLoose(currentDefinition)) {
+      errors.push("definition must match current localization for pronunciation-only repair");
+    }
+  }
 
   if (soleSource?.source_lang === lang && normalizeLoose(term) !== normalizeLoose(soleSource.source_word)) {
     errors.push("term must match sole source_word when target language is the source language");

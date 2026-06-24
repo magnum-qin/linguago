@@ -6,12 +6,13 @@ import { performance } from "node:perf_hooks";
 const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
 const DEFAULT_ENDPOINT = "http://100.99.99.99:11441";
 const DEFAULT_MODEL = "qwen3.6:latest";
-const PROMPT_VERSION = "dictionary-v2-product-fusion-review-v1";
+const DEFAULT_PROMPT_VERSION = "dictionary-v2-product-fusion-review-v1";
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const endpoint = String(args.endpoint || process.env.OLLAMA_HOST || DEFAULT_ENDPOINT).replace(/\/$/u, "");
 const model = args.model || process.env.OLLAMA_MODEL || DEFAULT_MODEL;
+const promptVersion = args["prompt-version"] || DEFAULT_PROMPT_VERSION;
 const limit = Number(args.limit || 20);
 const minSourceCount = Number(args["min-source-count"] || 2);
 const shardCount = Number(args["shard-count"] || 1);
@@ -28,14 +29,18 @@ const selectOnly = args["select-only"] === "true";
 const candidatesOutPath = path.resolve(
   args["candidates-out"] || dbPath.replace(/\.db$/u, ".fusion-review-candidates.json")
 );
+const senseIds = loadSenseIds(args["sense-ids"], args["sense-ids-file"]);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!Number.isInteger(shardCount) || shardCount < 1) throw new Error("--shard-count must be a positive integer");
 if (!Number.isInteger(shardIndex) || shardIndex < 0 || shardIndex >= shardCount) {
   throw new Error("--shard-index must be between 0 and shard-count - 1");
 }
-if (!["source-count", "high-risk", "short-gloss", "same-lang-mismatch"].includes(candidateFilter)) {
-  throw new Error("--candidate-filter must be one of: source-count, high-risk, short-gloss, same-lang-mismatch");
+if (!["source-count", "high-risk", "short-gloss", "same-lang-mismatch", "sense-ids"].includes(candidateFilter)) {
+  throw new Error("--candidate-filter must be one of: source-count, high-risk, short-gloss, same-lang-mismatch, sense-ids");
+}
+if (candidateFilter === "sense-ids" && !senseIds.length) {
+  throw new Error("--candidate-filter sense-ids requires --sense-ids or --sense-ids-file");
 }
 if (!Number.isFinite(riskSourceCount) || riskSourceCount < 1) {
   throw new Error("--risk-source-count must be a positive number");
@@ -50,6 +55,7 @@ db.pragma("busy_timeout = 10000");
 ensureReviewSchema(db);
 
 const candidateWhere = candidateFilterClause(candidateFilter);
+const senseIdClause = senseIds.length ? `AND ps.id IN (${senseIds.join(",")})` : "";
 const candidates = db
   .prepare(
     `
@@ -67,6 +73,7 @@ const candidates = db
     FROM product_entries pe
     JOIN product_senses ps ON ps.product_entry_id = pe.id
     WHERE ${candidateWhere}
+      ${senseIdClause}
       AND (pe.id % @shardCount) = @shardIndex
       AND (
         @retryNeedsReview = 1
@@ -96,7 +103,7 @@ const candidates = db
     shardIndex,
     retryNeedsReview: retryNeedsReview ? 1 : 0,
     model,
-    promptVersion: PROMPT_VERSION,
+    promptVersion,
     limit
   });
 
@@ -113,7 +120,7 @@ if (selectOnly) {
   const selection = {
     ok: true,
     db: path.relative(process.cwd(), dbPath),
-    prompt_version: PROMPT_VERSION,
+    prompt_version: promptVersion,
     candidate_filter: candidateFilter,
     min_source_count: minSourceCount,
     risk_source_count: riskSourceCount,
@@ -192,7 +199,7 @@ for (const candidate of candidates) {
         product_entry_id: candidate.product_entry_id,
         product_sense_id: candidate.product_sense_id,
         model,
-        prompt_version: PROMPT_VERSION,
+        prompt_version: promptVersion,
         status,
         decision: normalizeDecision(output.decision),
         confidence: normalizedConfidence(output.confidence),
@@ -223,7 +230,7 @@ for (const candidate of candidates) {
         product_entry_id: candidate.product_entry_id,
         product_sense_id: candidate.product_sense_id,
         model,
-        prompt_version: PROMPT_VERSION,
+        prompt_version: promptVersion,
         status: "failed",
         decision: "needs_review",
         confidence: 0,
@@ -246,7 +253,7 @@ const summary = {
   db: path.relative(process.cwd(), dbPath),
   endpoint,
   model,
-  prompt_version: PROMPT_VERSION,
+  prompt_version: promptVersion,
   candidate_filter: candidateFilter,
   min_source_count: minSourceCount,
   risk_source_count: riskSourceCount,
@@ -266,7 +273,7 @@ const summary = {
       ORDER BY status, decision
     `
     )
-    .all(model, PROMPT_VERSION),
+    .all(model, promptVersion),
   highest_confidence_split: db
     .prepare(
       `
@@ -278,7 +285,7 @@ const summary = {
       LIMIT 10
     `
     )
-    .all(model, PROMPT_VERSION)
+    .all(model, promptVersion)
 };
 
 fs.writeFileSync(dbPath.replace(/\.db$/u, ".fusion-review.summary.json"), JSON.stringify(summary, null, 2));
@@ -315,6 +322,9 @@ function ensureReviewSchema(database) {
 }
 
 function candidateFilterClause(filter) {
+  if (filter === "sense-ids") {
+    return "ps.status IN ('accepted', 'ready_for_llm', 'needs_review', 'draft_fused')";
+  }
   if (filter === "same-lang-mismatch") {
     return `
       ps.status IN ('accepted', 'ready_for_llm')
@@ -559,6 +569,32 @@ function normalizedConfidence(value) {
 function cleanNullable(value) {
   const text = typeof value === "string" ? value.trim() : "";
   return text || null;
+}
+
+function loadSenseIds(inlineValue, fileValue) {
+  const ids = new Set();
+  for (const value of String(inlineValue || "").split(",")) {
+    const id = Number(value.trim());
+    if (Number.isInteger(id) && id > 0) ids.add(id);
+  }
+
+  if (fileValue) {
+    const filePath = path.resolve(fileValue);
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const values = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed.flagged_sense_ids)
+        ? parsed.flagged_sense_ids
+        : Array.isArray(parsed.sense_ids)
+          ? parsed.sense_ids
+          : [];
+    for (const value of values) {
+      const id = Number(value);
+      if (Number.isInteger(id) && id > 0) ids.add(id);
+    }
+  }
+
+  return [...ids].sort((a, b) => a - b);
 }
 
 function parseArgs(argv) {

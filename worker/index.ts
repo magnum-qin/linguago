@@ -120,7 +120,7 @@ async function handleTranslate(
     if (dictionaryCached && dictionaryCached.type === "word" && dictionaryCached.provider === "dictionary") {
       const isLegacyWordCache = !dictionaryCached.senses || dictionaryCached.senses.length === 0;
       if (!isLegacyWordCache) {
-        return json({ ...dictionaryCached, cached: true });
+        return json({ ...dictionaryCached, cached: true, cache_hit: true });
       }
       console.log(`Ignoring legacy dictionary cache for ${text}`);
     }
@@ -128,7 +128,8 @@ async function handleTranslate(
     const dictionaryResponse = await lookupDictionaryFirst({
       env,
       text,
-      targetLang
+      targetLang,
+      sourceLang
     });
 
     if (dictionaryResponse) {
@@ -153,7 +154,7 @@ async function handleTranslate(
     if (cached) {
       const isLegacyWordCache = cached.type === "word" && (!cached.senses || cached.senses.length === 0);
       if (!isLegacyWordCache) {
-        return json({ ...cached, cached: true });
+        return json({ ...cached, cached: true, cache_hit: true });
       }
       console.log(`Ignoring legacy cache for ${text}`);
     }
@@ -253,7 +254,7 @@ async function handleTranslateStream(
         if (dictionaryCached && dictionaryCached.type === "word" && dictionaryCached.provider === "dictionary") {
           const isLegacyWordCache = !dictionaryCached.senses || dictionaryCached.senses.length === 0;
           if (!isLegacyWordCache) {
-            send("final", { ...dictionaryCached, cached: true });
+            send("final", { ...dictionaryCached, cached: true, cache_hit: true });
             send("done", { ok: true });
             controller.close();
             return;
@@ -264,7 +265,8 @@ async function handleTranslateStream(
         const dictionaryResponse = await lookupDictionaryFirst({
           env,
           text,
-          targetLang
+          targetLang,
+          sourceLang
         });
 
         if (dictionaryResponse) {
@@ -292,7 +294,7 @@ async function handleTranslateStream(
         if (cached) {
           const isLegacyWordCache = cached.type === "word" && (!cached.senses || cached.senses.length === 0);
           if (!isLegacyWordCache) {
-            send("final", { ...cached, cached: true });
+            send("final", { ...cached, cached: true, cache_hit: true });
             send("done", { ok: true });
             controller.close();
             return;

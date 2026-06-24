@@ -5,6 +5,7 @@ import { useTranslation } from './composables/useTranslation';
 import TranslatorCard from './components/TranslatorCard.vue';
 import ResultCard from './components/ResultCard.vue';
 import BookmarksCard from './components/BookmarksCard.vue';
+import HistoryCard from './components/HistoryCard.vue';
 import SettingsOverlay from './components/SettingsOverlay.vue';
 
 const { currentTheme } = useTheme();
@@ -27,6 +28,7 @@ const hasResult = computed(() => !!resultData.value || isTranslating.value);
         <TranslatorCard />
         <ResultCard />
         <BookmarksCard />
+        <HistoryCard />
       </main>
     </div>
     

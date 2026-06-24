@@ -430,7 +430,174 @@ This runs product example dedupe, deterministic quality-warning repair, product-
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release-dictionary-v2-product-d1.ps1 -SkipPush
 ```
 
-The first full-database completion batches used `qwen3.6:latest` with `profile core` and `--max-senses-per-entry 1`, then moved to the A6000 cluster behind `100.99.99.99`. Current production nodes:
+The first full-database completion batches used Ollama `qwen3.6:latest` with `profile core` and `--max-senses-per-entry 1`, then moved to the A6000 cluster behind `100.99.99.99`. That flow is historical and should not be the default for new product-dictionary source-gap work.
+
+The active source-gap supplement flow uses Unsloth Studio's OpenAI-compatible API and writes whole four-language product records with `scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs`. Use the cleaned source-gap report, not the raw incomplete report, unless intentionally debugging rejects:
+
+```powershell
+$env:UNSLOTH_API_KEY = "sk-unsloth-..."
+node scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --report logs/product-incomplete-gap-senses-clean-20260623.json `
+  --model unsloth/Qwen3.6-35B-A3B-MTP-GGUF `
+  --endpoints http://100.99.99.99:11447,http://100.99.99.99:11448 `
+  --limit 100 `
+  --concurrency 2 `
+  --batch-size 1 `
+  --dry-run true `
+  --apply false `
+  --quiet true `
+  --prewarm true `
+  --gguf-variant UD-IQ4_NL `
+  --max-seq-length 8192 `
+  --speculative-type mtp `
+  --out logs/product-source-gap-unsloth-dry-run.json
+```
+
+For a real write, change `--dry-run true --apply false` to `--dry-run false --apply true`, then run the fast audit:
+
+```powershell
+npm run dict:v2:audit:product-fast -- --out logs/product-fast-audit-after-source-gap.json
+```
+
+After large source-gap runs, do not keep rerunning the generic command against the same clean report. First generate a residual report that compares the clean report against the current product DB and the last generation log:
+
+```powershell
+node scripts/report-dictionary-v2-product-source-gap-residuals.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --report logs/product-incomplete-gap-senses-clean-20260623.json `
+  --attempt-log logs/product-source-gap-unsloth-4090-iq4-source-link-backfill-20260624.json `
+  --out logs/product-source-gap-residual-clean-20260624.json
+```
+
+As of 2026-06-24, the first residual report showed `7530` clean source-gap candidates, `7306` complete candidates, and `224` residuals. Those residuals were mostly validation edge cases, not capacity problems: rare Han variants, kana/orthography entries, abbreviation/proper-name entries, missing IPA, and a few transient fetch/timeouts. For those, use the residual prompt mode and the residual report as input:
+
+```powershell
+node scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --report logs/product-source-gap-residual-clean-20260624.json `
+  --model unsloth/Qwen3.6-35B-A3B-MTP-GGUF `
+  --endpoints http://100.99.99.99:11447,http://100.99.99.99:11448 `
+  --limit 224 `
+  --concurrency 2 `
+  --batch-size 1 `
+  --dry-run true `
+  --apply false `
+  --quiet true `
+  --prewarm true `
+  --gguf-variant UD-IQ4_NL `
+  --max-seq-length 8192 `
+  --speculative-type mtp `
+  --residual-mode true `
+  --include-risky true `
+  --out logs/product-source-gap-unsloth-residual-dry-run-20260624.json
+```
+
+Only switch that residual command to `--dry-run false --apply true` after checking the dry-run pass rate. In the 2026-06-24 residual run, a 30-row dry run accepted `25/30`; the matching 30-row apply accepted `25/30`, and the remaining 199-row apply accepted `173/199`. Fast audit stayed green after both writes. The clean source-gap state after this pass was `7504/7530` complete, with `26` final residuals in `logs/product-source-gap-residual-final-20260624.json`.
+
+Do not spend repeated full model passes on those final residuals. They are mostly plural/inflected English entries with very broad glosses, brands/acronyms (`facebook`, `dvd`, `bmw`), source-language terms whose gloss is too generic (`pt-BR regular -> normal`), or thin definition cases. The final 26 residuals were closed manually with `scripts/finalize-dictionary-v2-product-source-gap-residuals-20260624.mjs`. The corrected post-finalize report is `logs/product-source-gap-residual-after-manual-finalize-fixed-20260624.json`: `7530/7530` complete, `0` residuals. Fast audit after this manual closure is `logs/product-fast-audit-after-manual-source-gap-finalize-fixed-20260624.json` and is green.
+
+The source-gap-complete product dictionary export was written to `outputs/d1-v2-product-native-export-source-gap-complete-20260624` and passed full import audit. It was pushed to Cloudflare D1 `linguago-dictionary` and deployed with Worker version `ac11f712-738a-4e17-b1d0-d94db4813457`. Remote D1 counts after push:
+
+| Table | Rows |
+| --- | ---: |
+| `v2_entries` | 29144 |
+| `v2_senses` | 29675 |
+| `v2_sense_localizations` | 118700 |
+| `v2_examples` | 3057 |
+| `v2_example_localizations` | 12006 |
+
+Online checks after deployment passed for core samples and manual residual samples (`facebook`, `dvd`, `bmw`, `女婿`, `ダイナー`), all returning `provider=dictionary` and `model=cloudflare-d1-v2`.
+
+Post-release quality cleanup on 2026-06-24 closed the deterministic Japanese Latin-only warning set and merged only the safest same-entry duplicate senses. The updated export is `outputs/d1-v2-product-native-export-quality-fixes-20260624`; it passed full import audit and was pushed to Cloudflare D1 `linguago-dictionary`.
+
+Remote D1 counts after the quality-fix push:
+
+| Table | Rows |
+| --- | ---: |
+| `v2_entries` | 29144 |
+| `v2_senses` | 29668 |
+| `v2_sense_localizations` | 118672 |
+| `v2_examples` | 3057 |
+| `v2_example_localizations` | 12006 |
+
+The post-fix audit has no `zh_terms_with_kana` or `ja_terms_with_latin_only` warnings. It still reports `80` duplicate same-entry localization warnings, but the conservative merge scanner finds no remaining rule-safe merge pairs; keep those for semantic review instead of automatic deletion. Online checks for `of`, `would`, `were`, `been`, `gonna`, and `could` return the repaired Japanese entries from `provider=dictionary`, `model=cloudflare-d1-v2`.
+
+The first semantic duplicate review pass is recorded in `logs/product-semantic-duplicate-review-20260624.json` and `logs/product-semantic-duplicate-review-20260624.md`. The `80` duplicate localization groups collapsed to `63` unique sense pairs: `18` were appropriate for LLM semantic review and `45` were single-term collision/manual review cases. The LLM review used `scripts/review-dictionary-v2-product-semantic-duplicates-unsloth.mjs` against the 4090 Unsloth endpoints and produced `logs/product-semantic-duplicate-llm-review-20260624.json`: `17` merge decisions and `1` keep-separate decision (`aunty`).
+
+The accepted LLM merge decisions were converted with `scripts/convert-dictionary-v2-product-llm-duplicate-review-to-merge-plan.mjs` into `logs/product-llm-approved-duplicate-merge-plan-20260624.json`, then applied through the existing duplicate merge applicator. This merged `17` senses, moved `4` source links, deleted `68` duplicate localizations, and preserved examples. The `aunty` keep-separate case was repaired manually with `scripts/repair-dictionary-v2-product-aunty-broad-sense-20260624.mjs` by broadening sense `22993` in Chinese, Japanese, and Portuguese instead of merging it.
+
+Fast audit after this pass is `logs/product-fast-audit-after-aunty-repair-20260624.json` and is green. The remaining duplicate warning state is now:
+
+| Metric | Count |
+| --- | ---: |
+| duplicate localization groups | 45 |
+| unique sense pairs | 45 |
+| LLM semantic-review pairs | 0 |
+| conservative auto-merge pairs | 0 |
+
+Treat the remaining `45` as manual keep/merge review items. They are not currently blocking publication because every publishable sense still has four valid localizations, no duplicate sense order, and no script/Latin-only warnings.
+
+The semantic-dedupe release export is `outputs/d1-v2-product-native-export-semantic-dedupe-20260624`. It passed full import audit with samples `hello`, `你好`, `中`, `tight`, `graduate`, `aunty`, `机长`, `of`, `would`, `facebook`, `dvd`, `bmw`, `女婿`, and `ダイナー`, then was pushed to Cloudflare D1 `linguago-dictionary`.
+
+Remote D1 counts after the semantic-dedupe push:
+
+| Table | Rows |
+| --- | ---: |
+| `v2_entries` | 29144 |
+| `v2_senses` | 29651 |
+| `v2_sense_localizations` | 118604 |
+| `v2_examples` | 3057 |
+| `v2_example_localizations` | 12006 |
+
+Online checks after the D1 push confirmed `tight` and `graduate` now each return one dictionary sense; `aunty` still returns two senses, with the broad second sense localized as `zh=阿姨`, `ja=おばさん`, and `pt-BR=tia`; `机长` returns one Chinese-source aviation-captain sense. No Worker redeploy was required because only D1 data changed.
+
+The remaining manual-review duplicate queue was then reviewed with the same Unsloth semantic-review script using `--recommendations manual_keep_or_merge_review`. The report is `logs/product-manual-duplicate-llm-review-20260624.json`: `41` high-confidence merge decisions, `3` keep-separate decisions (`卿`, `ううん`, `frighten`), and `1` repair-before-merge decision (`murmuring`). The `41` merge decisions were applied from `logs/product-manual-llm-approved-duplicate-merge-plan-20260624.json`; `murmuring` was repaired with `scripts/repair-dictionary-v2-product-murmuring-20260624.mjs` and then merged with `logs/product-murmuring-repaired-duplicate-merge-plan-20260624.json`.
+
+The final semantic-dedupe export is `outputs/d1-v2-product-native-export-semantic-dedupe-final-20260624`. It passed full import audit and was pushed to Cloudflare D1 `linguago-dictionary`.
+
+Remote D1 counts after the final semantic-dedupe push:
+
+| Table | Rows |
+| --- | ---: |
+| `v2_entries` | 29144 |
+| `v2_senses` | 29609 |
+| `v2_sense_localizations` | 118436 |
+| `v2_examples` | 3057 |
+| `v2_example_localizations` | 12006 |
+
+The only remaining duplicate-localization warnings are the three intentional keep-separate cases:
+
+| Entry | Reason to keep separate |
+| --- | --- |
+| `卿` | Distinct honorific/title vs suffix/pronoun usage. |
+| `ううん` | General negative answer vs informal `nuh-uh` register. |
+| `frighten` | General cause-fear sense vs scare-away/translation-direction nuance; needs later lexical cleanup before any merge. |
+
+Online checks after the final D1 push confirmed `red` and `murmuring` now each return one sense, while `卿`, `ううん`, and `frighten` intentionally remain multi-sense. No Worker redeploy was required.
+
+Current Unsloth production model guidance:
+
+- Model: `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`.
+- Preferred quantization: `UD-IQ4_NL`.
+- Runtime: `max_seq_length=8192`, `speculative_type=mtp`, `batch-size=1`.
+- Use one worker per GPU endpoint. For the two RTX 4090 nodes, `--concurrency 2` across `11447,11448` is the tested setting.
+- `UD-IQ4_NL` is smaller and faster than `UD-Q4_K_XL` for this task while keeping similar validation quality. It also fits the 24 GB RTX 4090 nodes without the previous CPU offload issue.
+
+Relevant 2026-06-23 dry-run benchmarks:
+
+| Node(s) | Endpoint(s) | Variant | Result | Throughput |
+| --- | --- | --- | --- | --- |
+| `a6000-155` | `11445` | `UD-IQ4_NL` | 48/50 accepted | 38.96 accepted/min |
+| `rtx4090-56` | `11447` | `UD-IQ4_NL` | 47/50 accepted | 51.66 accepted/min |
+| `rtx4090-47` | `11448` | `UD-IQ4_NL` | 47/50 accepted | 46.64 accepted/min |
+| `rtx4090-56` + `rtx4090-47` | `11447,11448` | `UD-IQ4_NL` | 96/100 accepted | about 90-100 accepted/min wall-clock |
+
+Unsloth Studio currently auto-loads `mmproj-F16.gguf` for this repo because it is detected as a vision model. `/v1/load` has no documented `vision=false` or `mmproj=false` option in the local OpenAPI schema, so capacity planning should assume mmproj remains loaded. On the two 4090 nodes, `UD-IQ4_NL` still loads with `-ngl -1` and about 19.8 GB / 24.6 GB VRAM used, so it is acceptable.
+
+Older Ollama queue commands, kept only for historical reference:
+
+Current old-flow nodes were:
 
 - `a6000-143`: `http://100.99.99.99:11441`
 - `a6000-144`: `http://100.99.99.99:11442`
@@ -476,6 +643,159 @@ npm run dict:v2:apply-overrides -- --db data/processed/linguago_v2_full.db
 ```
 
 The override script upserts `sense_localizations`, marks matching `llm_completion_jobs` as `accepted`, and resolves the matching `missing_<lang>_localization` quality issue. Keep this layer small and explicit; it is for grammar/function words and source-sense cleanup cases, not a replacement for normal LLM completion.
+
+## 2026-06-24 Entry/Sense Merge Release
+
+After the pronunciation-group and semantic-dedupe pass, D1 still exposed duplicate-looking results for homographs such as `卿` and `ううん`. Direct D1 inspection showed the remaining problem was not duplicate `sense_order` inside one entry, but multiple product entries with the same `normalized_key + primary_lang`. The Worker lookup can surface those as one search result, so the product layer must keep one entry per lookup key and put the distinct meanings under that entry.
+
+Actions applied to `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db`:
+
+- Backed up the DB to `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-entry-merge-20260624.db`.
+- Ran `scripts/merge-dictionary-v2-product-entries.mjs` across all remaining duplicate product entries.
+- Result: `4595` duplicate entry groups merged, `6077` duplicate entries deleted, `6083` senses moved, and `10738` senses renumbered.
+- Ran `scripts/merge-dictionary-v2-product-senses.mjs` after entry merge.
+- Result: `811` deterministic duplicate senses merged; rule duplicates dropped to `0`.
+- Ran Unsloth semantic review on the remaining `llm_semantic_review` pairs with `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`, `UD-IQ4_NL`, MTP, endpoints `11441,11444,11448,11447`.
+- LLM result: `45/45` valid reviews, `38` merge, `7` keep separate, average `1.98s` per pair.
+- Applied `37` LLM-approved merges from `logs/product-llm-approved-duplicate-merge-plan-after-entry-sense-merge-20260624.json`; one overlapping candidate was skipped because its remove sense had already been removed by an earlier merge.
+
+Published export:
+
+```text
+outputs/d1-v2-product-native-export-entry-sense-llm-merged-20260624
+```
+
+Full import audit passed with no blocking structural errors:
+
+- `bad_sense_localization_counts`: `0`
+- `duplicate_sense_orders`: `0`
+- empty required fields: `0`
+- orphan rows: `0`
+- `zh_terms_with_kana`: `0`
+- `ja_terms_with_latin_only`: `0`
+
+Remaining warning queue after this release:
+
+- `duplicate_sense_localizations`: `327`
+- These are not publish blockers. Most are `manual_keep_or_merge_review`, `likely_keep_separate`, or a small residual `llm_semantic_review` queue after the first post-entry-merge cleanup.
+
+Remote Cloudflare D1 `linguago-dictionary` counts after the successful retry push:
+
+| Table | Rows |
+| --- | ---: |
+| `v2_entries` | 23070 |
+| `v2_senses` | 28761 |
+| `v2_sense_localizations` | 115044 |
+| `v2_examples` | 3049 |
+| `v2_example_localizations` | 11974 |
+
+Worker cache was bumped to `TRANSLATION_CACHE_VERSION = "v53-product-entry-sense-merge"` and deployed as Worker version `c5554e4e-3369-470b-8204-769fa12b8580`. This invalidates the previous dictionary KV cache keys after the D1 data shape changed.
+
+Online API checks after deploy:
+
+- `卿`: returns one Japanese-source entry with three consecutive senses: `Lord`, `minister`, `minister`.
+- `ううん`: returns one Japanese-source entry with three consecutive senses: `nuh-uh`, `no`, `no`.
+- `frighten`: returns two senses with the repaired Portuguese/Japanese localizations: `afugentar` and `amedrontar`.
+- `中`: defaults to the Chinese-source entry when auto-detected as Chinese, with five consecutive senses including `zhōng` and `zhòng` meanings.
+
+Note: dictionary responses still include `cached: true` because dictionary hits are marked as cacheable/dictionary results in the response shape. After the v53 deploy, the returned field values confirm the old KV payload is no longer being used.
+
+Next cleanup queue:
+
+1. Review `logs/product-semantic-duplicate-review-after-entry-sense-llm-merge-20260624.json`.
+2. Resolve the single `encoding_repair_first` item.
+3. Run another targeted LLM/manual pass on the remaining `llm_semantic_review` and high-confidence `manual_keep_or_merge_review` pairs.
+4. Re-export, full-audit, and push D1 only after the next batch passes.
+
+## 2026-06-24 Step 6 Cleanup Checkpoint
+
+This checkpoint continued the post-entry-merge cleanup on
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db`.
+
+Semantic duplicate cleanup:
+
+- Starting warning report:
+  `logs/product-semantic-duplicate-review-step6-start-20260624.json`.
+- Starting warnings: `327` duplicate localization groups, `319` unique sense pairs.
+- Unsloth semantic review model:
+  `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`, `UD-IQ4_NL`, MTP, endpoints
+  `11441,11444,11448,11447`.
+- LLM review result: `279` candidates, `277` valid, `180` merge,
+  `85` keep separate, `12` repair before merge, average `2.14s`.
+- Applied LLM-approved merge plan:
+  `logs/product-llm-approved-duplicate-merge-plan-step6-20260624.json`.
+- Applied result: `179` senses merged, `1` skipped overlapping candidate,
+  `716` sense localizations deleted, `25` examples deleted.
+- After-merge warning report:
+  `logs/product-semantic-duplicate-review-step6-after-merge-20260624.json`.
+- Remaining warnings: `151` duplicate localization groups, `143` unique pairs.
+
+High-priority example supplement:
+
+- Added `scripts/supplement-dictionary-v2-product-known-examples-20260624.mjs`.
+- Inserted `6` hand-reviewed examples and `24` localized example rows for
+  `of`, `would`, `は`, `に`, `ううん`, and `frighten`.
+- The script only inserts when the selected sense has no accepted example, and
+  uses fixed negative `source_example_id` values so repeated runs do not create
+  duplicates.
+
+Final local export:
+
+```text
+outputs/d1-v2-product-native-export-step6-final-20260624
+```
+
+Final export counts:
+
+| Table | Rows |
+| --- | ---: |
+| `v2_entries` | 23070 |
+| `v2_entry_forms` | 161057 |
+| `v2_pronunciation_groups` | 24878 |
+| `v2_senses` | 28582 |
+| `v2_sense_localizations` | 114328 |
+| `v2_examples` | 3030 |
+| `v2_example_localizations` | 11898 |
+
+Full export audit passed:
+
+- `bad_sense_localization_counts`: `0`
+- `duplicate_sense_orders`: `0`
+- empty required fields: `0`
+- orphan rows: `0`
+- `mojibake_texts`: `0`
+- `html_artifacts`: `0`
+- `duplicate_zh_examples_by_en_reading`: `0`
+- remaining non-blocking `duplicate_sense_localizations`: `151`
+
+Worker/API shape changes:
+
+- `TranslateResponse` now supports optional `cache_hit`.
+- Dictionary-origin responses are returned with `cached: false` and
+  `cache_hit: false`; KV cache hits are explicitly returned with
+  `cache_hit: true`.
+- The frontend dictionary badge now treats `provider === "dictionary"` as
+  "核心词典" and uses `cache_hit` only for actual KV/provider cache hits.
+- Worker cache version bumped to
+  `TRANSLATION_CACHE_VERSION = "v54-step6-warning-cleanup-cache-hit"`.
+
+Deployment status:
+
+- Local export and audit are complete.
+- Remote D1 push succeeded with
+  `scripts/push-dictionary-v2-native-to-d1.ps1 -SkipExport -OutDir outputs/d1-v2-product-native-export-step6-final-20260624 -DatabaseName linguago-dictionary`.
+- Worker deploy succeeded as version
+  `1b2f40d0-a3ad-4e4c-99fa-eb318cae2174`.
+- `/health` confirmed remote D1 counts:
+  `entries=23070`, `senses=28582`, `sense_localizations=114328`,
+  `examples=3030`, `example_localizations=11898`.
+- Online API regression passed for `中`, `inside`, `breaks`, `although`,
+  and `cor`. `中` now exposes two pronunciation groups: `zhōng` for
+  sense orders `1,2,3` and `zhòng` for `4,5`.
+- Online render/UI smoke passed on mobile and desktop with no horizontal
+  overflow. Stream abort warnings in the smoke log are expected when the test
+  cancels a previous streaming request during navigation; all captured API
+  responses were `200`.
 
 ## Database
 

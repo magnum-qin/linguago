@@ -3,9 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
+const mode = String(args.mode || "full").trim();
 const outDir = path.resolve(args["out-dir"] || "outputs/d1-v2-product-native-export");
+const productDbPath = path.resolve(args.db || "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db");
 const manifestPath = path.join(outDir, "manifest.json");
-const auditDbPath = path.join(outDir, "audit-import.db");
+const importMode = String(args.import || "memory").trim();
+const auditDbPath = importMode === "memory" ? ":memory:" : path.join(outDir, "audit-import.db");
 const auditPath = path.join(outDir, "audit.json");
 const samplesPath = path.join(outDir, "audit-samples.json");
 const HTML_ENTITY_RE = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#x[0-9a-fA-F]{1,6});/u;
@@ -18,19 +21,40 @@ const sampleTerms = (args.samples || "hello,\u4f60\u597d,\u600e,\u5565,appearanc
   .map((term) => term.trim())
   .filter(Boolean);
 
+if (!["full", "fast"].includes(mode)) {
+  throw new Error(`Unknown --mode: ${mode}. Use full or fast.`);
+}
+
+if (mode === "fast") {
+  if (!fs.existsSync(productDbPath)) throw new Error(`Missing product DB: ${productDbPath}`);
+  const db = new Database(productDbPath, { readonly: true });
+  registerFunctions(db);
+  const audit = buildFastProductAudit(db);
+  const samples = sampleTerms.map((term) => lookupProductSample(db, term));
+  audit.sample_failures = samples.filter((sample) => !sample.ok).map((sample) => ({
+    term: sample.term,
+    reason: sample.reason
+  }));
+  audit.ok = isFastAuditOk(audit);
+  const fastAuditPath = path.resolve(args.out || "logs/product-fast-audit.json");
+  fs.mkdirSync(path.dirname(fastAuditPath), { recursive: true });
+  fs.writeFileSync(fastAuditPath, JSON.stringify({ audit, samples }, null, 2), "utf8");
+  console.log(JSON.stringify({ audit, samples, out: path.relative(process.cwd(), fastAuditPath) }, null, 2));
+  db.close();
+  if (!audit.ok) process.exitCode = 1;
+  process.exit(0);
+}
+
 if (!fs.existsSync(manifestPath)) {
   throw new Error(`Missing product D1 export manifest: ${manifestPath}`);
 }
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-if (fs.existsSync(auditDbPath)) fs.unlinkSync(auditDbPath);
+if (auditDbPath !== ":memory:" && fs.existsSync(auditDbPath)) fs.unlinkSync(auditDbPath);
 
 const db = new Database(auditDbPath);
-db.pragma("foreign_keys = ON");
-db.function("invalid_pos", invalidPartOfSpeech);
-db.function("source_script_mismatch", sourceScriptMismatch);
-db.function("text_has_mojibake", textHasMojibake);
-db.function("text_has_html_artifact", textHasHtmlArtifact);
+configureImportDb(db);
+registerFunctions(db);
 
 for (const relativeFile of [manifest.schema, ...(manifest.chunks || [])]) {
   const sqlPath = path.resolve(relativeFile);
@@ -39,6 +63,8 @@ for (const relativeFile of [manifest.schema, ...(manifest.chunks || [])]) {
 }
 
 const audit = buildAudit(db, manifest);
+audit.mode = mode;
+audit.import_mode = importMode;
 const samples = sampleTerms.map((term) => lookupSample(db, term));
 
 audit.sample_failures = samples.filter((sample) => !sample.ok).map((sample) => ({
@@ -55,6 +81,203 @@ db.close();
 
 if (!audit.ok) {
   process.exitCode = 1;
+}
+
+function configureImportDb(database) {
+  database.pragma("foreign_keys = ON");
+  database.pragma("journal_mode = OFF");
+  database.pragma("synchronous = OFF");
+  database.pragma("temp_store = MEMORY");
+  database.pragma("cache_size = -200000");
+  if (auditDbPath !== ":memory:") database.pragma("locking_mode = EXCLUSIVE");
+}
+
+function registerFunctions(database) {
+  database.function("invalid_pos", invalidPartOfSpeech);
+  database.function("source_script_mismatch", sourceScriptMismatch);
+  database.function("text_has_mojibake", textHasMojibake);
+  database.function("text_has_html_artifact", textHasHtmlArtifact);
+}
+
+function buildFastProductAudit(database) {
+  const hasTable = (name) =>
+    Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
+  const hasBlocks = hasTable("product_sense_publication_blocks");
+  const count = (sql) => scalar(database, sql);
+  const publishableClause = hasBlocks
+    ? `ps.status = 'accepted' AND NOT EXISTS (SELECT 1 FROM product_sense_publication_blocks b WHERE b.product_sense_id = ps.id)`
+    : `ps.status = 'accepted'`;
+
+  return {
+    ok: false,
+    mode: "fast",
+    db: path.relative(process.cwd(), productDbPath),
+    counts: {
+      product_entries: count("SELECT COUNT(*) AS n FROM product_entries"),
+      product_senses: count("SELECT COUNT(*) AS n FROM product_senses"),
+      product_localizations: count("SELECT COUNT(*) AS n FROM product_localizations"),
+      product_examples: count("SELECT COUNT(*) AS n FROM product_examples"),
+      product_example_localizations: count("SELECT COUNT(*) AS n FROM product_example_localizations")
+    },
+    publishable: {
+      senses: count(`
+        SELECT COUNT(*) AS n
+        FROM product_senses ps
+        WHERE ${publishableClause}
+      `),
+      bad_sense_localization_counts: count(`
+        SELECT COUNT(*) AS n
+        FROM (
+          SELECT ps.id
+          FROM product_senses ps
+          LEFT JOIN product_localizations pl ON pl.product_sense_id = ps.id AND pl.needs_review = 0
+          WHERE ${publishableClause}
+          GROUP BY ps.id
+          HAVING COUNT(DISTINCT pl.lang) != 4
+        )
+      `),
+      review_localizations: count(`
+        SELECT COUNT(*) AS n
+        FROM product_senses ps
+        JOIN product_localizations pl ON pl.product_sense_id = ps.id
+        WHERE ${publishableClause}
+          AND pl.needs_review = 1
+      `)
+    },
+    duplicate_sense_orders: count(`
+      SELECT COUNT(*) AS n
+      FROM (
+        SELECT product_entry_id, sense_order
+        FROM product_senses
+        GROUP BY product_entry_id, sense_order
+        HAVING COUNT(*) > 1
+      )
+    `),
+    empty_required: {
+      empty_words: count("SELECT COUNT(*) AS n FROM product_entries WHERE COALESCE(headword, '') = ''"),
+      empty_localizations: count(`
+        SELECT COUNT(*) AS n
+        FROM product_localizations
+        WHERE COALESCE(term, '') = '' OR COALESCE(definition, '') = ''
+      `),
+      empty_examples: count("SELECT COUNT(*) AS n FROM product_examples WHERE COALESCE(source_text, '') = ''"),
+      empty_example_localizations: count(`
+        SELECT COUNT(*) AS n
+        FROM product_example_localizations
+        WHERE COALESCE(text, '') = ''
+      `)
+    },
+    orphans: {
+      orphan_senses: count(`
+        SELECT COUNT(*) AS n
+        FROM product_senses ps
+        LEFT JOIN product_entries pe ON pe.id = ps.product_entry_id
+        WHERE pe.id IS NULL
+      `),
+      orphan_localizations: count(`
+        SELECT COUNT(*) AS n
+        FROM product_localizations pl
+        LEFT JOIN product_senses ps ON ps.id = pl.product_sense_id
+        WHERE ps.id IS NULL
+      `),
+      orphan_source_links: count(`
+        SELECT COUNT(*) AS n
+        FROM product_sense_source_links l
+        LEFT JOIN product_senses ps ON ps.id = l.product_sense_id
+        WHERE ps.id IS NULL
+      `),
+      orphan_examples: count(`
+        SELECT COUNT(*) AS n
+        FROM product_examples x
+        LEFT JOIN product_senses ps ON ps.id = x.product_sense_id
+        WHERE ps.id IS NULL
+      `),
+      orphan_example_localizations: count(`
+        SELECT COUNT(*) AS n
+        FROM product_example_localizations xl
+        LEFT JOIN product_examples x ON x.id = xl.product_example_id
+        WHERE x.id IS NULL
+      `)
+    },
+    content_integrity: {
+      invalid_part_of_speech: count(`
+        SELECT COUNT(*) AS n
+        FROM product_senses
+        WHERE invalid_pos(part_of_speech)
+      `),
+      source_script_mismatches: count(`
+        SELECT COUNT(*) AS n
+        FROM product_entries
+        WHERE source_script_mismatch(headword, primary_lang)
+      `),
+      mojibake_texts: count(`
+        SELECT COUNT(*) AS n
+        FROM (
+          SELECT id
+          FROM product_entries
+          WHERE text_has_mojibake(headword, primary_lang)
+             OR text_has_mojibake(normalized_key, primary_lang)
+          UNION ALL
+          SELECT id
+          FROM product_localizations
+          WHERE text_has_mojibake(term, lang)
+             OR text_has_mojibake(reading, lang)
+             OR text_has_mojibake(pronunciation, lang)
+             OR text_has_mojibake(definition, lang)
+          UNION ALL
+          SELECT id
+          FROM product_examples
+          WHERE text_has_mojibake(source_text, source_lang)
+          UNION ALL
+          SELECT id
+          FROM product_example_localizations
+          WHERE text_has_mojibake(text, lang)
+        )
+      `),
+      html_artifacts: count(`
+        SELECT COUNT(*) AS n
+        FROM product_localizations
+        WHERE text_has_html_artifact(term, lang)
+           OR text_has_html_artifact(definition, lang)
+      `),
+      source_script_mismatch_samples: database
+        .prepare(`
+          SELECT id AS entry_id, headword AS word, primary_lang AS source_lang, normalized_key
+          FROM product_entries
+          WHERE source_script_mismatch(headword, primary_lang)
+          ORDER BY frequency_rank IS NULL, frequency_rank, id
+          LIMIT 20
+        `)
+        .all()
+    },
+    warnings: {
+      duplicate_sense_localizations: count(`
+        SELECT COUNT(*) AS n
+        FROM (
+          SELECT pe.id, pl.lang, lower(trim(pl.term)) AS term_key, lower(trim(pl.definition)) AS definition_key
+          FROM product_entries pe
+          JOIN product_senses ps ON ps.product_entry_id = pe.id
+          JOIN product_localizations pl ON pl.product_sense_id = ps.id
+          GROUP BY pe.id, pl.lang, term_key, definition_key
+          HAVING COUNT(*) > 1
+        )
+      `),
+      zh_terms_with_kana: count(`
+        SELECT COUNT(*) AS n
+        FROM product_localizations
+        WHERE lang='zh' AND term GLOB '*[\u3040-\u30ff]*'
+      `),
+      ja_terms_with_latin_only: count(`
+        SELECT COUNT(*) AS n
+        FROM product_localizations
+        WHERE lang='ja'
+          AND term GLOB '*[A-Za-z]*'
+          AND term NOT GLOB '*[\u3040-\u30ff\u4e00-\u9fff]*'
+          AND NOT (length(term) = 1 AND term = upper(term))
+          AND NOT (length(term) BETWEEN 2 AND 8 AND term = upper(term))
+      `)
+    }
+  };
 }
 
 function buildAudit(database, exportManifest) {
@@ -528,6 +751,69 @@ function lookupSample(database, term) {
   };
 }
 
+function lookupProductSample(database, term) {
+  const normalized = normalizeKey(term);
+  const entry = database
+    .prepare(
+      `
+        WITH candidates AS (
+          SELECT pe.id, pe.headword AS word, pe.primary_lang AS source_lang, pe.frequency_rank, 0 AS priority
+          FROM product_entries pe
+          WHERE lower(trim(pe.normalized_key)) = @normalized
+             OR lower(trim(pe.headword)) = @normalized
+          UNION ALL
+          SELECT pe.id, pe.headword AS word, pe.primary_lang AS source_lang, pe.frequency_rank, 1 AS priority
+          FROM product_localizations pl
+          JOIN product_senses ps ON ps.id = pl.product_sense_id
+          JOIN product_entries pe ON pe.id = ps.product_entry_id
+          WHERE lower(trim(pl.term)) = @normalized
+            AND pl.needs_review = 0
+        )
+        SELECT *
+        FROM candidates
+        ORDER BY priority, CASE WHEN frequency_rank IS NULL THEN 999999 ELSE frequency_rank END, id
+        LIMIT 1
+      `
+    )
+    .get({ normalized });
+
+  if (!entry) return { term, ok: false, reason: "no_match" };
+
+  const senses = database
+    .prepare(
+      `
+        SELECT id, sense_order, part_of_speech, gloss_key, status
+        FROM product_senses
+        WHERE product_entry_id = ?
+        ORDER BY sense_order, id
+        LIMIT 3
+      `
+    )
+    .all(entry.id)
+    .map((sense) => ({
+      ...sense,
+      localizations: database
+        .prepare(
+          `
+            SELECT lang, term, reading, reading_system, pronunciation, pronunciation_system, definition, needs_review
+            FROM product_localizations
+            WHERE product_sense_id = ?
+            ORDER BY lang
+          `
+        )
+        .all(sense.id)
+    }));
+
+  const badLocalizationCount = senses.filter((sense) => new Set(sense.localizations.filter((row) => !row.needs_review).map((row) => row.lang)).size !== 4).length;
+  return {
+    term,
+    ok: badLocalizationCount === 0,
+    reason: badLocalizationCount ? "sense_not_four_language_complete" : "",
+    entry,
+    senses
+  };
+}
+
 function isAuditOk(audit) {
   return (
     audit.count_mismatches.length === 0 &&
@@ -542,6 +828,20 @@ function isAuditOk(audit) {
     audit.content_integrity.mojibake_texts === 0 &&
     audit.content_integrity.html_artifacts === 0 &&
     audit.duplicate_zh_examples_by_en_reading === 0 &&
+    audit.sample_failures.length === 0
+  );
+}
+
+function isFastAuditOk(audit) {
+  return (
+    audit.publishable.bad_sense_localization_counts === 0 &&
+    audit.publishable.review_localizations === 0 &&
+    audit.duplicate_sense_orders === 0 &&
+    Object.values(audit.empty_required).every((value) => value === 0) &&
+    Object.values(audit.orphans).every((value) => value === 0) &&
+    audit.content_integrity.source_script_mismatches === 0 &&
+    audit.content_integrity.mojibake_texts === 0 &&
+    audit.content_integrity.html_artifacts === 0 &&
     audit.sample_failures.length === 0
   );
 }
@@ -577,9 +877,9 @@ function sourceScriptMismatch(word, sourceLang) {
   const hasHan = /\p{Script=Han}/u.test(text);
   const hasHiragana = /\p{Script=Hiragana}/u.test(text);
   const hasKatakana = /\p{Script=Katakana}/u.test(text);
-  const hasKana = hasHiragana || hasKatakana;
+  const hasKana = hasHiragana || hasKatakana || /[\u30fc\uff70]/u.test(text);
 
-  if (lang === "zh") return hasLatin || hasKana || !hasHan ? 1 : 0;
+  if (lang === "zh") return hasKana || !hasHan ? 1 : 0;
   if (lang === "ja") return hasHan || hasKana ? 0 : 1;
   if (lang === "en" || lang === "pt-BR") return hasHan || hasKana ? 1 : 0;
   return 0;

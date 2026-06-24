@@ -24,7 +24,8 @@ const currentWord = computed(() => {
   return '';
 });
 const isDesktop = ref(false);
-const activeLang = ref('zh');
+const DEFAULT_RESULT_LANG = 'en';
+const activeLang = ref(DEFAULT_RESULT_LANG);
 
 const isReportModalOpen = ref(false);
 const reportReason = ref('');
@@ -75,7 +76,10 @@ watch(activeTabIndex, async () => {
   updateIndicator();
 });
 
-watch(resultData, async () => {
+watch(resultData, async (value) => {
+  if (value && typeof value !== 'string') {
+    activeLang.value = DEFAULT_RESULT_LANG;
+  }
   await nextTick();
   setTimeout(updateIndicator, 50);
 });
@@ -111,13 +115,17 @@ const currentSenses = computed(() => {
 const currentSenseGroups = computed(() => {
   const groups: Array<{ key: string; label: string; system: string; senses: any[] }> = [];
   const index = new Map<string, { key: string; label: string; system: string; senses: any[] }>();
+  const sourceLang = resultData.value?.detected_source_lang || resultData.value?.source_lang || '';
 
   if (resultData.value && Array.isArray(resultData.value.pronunciation_groups)) {
+    let groupedSenseCount = 0;
     for (const group of resultData.value.pronunciation_groups) {
       const senses = Array.isArray(group.senses)
         ? group.senses.filter((sense: any) => senseDefinition(sense, activeLang.value))
         : [];
       if (senses.length === 0) continue;
+      if (group.lang !== sourceLang || !group.reading) continue;
+      groupedSenseCount += senses.length;
       groups.push({
         key: group.reading_key || group.reading || `group-${groups.length + 1}`,
         label: group.reading || '',
@@ -125,7 +133,8 @@ const currentSenseGroups = computed(() => {
         senses
       });
     }
-    if (groups.length > 0) return groups;
+    if (groups.length > 0 && groupedSenseCount === currentSenses.value.length) return groups;
+    groups.length = 0;
   }
 
   for (const sense of currentSenses.value) {
@@ -303,10 +312,10 @@ const submitReport = async () => {
       <div v-if="resultData" class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative">
         <div class="flex items-center justify-between w-full mb-6">
           <span class="text-[0.7rem] font-bold uppercase tracking-widest text-m3-on-surface-variant flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full" :class="resultData.provider === 'dictionary' ? 'bg-[#ff9800]' : (resultData.cached ? 'bg-m3-primary' : 'bg-[#008053]')"></span>
+            <span class="w-1.5 h-1.5 rounded-full" :class="resultData.provider === 'dictionary' ? 'bg-[#ff9800]' : ((resultData.cache_hit ?? resultData.cached) ? 'bg-m3-primary' : 'bg-[#008053]')"></span>
             <div class="flex flex-col">
-              <span>{{ resultData.provider === 'dictionary' ? '核心词典' : (resultData.cached ? '已缓存' : 'AI') }}</span>
-              <span class="text-[0.55rem] opacity-70 tracking-normal mt-0.5" v-if="resultData.provider === 'dictionary' || resultData.cached">
+              <span>{{ resultData.provider === 'dictionary' ? '核心词典' : ((resultData.cache_hit ?? resultData.cached) ? '已缓存' : 'AI') }}</span>
+              <span class="text-[0.55rem] opacity-70 tracking-normal mt-0.5" v-if="resultData.provider === 'dictionary' || (resultData.cache_hit ?? resultData.cached)">
                 {{ resultData.provider === 'dictionary' ? 'Dicionário Principal' : 'Em cache' }}
               </span>
             </div>

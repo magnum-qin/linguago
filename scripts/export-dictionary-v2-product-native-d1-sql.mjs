@@ -397,6 +397,7 @@ function q(value) {
 }
 
 function n(value) {
+  if (value === null || value === undefined || value === "") return "NULL";
   const number = Number(value);
   if (!Number.isFinite(number)) return "NULL";
   return String(number);

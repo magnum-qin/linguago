@@ -1,22 +1,27 @@
 import { ref, shallowRef } from 'vue';
 import { openTranslationStream } from '../utils/api.js';
 import { settings } from './useSettings';
+import { useHistory } from './useHistory';
 
 const inputText = ref('');
 const resultData = shallowRef<any>(null);
 const isTranslating = ref(false);
+const sourceLangPreference = ref<'auto' | 'zh' | 'ja'>('auto');
 
 export function useTranslation() {
+  const { addHistory } = useHistory();
+
   const translate = async () => {
     if (!inputText.value.trim() || isTranslating.value) return;
     
     isTranslating.value = true;
     resultData.value = null;
+    const text = inputText.value.trim();
     
     try {
       const payload = {
-        text: inputText.value,
-        source_lang: 'auto',
+        text,
+        source_lang: sourceLangPreference.value,
         target_lang: 'zh',
         provider: settings.provider,
         model: settings.model,
@@ -43,6 +48,14 @@ export function useTranslation() {
             const parsed = JSON.parse(line);
             if (parsed.event === 'partial_translation' || parsed.event === 'partial_explanation' || parsed.event === 'final') {
               resultData.value = parsed.data;
+              if (parsed.event === 'final') {
+                addHistory({
+                  text,
+                  targetLang: parsed.data?.target_lang || payload.target_lang,
+                  provider: parsed.data?.provider || payload.provider,
+                  model: parsed.data?.model || payload.model
+                });
+              }
             } else if (parsed.event === 'error') {
               throw new Error(parsed.data.message || 'Translation failed');
             }
@@ -66,6 +79,7 @@ export function useTranslation() {
 
   return {
     inputText,
+    sourceLangPreference,
     resultData,
     isTranslating,
     translate,

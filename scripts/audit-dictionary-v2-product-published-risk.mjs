@@ -122,6 +122,15 @@ const result = {
   db: path.relative(process.cwd(), dbPath),
   generated_at: new Date().toISOString(),
   summary,
+  flagged_sense_ids: allFlagged.map((item) => item.sense_id),
+  flagged_senses: allFlagged.map((item) => ({
+    sense_id: item.sense_id,
+    entry_id: item.entry_id,
+    headword: item.headword,
+    primary_lang: item.primary_lang,
+    frequency_rank: item.frequency_rank,
+    issues: item.issues
+  })),
   issue_buckets: summarizeBuckets(buckets, sampleLimit),
   recommended_next_steps: recommend(summary)
 };

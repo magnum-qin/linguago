@@ -13,8 +13,12 @@ const promptVersion = args["prompt-version"] || DEFAULT_PROMPT_VERSION;
 const keepThreshold = Number(args["keep-threshold"] || 0.8);
 const splitThreshold = Number(args["split-threshold"] || 0.8);
 const dryRun = args["dry-run"] === "true";
+const keepAction = args["keep-action"] || "ready_for_llm";
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
+if (!["ready_for_llm", "noop"].includes(keepAction)) {
+  throw new Error("--keep-action must be one of: ready_for_llm, noop");
+}
 
 const db = new Database(dbPath);
 db.pragma("foreign_keys = ON");
@@ -88,11 +92,13 @@ const stats = {
   split_threshold: splitThreshold,
   reviewed_accepted: latestReviews.length,
   marked_ready_for_llm: 0,
+  kept_unchanged: 0,
   marked_split_pending: 0,
   marked_needs_review: 0,
   skipped_low_confidence_keep: 0,
   skipped_low_confidence_split: 0,
   split_plans_upserted: 0,
+  keep_action: keepAction,
   dry_run: dryRun
 };
 
@@ -202,6 +208,10 @@ function applyReview(review, write) {
   if (review.decision === "keep") {
     if (Number(review.confidence) < keepThreshold) {
       stats.skipped_low_confidence_keep++;
+      return;
+    }
+    if (keepAction === "noop") {
+      stats.kept_unchanged++;
       return;
     }
     if (write) {

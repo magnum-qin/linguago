@@ -14,6 +14,7 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Static hosting: Workers Assets from `dist/`.
 - Cache/settings/rate limits: Cloudflare KV binding `CACHE`.
 - Dictionary: Cloudflare D1 binding `DB`, plus optional Louis SQLite API through `DICTIONARY_API_URL` and `DICTIONARY_API_TOKEN`.
+- Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
 ## Read These First
@@ -178,6 +179,40 @@ npm run deploy
 ```
 
 PowerShell may block `npm.ps1`; use `npm.cmd run <script>` if needed.
+
+## GPU Cluster Notes
+
+The active local LLM API is Unsloth Studio, not Ollama. Use OpenAI-compatible endpoints with a bearer token:
+
+- `GET /v1/status`
+- `GET /v1/models`
+- `POST /v1/load`
+- `POST /v1/chat/completions`
+
+Project-approved test nodes and jump-host forwarding:
+
+| Node | Base URL | Target |
+| --- | --- | --- |
+| `a6000-143` | `http://100.99.99.99:11441` | `192.168.2.143:8888` |
+| `a6000-147` | `http://100.99.99.99:11444` | `172.23.4.53:8888` |
+| `rtx4090-47` | `http://100.99.99.99:11448` | `172.23.4.47:8888` |
+| `rtx4090-56` | `http://100.99.99.99:11447` | `172.23.4.56:8888` |
+
+Run the cluster smoke test with `UNSLOTH_API_KEY` set:
+
+```bash
+npm run dict:v2:test:unsloth -- --out logs/unsloth-studio-cluster-test.json
+```
+
+The smoke test currently targets `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`, uses `/v1/load` before `/v1/chat/completions`, and disables MTP automatically for nodes whose `/v1/status` reports no MTP support. On 2026-06-22 all four listed nodes passed the structured dictionary test with `10/10`; see `logs/unsloth-studio-cluster-test-20260622.json`.
+
+Current production-generation guidance from the 2026-06-23 source-gap benchmarks:
+
+- Use `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` with `gguf_variant=UD-IQ4_NL`.
+- Use `max_seq_length=8192`, `speculative_type=mtp`, `batch-size=1`, and one worker per GPU endpoint.
+- `rtx4090-56` (`11447`) and `rtx4090-47` (`11448`) both run `UD-IQ4_NL` with `-ngl -1` full layer GPU offload, `--flash-attn on`, `--spec-type draft-mtp`, and about 19.8 GB VRAM used. This avoids the previous `UD-Q4_K_XL` 4090 VRAM pressure and CPU offload problem.
+- Measured source-gap dry-run throughput: `rtx4090-56` 47/50 accepted at 51.66 accepted/min, `rtx4090-47` 47/50 accepted at 46.64 accepted/min, dual 4090 96/100 accepted at about 90-100 accepted/min wall-clock. `a6000-155` with the same variant produced 48/50 accepted at 38.96 accepted/min.
+- Unsloth Studio detects the Qwen3.6 MTP repo as a vision model and auto-adds `mmproj-F16.gguf`. Local OpenAPI exposes `gguf_variant`, `max_seq_length`, `speculative_type`, `spec_draft_n_max`, `tensor_parallel`, and `llama_extra_args`, but no supported `vision=false` or `mmproj=false` load option. Do not assume mmproj can be disabled through `/v1/load`.
 
 ## UI Constraints
 
