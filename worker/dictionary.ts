@@ -525,7 +525,9 @@ function v2DictionaryEntryToResponse(
 ): WordResponse {
   const parsedSenses = parseJsonValue(entry.senses);
   const rawSenses = Array.isArray(parsedSenses) ? (parsedSenses as Array<Record<string, unknown>>) : [];
-  const senses = rawSenses.map((sense, index) => normalizeV2Sense(sense, index));
+  const senses = rawSenses
+    .map((sense, index) => normalizeV2Sense(sense, index))
+    .sort((a, b) => a.sense_order - b.sense_order);
   const firstSense = senses[0] || null;
   const translations = v2PrimaryTranslations(senses);
   const pronunciationGroups = v2PronunciationGroups(senses, String(entry.word || original));

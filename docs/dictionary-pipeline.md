@@ -985,6 +985,41 @@ default to the Chinese product entry depending on lookup ranking. The entry
 data has been corrected, but default language disambiguation remains a separate
 lookup/UI ranking task.
 
+## 2026-06-24 Batch 3 High-Frequency Overrides
+
+A fourth deterministic override pass fixed another set of high-frequency cases
+where one translated localization had been copied from a neighboring sense. The
+batch covered entries such as `另外`, `放手`, `連続`, `好み`, `国際`, `業`, `何時`,
+`白色`, `篇`, `叔`, `ビジター`, `労働`, and `閉`.
+
+Result:
+
+- override config: `57` entries;
+- local product database update: `57` senses and `101` localizations touched;
+- semantic duplicate review: `108 -> 97` warnings;
+- full export audit: no blocking errors, `mojibake_texts = 0`,
+  `html_artifacts = 0`;
+- exported `entry_forms`: `161161`;
+- exported `pronunciation_groups`: `24898`;
+- exported product counts: `23070` entries, `28582` senses,
+  `114328` sense localizations, `3030` examples, and `11898` example
+  localizations;
+- local export:
+  `outputs/d1-v2-product-native-export-batch3-overrides-20260624`.
+
+Remote D1 push succeeded on 2026-06-25. `/health` reported `published_at` as
+`2026-06-24T14:53:32.203Z` with `23070` entries, `28582` senses, `114328`
+sense localizations, `3030` examples, and `11898` example localizations.
+
+Worker cache was bumped to `TRANSLATION_CACHE_VERSION =
+"v55-dictionary-sense-order"` and deployed as Worker version
+`47b719f7-a824-4a33-b6b6-e8a46f28b746`. This invalidates old dictionary KV
+results and ensures v2 senses are displayed in stable `sense_order` order even
+when SQL matching temporarily prioritizes a matched sense.
+
+Spot-checked audit samples confirmed the corrected distinctions for `另外`,
+`放手`, `国際`, `何時`, `白色`, `篇`, `叔`, `ビジター`, `労働`, and `閉`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

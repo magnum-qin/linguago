@@ -807,5 +807,368 @@
         "definition": "对学习、职责等没有给予应有的注意。"
       }
     }
+  },
+  {
+    "target": {
+      "headword": "另外",
+      "primary_lang": "zh",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "その上",
+        "reading": "そのうえ",
+        "reading_system": "kana",
+        "definition": "前に述べたことに、さらに別の点を付け加えること。"
+      },
+      "zh": {
+        "term": "而且",
+        "reading": "ér qiě",
+        "reading_system": "pinyin",
+        "definition": "用于进一步补充说明，表示此外、并且。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "放手",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "諦める",
+        "reading": "あきらめる",
+        "reading_system": "kana",
+        "definition": "続けようとする気持ちや関わりを断つこと。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "連続",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "ja": {
+        "term": "連続的",
+        "reading": "れんぞくてき",
+        "reading_system": "kana",
+        "definition": "途切れずに続いているさま。"
+      },
+      "zh": {
+        "term": "连续的",
+        "reading": "lián xù de",
+        "reading_system": "pinyin",
+        "definition": "不间断地接连发生或存在的。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "好み",
+      "primary_lang": "ja",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "〜好み",
+        "reading": "このみ",
+        "reading_system": "kana",
+        "definition": "ある対象に対する好みや趣味を表す接尾的な表現。"
+      },
+      "zh": {
+        "term": "对……的喜好",
+        "reading": "duì de xǐ hào",
+        "reading_system": "pinyin",
+        "definition": "表示对某一对象的偏好或喜爱。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "国際",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "diplomatic relations",
+        "definition": "Official relations or intercourse between nations."
+      },
+      "ja": {
+        "term": "国交",
+        "reading": "こっこう",
+        "reading_system": "kana",
+        "definition": "国と国との公式な交際や関係。"
+      },
+      "zh": {
+        "term": "国际交往",
+        "reading": "guó jì jiāo wǎng",
+        "reading_system": "pinyin",
+        "definition": "国家之间的正式往来或外交关系。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "業",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "karmic result",
+        "definition": "The consequence or fate believed to arise from one's karma."
+      },
+      "ja": {
+        "term": "業報",
+        "reading": "ごうほう",
+        "reading_system": "kana",
+        "definition": "過去の行為によって生じる報い。"
+      },
+      "zh": {
+        "term": "业报",
+        "reading": "yè bào",
+        "reading_system": "pinyin",
+        "definition": "佛教中由过去行为所导致的果报。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "何時",
+      "primary_lang": "ja",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.94,
+    "localizations": {
+      "ja": {
+        "term": "いつ",
+        "reading": "いつ",
+        "reading_system": "kana",
+        "definition": "時を尋ねる語。どの時点か。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "白色",
+      "primary_lang": "zh",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "white terror; reactionary",
+        "definition": "Reactionary repression, especially political persecution or terror."
+      },
+      "zh": {
+        "term": "白色恐怖",
+        "reading": "bái sè kǒng bù",
+        "reading_system": "pinyin",
+        "definition": "反动势力对革命者或进步人士进行的残酷镇压和恐怖统治。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "白色",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "white pollution",
+        "definition": "Pollution caused by plastic waste or disposable plastic products."
+      },
+      "zh": {
+        "term": "白色污染",
+        "reading": "bái sè wū rǎn",
+        "reading_system": "pinyin",
+        "definition": "由塑料废弃物，尤其是一次性塑料制品造成的环境污染。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "篇",
+      "primary_lang": "zh",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "bound bamboo slips",
+        "definition": "A bound set of bamboo slips used for writing or recordkeeping in ancient China."
+      },
+      "pt-BR": {
+        "term": "tiras de bambu encadernadas",
+        "definition": "Conjunto de tiras de bambu usado para escrita ou registro na China antiga."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "篇",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "sheet; measure word for writings",
+        "definition": "A sheet of paper, or a measure word used for articles and written pieces."
+      },
+      "ja": {
+        "term": "篇",
+        "reading": "へん",
+        "reading_system": "kana",
+        "definition": "文章や書物などを数える単位。また、紙の一枚。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "叔",
+      "primary_lang": "zh",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "en": {
+        "term": "younger brother-in-law",
+        "definition": "A husband's younger brother."
+      },
+      "zh": {
+        "term": "小叔子",
+        "reading": "xiǎo shū zi",
+        "reading_system": "pinyin",
+        "definition": "丈夫的弟弟。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "叔",
+      "primary_lang": "zh",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "third younger brother",
+        "definition": "The third brother among four brothers; also an extended kinship term."
+      },
+      "ja": {
+        "term": "三番目の弟",
+        "reading": "さんばんめのおとうと",
+        "reading_system": "kana",
+        "definition": "四人兄弟のうち三番目の弟を指す語。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "ビジター",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "en": {
+        "term": "visiting team",
+        "definition": "A team playing or competing away from its home venue."
+      },
+      "ja": {
+        "term": "ビジターチーム",
+        "reading": "ビジターチーム",
+        "reading_system": "katakana",
+        "definition": "本拠地ではない場所で試合をする側のチーム。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "労働",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "Labour Party",
+        "definition": "A political party representing labor interests, especially in countries such as the United Kingdom or Australia."
+      },
+      "pt-BR": {
+        "term": "Partido Trabalhista",
+        "definition": "Partido político associado aos interesses dos trabalhadores, especialmente no Reino Unido ou na Austrália."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "閉",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "obstruct; block up",
+        "definition": "To obstruct, block up, or stop a passage."
+      },
+      "ja": {
+        "term": "塞ぐ",
+        "reading": "ふさぐ",
+        "reading_system": "kana",
+        "definition": "通路や穴などを閉ざして通れなくすること。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "閉",
+      "primary_lang": "zh",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-batch3-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "shut; close",
+        "definition": "To shut or close something."
+      },
+      "ja": {
+        "term": "閉じる",
+        "reading": "とじる",
+        "reading_system": "kana",
+        "definition": "開いているものを閉めること。"
+      }
+    }
   }
 ]
