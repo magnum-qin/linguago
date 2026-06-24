@@ -1,0 +1,196 @@
+[
+  {
+    "target": { "headword": "的", "primary_lang": "zh", "sense_order": 1 },
+    "part_of_speech": "particle",
+    "gloss_key": "possessive or attributive particle",
+    "source": "manual:product-core-function-word-override",
+    "confidence": 0.99,
+    "localizations": {
+      "en": {
+        "term": "of; possessive particle",
+        "pronunciation": "/əv/",
+        "pronunciation_system": "IPA",
+        "definition": "A structural particle used after a modifier to mark possession, attribution, or description."
+      },
+      "zh": {
+        "term": "的",
+        "reading": "de",
+        "reading_system": "pinyin",
+        "definition": "结构助词，用在定语后，表示所属、修饰、性质或说明。"
+      },
+      "ja": {
+        "term": "の",
+        "reading": "の",
+        "reading_system": "kana",
+        "definition": "連体修飾や所有を表す中国語の構造助詞。"
+      },
+      "pt-BR": {
+        "term": "de; partícula possessiva",
+        "pronunciation": "/dʒi/",
+        "pronunciation_system": "IPA",
+        "definition": "Partícula estrutural chinesa que marca posse, atributo ou modificação."
+      }
+    }
+  },
+  {
+    "target": { "headword": "ペット", "primary_lang": "ja", "sense_order": 2 },
+    "part_of_speech": "noun",
+    "gloss_key": "trumpet",
+    "source": "manual:pet-trumpet-repair-20260624",
+    "localizations": {
+      "en": {
+        "term": "trumpet",
+        "pronunciation": "/ˈtrʌm.pɪt/",
+        "pronunciation_system": "IPA",
+        "definition": "A brass musical instrument played by blowing through a mouthpiece."
+      },
+      "ja": {
+        "term": "トランペット",
+        "reading": "トランペット",
+        "reading_system": "katakana",
+        "definition": "金管楽器の一種。唇を振動させて音を出す楽器。"
+      },
+      "zh": {
+        "term": "小号",
+        "reading": "xiǎohào",
+        "reading_system": "pinyin",
+        "definition": "一种铜管乐器，通过吹嘴吹奏发声。"
+      },
+      "pt-BR": {
+        "term": "trompete",
+        "pronunciation": "/tɾõˈpe.tʃi/",
+        "pronunciation_system": "IPA",
+        "definition": "Instrumento musical de sopro da família dos metais, tocado com um bocal."
+      }
+    }
+  },
+  {
+    "target": { "headword": "評価", "primary_lang": "ja", "sense_order": 2 },
+    "part_of_speech": "noun",
+    "source": "manual:residual-pos-duplicate-repair-20260624",
+    "localizations": {
+      "ja": {
+        "term": "評価額",
+        "reading": "ひょうかがく",
+        "reading_system": "kana",
+        "definition": "資産や会社などの金銭的な価値を見積もること。また、その金額。"
+      },
+      "pt-BR": {
+        "term": "valoração",
+        "definition": "Estimativa do valor monetário ou econômico de algo."
+      }
+    }
+  },
+  {
+    "target": { "headword": "耐心", "primary_lang": "zh", "sense_order": 3 },
+    "part_of_speech": "verb",
+    "source": "manual:residual-pos-duplicate-repair-20260624",
+    "localizations": {
+      "en": {
+        "term": "be patient",
+        "definition": "To wait or endure difficulty calmly without becoming annoyed."
+      },
+      "ja": {
+        "term": "辛抱強い",
+        "reading": "しんぼうづよい",
+        "reading_system": "kana",
+        "definition": "困難や遅れに対して、いらだたずに落ち着いて耐えるさま。"
+      }
+    }
+  },
+  {
+    "target": { "headword": "发明", "primary_lang": "zh", "sense_order": 2 },
+    "part_of_speech": "noun",
+    "source": "manual:residual-pos-duplicate-repair-20260624",
+    "localizations": {
+      "zh": {
+        "term": "发明",
+        "reading": "fā míng",
+        "reading_system": "pinyin",
+        "definition": "被创造出来的新事物、新装置或新方法。"
+      },
+      "ja": {
+        "term": "発明品",
+        "reading": "はつめいひん",
+        "reading_system": "kana",
+        "definition": "新しく考え出され、作られた物や方法。"
+      }
+    }
+  },
+  {
+    "target": { "headword": "詩", "primary_lang": "ja", "sense_order": 2 },
+    "part_of_speech": "noun",
+    "source": "manual:residual-pos-duplicate-repair-20260624",
+    "localizations": {
+      "en": {
+        "term": "Chinese poem",
+        "definition": "A poem written in Chinese or in a Chinese poetic tradition."
+      },
+      "zh": {
+        "term": "汉诗",
+        "reading": "hàn shī",
+        "reading_system": "pinyin",
+        "definition": "以汉语或汉诗传统写成的诗。"
+      }
+    }
+  },
+  {
+    "target": { "headword": "摄影", "primary_lang": "zh", "sense_order": 2 },
+    "part_of_speech": "verb",
+    "source": "manual:residual-pos-duplicate-repair-20260624",
+    "localizations": {
+      "en": {
+        "term": "take a photograph",
+        "definition": "To use a camera to capture an image."
+      },
+      "zh": {
+        "term": "摄影",
+        "reading": "shè yǐng",
+        "reading_system": "pinyin",
+        "definition": "用相机拍摄并记录影像。"
+      }
+    }
+  },
+  {
+    "target": { "headword": "相似", "primary_lang": "zh", "sense_order": 2 },
+    "part_of_speech": "verb",
+    "source": "manual:residual-pos-duplicate-repair-20260624",
+    "localizations": {
+      "en": {
+        "term": "be similar",
+        "definition": "To resemble another thing without being exactly the same."
+      },
+      "zh": {
+        "term": "相似",
+        "reading": "xiāng sì",
+        "reading_system": "pinyin",
+        "definition": "彼此相像，但不完全相同。"
+      },
+      "ja": {
+        "term": "似る",
+        "reading": "にる",
+        "reading_system": "kana",
+        "definition": "形や性質が他のものと同じように見える。"
+      }
+    }
+  },
+  {
+    "target": { "headword": "無礼", "primary_lang": "ja", "sense_order": 2 },
+    "part_of_speech": "noun",
+    "source": "manual:residual-pos-duplicate-repair-20260624",
+    "localizations": {
+      "ja": {
+        "term": "無礼さ",
+        "reading": "ぶれいさ",
+        "reading_system": "kana",
+        "definition": "礼儀を欠いている性質や態度。"
+      },
+      "zh": {
+        "term": "无礼",
+        "reading": "wú lǐ",
+        "reading_system": "pinyin",
+        "definition": "缺乏礼貌的行为、态度或性质。"
+      }
+    }
+  }
+]

@@ -865,6 +865,55 @@ Remote D1 push succeeded. `/health` reported `published_at` as
 `2026-06-24T11:01:40.008Z`. Online API spot checks passed for `ペット`,
 `评价`, `耐心`, `摄影`, `相似`, and `無礼`.
 
+## 2026-06-24 Product Override Layer
+
+The product database now has a replayable override layer for hand-reviewed
+localization and POS repairs:
+
+```text
+config/dictionary-overrides/product-sense-localizations.json
+scripts/apply-dictionary-v2-product-localization-overrides.mjs
+```
+
+The script locates a product sense by `headword + primary_lang + sense_order`
+or `headword + primary_lang + gloss_key`, then updates `product_senses` and
+`product_localizations`. This makes deterministic fixes reusable after future
+database rebuilds instead of leaving them only in one-off dated repair scripts.
+
+Current overrides include:
+
+- the previously verified residual repairs for `ペット`, `評価`, `耐心`,
+  `发明`, `詩`, `摄影`, `相似`, and `無礼`;
+- a high-frequency correction for Chinese `的`, making sense 1 the common
+  structural particle / possessive-attributive marker while retaining the rare
+  character senses after it.
+
+Apply command:
+
+```powershell
+node scripts/apply-dictionary-v2-product-localization-overrides.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --overrides config/dictionary-overrides/product-sense-localizations.json `
+  --apply true
+```
+
+Published export after applying the override layer:
+
+```text
+outputs/d1-v2-product-native-export-product-overrides-20260624
+```
+
+Full export audit passed with no blocking errors and the duplicate warning
+queue remained stable at `135`. Remote D1 push succeeded. `/health` reported
+`published_at` as `2026-06-24T12:24:08.707Z`.
+
+Online spot checks after the push:
+
+- `的`: sense 1 is now `particle / possessive or attributive particle`.
+- `ペット`: sense 1 `pet`, sense 2 `trumpet`.
+- `发明`: sense 1 verb `to invent`, sense 2 noun `invention`.
+- `摄影`: sense 1 noun `photography`, sense 2 verb `take a photograph`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
