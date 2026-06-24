@@ -103,9 +103,12 @@ const handlePaste = async () => {
   }
 };
 
-const toggleSourceLang = () => {
+const toggleSourceLang = async () => {
   if (!sourceToggleVisible.value) return;
   sourceLangPreference.value = sourceLangPreference.value === 'ja' ? 'zh' : 'ja';
+  if (inputText.value.trim() && hasResult.value && !isTranslating.value) {
+    await translate();
+  }
 };
 
 const handleClear = () => {
