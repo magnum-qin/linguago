@@ -1034,6 +1034,22 @@ when SQL matching temporarily prioritizes a matched sense.
 Spot-checked audit samples confirmed the corrected distinctions for `另外`,
 `放手`, `国際`, `何時`, `白色`, `篇`, `叔`, `ビジター`, `労働`, and `閉`.
 
+On 2026-06-25, a follow-up spot fix corrected `白色` Japanese and Portuguese
+localizations that were structurally valid but semantically weak:
+
+- sense 1 now uses `ja=白色テロ` and `pt-BR=terror branco`;
+- sense 2 now uses `ja=白色汚染` and `pt-BR=poluição branca`;
+- local override replay touched `57` senses and `105` localizations;
+- full export audit passed with no blocking errors, `mojibake_texts = 0`, and
+  `html_artifacts = 0`;
+- exported and pushed
+  `outputs/d1-v2-product-native-export-spotfix-white-20260625`;
+- `/health` reported `published_at` as `2026-06-24T22:32:42.731Z`;
+- Worker cache was bumped to `TRANSLATION_CACHE_VERSION = "v56-white-spotfix"`
+  and deployed as Worker version `8aee0b85-ffd8-4cd5-895f-01cb2bc91008`;
+- `npm run check:online-dictionary` passed, including the new
+  `zh-white-spotfix` regression case.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

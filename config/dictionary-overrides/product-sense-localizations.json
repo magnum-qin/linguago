@@ -978,6 +978,16 @@
         "term": "white terror; reactionary",
         "definition": "Reactionary repression, especially political persecution or terror."
       },
+      "ja": {
+        "term": "白色テロ",
+        "reading": "はくしょくテロ",
+        "reading_system": "kana",
+        "definition": "反動勢力による政治的弾圧や恐怖支配。"
+      },
+      "pt-BR": {
+        "term": "terror branco",
+        "definition": "Repressão reacionária, especialmente perseguição política ou terror."
+      },
       "zh": {
         "term": "白色恐怖",
         "reading": "bái sè kǒng bù",
@@ -998,6 +1008,16 @@
       "en": {
         "term": "white pollution",
         "definition": "Pollution caused by plastic waste or disposable plastic products."
+      },
+      "ja": {
+        "term": "白色汚染",
+        "reading": "はくしょくおせん",
+        "reading_system": "kana",
+        "definition": "プラスチックごみ、特に使い捨てプラスチック製品による環境汚染。"
+      },
+      "pt-BR": {
+        "term": "poluição branca",
+        "definition": "Poluição causada por resíduos plásticos ou produtos plásticos descartáveis."
       },
       "zh": {
         "term": "白色污染",

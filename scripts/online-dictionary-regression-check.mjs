@@ -52,6 +52,15 @@ const cases = [
     }
   },
   {
+    id: "zh-white-spotfix",
+    text: "\u767d\u8272",
+    source_lang: "zh",
+    expectedTermsByOrder: {
+      1: { en: "white terror; reactionary", zh: "\u767d\u8272\u6050\u6016", ja: "\u767d\u8272\u30c6\u30ed", "pt-BR": "terror branco" },
+      2: { en: "white pollution", zh: "\u767d\u8272\u6c61\u67d3", ja: "\u767d\u8272\u6c5a\u67d3", "pt-BR": "polui\u00e7\u00e3o branca" }
+    }
+  },
+  {
     id: "zh-bi-overrides",
     text: "\u9589",
     source_lang: "zh",
