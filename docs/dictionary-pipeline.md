@@ -950,6 +950,41 @@ Online spot checks after the push:
 - `公平`: noun sense Japanese term is `公平性`.
 - `退屈`: verbal sense is `feel bored / 退屈する`.
 
+## 2026-06-24 Batch 2 High-Frequency Overrides
+
+A third deterministic override pass fixed additional high-frequency entries
+where one localization had been copied from a neighboring sense. The batch
+covered entries such as `没有`, `秘密`, `教`, `無し`, `全`, `離`, `気の毒`,
+`惑星`, `尻`, `茶`, `道具`, `世紀`, `激动`, `妙`, `見かけ`, `教育`, and `留守`.
+
+Result:
+
+- override config: `40` entries;
+- local product database update: `40` senses and `67` localizations touched;
+- semantic duplicate review: `125 -> 108` warnings;
+- full export audit: no blocking errors, `mojibake_texts = 0`,
+  `html_artifacts = 0`;
+- exported `entry_forms`: `161125`;
+- exported `pronunciation_groups`: `24891`;
+- published export:
+  `outputs/d1-v2-product-native-export-batch2-overrides-20260624`.
+
+Remote D1 push succeeded. `/health` reported `published_at` as
+`2026-06-24T12:58:20.725Z`.
+
+Online spot checks after the push:
+
+- `気の毒`: second sense is now `unpardonable`.
+- `惑星`: second sense is now `dark horse`.
+- `尻`: second sense is now `last place`.
+- `留守`: second and third senses are separated as `house-sitting` and
+  `neglecting`.
+
+Note: Chinese/Japanese homographs such as `秘密`, `教育`, and `茶` can still
+default to the Chinese product entry depending on lookup ranking. The entry
+data has been corrected, but default language disambiguation remains a separate
+lookup/UI ranking task.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

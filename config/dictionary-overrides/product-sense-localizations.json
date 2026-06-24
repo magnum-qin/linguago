@@ -432,5 +432,380 @@
         "definition": "興味を持てず、つまらないと感じる。"
       }
     }
+  },
+  {
+    "target": {
+      "headword": "没有",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "ja": {
+        "term": "まだ〜していない",
+        "reading": "まだしていない",
+        "reading_system": "kana",
+        "definition": "動作や出来事がまだ実現していないことを表す。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "秘密",
+      "primary_lang": "ja",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.94,
+    "localizations": {
+      "ja": {
+        "term": "謎",
+        "reading": "なぞ",
+        "reading_system": "kana",
+        "definition": "理由や正体がわからず、説明しにくいこと。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "教",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "教え導く",
+        "reading": "おしえみちびく",
+        "reading_system": "kana",
+        "definition": "知識や方針を示して、正しい方向へ導くこと。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "無し",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "en": {
+        "term": "nonexistent",
+        "definition": "Not existing; absent."
+      },
+      "zh": {
+        "term": "不存在",
+        "reading": "bù cún zài",
+        "reading_system": "pinyin",
+        "definition": "没有存在；并不存在。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "無し",
+      "primary_lang": "ja",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "ja": {
+        "term": "受け入れられない",
+        "reading": "うけいれられない",
+        "reading_system": "kana",
+        "definition": "認めたり許したりすることができない。"
+      },
+      "zh": {
+        "term": "不可接受",
+        "reading": "bù kě jiē shòu",
+        "reading_system": "pinyin",
+        "definition": "不能被接受或认可。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "全",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "zh": {
+        "term": "全部",
+        "reading": "quán bù",
+        "reading_system": "pinyin",
+        "definition": "所有的；整个范围内的全部。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "離",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "立ち去る",
+        "reading": "たちさる",
+        "reading_system": "kana",
+        "definition": "その場所から離れて行くこと。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "気の毒",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "en": {
+        "term": "unpardonable",
+        "definition": "So wrong or improper that it cannot be forgiven."
+      },
+      "zh": {
+        "term": "不可原谅",
+        "reading": "bù kě yuán liàng",
+        "reading_system": "pinyin",
+        "definition": "错误或行为严重到不能被原谅。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "惑星",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "dark horse",
+        "definition": "A person, team, or thing that unexpectedly succeeds despite little prior attention."
+      },
+      "ja": {
+        "term": "伏兵",
+        "reading": "ふくへい",
+        "reading_system": "kana",
+        "definition": "予想外の活躍をして成功する人やもの。"
+      },
+      "pt-BR": {
+        "term": "azarão",
+        "definition": "Pessoa, equipe ou coisa pouco esperada que surpreende pelo sucesso."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "尻",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "en": {
+        "term": "last place; rear end",
+        "definition": "The last position, end, or rear part of something."
+      },
+      "zh": {
+        "term": "末尾",
+        "reading": "mò wěi",
+        "reading_system": "pinyin",
+        "definition": "最后的位置；末端。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "茶",
+      "primary_lang": "ja",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "pt-BR": {
+        "term": "preparo do chá",
+        "definition": "Processo de preparar chá por infusão de folhas em água quente."
+      },
+      "zh": {
+        "term": "泡茶",
+        "reading": "pào chá",
+        "reading_system": "pinyin",
+        "definition": "用热水冲泡茶叶以制成茶饮。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "道具",
+      "primary_lang": "ja",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "furniture",
+        "definition": "Movable objects such as tables, chairs, and beds used to make a room usable."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "世紀",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "時代",
+        "reading": "じだい",
+        "reading_system": "kana",
+        "definition": "特定の特徴をもつ歴史上の長い期間。"
+      },
+      "zh": {
+        "term": "时代",
+        "reading": "shí dài",
+        "reading_system": "pinyin",
+        "definition": "具有某种特征的历史时期。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "激动",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "excite; stir up",
+        "definition": "To cause strong emotion or agitation in someone."
+      },
+      "ja": {
+        "term": "興奮させる",
+        "reading": "こうふんさせる",
+        "reading_system": "kana",
+        "definition": "人の感情を高ぶらせること。"
+      },
+      "zh": {
+        "term": "使激动",
+        "reading": "shǐ jī dòng",
+        "reading_system": "pinyin",
+        "definition": "使人的感情受到刺激而高涨或冲动。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "妙",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "巧妙",
+        "reading": "こうみょう",
+        "reading_system": "kana",
+        "definition": "非常にうまく工夫されていること。また、そのさま。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "見かけ",
+      "primary_lang": "ja",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "apparent",
+        "definition": "Seeming to be true or real, especially when this may differ from the facts."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "教育",
+      "primary_lang": "ja",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "culture",
+        "definition": "The customs, arts, knowledge, and ways of life of a group or society."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "留守",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "留守番",
+        "reading": "るすばん",
+        "reading_system": "kana",
+        "definition": "家の人が不在の間、その家にいて管理や用事をすること。"
+      },
+      "zh": {
+        "term": "看家",
+        "reading": "kān jiā",
+        "reading_system": "pinyin",
+        "definition": "人在别人外出时留在家中照看房屋。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "留守",
+      "primary_lang": "ja",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-batch2-20260624",
+    "confidence": 0.88,
+    "localizations": {
+      "ja": {
+        "term": "怠る",
+        "reading": "おこたる",
+        "reading_system": "kana",
+        "definition": "勉強や務めなどを十分に行わず、おろそかにすること。"
+      },
+      "zh": {
+        "term": "疏忽",
+        "reading": "shū hū",
+        "reading_system": "pinyin",
+        "definition": "对学习、职责等没有给予应有的注意。"
+      }
+    }
   }
 ]
