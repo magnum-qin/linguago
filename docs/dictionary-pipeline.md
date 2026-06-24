@@ -1050,6 +1050,25 @@ localizations that were structurally valid but semantically weak:
 - `npm run check:online-dictionary` passed, including the new
   `zh-white-spotfix` regression case.
 
+On 2026-06-25, a second follow-up spot fix corrected `杆`, which was returning
+`sandalwood` because an upstream source/fusion sense for the Chinese headword
+had been accepted with the wrong source gloss and reading (`sandalwood`,
+`tan xiang`). This was a data-layer error, not a frontend rendering issue.
+
+- sense 1 now separates `gan1` as `pole; post; staff`;
+- sense 2 now separates `gan3` as `shaft; handle; classifier`;
+- the override config now has `59` entries;
+- local override replay touched `59` senses and `113` localizations;
+- full export audit passed with no blocking errors, `mojibake_texts = 0`, and
+  `html_artifacts = 0`; same-entry duplicate warnings remained at `97`;
+- exported and pushed
+  `outputs/d1-v2-product-native-export-spotfix-gan-20260625`;
+- `/health` reported `published_at` as `2026-06-24T22:58:33.914Z`;
+- Worker cache was bumped to `TRANSLATION_CACHE_VERSION = "v57-gan-spotfix"`
+  and deployed as Worker version `bbc66794-7bb9-4551-95d3-6ef57539e092`;
+- `npm run check:online-dictionary` passed, including the new
+  `zh-gan-spotfix` regression case.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

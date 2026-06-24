@@ -1190,5 +1190,79 @@
         "definition": "開いているものを閉めること。"
       }
     }
+  },
+  {
+    "target": {
+      "headword": "杆",
+      "primary_lang": "zh",
+      "sense_order": 1
+    },
+    "source": "manual:wrong-source-gloss-spotfix-20260625",
+    "part_of_speech": "noun",
+    "gloss_key": "pole; post; staff",
+    "confidence": 0.96,
+    "localizations": {
+      "en": {
+        "term": "pole; post; staff",
+        "pronunciation": "/poʊl/",
+        "pronunciation_system": "IPA",
+        "definition": "A long, slender piece of wood, bamboo, or metal used as a support, post, or staff."
+      },
+      "zh": {
+        "term": "杆",
+        "reading": "gān",
+        "reading_system": "pinyin",
+        "definition": "细长的棍状物，可用作支撑、标杆或工具的一部分。"
+      },
+      "ja": {
+        "term": "棒; 竿",
+        "reading": "ぼう; さお",
+        "reading_system": "kana",
+        "definition": "支柱や道具として使う細長い木・竹・金属などの棒状のもの。"
+      },
+      "pt-BR": {
+        "term": "haste; poste; vara",
+        "pronunciation": "/ˈas.tʃi/",
+        "pronunciation_system": "IPA",
+        "definition": "Peça longa e fina de madeira, bambu ou metal usada como apoio, poste ou vara."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "杆",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:wrong-source-gloss-spotfix-20260625",
+    "part_of_speech": "classifier",
+    "gloss_key": "shaft; handle; classifier for shaft-like objects",
+    "confidence": 0.96,
+    "localizations": {
+      "en": {
+        "term": "shaft; handle; classifier",
+        "pronunciation": "/ʃæft/",
+        "pronunciation_system": "IPA",
+        "definition": "The long narrow part of an object, such as a handle or shaft; also a classifier for objects with a shaft, such as guns or pens."
+      },
+      "zh": {
+        "term": "杆",
+        "reading": "gǎn",
+        "reading_system": "pinyin",
+        "definition": "器物上细长的部分；也作量词，用于有杆状部分的器物，如枪、笔等。"
+      },
+      "ja": {
+        "term": "柄; 竿状の物の助数詞",
+        "reading": "え; さおじょうのもののじょすうし",
+        "reading_system": "kana",
+        "definition": "道具などの細長い柄の部分。また、銃や筆など棒状の部分を持つ物を数える語。"
+      },
+      "pt-BR": {
+        "term": "cabo; haste; classificador",
+        "pronunciation": "/ˈka.bu/",
+        "pronunciation_system": "IPA",
+        "definition": "Parte longa e estreita de um objeto, como cabo ou haste; também classificador para objetos com haste, como armas ou canetas."
+      }
+    }
   }
 ]

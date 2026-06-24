@@ -61,6 +61,15 @@ const cases = [
     }
   },
   {
+    id: "zh-gan-spotfix",
+    text: "\u6746",
+    source_lang: "zh",
+    expectedTermsByOrder: {
+      1: { en: "pole; post; staff", zh: "\u6746", ja: "\u68d2; \u7aff", "pt-BR": "haste; poste; vara" },
+      2: { en: "shaft; handle; classifier", zh: "\u6746", ja: "\u67c4; \u7aff\u72b6\u306e\u7269\u306e\u52a9\u6570\u8a5e", "pt-BR": "cabo; haste; classificador" }
+    }
+  },
+  {
     id: "zh-bi-overrides",
     text: "\u9589",
     source_lang: "zh",
