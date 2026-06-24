@@ -430,6 +430,20 @@ This runs product example dedupe, deterministic quality-warning repair, product-
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release-dictionary-v2-product-d1.ps1 -SkipPush
 ```
 
+After any D1 or Worker release, run the online dictionary regression separately:
+
+```powershell
+npm run check:online-dictionary
+```
+
+This checks `/health` D1 counts and policy, then queries a fixed set of
+dictionary-sensitive terms including `中`, `另外`, `何時`, `国際`, `ビジター`,
+`閉`, and Chinese/Japanese `秘密`. The gate verifies
+`provider=dictionary`, `model=cloudflare-d1-v2`, stable `sense_order` display,
+four-language localizations/definitions, pronunciation grouping, and key
+override terms. It is intentionally not part of `npm run check:all` because it
+depends on the deployed Worker and network access.
+
 The first full-database completion batches used Ollama `qwen3.6:latest` with `profile core` and `--max-senses-per-entry 1`, then moved to the A6000 cluster behind `100.99.99.99`. That flow is historical and should not be the default for new product-dictionary source-gap work.
 
 The active source-gap supplement flow uses Unsloth Studio's OpenAI-compatible API and writes whole four-language product records with `scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs`. Use the cleaned source-gap report, not the raw incomplete report, unless intentionally debugging rejects:

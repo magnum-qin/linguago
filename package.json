@@ -12,6 +12,7 @@
     "check:all": "node scripts/check-all.mjs",
     "check:api": "node scripts/api-smoke.mjs",
     "check:online-ui": "node scripts/online-ui-smoke.mjs",
+    "check:online-dictionary": "node scripts/online-dictionary-regression-check.mjs",
     "check:dictionary-regression": "node scripts/dictionary-v2-product-regression-check.mjs",
     "check:sw": "node scripts/sw-cache-check.mjs",
     "benchmark:stream": "node scripts/stream-benchmark.mjs",
