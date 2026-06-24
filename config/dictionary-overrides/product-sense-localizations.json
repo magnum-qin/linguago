@@ -1,6 +1,10 @@
 [
   {
-    "target": { "headword": "的", "primary_lang": "zh", "sense_order": 1 },
+    "target": {
+      "headword": "的",
+      "primary_lang": "zh",
+      "sense_order": 1
+    },
     "part_of_speech": "particle",
     "gloss_key": "possessive or attributive particle",
     "source": "manual:product-core-function-word-override",
@@ -33,7 +37,11 @@
     }
   },
   {
-    "target": { "headword": "ペット", "primary_lang": "ja", "sense_order": 2 },
+    "target": {
+      "headword": "ペット",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
     "part_of_speech": "noun",
     "gloss_key": "trumpet",
     "source": "manual:pet-trumpet-repair-20260624",
@@ -65,7 +73,11 @@
     }
   },
   {
-    "target": { "headword": "評価", "primary_lang": "ja", "sense_order": 2 },
+    "target": {
+      "headword": "評価",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
     "part_of_speech": "noun",
     "source": "manual:residual-pos-duplicate-repair-20260624",
     "localizations": {
@@ -82,7 +94,11 @@
     }
   },
   {
-    "target": { "headword": "耐心", "primary_lang": "zh", "sense_order": 3 },
+    "target": {
+      "headword": "耐心",
+      "primary_lang": "zh",
+      "sense_order": 3
+    },
     "part_of_speech": "verb",
     "source": "manual:residual-pos-duplicate-repair-20260624",
     "localizations": {
@@ -99,7 +115,11 @@
     }
   },
   {
-    "target": { "headword": "发明", "primary_lang": "zh", "sense_order": 2 },
+    "target": {
+      "headword": "发明",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
     "part_of_speech": "noun",
     "source": "manual:residual-pos-duplicate-repair-20260624",
     "localizations": {
@@ -118,7 +138,11 @@
     }
   },
   {
-    "target": { "headword": "詩", "primary_lang": "ja", "sense_order": 2 },
+    "target": {
+      "headword": "詩",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
     "part_of_speech": "noun",
     "source": "manual:residual-pos-duplicate-repair-20260624",
     "localizations": {
@@ -135,7 +159,11 @@
     }
   },
   {
-    "target": { "headword": "摄影", "primary_lang": "zh", "sense_order": 2 },
+    "target": {
+      "headword": "摄影",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
     "part_of_speech": "verb",
     "source": "manual:residual-pos-duplicate-repair-20260624",
     "localizations": {
@@ -152,7 +180,11 @@
     }
   },
   {
-    "target": { "headword": "相似", "primary_lang": "zh", "sense_order": 2 },
+    "target": {
+      "headword": "相似",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
     "part_of_speech": "verb",
     "source": "manual:residual-pos-duplicate-repair-20260624",
     "localizations": {
@@ -175,7 +207,11 @@
     }
   },
   {
-    "target": { "headword": "無礼", "primary_lang": "ja", "sense_order": 2 },
+    "target": {
+      "headword": "無礼",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
     "part_of_speech": "noun",
     "source": "manual:residual-pos-duplicate-repair-20260624",
     "localizations": {
@@ -190,6 +226,210 @@
         "reading": "wú lǐ",
         "reading_system": "pinyin",
         "definition": "缺乏礼貌的行为、态度或性质。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "一緒",
+      "primary_lang": "ja",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.95,
+    "localizations": {
+      "en": {
+        "term": "same",
+        "definition": "Being the same; not different."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "少し",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "ja": {
+        "term": "少し先",
+        "reading": "すこしさき",
+        "reading_system": "kana",
+        "definition": "短い距離だけ先にあること。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "明白",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "ja": {
+        "term": "率直",
+        "reading": "そっちょく",
+        "reading_system": "kana",
+        "definition": "隠さず、はっきりと言うこと。また、そのさま。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "行",
+      "primary_lang": "zh",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "旅行",
+        "reading": "りょこう",
+        "reading_system": "kana",
+        "definition": "ある場所から別の場所へ行くこと。また、その道のり。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "心",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.94,
+    "localizations": {
+      "ja": {
+        "term": "精神",
+        "reading": "せいしん",
+        "reading_system": "kana",
+        "definition": "考えたり感じたり判断したりする心の働き。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "下",
+      "primary_lang": "zh",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.94,
+    "localizations": {
+      "zh": {
+        "term": "下",
+        "reading": "xià",
+        "reading_system": "pinyin",
+        "definition": "在较低的位置或方向；在……下面。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "先生",
+      "primary_lang": "ja",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "en": {
+        "term": "sensei; teacher honorific",
+        "definition": "A respectful title for a teacher, doctor, master, or specialist."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "秘密",
+      "primary_lang": "zh",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.9,
+    "localizations": {
+      "ja": {
+        "term": "謎",
+        "reading": "なぞ",
+        "reading_system": "kana",
+        "definition": "理由や正体がわからず、説明しにくいこと。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "始",
+      "primary_lang": "zh",
+      "sense_order": 1
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "ja": {
+        "term": "始まり",
+        "reading": "はじまり",
+        "reading_system": "kana",
+        "definition": "物事が始まる時点や最初の部分。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "安定",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.94,
+    "localizations": {
+      "zh": {
+        "term": "稳定的",
+        "reading": "wěn dìng de",
+        "reading_system": "pinyin",
+        "definition": "状态平稳、不容易改变的。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "公平",
+      "primary_lang": "zh",
+      "sense_order": 3
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "ja": {
+        "term": "公平性",
+        "reading": "こうへいせい",
+        "reading_system": "kana",
+        "definition": "偏りがなく、公正である性質。"
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "退屈",
+      "primary_lang": "ja",
+      "sense_order": 2
+    },
+    "source": "manual:highfreq-duplicate-localization-20260624",
+    "confidence": 0.92,
+    "localizations": {
+      "en": {
+        "term": "feel bored",
+        "definition": "To feel weary or uninterested because something lacks interest."
+      },
+      "ja": {
+        "term": "退屈する",
+        "reading": "たいくつする",
+        "reading_system": "kana",
+        "definition": "興味を持てず、つまらないと感じる。"
       }
     }
   }

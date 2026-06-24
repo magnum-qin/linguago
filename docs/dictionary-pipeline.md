@@ -914,6 +914,42 @@ Online spot checks after the push:
 - `发明`: sense 1 verb `to invent`, sense 2 noun `invention`.
 - `摄影`: sense 1 noun `photography`, sense 2 verb `take a photograph`.
 
+## 2026-06-24 High-Frequency Product Overrides
+
+A second override batch was applied to reduce high-frequency duplicate
+localization warnings without invoking LLM repair. The batch updates local
+translations/definitions for entries such as `一緒`, `少し`, `明白`, `行`, `心`,
+`下`, `先生`, `秘密`, `始`, `安定`, `公平`, and `退屈`.
+
+Apply command:
+
+```powershell
+node scripts/apply-dictionary-v2-product-localization-overrides.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --overrides config/dictionary-overrides/product-sense-localizations.json `
+  --apply true
+```
+
+Result:
+
+- override config: `21` entries;
+- local product database update: `21` senses and `36` localizations touched;
+- semantic duplicate review: `135 -> 125` warnings;
+- full export audit: no blocking errors, `mojibake_texts = 0`,
+  `html_artifacts = 0`;
+- published export:
+  `outputs/d1-v2-product-native-export-highfreq-overrides-20260624`.
+
+Remote D1 push succeeded. `/health` reported `published_at` as
+`2026-06-24T12:37:00.788Z`.
+
+Online spot checks after the push:
+
+- `一緒`: first sense English term is `same`.
+- `少し`: distance sense Japanese term is `少し先`.
+- `公平`: noun sense Japanese term is `公平性`.
+- `退屈`: verbal sense is `feel bored / 退屈する`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
