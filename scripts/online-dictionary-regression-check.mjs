@@ -70,6 +70,38 @@ const cases = [
     }
   },
   {
+    id: "en-people-primary-conflict",
+    text: "people",
+    source_lang: "en",
+    maxSenses: 1,
+    expectedTermsByOrder: {
+      1: { en: "people", zh: "\u4eba\u4eec; \u4eba\u6c11", ja: "\u4eba\u3005", "pt-BR": "pessoas; povo" }
+    },
+    forbiddenTerms: ["someone", "\u6709\u4eba", "\u8ab0\u304b", "algu\u00e9m"]
+  },
+  {
+    id: "en-exchange-blocked-mixed-sense",
+    text: "exchange",
+    source_lang: "en",
+    maxSenses: 2,
+    expectedTermsByOrder: {
+      1: { en: "exchange", zh: "\u4ea4\u6362", ja: "\u4ea4\u63db", "pt-BR": "troca" },
+      2: { en: "currency exchange", zh: "\u5916\u6c47\u5151\u6362", ja: "\u4e21\u66ff", "pt-BR": "c\u00e2mbio" }
+    },
+    forbiddenTerms: ["central", "\u4e2d\u592e\u7684", "\u4e2d\u592e\u306e"]
+  },
+  {
+    id: "en-court-blocked-mixed-sense",
+    text: "court",
+    source_lang: "en",
+    maxSenses: 2,
+    expectedTermsByOrder: {
+      1: { en: "court", zh: "\u6cd5\u9662", ja: "\u88c1\u5224\u6240", "pt-BR": "tribunal" },
+      2: { en: "court", zh: "\u7ea6\u4f1a", ja: "\u4ea4\u969b\u3059\u308b", "pt-BR": "namorar" }
+    },
+    forbiddenTerms: ["backyard", "\u540e\u9662", "\u88cf\u5ead", "quintal"]
+  },
+  {
     id: "zh-bi-overrides",
     text: "\u9589",
     source_lang: "zh",
@@ -184,10 +216,14 @@ async function checkTerm(item) {
   if (senses.length < expectedMinSenses) {
     errors.push(`senses length ${senses.length}, expected >= ${expectedMinSenses}`);
   }
+  if (item.maxSenses && senses.length > item.maxSenses) {
+    errors.push(`senses length ${senses.length}, expected <= ${item.maxSenses}`);
+  }
 
   validateSenseOrder(senses, errors);
   validateLocalizations(senses, errors);
   validateExpectedTerms(item.expectedTermsByOrder || {}, senses, errors);
+  validateForbiddenTerms(item.forbiddenTerms || [], senses, errors);
   validatePronunciationGroups(item, data, errors);
   validateExamples(data, errors);
 
@@ -257,6 +293,19 @@ function validateExpectedTerms(expectedTermsByOrder, senses, errors) {
       const actual = sense.localizations?.[lang]?.term;
       if (actual !== expectedTerm) {
         errors.push(`sense ${orderText} ${lang} term is ${actual || "missing"}, expected ${expectedTerm}`);
+      }
+    }
+  }
+}
+
+function validateForbiddenTerms(forbiddenTerms, senses, errors) {
+  if (!forbiddenTerms.length) return;
+  const forbidden = new Set(forbiddenTerms.map((term) => String(term).toLowerCase()));
+  for (const sense of senses) {
+    for (const lang of langs) {
+      const term = sense.localizations?.[lang]?.term;
+      if (term && forbidden.has(String(term).toLowerCase())) {
+        errors.push(`sense ${sense.sense_order || "?"} ${lang} term is forbidden: ${term}`);
       }
     }
   }

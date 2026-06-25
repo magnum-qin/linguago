@@ -1264,5 +1264,153 @@
         "definition": "Parte longa e estreita de um objeto, como cabo ou haste; também classificador para objetos com haste, como armas ou canetas."
       }
     }
+  },
+  {
+    "target": {
+      "headword": "come",
+      "primary_lang": "en",
+      "sense_order": 2
+    },
+    "source": "manual:primary-english-term-conflict-20260625",
+    "part_of_speech": "verb",
+    "gloss_key": "come from; derive from; originate from",
+    "confidence": 0.94,
+    "localizations": {
+      "en": {
+        "term": "come from; derive from",
+        "pronunciation": "/kʌm frʌm/",
+        "pronunciation_system": "IPA",
+        "definition": "To originate from a source; to be derived from something."
+      },
+      "zh": {
+        "term": "来自; 源自",
+        "reading": "lai2 zi4; yuan2 zi4",
+        "reading_system": "pinyin",
+        "definition": "从某个来源产生、起源或派生。"
+      },
+      "ja": {
+        "term": "由来する; 派生する",
+        "reading": "ゆらいする; はせいする",
+        "reading_system": "kana",
+        "definition": "ある起源や出所から生じる、または派生する。"
+      },
+      "pt-BR": {
+        "term": "vir de; derivar de",
+        "pronunciation": "/viʁ dʒi/",
+        "pronunciation_system": "IPA",
+        "definition": "Ter origem em uma fonte; derivar de algo."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "alone",
+      "primary_lang": "en",
+      "sense_order": 3
+    },
+    "source": "manual:primary-english-term-conflict-20260625",
+    "part_of_speech": "adjective",
+    "gloss_key": "alone; single; unmarried",
+    "confidence": 0.94,
+    "localizations": {
+      "en": {
+        "term": "single; alone",
+        "pronunciation": "/ˈsɪŋɡəl/",
+        "pronunciation_system": "IPA",
+        "definition": "Not married or not in a romantic partnership; single."
+      },
+      "zh": {
+        "term": "单身",
+        "reading": "dan1 shen1",
+        "reading_system": "pinyin",
+        "definition": "没有配偶或固定伴侣的状态。"
+      },
+      "ja": {
+        "term": "独身",
+        "reading": "どくしん",
+        "reading_system": "kana",
+        "definition": "結婚していない、または配偶者がいない状態。"
+      },
+      "pt-BR": {
+        "term": "solteiro",
+        "pronunciation": "/soʊˈtej.ɾu/",
+        "pronunciation_system": "IPA",
+        "definition": "Que nao e casado ou nao tem parceiro romantico fixo."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "people",
+      "primary_lang": "en",
+      "sense_order": 1
+    },
+    "source": "manual:primary-english-term-conflict-20260625",
+    "part_of_speech": "noun",
+    "gloss_key": "people; persons; human beings collectively",
+    "confidence": 0.95,
+    "localizations": {
+      "en": {
+        "term": "people",
+        "pronunciation": "/ˈpiːpəl/",
+        "pronunciation_system": "IPA",
+        "definition": "Human beings considered collectively; a group of persons."
+      },
+      "zh": {
+        "term": "人们; 人民",
+        "reading": "ren2 men; ren2 min2",
+        "reading_system": "pinyin",
+        "definition": "泛指一群人或社会中的人。"
+      },
+      "ja": {
+        "term": "人々",
+        "reading": "ひとびと",
+        "reading_system": "kana",
+        "definition": "複数の人間、または集団としての人。"
+      },
+      "pt-BR": {
+        "term": "pessoas; povo",
+        "pronunciation": "/peˈso.as/",
+        "pronunciation_system": "IPA",
+        "definition": "Seres humanos considerados coletivamente; um grupo de pessoas."
+      }
+    }
+  },
+  {
+    "target": {
+      "headword": "experience",
+      "primary_lang": "en",
+      "sense_order": 3
+    },
+    "source": "manual:primary-english-term-conflict-20260625",
+    "part_of_speech": "verb",
+    "gloss_key": "experience; taste; try",
+    "confidence": 0.92,
+    "localizations": {
+      "en": {
+        "term": "experience; taste",
+        "pronunciation": "/ɪkˈspɪriəns/",
+        "pronunciation_system": "IPA",
+        "definition": "To undergo, try, or taste something directly."
+      },
+      "zh": {
+        "term": "体验; 尝",
+        "reading": "ti3 yan4; chang2",
+        "reading_system": "pinyin",
+        "definition": "亲身经历、尝试或品尝某事物。"
+      },
+      "ja": {
+        "term": "経験する; 味わう",
+        "reading": "けいけんする; あじわう",
+        "reading_system": "kana",
+        "definition": "物事を実際に経験したり、味わったりする。"
+      },
+      "pt-BR": {
+        "term": "experimentar; provar",
+        "pronunciation": "/is.pe.ɾi.mẽˈtaʁ/",
+        "pronunciation_system": "IPA",
+        "definition": "Passar por algo diretamente; experimentar ou provar."
+      }
+    }
   }
 ]

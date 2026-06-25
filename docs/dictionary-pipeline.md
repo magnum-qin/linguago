@@ -1069,6 +1069,47 @@ had been accepted with the wrong source gloss and reading (`sandalwood`,
 - `npm run check:online-dictionary` passed, including the new
   `zh-gan-spotfix` regression case.
 
+On 2026-06-25, the next product-quality pass removed the remaining
+`primary_english_term_conflict` published-risk bucket from the local product
+database:
+
+- `come` sense 2 was rewritten as `come from; derive from`;
+- `alone` sense 3 was rewritten as the single/unmarried sense;
+- `people` was rewritten from the erroneous `someone` localization to the
+  collective `people` sense;
+- `experience` sense 3 was rewritten as `experience; taste`;
+- `exchange` sense 3 (`central`) and `court` sense 3 (`backyard`) were marked
+  with product publication blocks and excluded from export;
+- the product localization override config now has `63` entries;
+- the new publication block config is
+  `config/dictionary-overrides/product-publication-blocks.json`;
+- the new reusable block applicator is
+  `scripts/apply-dictionary-v2-product-publication-blocks.mjs`;
+- the product-native D1 exporter now respects
+  `product_sense_publication_blocks` when that table exists;
+- local published-risk audit changed `primary_english_term_conflict` from `6`
+  to `0`, with `28580` accepted publishable senses;
+- full export audit passed for
+  `outputs/d1-v2-product-native-export-primary-conflict-fix-20260625`, with
+  `23070` entries, `28580` senses, `114320` sense localizations, and no
+  blocking errors, `mojibake_texts = 0`, `html_artifacts = 0`;
+- a literal `??` export scan found `0` runs after repairing a PowerShell
+  encoding issue in the newly added overrides.
+
+Remote D1 push succeeded on 2026-06-25. `/health` reported `published_at` as
+`2026-06-24T23:13:41.807Z` with `23070` entries, `28580` senses, `114320`
+sense localizations, `3030` examples, and `11898` example localizations.
+
+Worker cache was bumped to `TRANSLATION_CACHE_VERSION =
+"v58-primary-conflict-fix"` and deployed as Worker version
+`6e61da19-d684-4390-8813-c99798006ffe`.
+
+`npm.cmd run check:online-dictionary` passed after deployment, including the
+new `en-people-primary-conflict`, `en-exchange-blocked-mixed-sense`, and
+`en-court-blocked-mixed-sense` regression cases. Online spot checks confirmed
+`exchange` now publishes only exchange/currency-exchange senses and `court`
+now publishes only court/romantic-court senses.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

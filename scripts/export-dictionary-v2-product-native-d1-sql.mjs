@@ -14,8 +14,21 @@ fs.mkdirSync(outDir, { recursive: true });
 const db = new Database(dbPath, { readonly: true });
 db.pragma("busy_timeout = 30000");
 
+const hasPublicationBlocks = Boolean(
+  db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'product_sense_publication_blocks'")
+    .get()
+);
+const publicationBlockWhere = hasPublicationBlocks
+  ? `AND NOT EXISTS (
+    SELECT 1
+    FROM product_sense_publication_blocks b
+    WHERE b.product_sense_id = s.id
+  )`
+  : "";
 const completeSenseWhere = `
   s.status = 'accepted'
+  ${publicationBlockWhere}
   AND s.id IN (
     SELECT product_sense_id
     FROM product_localizations

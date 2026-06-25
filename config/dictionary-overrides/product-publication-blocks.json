@@ -1,0 +1,22 @@
+[
+  {
+    "target": {
+      "headword": "exchange",
+      "primary_lang": "en",
+      "sense_order": 3
+    },
+    "block_code": "blocked_source_ambiguous",
+    "rationale": "The English entry is exchange, but this product sense is localized as central / 中央的 / 中央の / central. This is a mixed-source sense and should not be published under exchange.",
+    "recommendation": "Rebuild or relocate the central sense under a matching headword/source entry before publication."
+  },
+  {
+    "target": {
+      "headword": "court",
+      "primary_lang": "en",
+      "sense_order": 3
+    },
+    "block_code": "blocked_source_ambiguous",
+    "rationale": "The English entry is court, but this product sense is localized as backyard / 后院 / 裏庭 / quintal. This is a mixed-source sense and should not be published under court.",
+    "recommendation": "Rebuild or relocate the backyard sense under a matching headword/source entry before publication."
+  }
+]
