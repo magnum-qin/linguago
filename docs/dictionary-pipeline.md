@@ -1209,6 +1209,92 @@ HTML artifacts. Published-risk broad gloss warnings dropped from `340` to
 `336`; the remaining broad-risk queue still needs review before the next D1
 export.
 
+## 2026-06-28 Broad Published-Sense Risk Batch 2
+
+The second broad-risk pass continued from the repaired local product DB, not
+from the already deployed D1 export. The refreshed triage command was:
+
+```powershell
+node scripts/report-dictionary-v2-product-broad-risk-triage.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --risk logs/product-published-risk-after-broad-split-and-local-repairs-20260625.json `
+  --out logs/product-broad-risk-triage-after-local-repairs-20260628.json `
+  --limit 220
+```
+
+The refreshed queue contained `336` broad-gloss input senses:
+`25` LLM split candidates, `11` manual repair/block rows, `1` manual-review
+row, `112` inflected-form rows, `21` function-word rows, and `166`
+likely-keep rows.
+
+`scripts/review-dictionary-v2-product-broad-risk-unsloth.mjs` now accepts
+`--retries` and retries once by default for transient `fetch failed`,
+`No model loaded`, JSON parse, HTTP 5xx, `ECONNRESET`, and `ETIMEDOUT`
+failures. Keep the broad-risk review single-concurrency until the selected
+Unsloth node proves stable through actual chat completions, not only `/v1/load`.
+
+The second small review used one loaded Unsloth endpoint:
+
+```powershell
+$env:UNSLOTH_API_KEY = "sk-unsloth-..."
+node scripts/review-dictionary-v2-product-broad-risk-unsloth.mjs `
+  --report logs/product-broad-risk-triage-after-local-repairs-20260628.json `
+  --out logs/product-broad-risk-llm-review-batch2-20260628.json `
+  --limit 25 `
+  --concurrency 1 `
+  --endpoints http://100.99.99.99:11444 `
+  --model unsloth/Qwen3.6-35B-A3B-MTP-GGUF `
+  --gguf-variant UD-IQ4_NL `
+  --max-tokens 1400 `
+  --timeout-ms 300000 `
+  --prewarm false `
+  --retries 1
+```
+
+It produced `23/25` valid decisions: `14` keep and `9` split. The two invalid
+rows were `miles` (JSON parse) and `flown` (non-split response with stale
+split suggestions). The repair-plan extraction approved `9` split candidates,
+but only three were applied after review: `hot`, `嫌`, and `激烈`. The other
+approved rows were intentionally skipped for this batch because they were
+proper-name noise, obscure low-value senses, stale lemma/inflection proposals,
+or needed manual example mapping (`liver`, `bacon`, `惡`, `gig`, `proven`,
+`sweaty`).
+
+`scripts/apply-dictionary-v2-product-broad-risk-split-plan.mjs` now supports
+`--sense-ids` so a reviewed subset can be applied without editing the generated
+plan:
+
+```powershell
+node scripts/apply-dictionary-v2-product-broad-risk-split-plan.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --plan logs/product-broad-risk-split-plan-batch2-20260628.json `
+  --sense-ids 2449,17795,19005 `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-broad-risk-batch2-20260628.db`.
+The selected apply step updated `3` existing senses, created `5` new senses,
+inserted `32` localizations, deleted `12` old localizations, and inserted `7`
+source links. Follow-up reading cleanup was applied with
+`scripts/repair-dictionary-v2-product-broad-split-batch2-readings-20260628.mjs`,
+which corrected English IPA for `hot`, Japanese readings/terms for `hot`, and
+Japanese terms/readings for `激烈`.
+
+Post-repair checks passed:
+
+- `npm run check`
+- `node --check` for the changed broad-risk scripts
+- fast product export audit
+- published-risk audit
+
+The latest local product DB has `23078` product entries, `28604` product
+senses, and `28587` publishable senses. Blocking export checks remain clean:
+`duplicate_sense_orders = 0`, `orphans = 0`, `mojibake_texts = 0`,
+`html_artifacts = 0`, and `bad_sense_localization_counts = 0`. The broad-gloss
+risk count dropped from `336` to `333`. D1 export should wait until at least
+one more reviewed broad-risk batch or a manual decision to freeze this stage.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

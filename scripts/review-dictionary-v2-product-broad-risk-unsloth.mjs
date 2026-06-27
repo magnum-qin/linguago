@@ -31,6 +31,7 @@ const dryRun = args["dry-run"] === "true";
 const ggufVariant = args["gguf-variant"] || "UD-IQ4_NL";
 const maxSeqLength = Number(args["max-seq-length"] || 8192);
 const speculativeType = args["speculative-type"] || "mtp";
+const retries = Number(args.retries || 1);
 
 if (!fs.existsSync(reportPath)) throw new Error(`Triage report not found: ${reportPath}`);
 if (!Number.isInteger(limit) || limit < 1) throw new Error(`Invalid --limit: ${args.limit}`);
@@ -69,6 +70,7 @@ const output = {
   endpoints,
   limit,
   concurrency,
+  retries,
   prewarm,
   gguf_variant: ggufVariant,
   max_seq_length: maxSeqLength,
@@ -90,13 +92,7 @@ async function runPool(rows) {
     while (nextIndex < rows.length) {
       const current = nextIndex++;
       const candidate = rows[current];
-      const result = await reviewCandidate(candidate, endpoint).catch((error) => ({
-        sense_id: candidate.product_sense.id,
-        headword: candidate.product_entry.headword,
-        endpoint,
-        valid: false,
-        error: errorMessage(error)
-      }));
+      const result = await reviewCandidateWithRetry(candidate, endpoint);
       results[current] = result;
       console.log(
         `[${current + 1}/${rows.length}] ${candidate.product_entry.headword} sense=${candidate.product_sense.id} -> ${
@@ -107,6 +103,29 @@ async function runPool(rows) {
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, rows.length) }, (_, index) => worker(index)));
   return results;
+}
+
+async function reviewCandidateWithRetry(candidate, endpoint) {
+  let lastResult = null;
+  const attempts = Math.max(1, retries + 1);
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const result = await reviewCandidate(candidate, endpoint).catch((error) => ({
+      sense_id: candidate.product_sense.id,
+      headword: candidate.product_entry.headword,
+      endpoint,
+      valid: false,
+      error: errorMessage(error)
+    }));
+    result.attempt = attempt;
+    lastResult = result;
+    if (result.valid) return result;
+    if (attempt < attempts && shouldRetry(result)) {
+      await sleep(1000 * attempt);
+      continue;
+    }
+    return result;
+  }
+  return lastResult;
 }
 
 async function reviewCandidate(candidate, endpoint) {
@@ -177,6 +196,15 @@ async function reviewCandidate(candidate, endpoint) {
     candidate,
     raw_preview: content.slice(0, 1200)
   };
+}
+
+function shouldRetry(result) {
+  const error = `${result.error || ""} ${(result.validation_errors || []).join(" ")}`;
+  return /fetch failed|No model loaded|json_parse_failed|HTTP 5\d\d|ECONNRESET|ETIMEDOUT/iu.test(error);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function toReviewCandidate(row) {

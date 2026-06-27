@@ -14,13 +14,16 @@ const apply = args.apply === "true";
 const limit = args.limit ? Number(args.limit) : 0;
 const dropUnmappedExamples = args["drop-unmapped-examples"] === "true";
 const clearJobs = args["clear-jobs"] !== "false";
+const senseIds = parseIdSet(args["sense-ids"]);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!fs.existsSync(planPath)) throw new Error(`Split plan not found: ${planPath}`);
 if (limit && (!Number.isInteger(limit) || limit < 1)) throw new Error(`Invalid --limit: ${args.limit}`);
 
 const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
-const candidates = (plan.approved_candidates || []).slice(0, limit || undefined);
+const candidates = (plan.approved_candidates || [])
+  .filter((candidate) => !senseIds.size || senseIds.has(Number(candidate.sense_id)))
+  .slice(0, limit || undefined);
 if (!candidates.length) throw new Error("No approved_candidates found in split plan");
 
 const db = new Database(dbPath);
@@ -187,6 +190,7 @@ const stats = {
   plan: path.relative(process.cwd(), planPath),
   apply,
   drop_unmapped_examples: dropUnmappedExamples,
+  sense_ids: senseIds.size ? [...senseIds] : null,
   candidates_seen: candidates.length,
   candidates_valid: 0,
   candidates_applied: 0,
@@ -525,4 +529,13 @@ function parseArgs(argv) {
     }
   }
   return parsed;
+}
+
+function parseIdSet(value) {
+  const ids = new Set();
+  for (const part of String(value || "").split(",")) {
+    const id = Number(part.trim());
+    if (Number.isInteger(id) && id > 0) ids.add(id);
+  }
+  return ids;
 }
