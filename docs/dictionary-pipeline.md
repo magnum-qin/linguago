@@ -1110,6 +1110,105 @@ new `en-people-primary-conflict`, `en-exchange-blocked-mixed-sense`, and
 `exchange` now publishes only exchange/currency-exchange senses and `court`
 now publishes only court/romantic-court senses.
 
+## 2026-06-25 Broad Published-Sense Risk Triage
+
+After the `primary_english_term_conflict` bucket reached `0`, the next active
+quality bucket is `broad_multi_definition_gloss`. This is not always an error:
+many rows are only synonym-rich glosses, function words, inflected English
+forms, or proper-name noise. The current workflow therefore triages first and
+only sends the remaining compact queue to LLM review.
+
+Read-only triage command:
+
+```powershell
+node scripts/report-dictionary-v2-product-broad-risk-triage.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --risk logs/product-published-risk-after-primary-conflict-fix-20260625.json `
+  --out logs/product-broad-risk-triage-20260625.json `
+  --limit 180
+```
+
+Current triage result:
+
+- input `broad_multi_definition_gloss` senses: `340`;
+- `llm_split_candidate`: `29`;
+- `manual_repair_or_block`: `11`;
+- `manual_review`: `1`;
+- `inflected_form_repair_or_keep`: `112`;
+- `function_word_keep`: `21`;
+- `likely_keep`: `166`.
+
+The small LLM review script is:
+
+```powershell
+$env:UNSLOTH_API_KEY = "sk-unsloth-..."
+node scripts/review-dictionary-v2-product-broad-risk-unsloth.mjs `
+  --report logs/product-broad-risk-triage-20260625.json `
+  --out logs/product-broad-risk-llm-review-20-20260625.json `
+  --limit 20 `
+  --concurrency 1 `
+  --endpoints http://100.99.99.99:11444 `
+  --model unsloth/Qwen3.6-35B-A3B-MTP-GGUF `
+  --gguf-variant UD-IQ4_NL
+```
+
+The first successful 20-row pass produced `14/20` valid model decisions:
+`9 keep`, `5 split`, and `6 invalid` due to JSON parse failures or node
+connection errors. Useful split candidates from that pass included `lihai`,
+`shenfen`, `fangxin`, and `tichu`; synonym-only rows such as `fangzi`,
+`fangshi`, `guai`, `suannle`, `juda`, `aiya`, and `meimiao` were correctly
+classified as keep. The later wider retry showed that some Unsloth nodes can
+return `/v1/load` success while `/v1/chat/completions` fails with
+`TypeError: fetch failed` or `No model loaded`; do not expand this review until
+the selected node can keep the model loaded through chat requests.
+
+Do not apply split decisions directly from this report. The next implementation
+step is to turn high-confidence `split` decisions into a reviewed repair plan,
+then either add deterministic product overrides or create new product senses
+with four-language localizations.
+
+The first repair-plan extraction step is:
+
+```powershell
+node scripts/create-dictionary-v2-product-broad-risk-split-plan.mjs `
+  --review logs/product-broad-risk-llm-review-20-20260625.json `
+  --triage logs/product-broad-risk-triage-20260625.json `
+  --out logs/product-broad-risk-split-plan-20260625.json `
+  --confidence-threshold 0.85
+```
+
+This cross-checks the LLM review against the current triage report so stale
+split decisions are excluded. In the first run it reviewed `20` rows and kept
+`4` approved split candidates: `lihai`, `shenfen`, `fangxin`, and `tichu`.
+The old `steven` split suggestion was excluded because the refreshed triage now
+classifies it as proper-name/manual repair noise rather than an LLM split
+candidate.
+
+The approved candidates were applied locally with:
+
+```powershell
+node scripts/apply-dictionary-v2-product-broad-risk-split-plan.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --plan logs/product-broad-risk-split-plan-20260625.json `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-broad-risk-split-20260625.db`.
+The apply step updated `4` existing senses, created `4` new senses, inserted
+`32` localizations, copied `4` source links, and moved the `tichu` example
+`提出问题` onto the new raise/put-forward sense. Follow-up repairs corrected
+the new split readings and fixed the old `tichu` withdraw/take-out English
+localization. Two old `fangxin` source-mismatch senses (`to indulge` and
+`to scatter`) were added to the publication block list so only the valid
+`fangxin` senses publish.
+
+Post-apply fast export audit passed with `28582` publishable senses, `0`
+duplicate sense-order errors, `0` orphan rows, `0` mojibake texts, and `0`
+HTML artifacts. Published-risk broad gloss warnings dropped from `340` to
+`336`; the remaining broad-risk queue still needs review before the next D1
+export.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

@@ -18,5 +18,21 @@
     "block_code": "blocked_source_ambiguous",
     "rationale": "The English entry is court, but this product sense is localized as backyard / 后院 / 裏庭 / quintal. This is a mixed-source sense and should not be published under court.",
     "recommendation": "Rebuild or relocate the backyard sense under a matching headword/source entry before publication."
+  },
+  {
+    "target": {
+      "sense_id": 6379
+    },
+    "block_code": "blocked_source_ambiguous",
+    "rationale": "The Chinese entry is fangxin, but this sense is localized as to indulge / indulgir with the reading fang zong. It belongs to a different Chinese source word and should not publish under fangxin.",
+    "recommendation": "Rebuild or relocate this source sense under the matching Chinese headword before publication."
+  },
+  {
+    "target": {
+      "sense_id": 6380
+    },
+    "block_code": "blocked_source_ambiguous",
+    "rationale": "The Chinese entry is fangxin, but this sense is localized as to scatter / espalhar with a non-fangxin reading. It belongs to a different Chinese source word and should not publish under fangxin.",
+    "recommendation": "Rebuild or relocate this source sense under the matching Chinese headword before publication."
   }
 ]
