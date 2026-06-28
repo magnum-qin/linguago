@@ -1417,6 +1417,49 @@ likely keeps. The previously blocked `bacon`, `George`, `James`, `Elizabeth`,
 `Edward`, `Steven`, and `Lincoln` rows are no longer included in published-risk
 or broad-risk triage reports.
 
+## 2026-06-28 Broad Published-Sense Risk Batch 5
+
+Batch 5 used the corrected publishable-only triage report and reviewed all `19`
+LLM split candidates through Unsloth Qwen3.6-35B-A3B-MTP on the non-155 nodes.
+The first smoke run failed with `Invalid token payload` because the script
+already prepends `Bearer`; pass the bare `sk-...` token to `--token`. With the
+correct token, the full run completed with `18/19` valid reviews: `14` keep,
+`4` split, and `1` invalid validation result.
+
+The approved split suggestions were deliberately not applied verbatim. They
+were mostly low-frequency or source-noisy rows (`miles`, `gig`, `sweaty`) plus
+one traditional Chinese character row (`惡`). Batch 5 therefore used a
+conservative deterministic repair script instead:
+
+```powershell
+node scripts/repair-dictionary-v2-product-broad-risk-batch5-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-broad-risk-batch5-20260628.db`.
+The script repaired:
+
+- `miles` as the plural of `mile`, instead of publishing eight measurement and
+  race sub-senses from the old source gloss;
+- `惡` sense `16161` as "fierce/cruel/over-strict", keeping it distinct from
+  the existing `wù` hostile-against sense and the `è` evil/wicked sense;
+- `gig` as the common modern "live performance or temporary job" sense, instead
+  of the noisy rowing-boat/fishing-tool/carriage source gloss;
+- `flown` as the past participle of `fly`, including the corrected Japanese
+  reading `とんだ`;
+- `sweaty` as "covered with sweat or causing sweat".
+
+Post-repair checks passed: script `node --check`, `npm run check`, fast product
+export audit, and published-risk audit. Blocking export checks remain clean:
+`duplicate_sense_orders = 0`, `orphans = 0`, `mojibake_texts = 0`,
+`html_artifacts = 0`, and `bad_sense_localization_counts = 0`. The corrected
+published-risk count is now `408` flagged publishable senses, with
+`broad_multi_definition_gloss = 314`. The refreshed batch-6 triage has `14` LLM
+split candidates, `1` manual-review row, `112` inflected-form rows, `21`
+function-word keeps, and `166` likely keeps.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
