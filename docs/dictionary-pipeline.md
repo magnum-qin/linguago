@@ -1546,6 +1546,42 @@ Blocking export checks remain clean: `duplicate_sense_orders = 0`,
 `orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
 `bad_sense_localization_counts = 0`.
 
+## 2026-06-28 Function-Word Broad-Risk Cleanup
+
+The next deterministic pass handled the `function_word_keep` bucket. These rows
+were high-frequency English grammatical words whose source glosses were broad by
+nature, but several localized rows still exposed noisy source content. The repair
+script is:
+
+```powershell
+node scripts/repair-dictionary-v2-product-function-words-batch12-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-function-words-batch12-20260628.db`.
+The script repaired `21` function-word senses, including `the`, `to`, `of`,
+`is`, `what`, `my`, `was`, `be`, `how`, `when`, `us`, `something`, `into`,
+`else`, `against`, `himself`, `unless`, `herself`, `towards`, `per`, and
+`toward`.
+
+Most rows were repaired by compressing `gloss_key` and the English definition.
+The script also corrected visible lookup quality problems:
+
+- `what` now maps to `what / 什么 / 何 / o que`, not the Chinese question
+  particle `吗`;
+- `us` now maps to the objective pronoun sense, not the United States;
+- `was` no longer exposes the Washington-state source collision;
+- `per` no longer uses the bad Portuguese term `dentrode`.
+
+Post-repair checks passed: script `node --check`, `npm run check`, fast product
+export audit, and published-risk audit. The corrected published-risk count is
+now `262` flagged publishable senses, with `broad_multi_definition_gloss = 166`.
+The refreshed batch-13 triage has no LLM split candidates, no manual-review
+rows, no inflected-form rows, and no function-word rows. The remaining broad
+risk queue is only `166` `likely_keep` rows.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
