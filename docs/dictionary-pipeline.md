@@ -1582,6 +1582,43 @@ The refreshed batch-13 triage has no LLM split candidates, no manual-review
 rows, no inflected-form rows, and no function-word rows. The remaining broad
 risk queue is only `166` `likely_keep` rows.
 
+## 2026-06-28 Likely-Keep Broad-Risk Cleanup
+
+The final deterministic broad-risk pass handled the remaining `likely_keep`
+bucket. These rows were not good split candidates: the four-language published
+localizations were already usable, but `product_senses.gloss_key` still carried
+broad source text that kept triggering `broad_multi_definition_gloss`.
+
+The repair script is:
+
+```powershell
+node scripts/repair-dictionary-v2-product-likely-keep-glosses-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --triage logs/product-broad-risk-triage-batch13-20260628.json `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-likely-keep-glosses-20260628.db`.
+The script compressed `166` likely-keep glosses by rebuilding `gloss_key` from
+the English localization definition, then the English term, then the existing
+source gloss/headword as fallback. It does not rewrite localized terms,
+definitions, readings, pronunciations, examples, or publication state.
+
+Post-repair checks passed: script `node --check`, `npm run check`, fast product
+export audit, and published-risk audit. After this pass:
+
+- publishable senses: `28580`;
+- flagged publishable senses: `96`;
+- `broad_multi_definition_gloss`: `0`;
+- final broad-risk triage input senses: `0`;
+- remaining published-risk buckets are `short_japanese_particle_or_kana_sense =
+  37`, `high_source_count_broad_sense = 51`, and `short_gloss_needs_review = 8`.
+
+Blocking export checks remain clean: `duplicate_sense_orders = 0`,
+`orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
+`bad_sense_localization_counts = 0`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
