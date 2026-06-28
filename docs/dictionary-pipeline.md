@@ -1460,6 +1460,41 @@ published-risk count is now `408` flagged publishable senses, with
 split candidates, `1` manual-review row, `112` inflected-form rows, `21`
 function-word keeps, and `166` likely keeps.
 
+## 2026-06-28 Broad Published-Sense Risk Batch 6
+
+Batch 6 handled the remaining LLM/manual triage rows without another model
+round. All `14` LLM candidates from batch 6 were already judged as `keep` in
+the previous Unsloth review, and the remaining `manual_review` row
+(`compromise`) had good localizations but an over-broad source gloss. The repair
+therefore only compressed `gloss_key` and normalized `part_of_speech`; it did
+not rewrite the four-language localization rows.
+
+The repair script is:
+
+```powershell
+node scripts/repair-dictionary-v2-product-broad-risk-batch6-keep-glosses-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-broad-risk-batch6-20260628.db`.
+The repaired rows were `房子`, `方式`, `管`, `怪`, `算了`, `巨大`, `哎呀`,
+`美妙`, `符合`, `通道`, `炳`, `不足`, `compromise`, `修改`, and `快感`.
+
+Post-repair checks passed: script `node --check`, `npm run check`, fast product
+export audit, and published-risk audit. Blocking export checks remain clean:
+`duplicate_sense_orders = 0`, `orphans = 0`, `mojibake_texts = 0`,
+`html_artifacts = 0`, and `bad_sense_localization_counts = 0`. The corrected
+published-risk count is now `393` flagged publishable senses, with
+`broad_multi_definition_gloss = 299`.
+
+The refreshed batch-8 triage has no LLM split candidates and no manual-review
+rows. The remaining broad-risk queue is rule-classified only: `112`
+inflected-form repair/keep rows, `21` function-word keeps, and `166` likely
+keeps. The next cleanup step should focus on deterministic handling of those
+three rule buckets rather than additional LLM review.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
