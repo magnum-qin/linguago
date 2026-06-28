@@ -1349,6 +1349,53 @@ export is:
 outputs/d1-v2-product-native-export-broad-risk-batch3-20260628
 ```
 
+## 2026-06-28 Manual Broad-Risk Batch 4
+
+After batch 3, the broad-risk queue still contained `331` rows. The refreshed
+triage showed that the remaining `manual_repair_or_block` rows were mostly two
+classes: high-frequency English mixed-source entries (`does`, `real`, `shall`)
+and proper-name encyclopedia rows (`George`, `James`, `Elizabeth`, `Edward`,
+`Steven`, `Lincoln`). These should not be handled by raw LLM split plans because
+they tend to create non-dictionary encyclopedia senses.
+
+The batch-4 repair script is:
+
+```powershell
+node scripts/repair-dictionary-v2-product-manual-risk-batch4-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-manual-risk-batch4-20260628.db`.
+The script:
+
+- repaired `does` to the third-person singular present form of `do`;
+- repaired `real` to the adjective sense "actually existing; genuine";
+- repaired `shall` to a compact auxiliary-verb sense;
+- repaired `sis` to informal "sister";
+- repaired `ay` to "yes/aye; expression of assent";
+- blocked broad proper-name or source-noise senses for `George`, `James`,
+  `Elizabeth`, `Edward`, `Steven`, and `Lincoln`.
+
+Post-repair checks passed: `npm run check`, script `node --check`, fast product
+audit, published-risk audit, product-native D1 export, and full import audit.
+The release-candidate export is:
+
+```text
+outputs/d1-v2-product-native-export-manual-risk-batch4-20260628
+```
+
+This export has `23064` entries, `28581` senses, `114324` sense localizations,
+`3030` examples, and `11898` example localizations. Blocking export checks
+remain clean: `duplicate_sense_orders = 0`, `orphans = 0`,
+`mojibake_texts = 0`, `html_artifacts = 0`, and
+`bad_sense_localization_counts = 0`. Published-risk
+`broad_multi_definition_gloss` is now `326`. The six blocked proper-name rows
+are intentionally absent from the published lookup; do not include them as
+required sample terms in export audits unless proper-name entries are rebuilt
+intentionally.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
