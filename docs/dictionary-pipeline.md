@@ -1688,6 +1688,46 @@ Blocking export checks remain clean: `duplicate_sense_orders = 0`,
 `orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
 `bad_sense_localization_counts = 0`.
 
+## 2026-06-28 High-Source Risk Cleanup
+
+The final published-risk pass cleaned the remaining
+`high_source_count_broad_sense` bucket. This bucket was different from the
+earlier broad-gloss issues: the published four-language rows were mostly usable,
+but each sense still had too many `product_sense_source_links`, which made the
+audit treat it as a possible over-merged fusion result. These source links are
+not exported to D1; they are local provenance and repair evidence.
+
+The repair script is:
+
+```powershell
+node scripts/repair-dictionary-v2-product-high-source-batch16-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --risk logs/product-published-risk-after-japanese-short-batch15-20260628.json `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-high-source-batch16-20260628.db`.
+The script processed all `51` high-source risk rows. It rebuilt each
+`gloss_key` from the current English definition, normalized empty POS labels
+where possible, and pruned over-broad provenance links to at most five strongest
+source links per sense. It reduced source links on these rows from `395` to
+`255`, deleting `140` low-priority links while keeping enough provenance for
+future review.
+
+Post-repair checks passed: script `node --check`, `npm run check`, fast product
+export audit, and published-risk audit. After this pass:
+
+- publishable senses: `28577`;
+- flagged publishable senses: `0`;
+- remaining published-risk buckets: none;
+- recommended next step from the audit: no published high-risk senses were
+  flagged by deterministic checks.
+
+Blocking export checks remain clean: `duplicate_sense_orders = 0`,
+`orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
+`bad_sense_localization_counts = 0`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
