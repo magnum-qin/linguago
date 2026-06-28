@@ -1654,6 +1654,40 @@ Blocking export checks remain clean: `duplicate_sense_orders = 0`,
 `orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
 `bad_sense_localization_counts = 0`.
 
+## 2026-06-28 Japanese Short-Gloss Risk Cleanup
+
+The next pass cleaned the `short_japanese_particle_or_kana_sense` bucket. The
+repair script is:
+
+```powershell
+node scripts/repair-dictionary-v2-product-japanese-short-batch15-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-japanese-short-batch15-20260628.db`.
+The script handled all `37` Japanese short-gloss risk rows. Most rows were
+legitimate high-frequency Japanese particles, pronouns, suffixes, loanwords, or
+interjections whose `gloss_key` was simply too short. Those rows were repaired
+by expanding `gloss_key` and normalizing part-of-speech labels. Five rows also
+received full four-language localization repairs: `な`, `ん`, `だい`, `ヨ`,
+and `シ`. One unsafe row, `せ`, was publication blocked because it was mapped to
+English `so` with weak source evidence and an inconsistent Japanese definition.
+
+Post-repair checks passed: script `node --check`, `npm run check`, fast product
+export audit, and published-risk audit. After this pass:
+
+- publishable senses: `28577`;
+- flagged publishable senses: `51`;
+- `short_japanese_particle_or_kana_sense`: `0`;
+- remaining published-risk bucket: `high_source_count_broad_sense = 51`;
+- warning counts `zh_terms_with_kana = 0` and `ja_terms_with_latin_only = 0`.
+
+Blocking export checks remain clean: `duplicate_sense_orders = 0`,
+`orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
+`bad_sense_localization_counts = 0`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
