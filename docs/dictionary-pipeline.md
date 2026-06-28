@@ -1728,6 +1728,45 @@ Blocking export checks remain clean: `duplicate_sense_orders = 0`,
 `orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
 `bad_sense_localization_counts = 0`.
 
+## 2026-06-28 Product D1 Native Export Audit
+
+After published-risk reached zero, the product D1 native SQL export was rebuilt
+from the current product candidate database:
+
+```powershell
+node scripts/export-dictionary-v2-product-native-d1-sql.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --out-dir outputs/d1-v2-product-native-export `
+  --chunk-bytes 7000000
+
+node scripts/audit-dictionary-v2-product-export.mjs `
+  --mode full `
+  --import memory `
+  --out-dir outputs/d1-v2-product-native-export
+```
+
+The npm alias `dict:v2:export:product-d1-native` and the exporter default DB
+were updated to use
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db`
+instead of the older `linguago_v2_product_top5000_fused_only_pilot.db`.
+
+Export stats:
+
+- `v2_entries`: `23060`;
+- `v2_entry_forms`: `161114`;
+- `v2_pronunciation_groups`: `24885`;
+- `v2_senses`: `28577`;
+- `v2_sense_localizations`: `114308`;
+- `v2_examples`: `3030`;
+- `v2_example_localizations`: `11898`;
+- SQL data chunks: `15`.
+
+Full import audit passed with `ok = true`. Blocking checks remain clean:
+`count_mismatches = 0`, `bad_sense_localization_counts = 0`,
+`duplicate_sense_orders = 0`, `orphans = 0`, `mojibake_texts = 0`,
+`html_artifacts = 0`, `source_script_mismatches = 0`, and
+`duplicate_zh_examples_by_en_reading = 0`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

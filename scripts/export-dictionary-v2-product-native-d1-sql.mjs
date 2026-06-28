@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = path.resolve(args.db || "data/processed/linguago_v2_product_top5000_fused_only_pilot.db");
+const dbPath = path.resolve(args.db || "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db");
 const outDir = path.resolve(args["out-dir"] || "outputs/d1-v2-product-native-export");
 const chunkBytes = Number(args["chunk-bytes"] || 7_000_000);
 const limitEntries = Number(args["limit-entries"] || 0);

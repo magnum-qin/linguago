@@ -71,7 +71,7 @@
     "dict:v2:rank:frequency": "node scripts/rank-dictionary-v2-frequency.mjs",
     "dict:v2:apply-overrides": "node scripts/apply-dictionary-v2-overrides.mjs",
     "dict:v2:export:d1-native": "node scripts/export-dictionary-v2-native-d1-sql.mjs --db data/processed/linguago_v2_full.db --out-dir outputs/d1-v2-native-export",
-    "dict:v2:export:product-d1-native": "node scripts/export-dictionary-v2-product-native-d1-sql.mjs --db data/processed/linguago_v2_product_top5000_fused_only_pilot.db --out-dir outputs/d1-v2-product-native-export",
+    "dict:v2:export:product-d1-native": "node scripts/export-dictionary-v2-product-native-d1-sql.mjs --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db --out-dir outputs/d1-v2-product-native-export",
     "dict:v2:release:product-d1": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release-dictionary-v2-product-d1.ps1",
     "dict:v2:push:d1-native": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/push-dictionary-v2-native-to-d1.ps1 -DbPath data/processed/linguago_v2_full.db -OutDir outputs/d1-v2-native-export",
     "dict:test:deepseek": "node scripts/deepseek-dictionary-test.mjs --candidates-file data/processed/generation_batch_frequency_400.jsonl --limit 12 --word-only",
