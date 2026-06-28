@@ -16,6 +16,40 @@ if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 const db = new Database(dbPath, { readonly: true });
 db.pragma("busy_timeout = 30000");
 
+const hasPublicationBlocks = Boolean(
+  db
+    .prepare(
+      `
+      SELECT 1
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND name = 'product_sense_publication_blocks'
+      LIMIT 1
+    `
+    )
+    .get()
+);
+const publishableSenseClause = hasPublicationBlocks
+  ? `ps.status = 'accepted'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM product_sense_publication_blocks b
+        WHERE b.product_sense_id = ps.id
+      )`
+  : `ps.status = 'accepted'`;
+const publishableSenseCountSql = hasPublicationBlocks
+  ? `
+    SELECT COUNT(*) AS n
+    FROM product_senses ps
+    WHERE ps.status = 'accepted'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM product_sense_publication_blocks b
+        WHERE b.product_sense_id = ps.id
+      )
+  `
+  : "SELECT COUNT(*) AS n FROM product_senses ps WHERE ps.status = 'accepted'";
+
 const rows = db
   .prepare(
     `
@@ -49,7 +83,7 @@ const rows = db
       ) AS source_words
     FROM product_entries pe
     JOIN product_senses ps ON ps.product_entry_id = pe.id
-    WHERE ps.status = 'accepted'
+    WHERE ${publishableSenseClause}
       AND (
         pe.source_count >= 6
         OR length(trim(ps.gloss_key)) <= 3
@@ -112,6 +146,8 @@ for (const row of rows) {
 
 const summary = {
   accepted_senses: db.prepare("SELECT COUNT(*) AS n FROM product_senses WHERE status = 'accepted'").get().n,
+  publishable_senses: db.prepare(publishableSenseCountSql).get().n,
+  publication_blocks_applied: hasPublicationBlocks,
   candidate_rows_scanned: rows.length,
   flagged_senses: allFlagged.length,
   buckets: Object.fromEntries([...buckets.entries()].map(([key, value]) => [key, value.count]))

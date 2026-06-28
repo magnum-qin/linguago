@@ -1396,6 +1396,27 @@ are intentionally absent from the published lookup; do not include them as
 required sample terms in export audits unless proper-name entries are rebuilt
 intentionally.
 
+## 2026-06-28 Published-Risk Audit Scope Fix
+
+The published-risk audit now uses the same publishable-sense scope as product
+export: `product_senses.status = 'accepted'` and no matching row in
+`product_sense_publication_blocks`. This prevents intentionally blocked source
+noise from re-entering the broad-risk queue after a repair batch.
+
+With the corrected scope, the batch-4 DB has:
+
+- raw accepted senses: `28588`;
+- publishable senses: `28581`;
+- flagged publishable senses: `413`;
+- `broad_multi_definition_gloss`: `319`;
+- clean batch-5 triage input: `319` broad senses.
+
+The refreshed batch-5 triage has `19` LLM split candidates, `1` manual-review
+row, `112` inflected-form rows, `21` likely function-word keeps, and `166`
+likely keeps. The previously blocked `bacon`, `George`, `James`, `Elizabeth`,
+`Edward`, `Steven`, and `Lincoln` rows are no longer included in published-risk
+or broad-risk triage reports.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
