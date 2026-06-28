@@ -1619,6 +1619,41 @@ Blocking export checks remain clean: `duplicate_sense_orders = 0`,
 `orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
 `bad_sense_localization_counts = 0`.
 
+## 2026-06-28 Short-Gloss Risk Cleanup
+
+After broad-risk reached zero, the next pass cleaned the remaining
+`short_gloss_needs_review` bucket. The repair script is:
+
+```powershell
+node scripts/repair-dictionary-v2-product-short-gloss-batch14-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-short-gloss-batch14-20260628.db`.
+The script repaired six short-gloss rows (`寸`, `lex`, `涴`, `Jun`, `mal`,
+`hup`) by replacing terse `gloss_key` values with explicit lexical glosses and
+rewriting the four-language localizations where needed. It also publication
+blocked two unsafe rows:
+
+- `nan`: mixed grandmother, Thai river, and bread senses while publishing bad
+  zh/ja localizations as `南`;
+- `sod`: mixed an informal British person sense with a turf-covering verb sense.
+
+Post-repair checks passed: script `node --check`, `npm run check`, fast product
+export audit, and published-risk audit. After this pass:
+
+- publishable senses: `28578`;
+- flagged publishable senses: `88`;
+- `short_gloss_needs_review`: `0`;
+- remaining published-risk buckets are `short_japanese_particle_or_kana_sense =
+  37` and `high_source_count_broad_sense = 51`.
+
+Blocking export checks remain clean: `duplicate_sense_orders = 0`,
+`orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
+`bad_sense_localization_counts = 0`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
