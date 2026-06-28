@@ -1495,6 +1495,57 @@ inflected-form repair/keep rows, `21` function-word keeps, and `166` likely
 keeps. The next cleanup step should focus on deterministic handling of those
 three rule buckets rather than additional LLM review.
 
+## 2026-06-28 Inflected-Form Broad-Risk Cleanup
+
+The next cleanup pass handled the `inflected_form_repair_or_keep` bucket without
+LLM review. The bucket contained `112` broad source glosses, mostly English
+inflected forms whose source definitions had inherited every sense of the lemma.
+Three deterministic scripts were used:
+
+```powershell
+node scripts/repair-dictionary-v2-product-inflected-batch9-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+
+node scripts/repair-dictionary-v2-product-inflected-batch10-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+
+node scripts/repair-dictionary-v2-product-inflected-batch11-final-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+```
+
+Backups were written before each batch:
+
+- `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-inflected-batch9-20260628.db`
+- `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-inflected-batch10-20260628.db`
+- `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-inflected-batch11-final-20260628.db`
+
+Batch 9 repaired `49` high-frequency forms such as `got`, `did`, `were`,
+`had`, `been`, `has`, `doing`, `came`, `went`, `seen`, `called`, `took`,
+`makes`, `comes`, `gets`, and `led`. Batch 10 repaired `57` mid/low-frequency
+forms such as `answers`, `stood`, `checking`, `escaped`, `served`, `deeper`,
+`cracked`, `decides`, `cancelled`, `lifted`, `freed`, `skipped`, `converted`,
+and `destroys`. Batch 11 repaired the last five ambiguous-but-publishable forms
+(`leads`, `fed`, `checks`, `cuts`, `noises`) and blocked `cass` with
+`blocked_source_ambiguous` because its source gloss mixed calcium and California
+abbreviation content that is not a supported lexical sense for the headword.
+
+Post-repair checks passed after every batch: script `node --check`, `npm run
+check`, fast product export audit, and published-risk audit. After the final
+batch:
+
+- publishable senses: `28580`;
+- flagged publishable senses: `281`;
+- `broad_multi_definition_gloss`: `187`;
+- `inflected_form_repair_or_keep`: `0`;
+- batch-12 triage has only `21` function-word keeps and `166` likely keeps.
+
+Blocking export checks remain clean: `duplicate_sense_orders = 0`,
+`orphans = 0`, `mojibake_texts = 0`, `html_artifacts = 0`, and
+`bad_sense_localization_counts = 0`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
