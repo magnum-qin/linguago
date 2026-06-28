@@ -1295,6 +1295,60 @@ senses, and `28587` publishable senses. Blocking export checks remain clean:
 risk count dropped from `336` to `333`. D1 export should wait until at least
 one more reviewed broad-risk batch or a manual decision to freeze this stage.
 
+## 2026-06-28 Broad Published-Sense Risk Batch 3
+
+The next triage used the batch-2 published-risk report and produced `333`
+remaining broad-gloss input senses. The split-candidate queue was down to `22`
+rows:
+
+```powershell
+node scripts/report-dictionary-v2-product-broad-risk-triage.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --risk logs/product-published-risk-after-broad-split-batch2-final-20260628.json `
+  --out logs/product-broad-risk-triage-batch3-20260628.json `
+  --limit 260
+```
+
+The single-endpoint Unsloth review completed in about `82` seconds with
+`20/22` valid decisions: `14` keep, `6` split, and `2` invalid. The remaining
+split approvals were mostly low-value or noisy rows already seen in batch 2:
+`liver`, `bacon`, `惡`, `gig`, `proven`, and `sweaty`. Do not apply the raw
+batch-3 split plan as-is; it would publish proper-name encyclopedia senses and
+rare archaic meanings.
+
+Instead, batch 3 used a conservative deterministic repair script:
+
+```powershell
+node scripts/repair-dictionary-v2-product-broad-risk-batch3-20260628.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --apply true
+```
+
+Before applying, a local backup was written to
+`data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-broad-risk-batch3-20260628.db`.
+The repair did three things:
+
+- split `liver` into anatomical organ sense `13814` and food sense `29700`;
+- narrowed `proven` sense `19406` to the published adjective meaning
+  "established beyond doubt";
+- blocked mixed `bacon` sense `16099` with `blocked_source_ambiguous` because
+  the entry already has a clean food sense and the extra row mixes Roger Bacon
+  and Francis Bacon proper-name content.
+
+Post-repair checks passed: `npm run check`, script `node --check`, fast product
+audit, published-risk audit, product-native D1 export, and full import audit.
+The latest local product DB has `23078` product entries, `28605` product
+senses, `114412` product localizations, and `28587` exportable/publishable D1
+senses after publication blocks. Blocking export checks remain clean:
+`duplicate_sense_orders = 0`, `orphans = 0`, `mojibake_texts = 0`,
+`html_artifacts = 0`, and `bad_sense_localization_counts = 0`. Published-risk
+`broad_multi_definition_gloss` is now `331`. The current release-candidate
+export is:
+
+```text
+outputs/d1-v2-product-native-export-broad-risk-batch3-20260628
+```
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
