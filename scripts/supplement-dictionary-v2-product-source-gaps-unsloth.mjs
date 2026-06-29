@@ -64,6 +64,7 @@ const batchSize = Number(args["batch-size"] || 1);
 const endpointConcurrency = parseEndpointConcurrency(args["endpoint-concurrency"], endpoints);
 const dryRun = args["dry-run"] === "true";
 const apply = args.apply === "true" || args.apply === true;
+const selectOnly = args["select-only"] === "true";
 const includeRisky = args["include-risky"] === "true";
 const prewarm = args.prewarm !== "false";
 const quiet = args.quiet === "true";
@@ -76,11 +77,15 @@ const maxSeqLength = Number(args["max-seq-length"] || 8192);
 const speculativeType = args["speculative-type"] || "mtp";
 const loadIn4bit = args["load-in-4bit"] !== "false";
 const residualMode = args["residual-mode"] === "true";
+const publishable = args.publishable === "true";
+const appliedEntryStatus = publishable ? "accepted" : "draft_single_source";
+const appliedSenseStatus = publishable ? "accepted" : "draft_single_source";
+const appliedLocalizationNeedsReview = publishable ? 0 : 1;
 const outPath = path.resolve(args.out || `logs/product-source-gap-unsloth-${apply ? "apply" : "dry-run"}-20260622.json`);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Product DB not found: ${dbPath}`);
 if (!fs.existsSync(reportPath)) throw new Error(`Gap report not found: ${reportPath}`);
-if (!token) throw new Error("Missing --token or UNSLOTH_API_KEY");
+if (!selectOnly && !token) throw new Error("Missing --token or UNSLOTH_API_KEY");
 if (!endpoints.length) throw new Error("No endpoints configured");
 if (!Number.isInteger(limit) || limit < 1) throw new Error(`Invalid --limit: ${args.limit}`);
 if (!Number.isInteger(concurrency) || concurrency < 1) throw new Error(`Invalid --concurrency: ${args.concurrency}`);
@@ -139,6 +144,45 @@ for (const row of allRows) {
 }
 eligibilityDb.close();
 
+if (selectOnly) {
+  const stats = {
+    db: path.relative(process.cwd(), dbPath),
+    report: path.relative(process.cwd(), reportPath),
+    model,
+    endpoints,
+    select_only: true,
+    limit,
+    selected: selected.length,
+    skipped_before_generation: rejectedBeforeGeneration.length,
+    skipped_before_generation_by_reason: countBy(rejectedBeforeGeneration.map((row) => row.reason))
+  };
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(
+    outPath,
+    JSON.stringify(
+      {
+        ok: true,
+        generated_at: new Date().toISOString(),
+        stats,
+        selected_preview: selected.slice(0, 80).map((row) => ({
+          source_entry_id: row.source_entry_id,
+          word: row.word,
+          source_lang: row.source_lang,
+          frequency_rank: row.frequency_rank,
+          gloss: row.gloss_preview || row.gloss_key,
+          quality_bucket: row.quality_bucket || null
+        })),
+        skipped_preview: rejectedBeforeGeneration.slice(0, 80)
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  console.log(JSON.stringify({ ok: true, out: path.relative(process.cwd(), outPath), stats }, null, 2));
+  process.exit(0);
+}
+
 const prewarmResults = prewarm ? await prewarmEndpoints() : [];
 
 const generated = await runGenerationPool(selected);
@@ -163,6 +207,10 @@ const stats = {
   speculative_type: speculativeType,
   load_in_4bit: loadIn4bit,
   residual_mode: residualMode,
+  publishable,
+  applied_entry_status: appliedEntryStatus,
+  applied_sense_status: appliedSenseStatus,
+  applied_localization_needs_review: appliedLocalizationNeedsReview,
   log_generated: logGenerated,
   selected: selected.length,
   skipped_before_generation: rejectedBeforeGeneration.length,
@@ -517,7 +565,7 @@ function normalizeGeneratedOutput(row, output) {
   normalized.part_of_speech = normalized.part_of_speech ?? row.useful_senses?.[0]?.part_of_speech ?? null;
   normalized.gloss_key = nonEmpty(normalized.gloss_key)
     ? normalized.gloss_key
-    : row.first_gloss_key || row.first_gloss_preview || "";
+    : row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || "";
 
   if (!normalized.localizations || typeof normalized.localizations !== "object") return normalized;
   const sourceLoc = normalized.localizations[row.source_lang];
@@ -543,7 +591,7 @@ function applyOutputs(items, stats) {
       INSERT INTO product_entries
         (headword, normalized_key, primary_lang, frequency_rank, group_key, group_method, status, source_count, lang_count, created_at)
       VALUES
-        (@headword, @normalized_key, @primary_lang, @frequency_rank, @group_key, 'source_gap_unsloth', 'accepted', 1, 4, @created_at)
+        (@headword, @normalized_key, @primary_lang, @frequency_rank, @group_key, 'source_gap_unsloth', @status, 1, 4, @created_at)
     `),
     getSense: db.prepare("SELECT id FROM product_senses WHERE product_entry_id = ? AND gloss_key = ?"),
     existingLocalizationsByEntry: db.prepare(`
@@ -568,13 +616,13 @@ function applyOutputs(items, stats) {
       INSERT INTO product_senses
         (product_entry_id, sense_order, part_of_speech, gloss_key, status, confidence, created_at)
       VALUES
-        (@product_entry_id, @sense_order, @part_of_speech, @gloss_key, 'accepted', 0.78, @created_at)
+        (@product_entry_id, @sense_order, @part_of_speech, @gloss_key, @status, 0.78, @created_at)
     `),
     upsertLocalization: db.prepare(`
       INSERT INTO product_localizations
         (product_sense_id, lang, term, reading, reading_system, pronunciation, pronunciation_system, definition, source, confidence, needs_review)
       VALUES
-        (@product_sense_id, @lang, @term, @reading, @reading_system, @pronunciation, @pronunciation_system, @definition, @source, 0.78, 0)
+        (@product_sense_id, @lang, @term, @reading, @reading_system, @pronunciation, @pronunciation_system, @definition, @source, 0.78, @needs_review)
       ON CONFLICT(product_sense_id, lang) DO UPDATE SET
         term = excluded.term,
         reading = excluded.reading,
@@ -584,7 +632,7 @@ function applyOutputs(items, stats) {
         definition = excluded.definition,
         source = excluded.source,
         confidence = excluded.confidence,
-        needs_review = 0
+        needs_review = excluded.needs_review
     `),
     insertSourceLink: db.prepare(`
       INSERT OR IGNORE INTO product_sense_source_links
@@ -608,6 +656,7 @@ function applyOutputs(items, stats) {
             primary_lang: item.primary_lang,
             frequency_rank: item.frequency_rank ?? null,
             group_key: groupKey,
+            status: appliedEntryStatus,
             created_at: now
           }).lastInsertRowid
         );
@@ -629,6 +678,7 @@ function applyOutputs(items, stats) {
               sense_order: senseOrder,
               part_of_speech: item.part_of_speech || null,
               gloss_key: item.gloss_key,
+              status: appliedSenseStatus,
               created_at: now
             }).lastInsertRowid
           );
@@ -647,7 +697,8 @@ function applyOutputs(items, stats) {
           pronunciation: loc.pronunciation || null,
           pronunciation_system: loc.pronunciation_system || null,
           definition: loc.definition,
-          source: SOURCE
+          source: SOURCE,
+          needs_review: appliedLocalizationNeedsReview
         });
         stats.localizations_upserted++;
       }
@@ -671,14 +722,14 @@ function candidateEligibility(row) {
   const word = String(row.word || "").trim();
   if (!word) return { ok: false, reason: "empty_word" };
   const groupKey = `source-gap:${row.source_lang}:${normalize(row.normalized_key || row.word)}`;
-  const glossKey = row.first_gloss_key || row.first_gloss_preview || "";
+  const glossKey = row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || "";
   if (row.first_sense_id && existingLinkedCompleteSense.get(row.first_sense_id)) {
     return { ok: false, reason: "already_linked_complete_source_gap" };
   }
   if (glossKey && existingCompleteSense.get(groupKey, glossKey)) return { ok: false, reason: "already_complete_source_gap" };
   if (row.repairable_from_same_entry) return { ok: false, reason: "deterministic_repair_available" };
   if (row.entry_level_four_lang_available) return { ok: false, reason: "entry_level_four_lang_available" };
-  if (!Boolean(row.first_gloss_key || row.first_gloss_preview)) return { ok: false, reason: "missing_gloss" };
+  if (!Boolean(glossKey)) return { ok: false, reason: "missing_gloss" };
   const risk = riskReason(row);
   if (risk && !includeRisky) return { ok: false, reason: risk };
   return { ok: true, reason: "" };
@@ -716,7 +767,10 @@ function findEquivalentSenseId(rows, item) {
 
 function riskReason(row) {
   const word = String(row.word || "").trim();
-  const gloss = String(row.first_gloss_key || row.first_gloss_preview || "").normalize("NFKC").trim().toLowerCase();
+  const gloss = String(row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || "")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase();
   const latinOnly = /^[\p{Script=Latin}\s.'’-]+$/u.test(word);
   if (row.source_lang === "en" && /^[A-Za-z]$/u.test(word)) return "latin_single_letter";
   if (row.source_lang === "en" && /^[A-Z]{2,}$/u.test(word)) return "latin_acronym";

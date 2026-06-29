@@ -446,6 +446,29 @@ depends on the deployed Worker and network access.
 
 The first full-database completion batches used Ollama `qwen3.6:latest` with `profile core` and `--max-senses-per-entry 1`, then moved to the A6000 cluster behind `100.99.99.99`. That flow is historical and should not be the default for new product-dictionary source-gap work.
 
+For current expansion work, first generate and filter a high-value coverage-gap
+report. Then run Unsloth in `--select-only true` or dry-run mode before any
+database write:
+
+```powershell
+node scripts/find-dictionary-v2-product-coverage-gaps.mjs `
+  --out logs/product-coverage-gaps-current-10000.json `
+  --limit 10000 `
+  --include-details true
+
+node scripts/filter-dictionary-v2-product-coverage-gap-report.mjs `
+  --in logs/product-coverage-gaps-current-10000.json `
+  --out logs/product-coverage-gaps-clean-high-value.json `
+  --limit 500
+
+node scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs `
+  --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db `
+  --report logs/product-coverage-gaps-clean-high-value.json `
+  --limit 20 `
+  --select-only true `
+  --out logs/product-source-gap-unsloth-select-only-20.json
+```
+
 The active source-gap supplement flow uses Unsloth Studio's OpenAI-compatible API and writes whole four-language product records with `scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs`. Use the cleaned source-gap report, not the raw incomplete report, unless intentionally debugging rejects:
 
 ```powershell
@@ -468,7 +491,7 @@ node scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs `
   --out logs/product-source-gap-unsloth-dry-run.json
 ```
 
-For a real write, change `--dry-run true --apply false` to `--dry-run false --apply true`, then run the fast audit:
+For a real write, change `--dry-run true --apply false` to `--dry-run false --apply true`, then run the fast audit. New expansion batches are draft by default: `product_entries.status = draft_single_source`, `product_senses.status = draft_single_source`, and generated localizations keep `needs_review = 1`. Do not pass `--publishable true` for ordinary expansion batches.
 
 ```powershell
 npm run dict:v2:audit:product-fast -- --out logs/product-fast-audit-after-source-gap.json
@@ -1878,13 +1901,17 @@ Expansion should continue from coverage-gap reports, not from a blind full-DB
 completion run:
 
 ```powershell
-npm run dict:v2:coverage:gaps
+npm run dict:v2:coverage:gaps -- --out logs/product-coverage-gaps-current.json --limit 1000 --include-details true
+npm run dict:v2:coverage:filter-gaps -- --in logs/product-coverage-gaps-current.json --out logs/product-coverage-gaps-clean-high-value.json --limit 500
 npm run dict:v2:coverage:source-gap-residuals
 ```
 
-Use Unsloth/Qwen MTP only to write draft/job rows first. Promote into
-publishable product tables only after deterministic audit and focused online
-regression pass.
+Use Unsloth/Qwen MTP only against the cleaned high-value report first. The
+source-gap Unsloth writer now defaults to draft writes when `--apply true` is
+used: new product entries and senses are `draft_single_source`, and generated
+localizations are kept with `needs_review = 1`. Do not use `--publishable true`
+for ordinary expansion batches. Promote into publishable product tables only
+after deterministic audit, spot checks, and focused online regression pass.
 
 ## Database
 

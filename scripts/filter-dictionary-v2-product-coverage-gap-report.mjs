@@ -1,0 +1,279 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const LANGS = ["en", "pt-BR", "zh", "ja"];
+const DEFAULT_IN = "logs/product-coverage-gaps-20260622.json";
+const DEFAULT_OUT = "logs/product-coverage-gaps-clean-high-value.json";
+const FUNCTION_GLOSSES = new Set([
+  "a",
+  "an",
+  "the",
+  "of",
+  "to",
+  "in",
+  "on",
+  "at",
+  "for",
+  "from",
+  "by",
+  "with",
+  "and",
+  "or",
+  "but",
+  "if",
+  "as",
+  "this",
+  "that",
+  "these",
+  "those",
+  "my",
+  "your",
+  "his",
+  "her",
+  "their",
+  "our",
+  "its",
+  "neither",
+  "all",
+  "one",
+  "two"
+]);
+
+const args = parseArgs(process.argv.slice(2));
+const inPath = path.resolve(args.in || DEFAULT_IN);
+const outPath = path.resolve(args.out || DEFAULT_OUT);
+const limit = Number(args.limit || 500);
+const minLangs = Number(args["min-clean-langs"] || 1);
+const minFirstSenseLangs = Number(args["min-first-sense-langs"] || 1);
+const minGlossLength = Number(args["min-gloss-length"] || 4);
+const sampleLimit = Number(args["sample-limit"] || 80);
+const keepRisky = args["keep-risky"] === "true";
+
+if (!fs.existsSync(inPath)) throw new Error(`Coverage gap report not found: ${inPath}`);
+if (!Number.isInteger(limit) || limit < 1) throw new Error(`Invalid --limit: ${args.limit}`);
+if (!Number.isInteger(minLangs) || minLangs < 1 || minLangs > 4) {
+  throw new Error(`Invalid --min-clean-langs: ${args["min-clean-langs"]}`);
+}
+if (!Number.isInteger(minFirstSenseLangs) || minFirstSenseLangs < 0 || minFirstSenseLangs > 4) {
+  throw new Error(`Invalid --min-first-sense-langs: ${args["min-first-sense-langs"]}`);
+}
+
+const report = JSON.parse(fs.readFileSync(inPath, "utf8"));
+const rows = Array.isArray(report.selected) ? report.selected : [];
+const accepted = [];
+const rejected = [];
+
+for (const row of rows) {
+  const reasons = rejectReasons(row);
+  if (reasons.length) {
+    rejected.push(compactRejected(row, reasons));
+    continue;
+  }
+  accepted.push({ ...row, quality_bucket: qualityBucket(row), quality_reasons: qualityReasons(row) });
+  if (accepted.length >= limit) break;
+}
+
+const summary = {
+  input: path.relative(process.cwd(), inPath),
+  output: path.relative(process.cwd(), outPath),
+  source_selected: rows.length,
+  clean_selected: accepted.length,
+  rejected_scanned: rejected.length,
+  limit,
+  min_clean_langs: minLangs,
+  min_first_sense_langs: minFirstSenseLangs,
+  min_gloss_length: minGlossLength,
+  keep_risky: keepRisky,
+  rejected_by_reason: countReasons(rejected),
+  clean_by_lang: countBy(accepted.map((row) => row.source_lang)),
+  clean_by_quality_bucket: countBy(accepted.map((row) => row.quality_bucket)),
+  clean_top_frequency_rank: accepted[0]?.frequency_rank ?? null,
+  clean_last_frequency_rank: accepted.at(-1)?.frequency_rank ?? null
+};
+
+const output = {
+  ...report,
+  ok: true,
+  generated_at: new Date().toISOString(),
+  source_report: path.relative(process.cwd(), inPath),
+  summary: {
+    ...(report.summary || {}),
+    high_value_filter: summary
+  },
+  selected_count: accepted.length,
+  selected: accepted,
+  rejected_preview: rejected.slice(0, sampleLimit),
+  next_step:
+    "Run supplement-dictionary-v2-product-source-gaps-unsloth.mjs against this clean report in dry-run mode first."
+};
+
+fs.mkdirSync(path.dirname(outPath), { recursive: true });
+fs.writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
+console.log(JSON.stringify({ ok: true, out: path.relative(process.cwd(), outPath), summary }, null, 2));
+
+function rejectReasons(row) {
+  const reasons = [];
+  const word = String(row?.word || "").trim();
+  const normalizedKey = String(row?.normalized_key || "").trim();
+  const sourceLang = row?.source_lang;
+  const gloss = String(row?.gloss_key || row?.gloss_preview || "").trim();
+  const cleanLangCount = Number(row?.clean_localization_lang_count || 0);
+  const firstSenseCleanLangCount = Number(row?.first_sense_clean_localization_lang_count || 0);
+
+  if (!LANGS.includes(sourceLang)) reasons.push("invalid_source_lang");
+  if (!word) reasons.push("empty_word");
+  if (!gloss) reasons.push("missing_gloss");
+  if (cleanLangCount < minLangs) reasons.push("too_few_clean_langs");
+  if (firstSenseCleanLangCount < minFirstSenseLangs) reasons.push("too_few_first_sense_clean_langs");
+  if (cleanLangCount <= 1 && gloss.length < Math.max(8, minGlossLength)) reasons.push("thin_single_lang_evidence");
+  if (gloss.length < minGlossLength) reasons.push("thin_gloss");
+
+  if (hasBadEncoding(word, sourceLang) || hasBadEncoding(normalizedKey, sourceLang)) reasons.push("source_mojibake");
+  if (hasBadEncoding(gloss, "en")) reasons.push("gloss_mojibake");
+  if (sourceLang && !sourceScriptOk(word, sourceLang)) reasons.push("source_script_mismatch");
+
+  const risk = riskReason(row);
+  if (risk && !keepRisky) reasons.push(risk);
+
+  return [...new Set(reasons)];
+}
+
+function riskReason(row) {
+  const word = String(row?.word || "").trim();
+  const gloss = String(row?.gloss_key || row?.gloss_preview || "").normalize("NFKC").trim().toLowerCase();
+  const normalizedWord = normalize(word);
+  const latinLetters = normalizeLatinLetters(word);
+  const latinOnly = /^[\p{Script=Latin}\s.'’_-]+$/u.test(word);
+
+  if (row?.source_lang === "en" && /^[A-Za-z]$/u.test(word)) return "latin_single_letter";
+  if (row?.source_lang === "en" && /^[A-Z]{2,}$/u.test(word)) return "latin_acronym";
+  if ((row?.source_lang === "en" || row?.source_lang === "pt-BR") && latinOnly && latinLetters.length <= 2) {
+    return "very_short_latin";
+  }
+  if (/\b(letter of the roman alphabet|blood group|radioactive|unit used in printing|linear unit)\b/u.test(gloss)) {
+    return "encyclopedic_or_symbol_gloss";
+  }
+  if (
+    /\b(surname|given name|family name|male name|female name|personal name|country|province|city|region|republic|administrative region|character from|monkey king)\b/u.test(
+      gloss
+    )
+  ) {
+    return "proper_name_gloss";
+  }
+  if (/\b(brand|trademark|company|corporation|facebook|dvd|bmw)\b/u.test(gloss)) return "brand_or_acronym_gloss";
+  if (/\b(variant of|alternative form of|alternative name for|obsolete form of|archaic form of|old variant)\b/u.test(gloss)) {
+    return "variant_or_alternative_form";
+  }
+  if (/\b(only used in|used only in|used in|ancient name of)\b/u.test(gloss)) return "bound_or_rare_character_gloss";
+  if (row?.source_lang === "en" && FUNCTION_GLOSSES.has(gloss)) return "english_function_gloss";
+  if (normalize(gloss) === normalizedWord) return "gloss_repeats_word";
+  if (row?.source_lang === "en" && /\b(one's|possessive|demonstrative)\b/u.test(gloss)) {
+    return "english_possessive_or_demonstrative";
+  }
+  if ((row?.source_lang === "zh" || row?.source_lang === "ja") && word.length === 1 && FUNCTION_GLOSSES.has(gloss)) {
+    return "single_cjk_function_word";
+  }
+  return "";
+}
+
+function qualityBucket(row) {
+  const langs = Number(row?.first_sense_clean_localization_lang_count || row?.clean_localization_lang_count || 0);
+  if (langs >= 4) return "four_lang_source_evidence";
+  if (row?.source_lang === "zh" || row?.source_lang === "ja") return "cjk_high_value";
+  if (row?.source_lang === "pt-BR") return "pt_high_value";
+  return "en_high_value";
+}
+
+function qualityReasons(row) {
+  const reasons = [];
+  if (Number(row?.first_sense_clean_localization_lang_count || 0) >= 4) reasons.push("first_sense_has_four_clean_langs");
+  if (Number(row?.clean_localization_lang_count || 0) >= 3) reasons.push("entry_has_three_or_more_clean_langs");
+  if (Number(row?.frequency_rank || Infinity) <= 5000) reasons.push("top_5000_frequency");
+  if (row?.source_lang === "zh" || row?.source_lang === "ja") reasons.push("cjk_lookup_value");
+  if (row?.source_lang === "pt-BR") reasons.push("pt_lookup_value");
+  return reasons;
+}
+
+function compactRejected(row, reasons) {
+  return {
+    source_entry_id: row?.source_entry_id,
+    word: row?.word,
+    source_lang: row?.source_lang,
+    frequency_rank: row?.frequency_rank,
+    gloss: row?.gloss_preview || row?.gloss_key || "",
+    clean_localization_lang_count: row?.clean_localization_lang_count,
+    first_sense_clean_localization_lang_count: row?.first_sense_clean_localization_lang_count,
+    reasons
+  };
+}
+
+function sourceScriptOk(word, lang) {
+  const text = String(word || "").trim();
+  if (!text) return false;
+  const hasLatin = /\p{Script=Latin}/u.test(text);
+  const hasHan = /\p{Script=Han}/u.test(text);
+  const hasHiragana = /\p{Script=Hiragana}/u.test(text);
+  const hasKatakana = /\p{Script=Katakana}/u.test(text);
+  const hasKana = hasHiragana || hasKatakana || /[\u30fc\uff70]/u.test(text);
+  if (lang === "zh") return hasHan && !hasKana;
+  if (lang === "ja") return hasHan || hasKana;
+  if (lang === "en" || lang === "pt-BR") return !hasHan && !hasKana && hasLatin;
+  return true;
+}
+
+function hasBadEncoding(value, lang) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (/[\uFFFD]/u.test(text)) return true;
+  if (/[锟絔]/u.test(text)) return true;
+  if (/(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u.test(text)) return true;
+  if (/[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u.test(text)) return true;
+  if (/[閳ラ敓閾嗚寘鑴垮啋钃规担濡楃粭鐟璢]/u.test(text)) return true;
+  if (/[\u9300-\u9fff][\u3040-\u30ff][\u9300-\u9fff]/u.test(text)) return true;
+  if (lang === "zh" && /[閵夐妵閵圿]/u.test(text)) return true;
+  if (lang === "ja" && /[閸旈崙閸熼崗閻╃拠鐠愭禍婢归弰閺夊璁砞]/u.test(text)) return true;
+  return false;
+}
+
+function normalize(value) {
+  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+}
+
+function normalizeLatinLetters(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z]/gu, "");
+}
+
+function countBy(values) {
+  const counts = {};
+  for (const value of values) counts[value] = (counts[value] || 0) + 1;
+  return counts;
+}
+
+function countReasons(rows) {
+  const counts = {};
+  for (const row of rows) {
+    for (const reason of row.reasons) counts[reason] = (counts[reason] || 0) + 1;
+  }
+  return counts;
+}
+
+function parseArgs(argv) {
+  const parsed = {};
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index];
+    if (!token.startsWith("--")) continue;
+    const key = token.slice(2);
+    const next = argv[index + 1];
+    if (next && !next.startsWith("--")) {
+      parsed[key] = next;
+      index++;
+    } else {
+      parsed[key] = "true";
+    }
+  }
+  return parsed;
+}
