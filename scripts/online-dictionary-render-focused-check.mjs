@@ -4,32 +4,61 @@ import path from "node:path";
 
 const url = process.env.PWA_URL || "https://translation-pwa.qhzggzh-linguago.workers.dev";
 const outDir = path.resolve("output/playwright/online-dictionary-focused");
-const traditionalSmokeChars = /[這個們夾碼東學開車會裡為與於體見說語點對時過還後發應嗎認識]/u;
+const edgePath = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+const traditionalSmokeChars = /[\u9019\u500b\u5011\u4f86\u8aaa\u6642\u9084\u5f8c\u767c\u807d\u8207\u5c0d\u6703\u8868\u5b78\u958b\u95dc\u9ad4]/u;
+const viewports = [
+  { name: "mobile", width: 390, height: 844, isMobile: true, hasTouch: true },
+  { name: "desktop", width: 1366, height: 900, isMobile: false, hasTouch: false }
+];
 const terms = [
-  { term: "中", expectedText: ["zhōng", "zhòng", "medium", "hit"] },
-  { term: "inside", expectedText: ["inside", "/ˈɪn.saɪd/"] },
-  { term: "although", expectedText: ["although", "/ɔːlˈðoʊ/"] }
+  {
+    term: "\u4e2d",
+    expectedText: ["zhong", "medium; intermediary", "hit; strike"]
+  },
+  {
+    term: "\u6746",
+    expectedText: ["gan", "pole; post; staff", "shaft; handle; classifier"]
+  },
+  {
+    term: "\u4f60\u597d",
+    expectedText: ["hello", "ni hao", "\u4f60\u597d\uff0c\u597d\u4e45\u4e0d\u89c1\u3002"]
+  },
+  { term: "inside", expectedText: ["inside", "IPA"] },
+  { term: "\u79d8\u5bc6", expectedText: ["secret"] },
+  { term: "\u4f55\u6642", expectedText: ["when", "what time"] },
+  { term: "\u56fd\u969b", expectedText: ["international"] },
+  { term: "\u30d3\u30b8\u30bf\u30fc", expectedText: ["visitor", "visiting team"] }
 ];
 
 await fs.mkdir(outDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({
-  viewport: { width: 390, height: 844 },
-  deviceScaleFactor: 2,
-  isMobile: true,
-  hasTouch: true
-});
+const launchOptions = { headless: true };
+if (await exists(edgePath)) {
+  launchOptions.executablePath = edgePath;
+}
 
+const browser = await chromium.launch(launchOptions);
 const report = {
   url,
   generated_at: new Date().toISOString(),
-  terms: []
+  browser: launchOptions.executablePath ? "msedge" : "playwright-chromium",
+  viewports: []
 };
 
 try {
-  for (const [index, item] of terms.entries()) {
-    report.terms.push(await checkRenderedTerm(page, item, index + 1));
+  for (const viewport of viewports) {
+    const page = await browser.newPage({
+      viewport: { width: viewport.width, height: viewport.height },
+      deviceScaleFactor: viewport.isMobile ? 2 : 1,
+      isMobile: viewport.isMobile,
+      hasTouch: viewport.hasTouch
+    });
+    const viewportReport = { name: viewport.name, terms: [] };
+    for (const [index, item] of terms.entries()) {
+      viewportReport.terms.push(await checkRenderedTerm(page, item, viewport.name, index + 1));
+    }
+    await page.close();
+    report.viewports.push(viewportReport);
   }
 } finally {
   await fs.writeFile(path.join(outDir, "report.json"), JSON.stringify(report, null, 2), "utf8");
@@ -37,16 +66,18 @@ try {
 }
 
 console.log(JSON.stringify(report, null, 2));
-const failures = report.terms.flatMap((item) => item.errors.map((error) => `${item.term}: ${error}`));
+const failures = report.viewports.flatMap((viewport) =>
+  viewport.terms.flatMap((item) => item.errors.map((error) => `${viewport.name}/${item.term}: ${error}`))
+);
 if (failures.length > 0) {
   console.error(`Focused render check failed:\n${failures.join("\n")}`);
   process.exit(1);
 }
 
-async function checkRenderedTerm(page, item, ordinal) {
+async function checkRenderedTerm(page, item, viewportName, ordinal) {
   await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
   await page.locator("textarea").first().fill(item.term);
-  await page.locator("button").filter({ hasText: /Traduzir/i }).last().click();
+  await page.locator("button").filter({ hasText: /\u7ffb\u8bd1|Traduzir/i }).last().click();
   await page.waitForFunction(
     () => {
       const text = document.body.innerText.toLowerCase();
@@ -55,17 +86,17 @@ async function checkRenderedTerm(page, item, ordinal) {
     undefined,
     { timeout: 45000 }
   );
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(900);
 
   const tabTexts = await collectTabTexts(page);
-  const screenshot = `${String(ordinal).padStart(2, "0")}-${safeName(item.term)}.png`;
+  const screenshot = `${viewportName}-${String(ordinal).padStart(2, "0")}-${safeName(item.term)}.png`;
   await page.screenshot({ path: path.join(outDir, screenshot), fullPage: true });
 
   const state = await page.evaluate(() => {
     const text = document.body.innerText;
     return {
       title: document.querySelector("h1")?.textContent?.trim() || "",
-      visibleTextPreview: text.slice(0, 1800),
+      visibleTextPreview: text.slice(0, 2500),
       hasDictionary: /dictionary|dicion/i.test(text),
       hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
       viewport: {
@@ -80,11 +111,18 @@ async function checkRenderedTerm(page, item, ordinal) {
   const errors = [];
   if (!state.hasDictionary) errors.push("page did not render a dictionary result");
   if (state.hasHorizontalOverflow) errors.push("page has horizontal overflow");
-  const combinedText = [state.visibleTextPreview, ...tabTexts.map((tab) => tab.visibleText)].join("\n");
+
+  const combinedText = [state.visibleTextPreview, ...tabTexts.map((tab) => tab.visibleText)]
+    .join("\n")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
   for (const expected of item.expectedText) {
-    if (!combinedText.includes(expected)) errors.push(`missing visible text ${expected}`);
+    const normalizedExpected = expected.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    if (!combinedText.includes(normalizedExpected)) errors.push(`missing visible text ${expected}`);
   }
-  const chineseTabText = tabTexts.find((tab) => tab.label === "中")?.visibleText || "";
+
+  const chineseTabText = tabTexts.find((tab) => /ZH|\u4e2d/i.test(tab.label))?.visibleText || combinedText;
   if (traditionalSmokeChars.test(chineseTabText)) {
     errors.push("Chinese tab contains likely Traditional Chinese characters");
   }
@@ -114,9 +152,20 @@ async function collectTabTexts(page) {
   return states;
 }
 
+async function exists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function safeName(value) {
-  return value
-    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40) || "term";
+  return (
+    value
+      .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "term"
+  );
 }

@@ -6,7 +6,7 @@ param(
   [switch]$SkipDeploy,
   [switch]$SkipOnlineChecks,
   [switch]$SkipTypecheck,
-  [switch]$SkipSimplifyZhExamples,
+  [switch]$SimplifyZhExamples,
   [string]$AuditSamples = ""
 )
 
@@ -28,10 +28,10 @@ function Invoke-Step {
 
 Set-Location $root
 if ([string]::IsNullOrWhiteSpace($AuditSamples)) {
-  $AuditSamples = "hello,$([char]0x4F60)$([char]0x597D),$([char]0x4E2D),although,breaks,cor"
+  $AuditSamples = "hello,$([char]0x4F60)$([char]0x597D),$([char]0x4E2D),$([char]0x6746),inside,$([char]0x79D8)$([char]0x5BC6),$([char]0x4F55)$([char]0x6642),$([char]0x56FD)$([char]0x969B),$([char]0x30D3)$([char]0x30B8)$([char]0x30BF)$([char]0x30FC)"
 }
 
-if (-not $SkipSimplifyZhExamples) {
+if ($SimplifyZhExamples) {
   Invoke-Step "Simplify Chinese product examples" {
     & node scripts/simplify-dictionary-v2-product-zh-examples.mjs --db $DbPath
   }

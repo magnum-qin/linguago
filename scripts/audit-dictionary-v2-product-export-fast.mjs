@@ -8,7 +8,7 @@ const manifestPath = path.join(outDir, "manifest.json");
 const auditDbPath = path.join(outDir, "audit-fast-import.db");
 const samplesPath = path.join(outDir, "audit-fast-samples.json");
 const auditPath = path.join(outDir, "audit-fast.json");
-const sampleTerms = String(args.samples || "hello,你好,中,although,breaks,cor")
+const sampleTerms = String(args.samples || "hello,你好,中,杆,inside,秘密,何時,国際,ビジター")
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);

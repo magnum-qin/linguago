@@ -1767,6 +1767,114 @@ Full import audit passed with `ok = true`. Blocking checks remain clean:
 `html_artifacts = 0`, `source_script_mismatches = 0`, and
 `duplicate_zh_examples_by_en_reading = 0`.
 
+## 2026-06-28 Product D1 Release Baseline
+
+The clean product D1 release baseline uses:
+
+```text
+data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db
+```
+
+The native D1 export was pushed to Cloudflare D1 `linguago-dictionary`, the
+Worker cache version was bumped, and the Worker was deployed. `/health`
+reported:
+
+- `published_at`: `2026-06-28T14:29:50.368Z`;
+- `entries`: `23060`;
+- `senses`: `28577`;
+- `sense_localizations`: `114308`;
+- `examples`: `3030`;
+- `example_localizations`: `11898`;
+- policy: `product_complete_4_lang_accepted_senses_only`.
+
+The pre-release backup SQL to keep outside Git is:
+
+```text
+backups/linguago-dictionary-before-product-v2-20260628-233308.sql
+```
+
+`logs/`, `output/`, `outputs/`, local SQLite databases, and SQL backups are
+run artifacts and should stay untracked.
+
+## Product D1 Release Tooling
+
+Use the combined release command for repeatable product D1 releases:
+
+```powershell
+npm run dict:v2:release:product-d1
+```
+
+The release script now defaults to the current product DB above. It does not
+rewrite Chinese examples by default; use `-SimplifyZhExamples` only when an
+explicit local DB mutation is intended. For a local rehearsal without touching
+Cloudflare:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release-dictionary-v2-product-d1.ps1 -SkipPush -SkipDeploy -SkipOnlineChecks
+```
+
+Fixed release checks:
+
+- `scripts/dictionary-v2-product-regression-check.mjs` validates the local
+  product DB against `hello`, `你好`, `inside`, `中`, `杆`, `秘密`, `何時`,
+  `国際`, and `ビジター`.
+- `scripts/online-dictionary-focused-check.mjs` validates `/health` counts and
+  the same online query set against Cloudflare D1.
+- `scripts/online-dictionary-render-focused-check.mjs` uses Playwright with the
+  installed Microsoft Edge fallback, verifies mobile and desktop rendering,
+  checks pronunciation groups / four-language tabs / sense numbering, and
+  fails on horizontal overflow or obvious Traditional Chinese examples in the
+  Chinese tab.
+- `scripts/audit-dictionary-v2-product-export-fast.mjs` uses the same focused
+  sample terms by default.
+
+The post-release gate should remain:
+
+```powershell
+npm run check
+npm run dict:v2:audit:product-fast
+node scripts/audit-dictionary-v2-product-published-risk.mjs
+node scripts/audit-dictionary-v2-product-export.mjs --mode full --import memory --out-dir outputs/d1-v2-product-native-export
+npm run check:online-dictionary
+node scripts/online-dictionary-focused-check.mjs
+node scripts/online-dictionary-render-focused-check.mjs
+```
+
+The blocking audit counters must remain zero: `flagged_senses`,
+`bad_sense_localization_counts`, `duplicate_sense_orders`, `orphans`,
+`mojibake_texts`, and `html_artifacts`.
+
+## Next Product Quality and Expansion Pass
+
+The current release baseline is stable enough to use as the online product
+dictionary. The next local quality target is the full-audit warning
+`duplicate_sense_localizations = 98`. Treat this as a warning queue, not as a
+release blocker.
+
+Start with a read-only report:
+
+```powershell
+npm run dict:v2:report:product-duplicate-senses
+```
+
+Only merge obvious duplicates. Do not merge senses merely because one language
+has the same term and definition if the pronunciations, part-of-speech labels,
+source links, or other language localizations indicate distinct senses.
+Priority spot checks for the next pass: `暗示`, `得知`, `不足`, `best`, `不用`,
+`活`, `下`, `每`, `絶対`, and `上手`.
+
+Expansion should continue from coverage-gap reports, not from a blind full-DB
+completion run:
+
+```powershell
+npm run dict:v2:coverage:gaps
+npm run dict:v2:coverage:source-gap-residuals
+```
+
+Use Unsloth/Qwen MTP only to write draft/job rows first. Promote into
+publishable product tables only after deterministic audit and focused online
+regression pass.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

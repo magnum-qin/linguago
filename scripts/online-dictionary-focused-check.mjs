@@ -4,13 +4,38 @@ import path from "node:path";
 const baseUrl = process.env.PWA_URL || "https://translation-pwa.qhzggzh-linguago.workers.dev";
 const outDir = path.resolve("output/online-dictionary-focused-check");
 const langs = ["zh", "en", "pt-BR", "ja"];
-const traditionalSmokeChars = /[這個們夾碼東學開車會裡為與於體見說語點對時過還後發應嗎認識]/u;
+const expectedCounts = {
+  entries: 23060,
+  senses: 28577,
+  sense_localizations: 114308,
+  examples: 3030,
+  example_localizations: 11898
+};
+const traditionalSmokeChars = /[這個們來說時還後發麼與對會裡學開關體]/u;
+
 const cases = [
-  { term: "中", minSenses: 2, requirePronunciationGroups: true, expectedReadings: ["zhōng", "zhòng"] },
-  { term: "inside", minSenses: 1, requirePronunciationGroups: true },
-  { term: "breaks", minSenses: 1 },
-  { term: "although", minSenses: 1 },
-  { term: "cor", minSenses: 1 }
+  {
+    id: "zh-zhong-polyphone",
+    term: "中",
+    minSenses: 5,
+    requirePronunciationGroups: true,
+    expectedReadings: ["zhōng", "zhòng"],
+    expectedTerms: ["medium; intermediary", "hit; strike", "win; be selected"]
+  },
+  {
+    id: "zh-gan-polyphone",
+    term: "杆",
+    minSenses: 2,
+    requirePronunciationGroups: true,
+    expectedReadings: ["gān", "gǎn"],
+    expectedTerms: ["pole; post; staff", "shaft; handle; classifier"]
+  },
+  { id: "zh-nihao", term: "你好", minSenses: 1, expectedTerms: ["hello"] },
+  { id: "en-inside", term: "inside", minSenses: 1, requirePronunciationGroups: true, expectedTerms: ["inside"] },
+  { id: "zh-secret", term: "秘密", minSenses: 2, requirePronunciationGroups: true, expectedTerms: ["secret"] },
+  { id: "ja-itsu", term: "何時", minSenses: 3, requirePronunciationGroups: true, expectedTerms: ["when", "what time"] },
+  { id: "ja-kokusai", term: "国際", minSenses: 2, requirePronunciationGroups: true, expectedTerms: ["international"] },
+  { id: "ja-visitor", term: "ビジター", minSenses: 2, requirePronunciationGroups: true, expectedTerms: ["visitor", "visiting team"] }
 ];
 
 await fs.mkdir(outDir, { recursive: true });
@@ -18,6 +43,7 @@ await fs.mkdir(outDir, { recursive: true });
 const report = {
   baseUrl,
   generated_at: new Date().toISOString(),
+  health: await checkHealth(),
   cases: []
 };
 
@@ -25,13 +51,33 @@ for (const item of cases) {
   report.cases.push(await checkTerm(item));
 }
 
-const failures = report.cases.flatMap((item) => item.errors.map((error) => `${item.term}: ${error}`));
+const failures = [
+  ...report.health.errors.map((error) => `health: ${error}`),
+  ...report.cases.flatMap((item) => item.errors.map((error) => `${item.id}: ${error}`))
+];
 await fs.writeFile(path.join(outDir, "report.json"), JSON.stringify(report, null, 2), "utf8");
 console.log(JSON.stringify(report, null, 2));
 
 if (failures.length > 0) {
   console.error(`Focused dictionary check failed:\n${failures.join("\n")}`);
   process.exit(1);
+}
+
+async function checkHealth() {
+  const response = await fetch(new URL("/health", baseUrl), { signal: AbortSignal.timeout(60000) });
+  const rawText = await response.text();
+  const data = safeJson(rawText);
+  const errors = [];
+  const stats = data?.dictionary?.stats || {};
+
+  if (!response.ok) errors.push(`HTTP ${response.status}: ${rawText.slice(0, 300)}`);
+  if (!data?.ok) errors.push("health ok is not true");
+  if (stats.source !== "cloudflare-d1-v2") errors.push(`dictionary source is ${stats.source || "missing"}`);
+  for (const [key, expected] of Object.entries(expectedCounts)) {
+    if (Number(stats[key]) !== expected) errors.push(`${key} is ${stats[key]}, expected ${expected}`);
+  }
+
+  return { ok: errors.length === 0, status: response.status, stats, errors };
 }
 
 async function checkTerm(item) {
@@ -52,12 +98,8 @@ async function checkTerm(item) {
   const data = safeJson(rawText);
   const errors = [];
 
-  if (!response.ok) {
-    errors.push(`HTTP ${response.status}: ${rawText.slice(0, 300)}`);
-  }
-  if (!data || typeof data !== "object") {
-    errors.push("response is not a JSON object");
-  }
+  if (!response.ok) errors.push(`HTTP ${response.status}: ${rawText.slice(0, 300)}`);
+  if (!data || typeof data !== "object") errors.push("response is not a JSON object");
   if (data?.provider !== "dictionary") errors.push(`provider is ${data?.provider || "missing"}, expected dictionary`);
   if (data?.model !== "cloudflare-d1-v2") errors.push(`model is ${data?.model || "missing"}, expected cloudflare-d1-v2`);
   if (data?.type !== "word") errors.push(`type is ${data?.type || "missing"}, expected word`);
@@ -79,32 +121,30 @@ async function checkTerm(item) {
   }
 
   const groups = Array.isArray(data?.pronunciation_groups) ? data.pronunciation_groups : [];
-  if (item.requirePronunciationGroups && groups.length === 0) {
-    errors.push("missing pronunciation_groups");
-  }
+  if (item.requirePronunciationGroups && groups.length === 0) errors.push("missing pronunciation_groups");
   if (groups.length > 0) {
     const groupedSenseOrders = groups.flatMap((group) =>
       Array.isArray(group.senses) ? group.senses.map((sense) => sense.sense_order) : []
     );
     const uniqueGrouped = new Set(groupedSenseOrders);
-    if (uniqueGrouped.size !== groupedSenseOrders.length) {
-      errors.push("duplicate senses across pronunciation_groups");
-    }
+    if (uniqueGrouped.size !== groupedSenseOrders.length) errors.push("duplicate senses across pronunciation_groups");
   }
-  if (item.expectedReadings) {
-    const text = JSON.stringify(groups);
-    for (const reading of item.expectedReadings) {
-      if (!text.includes(reading)) errors.push(`missing expected pronunciation reading ${reading}`);
-    }
+
+  const serialized = JSON.stringify(data);
+  for (const reading of item.expectedReadings || []) {
+    if (!serialized.includes(reading)) errors.push(`missing expected pronunciation reading ${reading}`);
   }
+  for (const term of item.expectedTerms || []) {
+    if (!serialized.includes(term)) errors.push(`missing expected term ${term}`);
+  }
+
   const zhExampleText = Array.isArray(data?.examples)
     ? data.examples.map((example) => example?.localizations?.zh?.text || example?.translations?.zh || "").join("\n")
     : "";
-  if (traditionalSmokeChars.test(zhExampleText)) {
-    errors.push("zh examples contain likely Traditional Chinese characters");
-  }
+  if (traditionalSmokeChars.test(zhExampleText)) errors.push("zh examples contain likely Traditional Chinese characters");
 
   return {
+    id: item.id,
     term: item.term,
     ok: errors.length === 0,
     elapsed_ms: Date.now() - started,

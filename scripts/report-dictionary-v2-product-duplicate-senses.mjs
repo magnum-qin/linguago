@@ -2,8 +2,8 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
-const DEFAULT_OUT = "data/processed/product-duplicate-sense-report.json";
+const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_OUT = "logs/product-duplicate-sense-report.json";
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
