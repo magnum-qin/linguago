@@ -1855,6 +1855,7 @@ Start with a read-only report:
 
 ```powershell
 npm run dict:v2:report:product-duplicate-senses
+npm run dict:v2:triage:product-duplicate-localizations
 ```
 
 Only merge obvious duplicates. Do not merge senses merely because one language
@@ -1862,6 +1863,16 @@ has the same term and definition if the pronunciations, part-of-speech labels,
 source links, or other language localizations indicate distinct senses.
 Priority spot checks for the next pass: `暗示`, `得知`, `不足`, `best`, `不用`,
 `活`, `下`, `每`, `絶対`, and `上手`.
+
+The 2026-06-29 triage of the current `98` duplicate-localization warning groups
+found no safe automatic merge candidates. All `104` reviewed sense pairs were
+classified as `likely_keep`: one language reused the same localized term and
+definition, but the other language localizations, source evidence, or lexical
+role showed distinct senses. Examples include adjective/noun pairs such as
+`必要`, grammatical or semantic variants such as `best`, and homographic
+Chinese/Japanese character senses such as `活`, `下`, `每`, `絶対`, and `上手`.
+Keep this warning as a non-blocking audit signal unless a future LLM/manual
+review identifies a concrete over-merge.
 
 Expansion should continue from coverage-gap reports, not from a blind full-DB
 completion run:

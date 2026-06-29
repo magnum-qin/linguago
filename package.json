@@ -52,6 +52,7 @@
     "dict:v2:repair:product-quality-warnings": "node scripts/repair-dictionary-v2-product-quality-warnings.mjs",
     "dict:v2:apply:product-publication-blocks": "node scripts/apply-dictionary-v2-product-publication-blocks.mjs",
     "dict:v2:audit:product-published-risk": "node scripts/audit-dictionary-v2-product-published-risk.mjs",
+    "dict:v2:triage:product-duplicate-localizations": "node scripts/triage-dictionary-v2-product-duplicate-localizations.mjs",
     "dict:v2:coverage:gaps": "node scripts/find-dictionary-v2-product-coverage-gaps.mjs",
     "dict:v2:coverage:promote": "node scripts/promote-dictionary-v2-product-coverage-gaps.mjs",
     "dict:v2:coverage:repair-incomplete": "node scripts/repair-dictionary-v2-product-incomplete-gap-senses.mjs",
