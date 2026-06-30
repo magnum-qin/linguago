@@ -2201,6 +2201,25 @@ renumbers the entry's senses to `1..n`.
   `TRANSLATION_CACHE_VERSION = "v66-zh-strict-ultra-20"` and deployed as Worker
   version `47c6e6c2-e39d-4aff-ad3e-b4cc84392d5f`.
 
+## 2026-06-30 Pingan Source-Gap Follow-up
+
+- Retried the held-out `平安夜` row. The model still returned romaji for Japanese
+  reading, so the row was manually repaired as the high-value `Christmas Eve`
+  sense and inserted as a normal `draft_single_source` row.
+- Deterministic promotion accepted the repaired row. The two older pt-BR
+  residuals remain blocked in draft review.
+- Product fast audit, published-risk audit, and full product D1 native export
+  audit passed after promotion.
+- Full product D1 native export was written to
+  `outputs/d1-v2-product-native-export-v67-pingan`.
+- Export counts: `entries=23525`, `senses=29042`,
+  `sense_localizations=116168`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to `TRANSLATION_CACHE_VERSION = "v67-pingan"`.
+- D1 was pushed and the Worker was deployed as version
+  `31b2b58e-006d-4bd9-b4ad-bf56a7bd409d`; `/health` reported
+  `published_at=2026-06-30T14:08:00.788Z`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
