@@ -216,14 +216,14 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v67:
+The current online D1 baseline is v68:
 
-- Worker cache version: `v67-pingan`.
-- Worker version: `31b2b58e-006d-4bd9-b4ad-bf56a7bd409d`.
-- Published counts: `entries=23525`, `senses=29042`,
-  `sense_localizations=116168`, `examples=3030`,
+- Worker cache version: `v68-source-gap-25`.
+- Worker version: `884c0937-2e60-4c6d-873b-0de5516328c6`.
+- Published counts: `entries=23550`, `senses=29067`,
+  `sense_localizations=116268`, `examples=3030`,
   `example_localizations=11898`.
-- D1 `published_at`: `2026-06-30T14:08:00.788Z`.
+- D1 `published_at`: `2026-06-30T17:05:29.385Z`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
@@ -239,6 +239,10 @@ The current online D1 baseline is v67:
 - The v67 follow-up manually repaired and promoted `平安夜` as `Christmas Eve`
   with four-language localizations after the model repeatedly returned romaji
   for Japanese reading.
+- The v68 follow-up generated a strict zh-first source-gap batch on `rtx4090-56`:
+  `25/25` generated rows passed dry-run, `25` draft senses were written, and
+  deterministic promote accepted all `25`. The two known pt-BR residual drafts
+  are still held in review.
 
 Source-gap generation flow:
 

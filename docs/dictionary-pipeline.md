@@ -2220,6 +2220,37 @@ renumbers the entry's senses to `1..n`.
   `31b2b58e-006d-4bd9-b4ad-bf56a7bd409d`; `/health` reported
   `published_at=2026-06-30T14:08:00.788Z`.
 
+## 2026-07-01 Strict zh-first Source-Gap 25 Release
+
+- Regenerated coverage gaps with a larger candidate window:
+  `logs/product-coverage-gaps-current-v68.json`.
+- Built a strict zh-first clean queue in
+  `logs/product-coverage-gaps-clean-high-value-balanced-v68-30-strictzh.json`;
+  known pt-BR residuals were blocked, first-sense clean localization was relaxed
+  to allow high-value source-gap rows, and traditional/single-character zh rows
+  were filtered out.
+- Initial dual-node dry-run failed because `11447/11448` had no loaded model and
+  temporarily timed out. Portproxy remained configured; `rtx4090-56` recovered,
+  auto-loaded `unsloth/Qwen3.6-27B-MTP-GGUF`, and was used as the stable node.
+- Dry-run accepted `25/25` generated rows. Five selected candidates were skipped
+  before generation because they were already complete or failed deterministic
+  candidate eligibility.
+- Applied the same batch as `draft_single_source`, then deterministic promote
+  accepted `25` senses and `100` localizations. The two older pt-BR residuals
+  remain blocked by `source_term_mismatch` / `source_link_word_mismatch`.
+- Product fast audit, published-risk audit, and full product D1 native export
+  audit passed after promotion.
+- Full product D1 native export was written to
+  `outputs/d1-v2-product-native-export-v68-source-gap-25`.
+- Export counts: `entries=23550`, `senses=29067`,
+  `sense_localizations=116268`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v68-source-gap-25"`.
+- D1 was pushed and the Worker was deployed as version
+  `884c0937-2e60-4c6d-873b-0de5516328c6`; `/health` reported
+  `published_at=2026-06-30T17:05:29.385Z`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v67
+Current production dictionary source of truth is Cloudflare D1 v2. The v68
 baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v67-pingan"`
-- Worker version `31b2b58e-006d-4bd9-b4ad-bf56a7bd409d`
-- `/health` counts: `entries=23525`, `senses=29042`,
-  `sense_localizations=116168`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v68-source-gap-25"`
+- Worker version `884c0937-2e60-4c6d-873b-0de5516328c6`
+- `/health` counts: `entries=23550`, `senses=29067`,
+  `sense_localizations=116268`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-06-30T14:08:00.788Z`
+- D1 `published_at`: `2026-06-30T17:05:29.385Z`
 
 `worker/dictionary.ts` still contains multiple adapters:
 
@@ -107,6 +107,11 @@ manual item is `ouvintes` linked to singular entry `ouvinte`. The first zh-only
 pilot promoted `19/19` generated draft senses after adding stricter prompt rules
 that prevent Chinese source terms from being copied into English/Portuguese
 terms.
+
+The v68 source-gap follow-up promoted `25` additional accepted senses from a
+strict zh-first dry-run on `rtx4090-56` using `Qwen3.6-27B-MTP-GGUF`. The two
+known pt-BR residual drafts remain rejected by deterministic promote:
+`ouvintes/ouvinte` and `bisavó/bisavô`.
 
 ## Frontend Constraints
 
