@@ -216,12 +216,12 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v64:
+The current online D1 baseline is v66:
 
-- Worker cache version: `v64-balanced-source-gap-80`.
-- Worker version: `e897a367-3da5-4e09-889c-1d836d87c116`.
-- Published counts: `entries=23504`, `senses=29021`,
-  `sense_localizations=116084`, `examples=3030`,
+- Worker cache version: `v66-zh-strict-ultra-20`.
+- Worker version: `47c6e6c2-e39d-4aff-ad3e-b4cc84392d5f`.
+- Published counts: `entries=23524`, `senses=29041`,
+  `sense_localizations=116164`, `examples=3030`,
   `example_localizations=11898`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
@@ -232,6 +232,9 @@ The current online D1 baseline is v64:
 - The first balanced v64 source-gap batch accepted `80/80` in dry-run and
   promoted `78/80`; the two rejected pt-BR plural/gender form rows remain in
   draft review because their source term does not match the reused entry.
+- The v66 strict zh pass used `Qwen3.6-27B-MTP-GGUF` with `--prompt-mode ultra`,
+  accepted `20/21` dry-run rows, promoted `20` new zh source-gap senses, and
+  left `平安夜` for review because the model returned romaji instead of kana.
 
 Source-gap generation flow:
 

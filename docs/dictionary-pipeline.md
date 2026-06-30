@@ -2179,6 +2179,28 @@ renumbers the entry's senses to `1..n`.
   balanced report it reduced the remaining zh queue to `21` actual select-only
   candidates.
 
+## 2026-06-30 Strict zh Ultra Source-Gap 20 Release
+
+- Retried the strict zh queue after the Unsloth 4090 endpoint recovered.
+  `Qwen3.6-27B-MTP-GGUF` with `--prompt-mode ultra`, `max_tokens=512`, and
+  single-node concurrency completed quickly at roughly 3.5-4.8 seconds per row.
+- Full strict zh dry-run accepted `20/21`; `平安夜` stayed out of the apply set
+  because the model returned romaji (`kurisumasu ibu`) instead of kana for
+  Japanese reading.
+- Applied `20` draft source-gap senses and `80` localizations, then deterministic
+  promotion accepted all 20 new zh senses. The two existing rejected pt-BR
+  residuals (`ouvintes/ouvinte`, `bisavó/bisavô`) remain draft review rows.
+- Product fast audit, published-risk audit, and full product D1 native export
+  audit passed after promotion.
+- Full product D1 native export was written to
+  `outputs/d1-v2-product-native-export-v66-zh-strict-ultra-20`.
+- Export counts: `entries=23524`, `senses=29041`,
+  `sense_localizations=116164`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v66-zh-strict-ultra-20"` and deployed as Worker
+  version `47c6e6c2-e39d-4aff-ad3e-b4cc84392d5f`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
