@@ -5,9 +5,9 @@ const baseUrl = process.env.PWA_URL || "https://translation-pwa.qhzggzh-linguago
 const outDir = path.resolve("output/online-dictionary-focused-check");
 const langs = ["zh", "en", "pt-BR", "ja"];
 const expectedCounts = {
-  entries: 23346,
-  senses: 28863,
-  sense_localizations: 115452,
+  entries: 23426,
+  senses: 28943,
+  sense_localizations: 115772,
   examples: 3030,
   example_localizations: 11898
 };

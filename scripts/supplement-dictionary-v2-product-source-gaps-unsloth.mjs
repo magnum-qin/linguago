@@ -477,6 +477,7 @@ function buildPrompt(row) {
     "{\"headword\":\"\",\"normalized_key\":\"\",\"primary_lang\":\"\",\"frequency_rank\":0,\"part_of_speech\":null,\"gloss_key\":\"\",\"localizations\":{\"en\":{\"term\":\"\",\"pronunciation\":\"\",\"pronunciation_system\":\"IPA\",\"definition\":\"\"},\"pt-BR\":{\"term\":\"\",\"pronunciation\":\"\",\"pronunciation_system\":\"IPA\",\"definition\":\"\"},\"zh\":{\"term\":\"\",\"reading\":\"\",\"reading_system\":\"pinyin\",\"definition\":\"\"},\"ja\":{\"term\":\"\",\"reading\":\"\",\"reading_system\":\"kana\",\"definition\":\"\"}}}",
     "Rules: source language term must equal headword exactly, including accents and script. Other language terms translate meaning_gloss, not the spelling of headword.",
     "Definitions must be written in the same language as their localization and must explain the meaning or grammatical use in a short phrase of at least 4 words for en/pt-BR, and at least 4 characters for zh/ja. Never repeat only the term.",
+    "gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.",
     "zh term and definition use Simplified Chinese. zh reading is pinyin with tone marks or tone numbers. ja reading must be kana only or kana with kanji okurigana; never romaji. en and pt-BR include IPA pronunciation. If unsure, keep the source term exactly and explain the gloss."
   ];
   if (residualMode) lines.push(...residualPromptRules(row));
@@ -501,6 +502,7 @@ function buildBatchPrompt(rows) {
     "{\"source_entry_id\":0,\"headword\":\"\",\"normalized_key\":\"\",\"primary_lang\":\"\",\"frequency_rank\":0,\"part_of_speech\":null,\"gloss_key\":\"\",\"localizations\":{\"en\":{\"term\":\"\",\"pronunciation\":\"\",\"pronunciation_system\":\"IPA\",\"definition\":\"\"},\"pt-BR\":{\"term\":\"\",\"pronunciation\":\"\",\"pronunciation_system\":\"IPA\",\"definition\":\"\"},\"zh\":{\"term\":\"\",\"reading\":\"\",\"reading_system\":\"pinyin\",\"definition\":\"\"},\"ja\":{\"term\":\"\",\"reading\":\"\",\"reading_system\":\"kana\",\"definition\":\"\"}}}",
     "Rules: return exactly one item for each input, preserving source_entry_id and order. source language term must equal headword exactly, including accents and script. Other language terms translate meaning_gloss, not the spelling of headword.",
     "Definitions must be written in the same language as their localization and must explain the meaning or grammatical use in a short phrase of at least 4 words for en/pt-BR, and at least 4 characters for zh/ja. Never repeat only the term.",
+    "gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.",
     "zh term and definition use Simplified Chinese. zh reading is pinyin with tone marks or tone numbers. ja reading must be kana only or kana with kanji okurigana; never romaji. en and pt-BR include IPA pronunciation. If unsure, keep the source term exactly and explain the gloss.",
     `inputs=${JSON.stringify(inputs)}`
   ];
@@ -524,7 +526,10 @@ function buildCompactPrompt(row) {
     "If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.",
     "Definitions must be natural explanations in the same language as the localization; do not copy the English meaning gloss as a definition for other languages.",
     "For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term.",
-    "Use Simplified Chinese for zh. Use kana for ja reading. Use IPA for en and pt-BR."
+    "gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.",
+    "Use Simplified Chinese for zh. zh.reading must be pinyin with tone marks or tone numbers, not hanzi.",
+    "Use kana for ja reading. ja.reading must contain Japanese kana, not romaji.",
+    "Use IPA for en and pt-BR."
   ];
   if (residualMode) lines.push(...residualPromptRules(row));
   return lines.join("\n");
@@ -546,6 +551,8 @@ function buildCompactBatchPrompt(rows) {
     "If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.",
     "Definitions must be natural explanations in the same language as the localization; do not copy the English meaning gloss as a definition for other languages.",
     "For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term.",
+    "gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.",
+    "zh.reading must be pinyin with tone marks or tone numbers, not hanzi. ja.reading must contain Japanese kana, not romaji.",
     "Inputs:",
     ...inputLines
   ];
@@ -580,6 +587,7 @@ function validateOutput(row, output) {
   if (normalize(output.headword) !== normalize(row.word)) errors.push("headword_mismatch");
   if (output.primary_lang !== row.source_lang) errors.push("primary_lang_mismatch");
   if (!nonEmpty(output.gloss_key)) errors.push("missing_gloss_key");
+  if (isBroadGlossKey(output.gloss_key)) errors.push("broad_gloss_key");
   if (!output.localizations || typeof output.localizations !== "object") errors.push("missing_localizations");
   for (const lang of LANGS) {
     const loc = output.localizations?.[lang];
@@ -632,6 +640,14 @@ function normalizeGeneratedOutput(row, output) {
     };
   }
   return normalized;
+}
+
+function isBroadGlossKey(value) {
+  const parts = String(value || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length >= 5;
 }
 
 function applyOutputs(items, stats) {

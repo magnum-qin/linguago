@@ -216,19 +216,19 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v62:
+The current online D1 baseline is v63:
 
-- Worker cache version: `v62-zh-source-gap-pilot`.
-- Worker version: `b8cf39ec-6c73-4b49-b9a3-ac2f90f76630`.
-- Published counts: `entries=23346`, `senses=28863`,
-  `sense_localizations=115452`, `examples=3030`,
+- Worker cache version: `v63-zh-source-gap-100`.
+- Worker version: `67641b31-e6c3-4446-9abb-a40fc63a4f49`.
+- Published counts: `entries=23426`, `senses=28943`,
+  `sense_localizations=115772`, `examples=3030`,
   `example_localizations=11898`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
-- The first zh-only source-gap pilot selected `19` model candidates, improved
-  from `7/19` to `19/19` accepted after prompt rules were tightened, then
-  promoted all `19` through deterministic validation.
+- The zh-only source-gap pilot has two published batches: first `19/19`, then
+  `80/80` after excluding low-value/proper-name candidates and tightening
+  `gloss_key` width validation.
 
 Source-gap generation flow:
 

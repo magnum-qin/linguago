@@ -2097,6 +2097,32 @@ renumbers the entry's senses to `1..n`.
   `TRANSLATION_CACHE_VERSION = "v62-zh-source-gap-pilot"` and deployed as
   Worker version `b8cf39ec-6c73-4b49-b9a3-ac2f90f76630`.
 
+## 2026-06-30 zh Source-Gap 100 Release
+
+- Regenerated a zh-only clean high-value coverage-gap report with `limit=100`.
+  Select-only skipped `20` already complete source-gap rows and selected `80`
+  model candidates.
+- Initial dry-run accepted `78/80`; two failures exposed reading-format and
+  low-value proper-name filtering gaps. The filter now rejects romanized CJK
+  administrative-name glosses, and the compact Unsloth prompt explicitly
+  requires Chinese readings to be pinyin and Japanese readings to contain kana.
+- The second dry-run accepted `80/80`; apply wrote `80` draft entries/senses,
+  `320` localizations, and `80` source links.
+- Deterministic promotion accepted `80/80`. A final published-risk pass found
+  two overly broad `gloss_key` values (`意見`, `騙子`); those were narrowed to
+  concise meaning labels, and the supplement/promote scripts now reject
+  `gloss_key` values with five or more semicolon-separated parts.
+- Product fast audit, published-risk audit, full product D1 native export audit,
+  and fixed online focused API/render checks passed for the new package.
+- Full product D1 native export was published from
+  `outputs/d1-v2-product-native-export-v63-zh-source-gap-100`.
+- Published D1 counts after push: `entries=23426`, `senses=28943`,
+  `sense_localizations=115772`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v63-zh-source-gap-100"` and deployed as Worker
+  version `67641b31-e6c3-4446-9abb-a40fc63a4f49`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

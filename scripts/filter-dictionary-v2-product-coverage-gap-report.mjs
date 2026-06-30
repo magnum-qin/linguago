@@ -219,6 +219,9 @@ function riskReason(row) {
   ) {
     return "proper_name_gloss";
   }
+  if ((row?.source_lang === "zh" || row?.source_lang === "ja") && isMostlyRomanizedCjkNameGloss(gloss)) {
+    return "romanized_cjk_proper_name_gloss";
+  }
   if (/\b(brand|trademark|company|corporation|facebook|dvd|bmw)\b/u.test(gloss)) return "brand_or_acronym_gloss";
   if (/\b(variant of|alternative form of|alternative name for|obsolete form of|archaic form of|old variant)\b/u.test(gloss)) {
     return "variant_or_alternative_form";
@@ -233,6 +236,19 @@ function riskReason(row) {
     return "single_cjk_function_word";
   }
   return "";
+}
+
+function isMostlyRomanizedCjkNameGloss(gloss) {
+  const normalized = String(gloss || "")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase();
+  if (!normalized || /[;]/u.test(normalized)) return false;
+  const tokens = normalized.split(/\s+/u).filter(Boolean);
+  if (tokens.length < 2 || tokens.length > 6) return false;
+  const toneTokens = tokens.filter((token) => /^[a-züv]+[1-5]$/u.test(token));
+  if (toneTokens.length !== tokens.length) return false;
+  return tokens.some((token) => token === "shi4" || token === "xian4" || token === "sheng3" || token === "qu1");
 }
 
 function qualityBucket(row) {

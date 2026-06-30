@@ -126,6 +126,7 @@ function validateCandidate(candidate) {
   if (!LANGS.includes(candidate.primary_lang)) errors.push("invalid_primary_lang");
   if (!nonEmpty(candidate.headword)) errors.push("missing_headword");
   if (!nonEmpty(candidate.gloss_key)) errors.push("missing_gloss_key");
+  if (isBroadGlossKey(candidate.gloss_key)) errors.push("broad_gloss_key");
   if (localizations.length !== 4 || new Set(localizations.map((loc) => loc.lang)).size !== 4) {
     errors.push("localization_count_not_four");
   }
@@ -340,6 +341,14 @@ function hasBadEncoding(value) {
 
 function hasHtmlArtifact(value) {
   return HTML_ENTITY_RE.test(String(value || ""));
+}
+
+function isBroadGlossKey(value) {
+  const parts = String(value || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length >= 5;
 }
 
 function nonEmpty(value) {
