@@ -2172,6 +2172,12 @@ renumbers the entry's senses to `1..n`.
   `scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs` as a
   shorter schema-preserving fallback prompt, and expanded fetch error messages
   to include the underlying cause when Node exposes one.
+- Added `--strict-zh true` and `--block-known-residuals true` to
+  `scripts/filter-dictionary-v2-product-coverage-gap-report.mjs`. The strict zh
+  mode filters traditional variants, single-character rows, redirect/proper-name
+  glosses, and source-term residuals before LLM generation. On the post-v64
+  balanced report it reduced the remaining zh queue to `21` actual select-only
+  candidates.
 
 ## Database
 

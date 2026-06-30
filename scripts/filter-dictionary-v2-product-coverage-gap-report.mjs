@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import * as OpenCC from "opencc-js";
 
 const LANGS = ["en", "pt-BR", "zh", "ja"];
 const DEFAULT_IN = "logs/product-coverage-gaps-20260622.json";
@@ -51,6 +52,13 @@ const minFirstSenseLangs = Number(args["min-first-sense-langs"] || 1);
 const minGlossLength = Number(args["min-gloss-length"] || 4);
 const sampleLimit = Number(args["sample-limit"] || 80);
 const keepRisky = args["keep-risky"] === "true";
+const strictZh = args["strict-zh"] === "true";
+const blockKnownResiduals = args["block-known-residuals"] === "true";
+const traditionalToSimplified = strictZh ? OpenCC.Converter({ from: "tw", to: "cn" }) : null;
+const KNOWN_RESIDUAL_KEYS = new Set([
+  "pt-BR|ouvintes|audience",
+  "pt-BR|bisavó|great-grandmother"
+]);
 
 if (!fs.existsSync(inPath)) throw new Error(`Coverage gap report not found: ${inPath}`);
 if (!Number.isInteger(limit) || limit < 1) throw new Error(`Invalid --limit: ${args.limit}`);
@@ -93,6 +101,8 @@ const summary = {
   lang_targets: langTargets,
   eligible_scanned: eligible.length,
   keep_risky: keepRisky,
+  strict_zh: strictZh,
+  block_known_residuals: blockKnownResiduals,
   rejected_by_reason: countReasons(rejected),
   clean_by_lang: countBy(accepted.map((row) => row.source_lang)),
   clean_by_quality_bucket: countBy(accepted.map((row) => row.quality_bucket)),
@@ -127,13 +137,14 @@ function rejectReasons(row) {
   const word = String(row?.word || "").trim();
   const normalizedKey = String(row?.normalized_key || "").trim();
   const sourceLang = row?.source_lang;
-  const gloss = String(row?.gloss_key || row?.gloss_preview || "").trim();
+  const gloss = String(row?.first_gloss_key || row?.gloss_key || row?.first_gloss_preview || row?.gloss_preview || "").trim();
   const cleanLangCount = Number(row?.clean_localization_lang_count || 0);
   const firstSenseCleanLangCount = Number(row?.first_sense_clean_localization_lang_count || 0);
 
   if (!LANGS.includes(sourceLang)) reasons.push("invalid_source_lang");
   if (!word) reasons.push("empty_word");
   if (!gloss) reasons.push("missing_gloss");
+  if (blockKnownResiduals && KNOWN_RESIDUAL_KEYS.has(sourceGapKey(row))) reasons.push("known_source_term_residual");
   if (cleanLangCount < minLangs) reasons.push("too_few_clean_langs");
   if (firstSenseCleanLangCount < minFirstSenseLangs) reasons.push("too_few_first_sense_clean_langs");
   if (cleanLangCount <= 1 && gloss.length < Math.max(8, minGlossLength)) reasons.push("thin_single_lang_evidence");
@@ -145,8 +156,29 @@ function rejectReasons(row) {
 
   const risk = riskReason(row);
   if (risk && !keepRisky) reasons.push(risk);
+  if (strictZh && sourceLang === "zh") reasons.push(...strictZhRejectReasons(row));
 
   return [...new Set(reasons)];
+}
+
+function strictZhRejectReasons(row) {
+  const reasons = [];
+  const word = String(row?.word || "").trim();
+  const gloss = String(row?.gloss_key || row?.gloss_preview || "").normalize("NFKC").trim();
+  if ([...word].length < 2) reasons.push("strict_zh_single_character");
+  if (traditionalToSimplified && traditionalToSimplified(word) !== word) reasons.push("strict_zh_traditional_variant");
+  if (/\b(see|short for|original form|synonym of|variant of|alternative form|J\.R\.R|Tolkien|county|district|city)\b/iu.test(gloss)) {
+    reasons.push("strict_zh_redirect_or_proper_gloss");
+  }
+  if (/[縣區市]/u.test(gloss) || /\[[A-Z][A-Za-z0-9]+\d/u.test(gloss)) {
+    reasons.push("strict_zh_proper_name_gloss");
+  }
+  return reasons;
+}
+
+function sourceGapKey(row) {
+  const gloss = row?.first_gloss_key || row?.gloss_key || row?.first_gloss_preview || row?.gloss_preview || "";
+  return `${row?.source_lang || ""}|${row?.word || ""}|${gloss}`;
 }
 
 function selectBalanced(rows, maxItems, targets, shouldFillRemaining) {
