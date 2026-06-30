@@ -2152,6 +2152,27 @@ renumbers the entry's senses to `1..n`.
   `TRANSLATION_CACHE_VERSION = "v64-balanced-source-gap-80"` and deployed as
   Worker version `e897a367-3da5-4e09-889c-1d836d87c116`.
 
+## 2026-06-30 Post-v64 Source-Gap Follow-up
+
+- Re-ran selection against the v64 balanced clean report. `pt-BR` had no
+  remaining publishable source-gap candidates after excluding the known
+  `ouvintes/ouvinte` and `bisavó/bisavô` form mismatches.
+- The remaining candidates were all `zh`; a stricter local filter removed
+  traditional variants, single characters, proper-name redirects, `see ...`
+  rows, `short for ...` rows, and historical/variant forms. That left `18`
+  simplified, multi-character zh candidates for a future retry.
+- No database writes were applied in this follow-up. Product fast audit and
+  published-risk audit still passed with v64 publishable counts.
+- Current Unsloth Studio generation is unstable for the dictionary prompt on
+  the 4090 endpoints: 27B/35B model load and minimal chat requests work, but
+  real source-gap generation returns `TypeError: fetch failed` around the
+  service timeout. `/v1/status` reported `llama_cpp_prebuilt_stale=true` on the
+  loaded 27B endpoint during this test.
+- Added `--prompt-mode ultra` to
+  `scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs` as a
+  shorter schema-preserving fallback prompt, and expanded fetch error messages
+  to include the underlying cause when Node exposes one.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

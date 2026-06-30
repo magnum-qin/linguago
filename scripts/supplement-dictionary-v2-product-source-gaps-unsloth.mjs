@@ -464,6 +464,7 @@ async function fetchJson(url, { method = "GET", timeoutMs = 30_000, body = null 
 }
 
 function buildPrompt(row) {
+  if (promptMode === "ultra") return buildUltraCompactPrompt(row);
   if (promptMode === "compact") return buildCompactPrompt(row);
   const lines = [
     "Return one compact JSON object. No markdown. No extra keys.",
@@ -485,6 +486,7 @@ function buildPrompt(row) {
 }
 
 function buildBatchPrompt(rows) {
+  if (promptMode === "ultra") return buildUltraCompactBatchPrompt(rows);
   if (promptMode === "compact") return buildCompactBatchPrompt(rows);
   const inputs = rows.map((row) => ({
     source_entry_id: row.source_entry_id,
@@ -508,6 +510,32 @@ function buildBatchPrompt(rows) {
   ];
   if (residualMode) lines.push(...residualPromptRules());
   return lines.join("\n");
+}
+
+function buildUltraCompactPrompt(row) {
+  const gloss = row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || "";
+  return [
+    "Return strict JSON only.",
+    `Input: source_entry_id=${row.source_entry_id}; headword=${row.word}; lang=${row.source_lang}; meaning=${gloss}`,
+    "Schema:",
+    "{\"headword\":\"\",\"normalized_key\":\"\",\"primary_lang\":\"\",\"frequency_rank\":0,\"part_of_speech\":null,\"gloss_key\":\"\",\"localizations\":{\"en\":{\"term\":\"\",\"pronunciation\":\"\",\"pronunciation_system\":\"IPA\",\"definition\":\"\"},\"pt-BR\":{\"term\":\"\",\"pronunciation\":\"\",\"pronunciation_system\":\"IPA\",\"definition\":\"\"},\"zh\":{\"term\":\"\",\"reading\":\"\",\"reading_system\":\"pinyin\",\"definition\":\"\"},\"ja\":{\"term\":\"\",\"reading\":\"\",\"reading_system\":\"kana\",\"definition\":\"\"}}}",
+    "Rules: source lang term equals headword exactly. en/pt terms translate meaning, not spelling. zh Simplified with pinyin reading. ja term Japanese with kana reading. en/pt pronunciations are IPA. Definitions are natural in each language. gloss_key max 2 close synonyms."
+  ].join("\n");
+}
+
+function buildUltraCompactBatchPrompt(rows) {
+  const inputs = rows.map((row) => {
+    const gloss = row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || "";
+    return `${row.source_entry_id}|${row.word}|${row.source_lang}|${gloss}`;
+  });
+  return [
+    "Return strict JSON only: {\"items\":[records]}.",
+    "Record schema:",
+    "{\"source_entry_id\":0,\"headword\":\"\",\"normalized_key\":\"\",\"primary_lang\":\"\",\"frequency_rank\":0,\"part_of_speech\":null,\"gloss_key\":\"\",\"localizations\":{\"en\":{\"term\":\"\",\"pronunciation\":\"\",\"pronunciation_system\":\"IPA\",\"definition\":\"\"},\"pt-BR\":{\"term\":\"\",\"pronunciation\":\"\",\"pronunciation_system\":\"IPA\",\"definition\":\"\"},\"zh\":{\"term\":\"\",\"reading\":\"\",\"reading_system\":\"pinyin\",\"definition\":\"\"},\"ja\":{\"term\":\"\",\"reading\":\"\",\"reading_system\":\"kana\",\"definition\":\"\"}}}",
+    "Rules: preserve source_entry_id. source lang term equals headword exactly. en/pt terms translate meaning. zh Simplified+pinyin. ja Japanese+kana. en/pt IPA. Natural definitions. gloss_key max 2 close synonyms.",
+    "Inputs source_entry_id|headword|lang|meaning:",
+    ...inputs
+  ].join("\n");
 }
 
 function buildCompactPrompt(row) {
@@ -1019,7 +1047,11 @@ function secondsSince(started) {
 }
 
 function errorMessage(error) {
-  return `${error?.name || "Error"}: ${error?.message || String(error)}`;
+  const base = `${error?.name || "Error"}: ${error?.message || String(error)}`;
+  const cause = error?.cause;
+  if (!cause) return base;
+  const details = [cause.code, cause.message].filter(Boolean).join(" ");
+  return details ? `${base} (${details})` : base;
 }
 
 function isRecoverableModelLoadError(error) {
