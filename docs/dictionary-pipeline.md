@@ -2123,6 +2123,35 @@ renumbers the entry's senses to `1..n`.
   `TRANSLATION_CACHE_VERSION = "v63-zh-source-gap-100"` and deployed as Worker
   version `67641b31-e6c3-4446-9abb-a40fc63a4f49`.
 
+## 2026-06-30 Balanced Source-Gap 80 Release
+
+- Regenerated the current 50k coverage-gap snapshot after v63. The raw report
+  still contains many low-value letters, acronyms, proper names, and thin
+  one-language rows, so the high-value filter remained mandatory.
+- Built a balanced clean report targeting `zh=80`, `pt-BR=60`, `ja=40`,
+  `en=20`; current filters yielded `140` clean candidates (`zh=80`,
+  `pt-BR=60`) and no clean `ja/en` candidates under the current evidence
+  thresholds.
+- Select-only skipped `4` already linked rows and selected `136` candidates.
+  The first 80-row dry-run accepted `80/80` using the dual 4090 Unsloth MTP
+  endpoints.
+- Apply wrote `80` draft senses and `320` localizations, creating `78` entries
+  and reusing `2` existing entries.
+- Deterministic promotion accepted `78/80`. The two rejected rows,
+  `ouvintes -> ouvinte` and `bisavó -> bisavô`, remain draft/needs-review
+  because their source terms do not match the reused product entries.
+- Product fast audit, published-risk audit, full product D1 native export audit,
+  online focused API check, online render check, and online dictionary
+  regression passed.
+- Full product D1 native export was published from
+  `outputs/d1-v2-product-native-export-v64-balanced-80`.
+- Published D1 counts after push: `entries=23504`, `senses=29021`,
+  `sense_localizations=116084`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v64-balanced-source-gap-80"` and deployed as
+  Worker version `e897a367-3da5-4e09-889c-1d836d87c116`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

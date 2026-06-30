@@ -79,13 +79,13 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v63
+Current production dictionary source of truth is Cloudflare D1 v2. The v64
 baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v63-zh-source-gap-100"`
-- Worker version `67641b31-e6c3-4446-9abb-a40fc63a4f49`
-- `/health` counts: `entries=23426`, `senses=28943`,
-  `sense_localizations=115772`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v64-balanced-source-gap-80"`
+- Worker version `e897a367-3da5-4e09-889c-1d836d87c116`
+- `/health` counts: `entries=23504`, `senses=29021`,
+  `sense_localizations=116084`, `examples=3030`,
   `example_localizations=11898`
 
 `worker/dictionary.ts` still contains multiple adapters:
