@@ -1913,6 +1913,190 @@ localizations are kept with `needs_review = 1`. Do not use `--publishable true`
 for ordinary expansion batches. Promote into publishable product tables only
 after deterministic audit, spot checks, and focused online regression pass.
 
+## 2026-06-29 Coverage Gap Expansion Gate
+
+The high-value coverage gap filter now supports balanced language targets:
+
+```powershell
+node scripts/filter-dictionary-v2-product-coverage-gap-report.mjs `
+  --in logs/product-coverage-gaps-current-50000.json `
+  --out logs/product-coverage-gaps-clean-high-value-balanced-20.json `
+  --limit 20 `
+  --balanced true `
+  --lang-targets zh=8,pt-BR=6,ja=4,en=2
+```
+
+The filter reports `eligible_by_lang` and `unmet_lang_targets` so expansion
+batches do not silently become single-language queues. With the current
+`current-50000` report, strict clean filtering produced `1148` eligible rows:
+`zh=569` and `pt-BR=579`. No English or Japanese candidates passed the current
+clean gates, so the first 20-row balanced report is filled by `zh=10` and
+`pt-BR=10`, with `ja=4` and `en=2` recorded as unmet targets. This means the
+next LLM dry-run should test zh/pt source gaps first, while a separate filter
+loosening pass is needed before adding ja/en source gaps.
+
+Encoding was checked by reading the JSON with Node as UTF-8 and printing code
+points for the first 20 selected headwords. The file contained no replacement
+characters; the earlier mojibake seen in PowerShell was console rendering, not
+stored JSON corruption.
+
+Before a real Unsloth call, run select-only:
+
+```powershell
+node scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs `
+  --report logs/product-coverage-gaps-clean-high-value-balanced-20.json `
+  --out logs/product-source-gap-unsloth-select-only-balanced-20.json `
+  --select-only true `
+  --limit 20 `
+  --endpoints http://100.99.99.99:11447,http://100.99.99.99:11448 `
+  --concurrency 2 `
+  --batch-size 1
+```
+
+The current select-only run selected `16` rows and skipped `4` rows as
+`already_linked_complete_source_gap`. Real generation still requires
+`UNSLOTH_API_KEY` in the environment; do not put the bearer token in committed
+files or logs. The Unsloth source-gap writer retries one recoverable generation
+format error once, including non-JSON content or missing batch `items`.
+
+The first real Unsloth run exposed a model/API stability issue specific to
+schema-heavy prompts on `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` `UD-IQ4_NL`: short
+chat prompts worked, but prompts containing large empty JSON shape templates
+caused `/v1/chat/completions` to close the socket after about 19-24 seconds.
+The source-gap runner therefore defaults to `--prompt-mode compact`, which uses
+a shorter text instruction and lets the local validator enforce the exact
+record shape. Keep `--prompt-mode compact` for production batches unless the
+Unsloth runtime/model is retested.
+
+Mixed zh/pt dry-run on the balanced 20 report produced `7/16` accepted: all
+accepted rows were `pt-BR`, while zh rows either triggered API disconnects or
+copied the Chinese source term into English/Portuguese terms. Split expansion
+by source language until the Chinese prompt/model path is fixed:
+
+```powershell
+node scripts/filter-dictionary-v2-product-coverage-gap-report.mjs `
+  --in logs/product-coverage-gaps-current-50000.json `
+  --out logs/product-coverage-gaps-clean-high-value-pt-20.json `
+  --limit 20 `
+  --balanced true `
+  --lang-targets pt-BR=20,zh=0,ja=0,en=0 `
+  --fill-remaining false
+
+node scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs `
+  --report logs/product-coverage-gaps-clean-high-value-pt-20.json `
+  --source-langs pt-BR `
+  --dry-run true `
+  --apply false `
+  --limit 20 `
+  --endpoints http://100.99.99.99:11448 `
+  --concurrency 1 `
+  --batch-size 1 `
+  --prewarm true `
+  --gguf-variant UD-IQ4_NL `
+  --max-seq-length 8192 `
+  --speculative-type mtp `
+  --prompt-mode compact
+```
+
+The first pt-BR-only batch selected `17` rows, skipped `3` already-complete
+source gaps, and accepted `17/17` in dry-run at roughly 1.3-2.2 seconds per row.
+Those 17 rows were then written as draft, deterministically promoted, and the
+fast product audit plus published-risk audit stayed clean. Publishable senses
+increased from `28577` to `28594`.
+
+Generated rows must remain draft until promoted:
+
+```powershell
+npm run dict:v2:coverage:promote-source-gap-drafts -- --limit 50
+```
+
+This command is dry-run by default. It only promotes with `--apply true`, and
+only when a draft source-gap sense has complete four-language localizations,
+source-language term/source link alignment, Chinese and Japanese readings,
+English and Portuguese pronunciations, no mojibake, no HTML artifacts, and no
+Traditional Chinese smoke-test hits in Chinese examples. Promotion changes
+`draft_single_source` rows to `accepted`, clears localization review flags, and
+renumbers the entry's senses to `1..n`.
+
+2026-06-30 pt-BR source-gap expansion release:
+
+- Expanded the pt-BR-only clean source-gap report to `271` candidates from
+  `logs/product-coverage-gaps-current-50000.json`.
+- After previous coverage, select-only found `177` remaining model candidates
+  and skipped `94` already-linked complete source gaps.
+- Dry-run accepted `158/177`; apply accepted the same `158/177`, inserting
+  `157` new entries, `158` draft senses, and `632` draft localizations.
+- Deterministic promotion accepted `157/158`. The single rejected draft was
+  `ouvinte` / `audience`, where the model shifted the source term to plural
+  `ouvintes/listeners`; it remains unpublished for later manual cleanup.
+- Post-promotion checks passed: `npm run check`, product fast audit, and
+  published-risk audit with `flagged_senses = 0`.
+- Full product D1 native export passed import audit at
+  `outputs/d1-v2-product-native-export-pt-expansion-20260630`.
+- Published D1 counts after push: `entries=23308`, `senses=28825`,
+  `sense_localizations=115300`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v60-pt-source-gap-expansion"` and deployed as
+  Worker version `bb0d265c-2386-40c6-b82c-3a6caccd2f04`.
+- Post-release checks passed: `/health`, `online-dictionary-focused-check`,
+  `online-dictionary-render-focused-check`, and `npm run check:online-dictionary`.
+
+2026-06-30 pt-BR residual source-gap release:
+
+- After the v60 release, the pt-BR 271 report had `20` clean residual source
+  gaps plus the blocked `ouvinte/ouvintes` singular-plural mismatch.
+- The first residual dry-run accepted only `1/20` because the compact prompt
+  allowed the model to copy the English gloss into localized definitions or
+  copy source spellings into target-language terms. The residual reporter now
+  carries `gloss_key` and `gloss_preview`, and the Unsloth prompt explicitly
+  requires natural localized definitions instead of copied gloss text.
+- With the revised residual prompt, the residual dry-run accepted `20/20`;
+  apply inserted `19` new entries, reused `1` existing entry, inserted `19`
+  new senses, reused `1` existing sense, and upserted `80` localizations.
+- Deterministic promotion accepted `19/19`. The remaining residual is still
+  the `ouvintes` source row linked to singular entry `ouvinte`; keep it in
+  `needs_review` until a singular/plural policy is implemented.
+- Post-promotion checks passed: `npm run check`, product fast audit,
+  published-risk audit, full product D1 native export audit, `/health`,
+  `online-dictionary-focused-check`, `online-dictionary-render-focused-check`,
+  and `npm run check:online-dictionary`.
+- Full product D1 native export passed import audit at
+  `outputs/d1-v2-product-native-export-pt-expansion-residual-20260630`.
+- Published D1 counts after push: `entries=23327`, `senses=28844`,
+  `sense_localizations=115376`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v61-pt-source-gap-residual"` and deployed as
+  Worker version `d168423d-7dfc-43b6-94ea-7f9ad8eefb26`.
+
+2026-06-30 zh-only source-gap pilot release:
+
+- Built `logs/product-coverage-gaps-clean-high-value-zh-20.json` from the
+  current 50k coverage gap report with `zh=20` and no fill from other languages.
+  It selected `20` clean zh candidates; select-only skipped `1` already-covered
+  row and left `19` model candidates.
+- The first compact prompt dry-run accepted only `7/19`. All `12` rejected rows
+  had the same issue: English and Portuguese `term` copied the Chinese source
+  spelling, while the localized definitions were otherwise usable.
+- The compact prompt now explicitly requires zh/ja source rows to translate
+  `en.term` and `pt-BR.term` into English/Portuguese dictionary terms, and to
+  make English/Portuguese IPA pronounce those translated terms rather than the
+  source-language word.
+- The second dry-run accepted `19/19`; apply wrote `19` draft entries/senses,
+  `76` localizations, and `19` source links.
+- Deterministic promotion accepted `19/19`, promoting `19` senses and `76`
+  localizations. Product fast audit, published-risk audit, full product D1
+  native export audit, online focused API check, and online render check passed.
+- Full product D1 native export was published from
+  `outputs/d1-v2-product-native-export-zh-source-gap-20260630`.
+- Published D1 counts after push: `entries=23346`, `senses=28863`,
+  `sense_localizations=115452`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v62-zh-source-gap-pilot"` and deployed as
+  Worker version `b8cf39ec-6c73-4b49-b9a3-ac2f90f76630`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

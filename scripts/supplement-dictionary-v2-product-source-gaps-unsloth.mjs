@@ -58,6 +58,7 @@ const endpoints = String(args.endpoints || DEFAULT_ENDPOINTS.join(","))
   .map((item) => item.trim().replace(/\/$/, ""))
   .filter(Boolean);
 const model = args.model || DEFAULT_MODEL;
+const sourceLangFilter = parseSourceLangFilter(args["source-langs"]);
 const limit = Number(args.limit || 8);
 const concurrency = Number(args.concurrency || Math.min(4, endpoints.length));
 const batchSize = Number(args["batch-size"] || 1);
@@ -77,6 +78,7 @@ const maxSeqLength = Number(args["max-seq-length"] || 8192);
 const speculativeType = args["speculative-type"] || "mtp";
 const loadIn4bit = args["load-in-4bit"] !== "false";
 const residualMode = args["residual-mode"] === "true";
+const promptMode = args["prompt-mode"] || "compact";
 const publishable = args.publishable === "true";
 const appliedEntryStatus = publishable ? "accepted" : "draft_single_source";
 const appliedSenseStatus = publishable ? "accepted" : "draft_single_source";
@@ -128,6 +130,7 @@ const existingLinkedCompleteSense = eligibilityDb.prepare(`
 const rejectedBeforeGeneration = [];
 const selected = [];
 for (const row of allRows) {
+  if (sourceLangFilter && !sourceLangFilter.has(row?.source_lang)) continue;
   const eligibility = candidateEligibility(row);
   if (!eligibility.ok) {
     rejectedBeforeGeneration.push({
@@ -150,6 +153,7 @@ if (selectOnly) {
     report: path.relative(process.cwd(), reportPath),
     model,
     endpoints,
+    source_langs: sourceLangFilter ? [...sourceLangFilter] : "all",
     select_only: true,
     limit,
     selected: selected.length,
@@ -193,6 +197,7 @@ const stats = {
   report: path.relative(process.cwd(), reportPath),
   model,
   endpoints,
+  source_langs: sourceLangFilter ? [...sourceLangFilter] : "all",
   dry_run: dryRun,
   apply,
   include_risky: includeRisky,
@@ -207,6 +212,7 @@ const stats = {
   speculative_type: speculativeType,
   load_in_4bit: loadIn4bit,
   residual_mode: residualMode,
+  prompt_mode: promptMode,
   publishable,
   applied_entry_status: appliedEntryStatus,
   applied_sense_status: appliedSenseStatus,
@@ -339,9 +345,9 @@ async function generateOneBatch(rows, endpoint, workerIndex) {
     }
     return items;
   } catch (error) {
-    if (isRecoverableModelLoadError(error)) {
+    if (isRecoverableModelLoadError(error) || isRecoverableGenerationError(error)) {
       try {
-        await loadEndpoint(endpoint);
+        if (isRecoverableModelLoadError(error)) await loadEndpoint(endpoint);
         const outputs = await generateBatch(rows, endpoint);
         const seconds = secondsSince(started);
         const items = rows.map((row, index) => {
@@ -458,6 +464,7 @@ async function fetchJson(url, { method = "GET", timeoutMs = 30_000, body = null 
 }
 
 function buildPrompt(row) {
+  if (promptMode === "compact") return buildCompactPrompt(row);
   const lines = [
     "Return one compact JSON object. No markdown. No extra keys.",
     `source_lang=${row.source_lang}`,
@@ -477,6 +484,7 @@ function buildPrompt(row) {
 }
 
 function buildBatchPrompt(rows) {
+  if (promptMode === "compact") return buildCompactBatchPrompt(rows);
   const inputs = rows.map((row) => ({
     source_entry_id: row.source_entry_id,
     source_lang: row.source_lang,
@@ -500,10 +508,57 @@ function buildBatchPrompt(rows) {
   return lines.join("\n");
 }
 
+function buildCompactPrompt(row) {
+  const gloss = row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || "";
+  const lines = [
+    "Return one JSON object for a multilingual dictionary entry.",
+    `Headword: ${row.word}`,
+    `Source language: ${row.source_lang}`,
+    `Meaning: ${gloss}`,
+    "Top-level keys: headword, normalized_key, primary_lang, frequency_rank, part_of_speech, gloss_key, localizations.",
+    "Localizations: en, pt-BR, zh, ja.",
+    "en and pt-BR fields: term, pronunciation, pronunciation_system, definition.",
+    "zh and ja fields: term, reading, reading_system, definition.",
+    "Use the exact headword as the source-language term.",
+    "If source language is zh or ja, en.term and pt-BR.term must be translated dictionary terms in English and Portuguese, not hanzi, kana, pinyin, or the original source spelling.",
+    "If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.",
+    "Definitions must be natural explanations in the same language as the localization; do not copy the English meaning gloss as a definition for other languages.",
+    "For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term.",
+    "Use Simplified Chinese for zh. Use kana for ja reading. Use IPA for en and pt-BR."
+  ];
+  if (residualMode) lines.push(...residualPromptRules(row));
+  return lines.join("\n");
+}
+
+function buildCompactBatchPrompt(rows) {
+  const inputLines = rows.map((row) => {
+    const gloss = row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || "";
+    return `- source_entry_id=${row.source_entry_id}; headword=${row.word}; source_lang=${row.source_lang}; meaning=${gloss}`;
+  });
+  const lines = [
+    "Return one JSON object with an items array for multilingual dictionary entries.",
+    "Each item must preserve source_entry_id and include headword, normalized_key, primary_lang, frequency_rank, part_of_speech, gloss_key, localizations.",
+    "Localizations: en, pt-BR, zh, ja.",
+    "en and pt-BR fields: term, pronunciation, pronunciation_system, definition.",
+    "zh and ja fields: term, reading, reading_system, definition.",
+    "Use exact headword as the source-language term. Use Simplified Chinese for zh. Use kana for ja reading. Use IPA for en and pt-BR.",
+    "If source language is zh or ja, en.term and pt-BR.term must be translated dictionary terms in English and Portuguese, not hanzi, kana, pinyin, or the original source spelling.",
+    "If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.",
+    "Definitions must be natural explanations in the same language as the localization; do not copy the English meaning gloss as a definition for other languages.",
+    "For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term.",
+    "Inputs:",
+    ...inputLines
+  ];
+  if (residualMode) lines.push(...residualPromptRules());
+  return lines.join("\n");
+}
+
 function residualPromptRules(row = null) {
   const extra = [
     "Residual-mode rules:",
-    "The previous generic run failed validation, usually because the model copied a non-English/non-Portuguese source spelling into English or Portuguese. Avoid copying the source headword into other languages unless it is a globally standard proper name, acronym, or loanword.",
+    "The previous generic run failed validation, usually because the model copied source spelling or the English gloss into fields that need localized terms and definitions.",
+    "Avoid copying the source headword into other languages unless it is a globally standard proper name, acronym, or loanword.",
+    "Avoid using the English gloss verbatim as any definition. Expand it into a short natural explanation in each target language.",
     "For Chinese or Japanese source entries, English and Portuguese terms must be natural translations of meaning_gloss, not pinyin, kana, hanzi, or the original character.",
     "For rare Han characters and variants, translate the gloss into an ordinary target-language term. Keep the source character only in the source-language localization.",
     "For abbreviations, acronyms, brands, and proper names, use the conventional localized name if available; otherwise use a short expanded descriptive term in each target language.",
@@ -544,7 +599,7 @@ function validateOutput(row, output) {
   const sourceTerm = output.localizations?.[row.source_lang]?.term;
   if (sourceTerm && normalize(sourceTerm) !== normalize(row.word)) errors.push("source_term_mismatch");
   const enTerm = output.localizations?.en?.term;
-  const gloss = firstGlossToken(row.first_gloss_key || row.first_gloss_preview);
+  const gloss = firstGlossToken(row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview);
   if (row.source_lang !== "en" && gloss && enTerm && normalize(enTerm) === normalize(row.word) && normalize(enTerm) !== normalize(gloss)) {
     errors.push("en_term_copies_non_english_source");
   }
@@ -878,6 +933,18 @@ function parseEndpointConcurrency(value, endpointList) {
   return byEndpoint;
 }
 
+function parseSourceLangFilter(value) {
+  if (!value) return null;
+  const langs = String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  for (const lang of langs) {
+    if (!LANGS.includes(lang)) throw new Error(`Invalid --source-langs value: ${lang}`);
+  }
+  return new Set(langs);
+}
+
 function chunkRows(rows, size) {
   const batches = [];
   for (let index = 0; index < rows.length; index += size) {
@@ -941,6 +1008,10 @@ function errorMessage(error) {
 
 function isRecoverableModelLoadError(error) {
   return /No model loaded|Call POST \/inference\/load first|Call POST \/v1\/load first|fetch failed/u.test(errorMessage(error));
+}
+
+function isRecoverableGenerationError(error) {
+  return /content is not JSON|batch content missing items array|Unexpected token|unterminated string|JSON/u.test(errorMessage(error));
 }
 
 function parseArgs(argv) {

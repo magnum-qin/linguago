@@ -14,6 +14,8 @@ This is the working backlog for future Codex sessions.
 - Continue expanding accepted word entries in batches.
 - Keep validating generated entries before importing them.
 - Track accepted / needs-review counts per batch.
+- For zh source-gap batches, keep the stricter prompt rule that English and Portuguese terms must be translated target-language terms, not copied Chinese source spellings.
+- Next zh expansion can scale from 20 to 100 only if dry-run acceptance remains at least 80% and deterministic promote remains clean.
 - Monitor `state/batches/<run>.status` files from remote sync batches and use them when checking progress.
 - Consider a lightweight admin endpoint or sync log for Louis dictionary imports.
 
@@ -25,6 +27,11 @@ This is the working backlog for future Codex sessions.
 - Consider haptic-like visual feedback for PWA buttons using only safe visual properties.
 - Check installed PWA mode on iPhone after any viewport/status-bar changes.
 - Check installed PWA cold-start behavior after service worker or manifest changes.
+- Add synonym / near-synonym / antonym / related-word sections once relation data is available.
+- Add word-form and inflection panels: English lemma/forms, Portuguese conjugation, Japanese dictionary/masu/te forms, and Chinese simplified/traditional variants.
+- Upgrade bookmarks into sense-level study cards with review states and Anki-style export.
+- Add compact per-sense source and confidence disclosure for dictionary/AI/open-source data provenance.
+- Add backend search suggestions and morphological normalization beyond the current local history/saved-word suggestions.
 
 ## Backend
 
@@ -41,7 +48,7 @@ This is the working backlog for future Codex sessions.
 
 ## Nice To Have
 
-- Add a small local fixture for dictionary-hit frontend rendering.
+- Keep the local dictionary-hit fixture current with ResultCard rendering assumptions.
 - Add a visual changelog with screenshots for major UI revisions.
 - Add CI checks for TypeScript and CSS build after the project is pushed to GitHub.
 - Add GitHub Actions deployment only if Cloudflare secrets are configured safely.

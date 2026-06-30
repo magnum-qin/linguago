@@ -1,0 +1,182 @@
+{
+  "fixtures": [
+    {
+      "id": "zh-zhong-polyphone",
+      "response": {
+        "type": "word",
+        "detected_source_lang": "zh",
+        "target_lang": "en",
+        "original": "中",
+        "translation": "medium; intermediary",
+        "provider": "dictionary",
+        "model": "cloudflare-d1-v2",
+        "cached": false,
+        "translations": {
+          "en": { "text": "medium; intermediary", "phonetic": "/ˈmiːdiəm/", "audio_text": "medium" },
+          "pt-BR": { "text": "médio", "phonetic": "/ˈme.di.u/", "audio_text": "médio" },
+          "zh": { "text": "中", "phonetic": "zhōng", "audio_text": "中" },
+          "ja": { "text": "中", "phonetic": "なか", "audio_text": "中" }
+        },
+        "word_details": {
+          "en": { "word": "medium; intermediary", "definition": "Of intermediate size, rank, or value." },
+          "pt-BR": { "word": "médio", "definition": "Que está no meio; que não é grande nem pequeno." },
+          "zh": { "word": "中", "definition": "中等；居中；在中间。" },
+          "ja": { "word": "中", "definition": "中間にある。真ん中。" }
+        },
+        "pronunciation_groups": [
+          {
+            "group_order": 1,
+            "lang": "zh",
+            "reading": "zhōng",
+            "reading_key": "zhong1",
+            "reading_system": "pinyin",
+            "audio_text": "中",
+            "senses": [
+              {
+                "sense_order": 1,
+                "part_of_speech": "character",
+                "gloss_key": "medium; intermediary",
+                "pronunciation_group": {
+                  "lang": "zh",
+                  "reading": "zhōng",
+                  "reading_key": "zhong1",
+                  "reading_system": "pinyin"
+                },
+                "definitions": {
+                  "en": "Of intermediate size, rank, or value.",
+                  "pt-BR": "Que está no meio; que não é grande nem pequeno.",
+                  "zh": "中等；居中；在中间。",
+                  "ja": "中間にある。真ん中。"
+                },
+                "localizations": {
+                  "en": { "term": "medium; intermediary", "pronunciation": "/ˈmiːdiəm/", "pronunciation_system": "IPA", "definition": "Of intermediate size, rank, or value." },
+                  "pt-BR": { "term": "médio", "pronunciation": "/ˈme.di.u/", "pronunciation_system": "IPA", "definition": "Que está no meio; que não é grande nem pequeno." },
+                  "zh": { "term": "中", "reading": "zhōng", "reading_system": "pinyin", "definition": "中等；居中；在中间。" },
+                  "ja": { "term": "中", "reading": "なか", "reading_system": "kana", "definition": "中間にある。真ん中。" }
+                },
+                "examples": [
+                  {
+                    "sentence": "这件夹克有三个尺码：小、中、大。",
+                    "source_lang": "zh",
+                    "localizations": {
+                      "en": { "text": "This jacket comes in three sizes: small, medium and large." },
+                      "pt-BR": { "text": "Esta jaqueta vem em três tamanhos: pequeno, médio e grande." },
+                      "zh": { "text": "这件夹克有三个尺码：小、中、大。" },
+                      "ja": { "text": "このジャケットは3つのサイズがあります：小、中、大。" }
+                    },
+                    "translations": {
+                      "en": "This jacket comes in three sizes: small, medium and large.",
+                      "pt-BR": "Esta jaqueta vem em três tamanhos: pequeno, médio e grande.",
+                      "zh": "这件夹克有三个尺码：小、中、大。",
+                      "ja": "このジャケットは3つのサイズがあります：小、中、大。"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "group_order": 2,
+            "lang": "zh",
+            "reading": "zhòng",
+            "reading_key": "zhong4",
+            "reading_system": "pinyin",
+            "audio_text": "中",
+            "senses": [
+              {
+                "sense_order": 2,
+                "part_of_speech": "verb",
+                "gloss_key": "hit; strike",
+                "pronunciation_group": {
+                  "lang": "zh",
+                  "reading": "zhòng",
+                  "reading_key": "zhong4",
+                  "reading_system": "pinyin"
+                },
+                "definitions": {
+                  "en": "To hit or strike a target.",
+                  "pt-BR": "Atingir corretamente um alvo.",
+                  "zh": "击中；命中目标。",
+                  "ja": "目標に当たる。"
+                },
+                "localizations": {
+                  "en": { "term": "hit; strike", "pronunciation": "/hɪt/; /straɪk/", "pronunciation_system": "IPA", "definition": "To hit or strike a target." },
+                  "pt-BR": { "term": "acertar", "pronunciation": "/a.seʁˈtaʁ/", "pronunciation_system": "IPA", "definition": "Atingir corretamente um alvo." },
+                  "zh": { "term": "中", "reading": "zhòng", "reading_system": "pinyin", "definition": "击中；命中目标。" },
+                  "ja": { "term": "当たる; 命中する", "reading": "あたる; めいちゅうする", "reading_system": "kana", "definition": "目標に当たる。" }
+                },
+                "examples": []
+              }
+            ]
+          }
+        ],
+        "senses": [],
+        "examples": []
+      }
+    },
+    {
+      "id": "zh-nihao-simple",
+      "response": {
+        "type": "word",
+        "detected_source_lang": "zh",
+        "target_lang": "en",
+        "original": "你好",
+        "translation": "hello",
+        "provider": "dictionary",
+        "model": "cloudflare-d1-v2",
+        "cached": false,
+        "translations": {
+          "en": { "text": "hello", "phonetic": "/həˈloʊ/", "audio_text": "hello" },
+          "pt-BR": { "text": "olá", "phonetic": "/o.ˈla/", "audio_text": "olá" },
+          "zh": { "text": "你好", "phonetic": "nǐ hǎo", "audio_text": "你好" },
+          "ja": { "text": "こんにちは", "phonetic": "こんにちは", "audio_text": "こんにちは" }
+        },
+        "word_details": {
+          "en": { "word": "hello", "definition": "Used as a greeting." },
+          "pt-BR": { "word": "olá", "definition": "Usado como saudação." },
+          "zh": { "word": "你好", "definition": "用于问候的致意语。" },
+          "ja": { "word": "こんにちは", "definition": "挨拶として使われる言葉。" }
+        },
+        "pronunciation_groups": [],
+        "senses": [
+          {
+            "sense_order": 1,
+            "part_of_speech": "",
+            "gloss_key": "hello; hi",
+            "definitions": {
+              "en": "Used as a greeting.",
+              "pt-BR": "Usado como saudação.",
+              "zh": "用于问候的致意语。",
+              "ja": "挨拶として使われる言葉。"
+            },
+            "localizations": {
+              "en": { "term": "hello", "pronunciation": "/həˈloʊ/", "pronunciation_system": "IPA", "definition": "Used as a greeting." },
+              "pt-BR": { "term": "olá", "pronunciation": "/o.ˈla/", "pronunciation_system": "IPA", "definition": "Usado como saudação." },
+              "zh": { "term": "你好", "reading": "nǐ hǎo", "reading_system": "pinyin", "definition": "用于问候的致意语。" },
+              "ja": { "term": "こんにちは", "reading": "こんにちは", "reading_system": "kana", "definition": "挨拶として使われる言葉。" }
+            },
+            "examples": [
+              {
+                "sentence": "你好，好久不见。",
+                "source_lang": "zh",
+                "localizations": {
+                  "en": { "text": "Hi, long time no see." },
+                  "pt-BR": { "text": "Olá, quanto tempo sem ver." },
+                  "zh": { "text": "你好，好久不见。" },
+                  "ja": { "text": "こんにちは、お久しぶりです。" }
+                },
+                "translations": {
+                  "en": "Hi, long time no see.",
+                  "pt-BR": "Olá, quanto tempo sem ver.",
+                  "zh": "你好，好久不见。",
+                  "ja": "こんにちは、お久しぶりです。"
+                }
+              }
+            ]
+          }
+        ],
+        "examples": []
+      }
+    }
+  ]
+}

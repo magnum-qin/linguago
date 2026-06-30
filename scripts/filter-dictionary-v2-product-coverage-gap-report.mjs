@@ -43,6 +43,9 @@ const args = parseArgs(process.argv.slice(2));
 const inPath = path.resolve(args.in || DEFAULT_IN);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
 const limit = Number(args.limit || 500);
+const balanced = args.balanced === "true";
+const fillRemaining = args["fill-remaining"] !== "false";
+const langTargets = parseLangTargets(args["lang-targets"]);
 const minLangs = Number(args["min-clean-langs"] || 1);
 const minFirstSenseLangs = Number(args["min-first-sense-langs"] || 1);
 const minGlossLength = Number(args["min-gloss-length"] || 4);
@@ -60,7 +63,7 @@ if (!Number.isInteger(minFirstSenseLangs) || minFirstSenseLangs < 0 || minFirstS
 
 const report = JSON.parse(fs.readFileSync(inPath, "utf8"));
 const rows = Array.isArray(report.selected) ? report.selected : [];
-const accepted = [];
+const eligible = [];
 const rejected = [];
 
 for (const row of rows) {
@@ -69,9 +72,11 @@ for (const row of rows) {
     rejected.push(compactRejected(row, reasons));
     continue;
   }
-  accepted.push({ ...row, quality_bucket: qualityBucket(row), quality_reasons: qualityReasons(row) });
-  if (accepted.length >= limit) break;
+  eligible.push({ ...row, quality_bucket: qualityBucket(row), quality_reasons: qualityReasons(row) });
+  if (!balanced && eligible.length >= limit) break;
 }
+
+const accepted = balanced ? selectBalanced(eligible, limit, langTargets, fillRemaining) : eligible.slice(0, limit);
 
 const summary = {
   input: path.relative(process.cwd(), inPath),
@@ -83,10 +88,16 @@ const summary = {
   min_clean_langs: minLangs,
   min_first_sense_langs: minFirstSenseLangs,
   min_gloss_length: minGlossLength,
+  balanced,
+  fill_remaining: fillRemaining,
+  lang_targets: langTargets,
+  eligible_scanned: eligible.length,
   keep_risky: keepRisky,
   rejected_by_reason: countReasons(rejected),
   clean_by_lang: countBy(accepted.map((row) => row.source_lang)),
   clean_by_quality_bucket: countBy(accepted.map((row) => row.quality_bucket)),
+  eligible_by_lang: countBy(eligible.map((row) => row.source_lang)),
+  unmet_lang_targets: unmetLangTargets(accepted, langTargets),
   clean_top_frequency_rank: accepted[0]?.frequency_rank ?? null,
   clean_last_frequency_rank: accepted.at(-1)?.frequency_rank ?? null
 };
@@ -136,6 +147,54 @@ function rejectReasons(row) {
   if (risk && !keepRisky) reasons.push(risk);
 
   return [...new Set(reasons)];
+}
+
+function selectBalanced(rows, maxItems, targets, shouldFillRemaining) {
+  const selected = [];
+  const used = new Set();
+  for (const lang of LANGS) {
+    const target = targets[lang] || 0;
+    if (!target) continue;
+    for (let index = 0; index < rows.length && selected.length < maxItems; index++) {
+      const row = rows[index];
+      if (used.has(index) || row.source_lang !== lang) continue;
+      selected.push(row);
+      used.add(index);
+      if (selected.filter((item) => item.source_lang === lang).length >= target) break;
+    }
+  }
+  if (shouldFillRemaining && selected.length < maxItems) {
+    for (let index = 0; index < rows.length && selected.length < maxItems; index++) {
+      if (used.has(index)) continue;
+      selected.push(rows[index]);
+      used.add(index);
+    }
+  }
+  return selected;
+}
+
+function parseLangTargets(value) {
+  const defaults = { zh: 80, "pt-BR": 60, ja: 40, en: 20 };
+  if (!value) return defaults;
+  const parsed = {};
+  for (const item of String(value).split(",")) {
+    const [rawLang, rawCount] = item.split("=");
+    const lang = String(rawLang || "").trim();
+    const count = Number(rawCount);
+    if (!LANGS.includes(lang)) throw new Error(`Unknown --lang-targets lang: ${lang}`);
+    if (!Number.isInteger(count) || count < 0) throw new Error(`Invalid --lang-targets count: ${item}`);
+    parsed[lang] = count;
+  }
+  return { ...defaults, ...parsed };
+}
+
+function unmetLangTargets(rows, targets) {
+  const counts = countBy(rows.map((row) => row.source_lang));
+  return Object.fromEntries(
+    Object.entries(targets)
+      .map(([lang, target]) => [lang, Math.max(0, target - (counts[lang] || 0))])
+      .filter(([, missing]) => missing > 0)
+  );
 }
 
 function riskReason(row) {

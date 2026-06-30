@@ -79,6 +79,8 @@ for (const row of sourceRows) {
     frequency_rank: row.frequency_rank,
     first_gloss_key: row.first_gloss_key,
     first_gloss_preview: row.first_gloss_preview,
+    gloss_key: row.gloss_key,
+    gloss_preview: row.gloss_preview,
     part_of_speech: row.useful_senses?.[0]?.part_of_speech || null,
     latest_errors: attempt?.errors || [],
     latest_endpoint: attempt?.endpoint || null,

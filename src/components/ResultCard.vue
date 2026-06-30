@@ -44,6 +44,7 @@ const activeTabIndex = computed(() => {
 });
 
 const transitionName = ref('slide-left');
+const expandedSenseKeys = ref<Set<string>>(new Set());
 
 const selectLang = (index: number, code: string) => {
   if (activeLang.value === code) return;
@@ -152,6 +153,10 @@ const currentSenseGroups = computed(() => {
   return groups;
 });
 
+const hasDictionarySenses = computed(() => {
+  return resultData.value?.provider === 'dictionary' && currentSenses.value.length > 0;
+});
+
 const showSenseGroups = computed(() => {
   return currentSenseGroups.value.some((group) => group.label) && currentSenseGroups.value.length > 1;
 });
@@ -186,6 +191,47 @@ const senseReading = (sense: any, lang: string) => {
     (group.lang === lang ? group.reading_system : '') ||
     '';
   return { label, key, system };
+};
+
+const sensePronunciation = (sense: any, lang: string) => {
+  const localization = sense?.localizations?.[lang] || {};
+  const label = localization.pronunciation || localization.reading || '';
+  const system = localization.pronunciation_system || localization.reading_system || '';
+  return { label, system };
+};
+
+const senseKey = (sense: any) => {
+  return `${sense?.sense_order || ''}:${sense?.gloss_key || ''}`;
+};
+
+const isSenseExpanded = (sense: any) => {
+  return expandedSenseKeys.value.has(senseKey(sense));
+};
+
+const toggleSenseExpanded = (sense: any) => {
+  const next = new Set(expandedSenseKeys.value);
+  const key = senseKey(sense);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedSenseKeys.value = next;
+};
+
+const senseLocalization = (sense: any, lang: string) => {
+  return sense?.localizations?.[lang] || {};
+};
+
+const senseExamples = (sense: any) => {
+  return Array.isArray(sense?.examples)
+    ? sense.examples.filter((example: any) => exampleTranslation(example, activeLang.value))
+    : [];
+};
+
+const hasSenseScopedExamples = computed(() => {
+  return currentSenses.value.some((sense: any) => senseExamples(sense).length > 0);
+});
+
+const langDisplay = (lang: string) => {
+  return langs.find((item) => item.code === lang)?.label || lang;
 };
 
 const exampleTranslation = (example: any, lang: string) => {
@@ -387,14 +433,14 @@ const submitReport = async () => {
         </div>
 
         <!-- Hero Header -->
-        <div class="flex flex-col items-start justify-start mb-4">
+        <div v-if="!hasDictionarySenses" class="flex flex-col items-start justify-start mb-4">
           <h1 class="text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] font-display font-black text-m3-on-surface tracking-tight break-words">
             <FuriganaText :text="currentWord" />
           </h1>
         </div>
         
         <!-- Phonetics -->
-        <div v-if="currentTranslation?.phonetic" class="flex flex-wrap gap-2 mb-6">
+        <div v-if="!hasDictionarySenses && currentTranslation?.phonetic" class="flex flex-wrap gap-2 mb-6">
           <button 
             @click="speak(currentTranslation.audio_text || currentTranslation.text, activeLang)"
             class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-m3-outline-variant/30 bg-m3-surface text-m3-on-surface-variant text-[0.95rem] font-medium tracking-wide shadow-sm cursor-pointer hover:bg-m3-primary hover:text-m3-on-primary hover:border-transparent hover:shadow-md transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary active:scale-95"
@@ -418,7 +464,7 @@ const submitReport = async () => {
             <!-- Content Area -->
             <div class="flex flex-col" v-if="currentSenses.length > 0 || currentExamples.length > 0">
               <!-- Definitions / Senses -->
-              <div v-if="currentSenses.length > 0" class="flex flex-col pt-3 pb-6 border-b border-m3-outline-variant/25">
+              <div v-if="currentSenses.length > 0" class="flex flex-col pt-3 pb-6" :class="(!hasSenseScopedExamples && currentExamples.length > 0) ? 'border-b border-m3-outline-variant/25' : ''">
                 <h4 class="text-[0.7rem] font-black uppercase tracking-[0.2em] text-m3-primary/80 mb-2 flex items-center gap-2">
                   <span class="w-1 h-3 rounded-full bg-m3-primary/50"></span>
                   <div class="flex flex-col">
@@ -427,22 +473,74 @@ const submitReport = async () => {
                   </div>
                 </h4>
                 <div v-for="group in currentSenseGroups" :key="group.key" class="py-2">
-                  <div v-if="showSenseGroups && group.label" class="sticky top-0 z-[1] -mx-1 mb-1 px-1 py-2 bg-m3-surface-container/95 backdrop-blur-sm">
-                    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-m3-primary/10 text-m3-primary text-[0.85rem] font-black tracking-wide">
+                  <div v-if="showSenseGroups && group.label" class="sticky top-0 z-[1] -mx-1 mb-2 px-1 py-2 bg-m3-surface-container/95 backdrop-blur-sm">
+                    <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-m3-primary/10 text-m3-primary text-[0.95rem] font-black tracking-wide">
                       <Volume2 class="w-3.5 h-3.5 opacity-80" />
                       {{ group.label }}
                       <span v-if="group.system" class="text-[0.62rem] uppercase tracking-widest opacity-70">{{ group.system }}</span>
                     </span>
                   </div>
-                  <div v-for="sense in group.senses" :key="`${group.key}-${sense.sense_order}-${sense.gloss_key}`" class="py-4">
+                  <div v-for="sense in group.senses" :key="`${group.key}-${sense.sense_order}-${sense.gloss_key}`" class="py-5">
                     <div class="flex gap-4 items-start">
-                      <span class="flex items-center justify-center w-[26px] h-[26px] rounded-[8px] bg-m3-primary/10 text-m3-primary text-[0.85rem] font-black shrink-0 mt-1">{{ sense.sense_order }}</span>
-                      <div class="flex flex-col gap-1.5 w-full pt-0.5">
-                        <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                      <span class="flex items-center justify-center w-[30px] h-[30px] rounded-[9px] bg-m3-primary/10 text-m3-primary text-[0.95rem] font-black shrink-0 mt-1.5">{{ sense.sense_order }}</span>
+                      <div class="flex flex-col gap-2 w-full pt-0.5">
+                        <div class="flex flex-wrap items-center gap-2">
                           <span v-if="sense.part_of_speech" class="px-2 py-0.5 rounded-[6px] bg-m3-surface-variant/60 text-m3-on-surface-variant text-[0.65rem] font-bold uppercase tracking-widest">{{ sense.part_of_speech }}</span>
                         </div>
-                        <span v-if="senseTerm(sense, activeLang)" class="text-m3-on-surface text-[1.05rem] sm:text-[1.15rem] font-bold leading-relaxed"><FuriganaText :text="senseTerm(sense, activeLang)" /></span>
-                        <span class="text-m3-on-surface text-[1rem] sm:text-[1.1rem] font-medium leading-relaxed"><FuriganaText :text="senseDefinition(sense, activeLang)" /></span>
+                        <div class="flex flex-wrap items-center gap-2.5">
+                          <span v-if="senseTerm(sense, activeLang)" class="text-m3-on-surface text-[1.35rem] sm:text-[1.65rem] font-black leading-tight"><FuriganaText :text="senseTerm(sense, activeLang)" /></span>
+                          <button
+                            v-if="sensePronunciation(sense, activeLang).label"
+                            @click="speak(senseTerm(sense, activeLang) || senseDefinition(sense, activeLang), activeLang)"
+                            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-m3-primary/10 text-m3-primary text-[0.8rem] sm:text-[0.85rem] font-black tracking-wide hover:bg-m3-primary hover:text-m3-on-primary transition-all"
+                            aria-label="Pronunciar sentido"
+                          >
+                            <Volume2 class="w-3.5 h-3.5 opacity-80" />
+                            {{ sensePronunciation(sense, activeLang).label }}
+                            <span v-if="sensePronunciation(sense, activeLang).system" class="text-[0.58rem] uppercase tracking-widest opacity-70">{{ sensePronunciation(sense, activeLang).system }}</span>
+                          </button>
+                          <button
+                            v-if="sense.localizations"
+                            @click="toggleSenseExpanded(sense)"
+                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-m3-surface border border-m3-outline-variant/30 text-m3-on-surface-variant text-[0.78rem] font-black hover:bg-m3-surface-container-high transition-all"
+                            aria-label="Toggle multilingual sense details"
+                          >
+                            四语
+                            <ChevronDown class="w-3.5 h-3.5 transition-transform" :class="isSenseExpanded(sense) ? 'rotate-180' : ''" />
+                          </button>
+                        </div>
+                        <span class="text-m3-on-surface text-[1.05rem] sm:text-[1.22rem] font-medium leading-relaxed"><FuriganaText :text="senseDefinition(sense, activeLang)" /></span>
+
+                        <div v-if="isSenseExpanded(sense)" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div
+                            v-for="lang in langs"
+                            :key="`${senseKey(sense)}-${lang.code}`"
+                            class="rounded-[14px] bg-m3-surface/70 border border-m3-outline-variant/20 p-3 flex flex-col gap-1.5"
+                          >
+                            <div class="flex items-center justify-between gap-2">
+                              <span class="text-[0.65rem] font-black tracking-widest text-m3-primary uppercase">{{ langDisplay(lang.code) }}</span>
+                              <span v-if="sensePronunciation(sense, lang.code).label" class="text-[0.72rem] font-bold text-m3-on-surface-variant">
+                                {{ sensePronunciation(sense, lang.code).label }}
+                              </span>
+                            </div>
+                            <span class="text-m3-on-surface text-[1rem] font-black leading-snug"><FuriganaText :text="senseLocalization(sense, lang.code).term" /></span>
+                            <span class="text-m3-on-surface-variant text-[0.9rem] leading-relaxed"><FuriganaText :text="senseLocalization(sense, lang.code).definition" /></span>
+                          </div>
+                        </div>
+
+                        <div v-if="senseExamples(sense).length > 0" class="mt-4 flex flex-col gap-3">
+                          <div
+                            v-for="(example, i) in senseExamples(sense)"
+                            :key="`${senseKey(sense)}-example-${i}`"
+                            class="flex gap-3 items-start rounded-[14px] bg-m3-surface/55 border border-m3-outline-variant/15 p-3"
+                          >
+                            <span class="w-1.5 h-1.5 rounded-full bg-m3-primary/50 mt-2.5 shrink-0"></span>
+                            <div class="flex flex-col gap-1">
+                              <p class="text-m3-on-surface text-[0.98rem] font-medium leading-relaxed"><FuriganaText :text="example.sentence" :highlight="currentWord" /></p>
+                              <p v-if="shouldShowExampleTranslation(example, activeLang)" class="text-m3-on-surface-variant text-[0.9rem] leading-relaxed"><FuriganaText :text="exampleTranslation(example, activeLang)" :highlight="currentWord" /></p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -450,7 +548,7 @@ const submitReport = async () => {
               </div>
 
               <!-- Examples -->
-              <div v-if="currentExamples.length > 0" class="pt-6 pb-2">
+              <div v-if="currentExamples.length > 0 && !hasSenseScopedExamples" class="pt-6 pb-2">
                 <h4 class="text-[0.7rem] font-black uppercase tracking-[0.2em] text-m3-primary/80 mb-2 flex items-center gap-2">
                   <span class="w-1 h-3 rounded-full bg-m3-primary/50"></span>
                   <div class="flex flex-col">

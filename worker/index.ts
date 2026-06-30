@@ -125,7 +125,7 @@ async function handleTranslate(
       console.log(`Ignoring legacy dictionary cache for ${text}`);
     }
 
-    const dictionaryResponse = await lookupDictionaryFirst({
+    const dictionaryResponse = await safeLookupDictionaryFirst({
       env,
       text,
       targetLang,
@@ -216,6 +216,26 @@ async function handleTranslate(
   }
 }
 
+async function safeLookupDictionaryFirst(input: {
+  env: Env;
+  text: string;
+  targetLang: LanguageCode;
+  sourceLang: LanguageCode | "auto";
+}): Promise<TranslateResponse | null> {
+  try {
+    return await lookupDictionaryFirst(input);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: "warn",
+        message: "dictionary_lookup_failed_falling_back",
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+    return null;
+  }
+}
+
 async function handleTranslateStream(
   request: Request,
   env: Env,
@@ -262,7 +282,7 @@ async function handleTranslateStream(
           console.log(`Ignoring legacy dictionary cache for ${text} in stream`);
         }
 
-        const dictionaryResponse = await lookupDictionaryFirst({
+        const dictionaryResponse = await safeLookupDictionaryFirst({
           env,
           text,
           targetLang,

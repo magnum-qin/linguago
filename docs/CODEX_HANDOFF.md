@@ -79,13 +79,33 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-`worker/dictionary.ts` currently mixes:
+Current production dictionary source of truth is Cloudflare D1 v2. The v62
+baseline was published with:
+
+- `TRANSLATION_CACHE_VERSION = "v62-zh-source-gap-pilot"`
+- Worker version `b8cf39ec-6c73-4b49-b9a3-ac2f90f76630`
+- `/health` counts: `entries=23346`, `senses=28863`,
+  `sense_localizations=115452`, `examples=3030`,
+  `example_localizations=11898`
+
+`worker/dictionary.ts` still contains multiple adapters:
 
 - Cloudflare D1 dictionary lookup through `env.DB`.
 - Louis SQLite API lookup through `DICTIONARY_API_URL` and `DICTIONARY_API_TOKEN`.
 - A narrow mock JMDict adapter.
 
-This is the most obvious old/new backend mix. Before changing dictionary semantics, decide whether D1, Louis, or a composed result is the production source of truth.
+D1 should be treated as the production path unless a task explicitly asks to
+revive Louis. Dictionary lookup failures are isolated by
+`safeLookupDictionaryFirst` in `worker/index.ts`; D1/Louis errors should fall
+through to model translation instead of failing the whole request.
+
+Current source-gap generation uses Unsloth Studio, not Ollama. LLM output must
+stay in draft/needs-review rows until deterministic promotion passes. The
+latest pt-BR source-gap run completed `270/271` candidates; the remaining
+manual item is `ouvintes` linked to singular entry `ouvinte`. The first zh-only
+pilot promoted `19/19` generated draft senses after adding stricter prompt rules
+that prevent Chinese source terms from being copied into English/Portuguese
+terms.
 
 ## Frontend Constraints
 
@@ -114,6 +134,8 @@ Preserve these unless explicitly asked to redesign:
 npm run build
 npm run check
 npm run check:all
+npm run check:dictionary-fixture
+npm run check:worker-dictionary-fallback
 ```
 
 Use targeted Playwright scripts after layout or interaction changes:

@@ -13,7 +13,7 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Backend: Cloudflare Worker in `worker/index.ts`.
 - Static hosting: Workers Assets from `dist/`.
 - Cache/settings/rate limits: Cloudflare KV binding `CACHE`.
-- Dictionary: Cloudflare D1 binding `DB`, plus optional Louis SQLite API through `DICTIONARY_API_URL` and `DICTIONARY_API_TOKEN`.
+- Dictionary: Cloudflare D1 binding `DB` is the production source of truth; optional Louis SQLite API support remains behind `DICTIONARY_API_URL` and `DICTIONARY_API_TOKEN`.
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
@@ -74,7 +74,7 @@ Cloudflare Worker
   |
   +-- KV cache/settings/rate-limit
   +-- D1 dictionary lookup
-  +-- Louis dictionary API fallback
+  +-- optional Louis dictionary API fallback
   +-- selected model provider
 ```
 
@@ -104,7 +104,7 @@ request
   +-- check KV translation cache
   +-- if word-like: try dictionary adapters
   |     +-- D1
-  |     +-- Louis SQLite API
+  |     +-- optional Louis SQLite API
   |     +-- mock JMDict test adapter
   +-- if dictionary miss: call model provider
   +-- parse and validate provider JSON
@@ -155,7 +155,7 @@ Word responses also include `phonetic`, `audio_text`, `word_details`, `senses`, 
 - Documentation had many plain-frontend references after the Vue/Vite migration.
 - `scripts/sw-cache-check.mjs` was still checking for removed `public/index.html`, `/app.js`, and `/styles.css`.
 - `npm run check` needed Vue and JS API declaration files after the migration.
-- `worker/dictionary.ts` now mixes D1, Louis SQLite API, and mock JMDict adapters; clarify production source-of-truth before deeper dictionary work.
+- `worker/dictionary.ts` still contains D1, Louis SQLite API, and mock JMDict adapters, but D1 v2 is the production source of truth. Dictionary adapter failures should fall back to model translation through `safeLookupDictionaryFirst`.
 - Many untracked root files are SQL dumps, logs, transfer archives, and scratch scripts. Review before staging anything.
 
 ## Cache Rules
@@ -213,6 +213,30 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 - `rtx4090-56` (`11447`) and `rtx4090-47` (`11448`) both run `UD-IQ4_NL` with `-ngl -1` full layer GPU offload, `--flash-attn on`, `--spec-type draft-mtp`, and about 19.8 GB VRAM used. This avoids the previous `UD-Q4_K_XL` 4090 VRAM pressure and CPU offload problem.
 - Measured source-gap dry-run throughput: `rtx4090-56` 47/50 accepted at 51.66 accepted/min, `rtx4090-47` 47/50 accepted at 46.64 accepted/min, dual 4090 96/100 accepted at about 90-100 accepted/min wall-clock. `a6000-155` with the same variant produced 48/50 accepted at 38.96 accepted/min.
 - Unsloth Studio detects the Qwen3.6 MTP repo as a vision model and auto-adds `mmproj-F16.gguf`. Local OpenAPI exposes `gguf_variant`, `max_seq_length`, `speculative_type`, `spec_draft_n_max`, `tensor_parallel`, and `llama_extra_args`, but no supported `vision=false` or `mmproj=false` load option. Do not assume mmproj can be disabled through `/v1/load`.
+
+## Current Dictionary Baseline
+
+The current online D1 baseline is v62:
+
+- Worker cache version: `v62-zh-source-gap-pilot`.
+- Worker version: `b8cf39ec-6c73-4b49-b9a3-ac2f90f76630`.
+- Published counts: `entries=23346`, `senses=28863`,
+  `sense_localizations=115452`, `examples=3030`,
+  `example_localizations=11898`.
+- The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
+  candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
+  source row was linked to a singular entry.
+- The first zh-only source-gap pilot selected `19` model candidates, improved
+  from `7/19` to `19/19` accepted after prompt rules were tightened, then
+  promoted all `19` through deterministic validation.
+
+Source-gap generation flow:
+
+1. Filter clean coverage gaps.
+2. Run Unsloth dry-run first.
+3. Apply only to draft/needs-review rows.
+4. Promote only through deterministic validation.
+5. Run product fast/full audits and online focused checks before publishing.
 
 ## UI Constraints
 
