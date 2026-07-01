@@ -8,14 +8,14 @@ import { useHistory } from '../composables/useHistory';
 
 const { currentTheme, toggleTheme } = useTheme();
 const { inputText, sourceLangPreference, translate, clear, resultData, isTranslating } = useTranslation();
-const { bookmarks, isBookmarksOpen } = useBookmarks();
-const { historyItems, isHistoryOpen } = useHistory();
+const { isBookmarksOpen } = useBookmarks();
+const { isHistoryOpen } = useHistory();
 
 const hasResult = computed(() => !!resultData.value || isTranslating.value);
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const lastDetectedCjkMode = ref<'zh' | 'ja' | 'hidden'>('hidden');
-const inputFocused = ref(false);
+const isComposingText = ref(false);
 
 const detectCjkMode = (text: string): 'zh' | 'ja' | 'hidden' => {
   const trimmed = text.trim();
@@ -29,33 +29,6 @@ const detectCjkMode = (text: string): 'zh' | 'ja' | 'hidden' => {
 
 const sourceToggleVisible = computed(() => detectCjkMode(inputText.value) !== 'hidden');
 const sourceToggleLabel = computed(() => sourceLangPreference.value === 'ja' ? '日' : '中');
-const sourceModeHint = computed(() => {
-  if (!sourceToggleVisible.value) return '';
-  return sourceLangPreference.value === 'ja' ? '按日语搜索 / Japonês' : '按中文搜索 / Chinês';
-});
-const searchSuggestions = computed(() => {
-  const query = inputText.value.trim().toLocaleLowerCase();
-  if (!query) return [];
-  const suggestions = new Map<string, { text: string; source: string }>();
-
-  for (const item of historyItems.value) {
-    const text = item.text.trim();
-    if (!text || !text.toLocaleLowerCase().includes(query)) continue;
-    suggestions.set(text, { text, source: 'History' });
-    if (suggestions.size >= 5) break;
-  }
-  for (const word of bookmarks.value) {
-    const text = word.trim();
-    if (!text || !text.toLocaleLowerCase().includes(query) || suggestions.has(text)) continue;
-    suggestions.set(text, { text, source: 'Saved' });
-    if (suggestions.size >= 6) break;
-  }
-
-  return [...suggestions.values()].slice(0, 6);
-});
-const showSearchSuggestions = computed(() => {
-  return inputFocused.value && inputText.value.trim().length > 0 && searchSuggestions.value.length > 0;
-});
 
 const autoResize = () => {
   if (!textareaRef.value) return;
@@ -146,17 +119,24 @@ const handleClear = () => {
 
 const handleTranslate = () => {
   if (inputText.value.trim()) {
-    textareaRef.value?.blur();
     translate();
   }
 };
 
-const useSuggestion = async (text: string) => {
-  inputText.value = text;
-  await nextTick();
-  autoResize();
+const handleTextareaKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    handleClear();
+    return;
+  }
+
+  if (e.key !== 'Enter') return;
+  if (e.isComposing || isComposingText.value || e.keyCode === 229) return;
+
+  e.preventDefault();
   handleTranslate();
 };
+
 </script>
 
 <template>
@@ -236,30 +216,11 @@ const useSuggestion = async (text: string) => {
         autocomplete="off"
         :placeholder="'单词或句子...\nPalavra ou frase...'"
         class="w-full resize-none border-0 outline-none min-h-[56px] bg-transparent text-m3-on-surface !text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] placeholder:text-m3-on-surface-variant/50 overflow-hidden font-display font-medium"
-        @keydown.enter.prevent="handleTranslate"
-        @keydown.esc.prevent="handleClear"
-        @focus="inputFocused = true"
-        @blur="inputFocused = false"
+        @keydown="handleTextareaKeydown"
+        @compositionstart="isComposingText = true"
+        @compositionend="isComposingText = false"
         @input="autoResize"
       ></textarea>
-
-      <div v-if="sourceModeHint || showSearchSuggestions" class="flex flex-col gap-2">
-        <div v-if="sourceModeHint" class="px-1 text-[0.72rem] font-bold text-m3-on-surface-variant/80">
-          {{ sourceModeHint }}
-        </div>
-        <div v-if="showSearchSuggestions" class="flex flex-wrap gap-2">
-          <button
-            v-for="item in searchSuggestions"
-            :key="`${item.source}-${item.text}`"
-            type="button"
-            class="inline-flex items-center gap-2 max-w-full rounded-full bg-m3-surface px-3 py-1.5 text-[0.78rem] font-bold text-m3-on-surface-variant border border-m3-outline-variant/20 hover:bg-m3-primary hover:text-m3-on-primary transition-all"
-            @mousedown.prevent="useSuggestion(item.text)"
-          >
-            <span class="truncate max-w-[180px]">{{ item.text }}</span>
-            <span class="text-[0.62rem] uppercase tracking-widest opacity-60">{{ item.source }}</span>
-          </button>
-        </div>
-      </div>
 
       <div class="flex items-center relative min-h-[44px] mt-3 w-full">
         <Transition name="fade-up">

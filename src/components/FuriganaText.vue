@@ -3,7 +3,7 @@ import { computed } from 'vue';
 
 const props = defineProps<{
   text: string;
-  highlight?: string;
+  highlight?: string | string[];
 }>();
 
 // Parse text like "漢[かん]字[じ]" into array of parts
@@ -54,16 +54,73 @@ const parsedSegments = computed(() => {
   return segments.length > 0 ? segments : [{ text: props.text }];
 });
 
+const highlightTerms = computed(() => {
+  const raw = Array.isArray(props.highlight) ? props.highlight : [props.highlight || ''];
+  const seen = new Set<string>();
+  const terms: string[] = [];
+
+  for (const item of raw) {
+    const value = String(item || '').trim();
+    if (!value) continue;
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    terms.push(value);
+  }
+
+  return terms.sort((a, b) => b.length - a.length);
+});
+
+const isLatinBoundary = (value: string, index: number) => {
+  if (index < 0 || index >= value.length) return true;
+  return !/[\p{L}\p{N}_]/u.test(value[index]);
+};
+
+const isLatinTerm = (term: string) => /^[\p{Script=Latin}\p{N}_'’-]+$/u.test(term);
+
+const matchesAt = (str: string, lower: string, index: number, term: string) => {
+  const lowerTerm = term.toLocaleLowerCase();
+  if (!lower.startsWith(lowerTerm, index)) return false;
+
+  if (isLatinTerm(term)) {
+    return isLatinBoundary(str, index - 1) && isLatinBoundary(str, index + term.length);
+  }
+
+  return true;
+};
+
 const highlightParts = (str: string) => {
-  if (!props.highlight || props.highlight.trim() === '') return [{ text: str, isHighlight: false }];
-  const query = props.highlight.trim();
-  const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-  const parts = str.split(regex);
-  return parts.map(part => ({
-    text: part,
-    isHighlight: part.toLowerCase() === query.toLowerCase()
-  })).filter(p => p.text !== '');
+  if (!highlightTerms.value.length) return [{ text: str, isHighlight: false }];
+
+  const parts: Array<{ text: string; isHighlight: boolean }> = [];
+  const lower = str.toLocaleLowerCase();
+  let index = 0;
+
+  while (index < str.length) {
+    const matched = highlightTerms.value.find((term) => matchesAt(str, lower, index, term));
+    if (matched) {
+      parts.push({ text: str.slice(index, index + matched.length), isHighlight: true });
+      index += matched.length;
+      continue;
+    }
+
+    const nextMatchIndex = findNextMatchIndex(str, lower, index + 1);
+    const end = nextMatchIndex === -1 ? str.length : nextMatchIndex;
+    parts.push({ text: str.slice(index, end), isHighlight: false });
+    index = end;
+  }
+
+  return parts.filter((part) => part.text !== '');
+};
+
+const findNextMatchIndex = (str: string, lower: string, start: number) => {
+  for (let index = start; index < str.length; index += 1) {
+    if (highlightTerms.value.some((term) => matchesAt(str, lower, index, term))) {
+      return index;
+    }
+  }
+
+  return -1;
 };
 </script>
 
