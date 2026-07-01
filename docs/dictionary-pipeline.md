@@ -2251,6 +2251,39 @@ renumbers the entry's senses to `1..n`.
   `884c0937-2e60-4c6d-873b-0de5516328c6`; `/health` reported
   `published_at=2026-06-30T17:05:29.385Z`.
 
+### v69 A6000 Source-Gap Batch
+
+- A6000 quality-first nodes were added for the next source-gap pass:
+  `a6000-143` at `100.99.99.99:11441` and `a6000-147` at
+  `100.99.99.99:11444`.
+- Both nodes used Unsloth `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` with
+  `gguf_variant=UD-Q4_K_XL`, `speculative_type=mtp`, `max_seq_length=8192`,
+  `batch-size=1`, and generation-only draft writes.
+- The 20-row dry-run accepted `20/20` generated rows.
+- The 100-row draft apply selected `100`, skipped `33` before generation,
+  generated `100`, accepted `99`, and rejected `1`.
+- Deterministic promote scanned `101` draft rows, promoted `94` senses and
+  `376` localizations, and left `7` draft rows blocked by
+  `source_term_mismatch` / `source_link_word_mismatch`: `罷/霸`, `臺/苔`,
+  `赴/敷`, `濟/積`, `扬/洋`, `ouvinte/ouvintes`, and `bisavô/bisavó`.
+- Product fast audit, published-risk audit, and full product D1 native export
+  audit passed after promotion. `duplicate_sense_localizations=98` remains a
+  non-blocking warning.
+- Full product D1 native export was written to
+  `outputs/d1-v2-product-native-export-v69-a6000-source-gap`.
+- Export counts: `entries=23644`, `senses=29161`,
+  `sense_localizations=116644`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v69-a6000-source-gap-94"`.
+- D1 was pushed and the Worker was deployed as version
+  `e8314f3b-d20e-42b2-a4cc-4670006370fd`; `/health` reported
+  `published_at=2026-07-01T05:20:42.529Z`.
+- Online render focused check, online focused API check, and full online
+  dictionary regression passed after deployment. The focused API check initially
+  failed only because its fixed expected counts still pointed to v68; those
+  expected counts were updated to v69.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

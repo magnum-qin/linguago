@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v68
+Current production dictionary source of truth is Cloudflare D1 v2. The v69
 baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v68-source-gap-25"`
-- Worker version `884c0937-2e60-4c6d-873b-0de5516328c6`
-- `/health` counts: `entries=23550`, `senses=29067`,
-  `sense_localizations=116268`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v69-a6000-source-gap-94"`
+- Worker version `e8314f3b-d20e-42b2-a4cc-4670006370fd`
+- `/health` counts: `entries=23644`, `senses=29161`,
+  `sense_localizations=116644`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-06-30T17:05:29.385Z`
+- D1 `published_at`: `2026-07-01T05:20:42.529Z`
 
 `worker/dictionary.ts` still contains multiple adapters:
 
@@ -108,10 +108,13 @@ pilot promoted `19/19` generated draft senses after adding stricter prompt rules
 that prevent Chinese source terms from being copied into English/Portuguese
 terms.
 
-The v68 source-gap follow-up promoted `25` additional accepted senses from a
-strict zh-first dry-run on `rtx4090-56` using `Qwen3.6-27B-MTP-GGUF`. The two
-known pt-BR residual drafts remain rejected by deterministic promote:
-`ouvintes/ouvinte` and `bisavó/bisavô`.
+The v69 A6000 source-gap follow-up used `a6000-143` and `a6000-147`
+(`100.99.99.99:11441` and `100.99.99.99:11444`) with Unsloth
+`unsloth/Qwen3.6-35B-A3B-MTP-GGUF` / `UD-Q4_K_XL`. The 20-row dry-run accepted
+`20/20`; the 100-row draft apply accepted `99/100`; deterministic promote
+accepted `94` senses and left `7` source-term mismatches in draft review
+(`罷/霸`, `臺/苔`, `赴/敷`, `濟/積`, `扬/洋`, `ouvinte/ouvintes`,
+`bisavô/bisavó`).
 
 ## Frontend Constraints
 

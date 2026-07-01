@@ -216,14 +216,14 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v68:
+The current online D1 baseline is v69:
 
-- Worker cache version: `v68-source-gap-25`.
-- Worker version: `884c0937-2e60-4c6d-873b-0de5516328c6`.
-- Published counts: `entries=23550`, `senses=29067`,
-  `sense_localizations=116268`, `examples=3030`,
+- Worker cache version: `v69-a6000-source-gap-94`.
+- Worker version: `e8314f3b-d20e-42b2-a4cc-4670006370fd`.
+- Published counts: `entries=23644`, `senses=29161`,
+  `sense_localizations=116644`, `examples=3030`,
   `example_localizations=11898`.
-- D1 `published_at`: `2026-06-30T17:05:29.385Z`.
+- D1 `published_at`: `2026-07-01T05:20:42.529Z`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
@@ -243,6 +243,11 @@ The current online D1 baseline is v68:
   `25/25` generated rows passed dry-run, `25` draft senses were written, and
   deterministic promote accepted all `25`. The two known pt-BR residual drafts
   are still held in review.
+- The v69 follow-up used `a6000-143` and `a6000-147` with Unsloth
+  `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` / `UD-Q4_K_XL`: the 20-row dry-run
+  accepted `20/20`, the 100-row draft apply accepted `99/100`, and
+  deterministic promote accepted `94` senses. Seven source-term mismatches
+  remain in draft review.
 
 Source-gap generation flow:
 
