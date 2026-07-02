@@ -877,7 +877,9 @@ function riskReason(row) {
   if (/\b(letter of the roman alphabet|blood group|radioactive|unit used in printing)\b/u.test(gloss)) return "encyclopedic_or_symbol_gloss";
   if (/\bsurname\b/u.test(gloss)) return "surname_gloss";
   if (/^boa$/u.test(gloss) || normalize(word) === normalize(gloss)) return "gloss_repeats_word";
-  if (/\b(one's|possessive|demonstrative)\b/u.test(gloss)) return "possessive_or_demonstrative";
+  if (row.source_lang === "en" && /\b(one's|possessive|demonstrative)\b/u.test(gloss)) {
+    return "possessive_or_demonstrative";
+  }
   if (row.source_lang === "pt-BR" && FUNCTION_GLOSSES.has(gloss)) return "pt_function_word";
   if ((row.source_lang === "zh" || row.source_lang === "ja") && word.length === 1 && FUNCTION_GLOSSES.has(gloss)) return "single_cjk_function_word";
   return "";

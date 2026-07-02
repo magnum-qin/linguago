@@ -216,14 +216,14 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v69:
+The current online D1 baseline is v70:
 
-- Worker cache version: `v69-a6000-source-gap-94`.
-- Worker version: `e8314f3b-d20e-42b2-a4cc-4670006370fd`.
-- Published counts: `entries=23644`, `senses=29161`,
-  `sense_localizations=116644`, `examples=3030`,
+- Worker cache version: `v70-source-gap-99`.
+- Worker version: `c7d2d544-563a-4ae4-bea5-011fa767fccf`.
+- Published counts: `entries=23743`, `senses=29260`,
+  `sense_localizations=117040`, `examples=3030`,
   `example_localizations=11898`.
-- D1 `published_at`: `2026-07-01T05:20:42.529Z`.
+- D1 `published_at`: `2026-07-02T00:38:14.774Z`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
@@ -248,6 +248,12 @@ The current online D1 baseline is v69:
   accepted `20/20`, the 100-row draft apply accepted `99/100`, and
   deterministic promote accepted `94` senses. Seven source-term mismatches
   remain in draft review.
+- The v70 follow-up fixed the source-gap supplement pre-generation skip rule so
+  Chinese glosses containing `one's` are no longer misclassified as English
+  possessive/demonstrative rows. A 20-row A6000 dry-run accepted all `17/17`
+  generated rows after three already-complete pt-BR rows were skipped; the
+  100-row draft apply accepted `99/100`, and deterministic promote accepted all
+  `99` draft senses.
 
 Source-gap generation flow:
 

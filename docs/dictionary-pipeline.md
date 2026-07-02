@@ -2284,6 +2284,43 @@ renumbers the entry's senses to `1..n`.
   failed only because its fixed expected counts still pointed to v68; those
   expected counts were updated to v69.
 
+### v70 Source-Gap Batch
+
+- A fresh v69 coverage gap report was generated as
+  `logs/product-coverage-gaps-current-v69.json`, then filtered to
+  `logs/product-coverage-gaps-clean-high-value-balanced-v70-120-first0.json`.
+  The clean report produced 120 candidates: 87 English, 30 Chinese, and 3
+  pt-BR; no Japanese candidates passed the current clean filter.
+- The source-gap supplement pre-generation skip rule was narrowed so
+  `one's` / `possessive` / `demonstrative` only blocks English source rows. This
+  fixed false skips for Chinese candidates such as `出手` and `心事`, whose
+  English glosses contained `one's`.
+- A mixed 20-row dry-run on `a6000-143` and `a6000-147` with Unsloth
+  `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` / `UD-Q4_K_XL` accepted all `17/17`
+  generated rows after three already-complete pt-BR rows were skipped.
+- The 100-row draft apply selected `100`, skipped `3` already-complete pt-BR
+  rows, generated `100`, accepted `99`, and rejected `1` (`audible`, blocked by
+  `term_language_zh`). It inserted 99 draft entries/senses and 396
+  localizations.
+- Deterministic promote scanned 106 draft rows, promoted the 99 new v70 senses
+  and 396 localizations, and left the seven older v69 source-term mismatch
+  drafts in review.
+- Product fast audit, published-risk audit, and full product D1 native export
+  audit passed after promotion. `duplicate_sense_localizations=98` remains a
+  non-blocking warning.
+- Full product D1 native export was written to
+  `outputs/d1-v2-product-native-export-v70-source-gap-99`.
+- Export counts: `entries=23743`, `senses=29260`,
+  `sense_localizations=117040`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v70-source-gap-99"`.
+- D1 was pushed and the Worker was deployed as version
+  `c7d2d544-563a-4ae4-bea5-011fa767fccf`; `/health` reported
+  `published_at=2026-07-02T00:38:14.774Z`.
+- Online focused API check, full online dictionary regression, and online render
+  focused check passed after deployment.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

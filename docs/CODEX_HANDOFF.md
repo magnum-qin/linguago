@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v69
+Current production dictionary source of truth is Cloudflare D1 v2. The v70
 baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v69-a6000-source-gap-94"`
-- Worker version `e8314f3b-d20e-42b2-a4cc-4670006370fd`
-- `/health` counts: `entries=23644`, `senses=29161`,
-  `sense_localizations=116644`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v70-source-gap-99"`
+- Worker version `c7d2d544-563a-4ae4-bea5-011fa767fccf`
+- `/health` counts: `entries=23743`, `senses=29260`,
+  `sense_localizations=117040`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-01T05:20:42.529Z`
+- D1 `published_at`: `2026-07-02T00:38:14.774Z`
 
 `worker/dictionary.ts` still contains multiple adapters:
 
@@ -115,6 +115,13 @@ The v69 A6000 source-gap follow-up used `a6000-143` and `a6000-147`
 accepted `94` senses and left `7` source-term mismatches in draft review
 (`罷/霸`, `臺/苔`, `赴/敷`, `濟/積`, `扬/洋`, `ouvinte/ouvintes`,
 `bisavô/bisavó`).
+
+The v70 source-gap follow-up fixed an over-broad pre-generation skip rule so
+Chinese source gaps with English glosses containing `one's` are not treated as
+English possessive/demonstrative entries. A 20-row A6000 dry-run accepted all
+`17/17` generated rows after three already-complete pt-BR rows were skipped.
+The 100-row draft apply accepted `99/100`; deterministic promote accepted all
+`99` draft senses.
 
 ## Frontend Constraints
 
