@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v71
+Current production dictionary source of truth is Cloudflare D1 v2. The v72
 baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v71-source-gap-98"`
-- Worker version `8474ca2e-6a2c-4347-a963-4c817ece67cb`
-- `/health` counts: `entries=23841`, `senses=29358`,
-  `sense_localizations=117432`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v72-four-node-source-gap-116"`
+- Worker version `d205cbae-27c2-4bd3-be2b-bc6f2078b561`
+- `/health` counts: `entries=23957`, `senses=29474`,
+  `sense_localizations=117896`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-02T01:03:18.149Z`
+- D1 `published_at`: `2026-07-02T11:20:40.928Z`
 
 `worker/dictionary.ts` still contains multiple adapters:
 
@@ -132,6 +132,18 @@ dry-run accepted `19/20` with only `audible` rejected, then the 100-row draft
 apply accepted `98/100` after skipping three already-complete rows.
 Deterministic promote accepted the `98` new draft senses. Product fast/full
 audits and online API/render checks passed after publishing.
+
+The v72 source-gap batch used all four active Unsloth nodes together:
+`a6000-143` / `a6000-147` with
+`unsloth/Qwen3.6-35B-A3B-MTP-GGUF` `UD-Q4_K_XL`, and `rtx4090-47` /
+`rtx4090-56` with the lower-memory 35B MTP variant. The A6000 half accepted
+`60/60`; the 4090 half selected `60`, skipped `3` already-linked complete
+source gaps, accepted `56`, and rejected `1` transient JSON parse failure
+(`touchy`). Deterministic promote accepted `116` new draft senses and `464`
+localizations. Product fast audit, published-risk audit, and full D1 native
+export audit passed. The export directory is
+`outputs/d1-v2-product-native-export-v72-four-node-source-gap-116`, with
+`entries=23957`, `senses=29474`, and `sense_localizations=117896`.
 
 ## Frontend Constraints
 

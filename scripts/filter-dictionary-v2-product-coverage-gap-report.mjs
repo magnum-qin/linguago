@@ -57,6 +57,10 @@ const blockKnownResiduals = args["block-known-residuals"] === "true";
 const traditionalToSimplified = strictZh ? OpenCC.Converter({ from: "tw", to: "cn" }) : null;
 const KNOWN_RESIDUAL_KEYS = new Set([
   "en|audible|n. a football play is changed orally after both teams have assumed their positions at the line of scrimmage\\na. heard or perceptible by the ear",
+  "en|maneuver|n. a military training exercise\\nn. a deliberate coordinated movement requiring dexterity and skill\\nn. a move made to gain a tactical end\\nv. act in order to achieve a certain goal\\nv. direct the course; determine the direction of travelling\\nv. perform a movement in military or naval tactics in order to secure an advantage in attack or defense",
+  "en|allegedly|r. according to what has been alleged",
+  "en|tram|v. travel by tram",
+  "en|minimal|a. the least possible",
   "pt-BR|ouvintes|audience",
   "pt-BR|bisavó|great-grandmother"
 ]);
@@ -240,6 +244,18 @@ function riskReason(row) {
   const latinLetters = normalizeLatinLetters(word);
   const latinOnly = /^[\p{Script=Latin}\s.'’_-]+$/u.test(word);
 
+  if (row?.source_lang === "en" && normalizedWord === "maneuver" && /\bmilitary training exercise\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
+  if (row?.source_lang === "en" && normalizedWord === "allegedly" && /\baccording to what has been alleged\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
+  if (row?.source_lang === "en" && normalizedWord === "tram" && /\btravel by tram\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
+  if (row?.source_lang === "en" && normalizedWord === "minimal" && /\bleast possible\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
   if (row?.source_lang === "en" && /^[A-Za-z]$/u.test(word)) return "latin_single_letter";
   if (row?.source_lang === "en" && /^[A-Z]{2,}$/u.test(word)) return "latin_acronym";
   if (row?.source_lang === "en" && /^[A-Z][a-z]+(?:[- ][A-Z][a-z]+)*$/u.test(word)) {
@@ -255,6 +271,7 @@ function riskReason(row) {
     /\b(surname|given name|family name|male name|female name|personal name|country|province|city|region|republic|administrative region|character from|monkey king)\b/u.test(
       gloss
     )
+    || /(?:女子名|男子名|人名)/u.test(gloss)
   ) {
     return "proper_name_gloss";
   }

@@ -5,13 +5,13 @@ const baseUrl = process.env.PWA_URL || "https://translation-pwa.qhzggzh-linguago
 const outDir = path.resolve("output/online-dictionary-focused-check");
 const langs = ["zh", "en", "pt-BR", "ja"];
 const expectedCounts = {
-  entries: 23841,
-  senses: 29358,
-  sense_localizations: 117432,
+  entries: 23957,
+  senses: 29474,
+  sense_localizations: 117896,
   examples: 3030,
   example_localizations: 11898
 };
-const traditionalSmokeChars = /[這個們來說時還後發麼與對會裡學開關體]/u;
+const traditionalSmokeChars = /[\u9019\u500b\u5011\u4f86\u8aaa\u6642\u9084\u5f8c\u767c\u807d\u8207\u5c0d\u6703\u8868\u5b78\u958b\u95dc\u9ad4]/u;
 
 const cases = [
   {

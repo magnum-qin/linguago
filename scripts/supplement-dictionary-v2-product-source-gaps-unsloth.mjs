@@ -874,6 +874,18 @@ function riskReason(row) {
   if (row.source_lang === "en" && normalize(word) === "audible" && /\bfootball play\b/u.test(gloss)) {
     return "known_source_term_residual";
   }
+  if (row.source_lang === "en" && normalize(word) === "maneuver" && /\bmilitary training exercise\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
+  if (row.source_lang === "en" && normalize(word) === "allegedly" && /\baccording to what has been alleged\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
+  if (row.source_lang === "en" && normalize(word) === "tram" && /\btravel by tram\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
+  if (row.source_lang === "en" && normalize(word) === "minimal" && /\bleast possible\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
   if (row.source_lang === "en" && /^[A-Za-z]$/u.test(word)) return "latin_single_letter";
   if (row.source_lang === "en" && /^[A-Z]{2,}$/u.test(word)) return "latin_acronym";
   if (row.source_lang === "en" && /^[A-Z][a-z]+(?:[- ][A-Z][a-z]+)*$/u.test(word)) {
@@ -881,7 +893,7 @@ function riskReason(row) {
   }
   if (latinOnly && normalizeLatinLetters(word).length <= 2) return "very_short_latin";
   if (/\b(letter of the roman alphabet|blood group|radioactive|unit used in printing)\b/u.test(gloss)) return "encyclopedic_or_symbol_gloss";
-  if (/\bsurname\b/u.test(gloss)) return "surname_gloss";
+  if (/\bsurname\b/u.test(gloss) || /(?:女子名|男子名|人名)/u.test(gloss)) return "surname_gloss";
   if (/^boa$/u.test(gloss) || normalize(word) === normalize(gloss)) return "gloss_repeats_word";
   if (row.source_lang === "en" && /\b(one's|possessive|demonstrative)\b/u.test(gloss)) {
     return "possessive_or_demonstrative";

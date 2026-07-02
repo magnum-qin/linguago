@@ -2358,6 +2358,37 @@ renumbers the entry's senses to `1..n`.
 - Online focused API check, full online dictionary regression, and online render
   focused check passed after deployment.
 
+### v72 Four-Node Source-Gap Batch
+
+- A fresh v71 coverage gap report was generated as
+  `logs/product-coverage-gaps-current-v71.json`, then filtered to
+  `logs/product-coverage-gaps-clean-high-value-balanced-v72-160-first0-r4.json`.
+  The final clean report selected 160 candidates after blocking repeated
+  residuals such as `audible`, `maneuver`, `allegedly`, `tram`, and `minimal`.
+- The 20-row verification pass split work across the four available Unsloth
+  nodes. `a6000-143` and `a6000-147` used
+  `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` / `UD-Q4_K_XL` and accepted `20/20`.
+  `rtx4090-47` and `rtx4090-56` used the 4090-safe 35B MTP deployment and
+  accepted `18/20`; the rejected `tram` and `minimal` rows were added to the
+  residual block list before the apply pass.
+- The formal apply batch inserted draft rows from both halves: A6000 accepted
+  `60/60`, while 4090 selected `60`, skipped `3` already-complete source gaps,
+  accepted `56`, and rejected one transient JSON parse failure (`touchy`).
+- Deterministic promote accepted `116` new source-gap draft senses and `464`
+  localizations. Product fast audit, published-risk audit, and full D1 native
+  export audit passed; `duplicate_sense_localizations=98` remains a
+  non-blocking warning.
+- Full product D1 native export was written to
+  `outputs/d1-v2-product-native-export-v72-four-node-source-gap-116`.
+- Export counts: `entries=23957`, `senses=29474`,
+  `sense_localizations=117896`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v72-four-node-source-gap-116"`.
+- D1 was pushed and the Worker was deployed as version
+  `d205cbae-27c2-4bd3-be2b-bc6f2078b561`; `/health` reported
+  `published_at=2026-07-02T11:20:40.928Z`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:
