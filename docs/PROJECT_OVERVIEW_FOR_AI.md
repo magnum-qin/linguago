@@ -17,9 +17,9 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
-Current dictionary baseline after the v72 four-node source-gap batch is D1 v2
-with cache version `v72-four-node-source-gap-116` and export counts
-`entries=23957`, `senses=29474`, `sense_localizations=117896`,
+Current dictionary baseline after the v73 four-node source-gap batch is D1 v2
+with cache version `v73-four-node-source-gap-97` and export counts
+`entries=24054`, `senses=29571`, `sense_localizations=118284`,
 `examples=3030`, and `example_localizations=11898`.
 
 ## Read These First

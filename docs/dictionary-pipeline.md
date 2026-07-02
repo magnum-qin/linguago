@@ -2389,6 +2389,35 @@ renumbers the entry's senses to `1..n`.
   `d205cbae-27c2-4bd3-be2b-bc6f2078b561`; `/health` reported
   `published_at=2026-07-02T11:20:40.928Z`.
 
+### v73 Four-Node Source-Gap Batch
+
+- A fresh v72 coverage gap report was generated as
+  `logs/product-coverage-gaps-current-v72.json`. With strict filtering and
+  `min-first-sense-langs=0`, the clean report
+  `logs/product-coverage-gaps-clean-high-value-balanced-v73-200-first0-r1.json`
+  selected `137` candidates: `134` English and `3` pt-BR. No zh or ja
+  candidates passed the current strict quality gates.
+- The 20-row dry-run split the work across A6000 143/147 and 4090 47/56 and
+  accepted `20/20`.
+- The 100-row draft apply selected `100`, skipped `3` already-linked complete
+  source gaps, generated `97`, accepted `97`, and rejected `0`. A6000 handled
+  `47` accepted rows after `3` skips; 4090 handled `50` accepted rows.
+- Deterministic promote accepted all `97` new draft senses and `388`
+  localizations. The seven older source-term mismatch drafts remained in
+  review. Product fast audit, published-risk audit, and full product D1 native
+  export audit passed; `duplicate_sense_localizations=98` remains a
+  non-blocking warning.
+- Full product D1 native export was written to
+  `outputs/d1-v2-product-native-export-v73-four-node-source-gap-97`.
+- Export counts: `entries=24054`, `senses=29571`,
+  `sense_localizations=118284`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v73-four-node-source-gap-97"`.
+- D1 was pushed and the Worker was deployed as version
+  `1ac2e9a2-b452-4ed9-b714-97a5eabb4014`; `/health` reported
+  `published_at=2026-07-02T11:35:54.965Z`.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

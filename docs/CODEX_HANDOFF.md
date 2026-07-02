@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v72
+Current production dictionary source of truth is Cloudflare D1 v2. The v73
 baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v72-four-node-source-gap-116"`
-- Worker version `d205cbae-27c2-4bd3-be2b-bc6f2078b561`
-- `/health` counts: `entries=23957`, `senses=29474`,
-  `sense_localizations=117896`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v73-four-node-source-gap-97"`
+- Worker version `1ac2e9a2-b452-4ed9-b714-97a5eabb4014`
+- `/health` counts: `entries=24054`, `senses=29571`,
+  `sense_localizations=118284`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-02T11:20:40.928Z`
+- D1 `published_at`: `2026-07-02T11:35:54.965Z`
 
 `worker/dictionary.ts` still contains multiple adapters:
 
@@ -144,6 +144,17 @@ localizations. Product fast audit, published-risk audit, and full D1 native
 export audit passed. The export directory is
 `outputs/d1-v2-product-native-export-v72-four-node-source-gap-116`, with
 `entries=23957`, `senses=29474`, and `sense_localizations=117896`.
+
+The v73 source-gap batch repeated the same four-node split after regenerating
+coverage gaps from v72. The strict clean filter produced `137` candidates:
+`134` English and `3` pt-BR. A 20-row dry-run accepted `20/20`; the 100-row
+apply selected `100`, skipped `3` already-linked complete rows, generated `97`,
+accepted `97`, and rejected `0`. Deterministic promote accepted all `97` new
+draft senses and `388` localizations, while the seven older source-term
+mismatch residual drafts remain in review. Product fast audit, published-risk
+audit, and full D1 native export audit passed. The export directory is
+`outputs/d1-v2-product-native-export-v73-four-node-source-gap-97`, with
+`entries=24054`, `senses=29571`, and `sense_localizations=118284`.
 
 ## Frontend Constraints
 
