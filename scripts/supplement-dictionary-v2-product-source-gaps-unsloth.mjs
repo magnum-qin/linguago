@@ -871,8 +871,14 @@ function riskReason(row) {
     .trim()
     .toLowerCase();
   const latinOnly = /^[\p{Script=Latin}\s.'’-]+$/u.test(word);
+  if (row.source_lang === "en" && normalize(word) === "audible" && /\bfootball play\b/u.test(gloss)) {
+    return "known_source_term_residual";
+  }
   if (row.source_lang === "en" && /^[A-Za-z]$/u.test(word)) return "latin_single_letter";
   if (row.source_lang === "en" && /^[A-Z]{2,}$/u.test(word)) return "latin_acronym";
+  if (row.source_lang === "en" && /^[A-Z][a-z]+(?:[- ][A-Z][a-z]+)*$/u.test(word)) {
+    return "english_capitalized_proper_like";
+  }
   if (latinOnly && normalizeLatinLetters(word).length <= 2) return "very_short_latin";
   if (/\b(letter of the roman alphabet|blood group|radioactive|unit used in printing)\b/u.test(gloss)) return "encyclopedic_or_symbol_gloss";
   if (/\bsurname\b/u.test(gloss)) return "surname_gloss";

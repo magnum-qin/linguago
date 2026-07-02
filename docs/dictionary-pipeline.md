@@ -2321,6 +2321,43 @@ renumbers the entry's senses to `1..n`.
 - Online focused API check, full online dictionary regression, and online render
   focused check passed after deployment.
 
+### v71 Source-Gap Batch
+
+- A fresh v70 coverage gap report was generated as
+  `logs/product-coverage-gaps-current-v70.json`, then filtered to
+  `logs/product-coverage-gaps-clean-high-value-balanced-v71-120-first0-r4.json`.
+  Candidate filtering was tightened to reject English capitalized proper-like
+  headwords and zh rows whose gloss is only a Latin proper name. The repeated
+  `audible` football-play residual was added to the known residual block list
+  for generic source-gap batches.
+- The strict v71 filter found no clean zh candidates under the current quality
+  gates. The 120 clean candidates were mostly English high-value source gaps
+  with three already-complete pt-BR rows still present in the report.
+- A 20-row A6000 dry-run on `a6000-143` and `a6000-147` with Unsloth
+  `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` / `UD-Q4_K_XL` accepted `19/20`. The
+  only failure was the known `audible` `term_language_zh` residual.
+- The 100-row draft apply selected `100`, skipped `3` already-complete rows,
+  generated `100`, accepted `98`, and rejected `2` (`maneuver`,
+  `allegedly`). It inserted 98 draft entries/senses and 392 localizations.
+- Deterministic promote scanned 105 draft rows, promoted the 98 new v71 senses
+  and 392 localizations, and left the seven older source-term mismatch drafts
+  in review.
+- Product fast audit, published-risk audit, and full product D1 native export
+  audit passed after promotion. `duplicate_sense_localizations=98` remains a
+  non-blocking warning.
+- Full product D1 native export was written to
+  `outputs/d1-v2-product-native-export-v71-source-gap-98`.
+- Export counts: `entries=23841`, `senses=29358`,
+  `sense_localizations=117432`, `examples=3030`,
+  `example_localizations=11898`.
+- Worker cache version was bumped to
+  `TRANSLATION_CACHE_VERSION = "v71-source-gap-98"`.
+- D1 was pushed and the Worker was deployed as version
+  `8474ca2e-6a2c-4347-a963-4c817ece67cb`; `/health` reported
+  `published_at=2026-07-02T01:03:18.149Z`.
+- Online focused API check, full online dictionary regression, and online render
+  focused check passed after deployment.
+
 ## Database
 
 The new four-language, sense-aligned SQLite / Cloudflare D1-compatible schema is in:

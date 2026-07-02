@@ -56,6 +56,7 @@ const strictZh = args["strict-zh"] === "true";
 const blockKnownResiduals = args["block-known-residuals"] === "true";
 const traditionalToSimplified = strictZh ? OpenCC.Converter({ from: "tw", to: "cn" }) : null;
 const KNOWN_RESIDUAL_KEYS = new Set([
+  "en|audible|n. a football play is changed orally after both teams have assumed their positions at the line of scrimmage\\na. heard or perceptible by the ear",
   "pt-BR|ouvintes|audience",
   "pt-BR|bisavó|great-grandmother"
 ]);
@@ -170,6 +171,9 @@ function strictZhRejectReasons(row) {
   if (/\b(see|short for|original form|synonym of|variant of|alternative form|J\.R\.R|Tolkien|county|district|city)\b/iu.test(gloss)) {
     reasons.push("strict_zh_redirect_or_proper_gloss");
   }
+  if (/^[A-Z][a-z]+(?:[- ][A-Z][a-z]+)*$/u.test(gloss)) {
+    reasons.push("strict_zh_latin_proper_name_gloss");
+  }
   if (/[縣區市]/u.test(gloss) || /\[[A-Z][A-Za-z0-9]+\d/u.test(gloss)) {
     reasons.push("strict_zh_proper_name_gloss");
   }
@@ -238,6 +242,9 @@ function riskReason(row) {
 
   if (row?.source_lang === "en" && /^[A-Za-z]$/u.test(word)) return "latin_single_letter";
   if (row?.source_lang === "en" && /^[A-Z]{2,}$/u.test(word)) return "latin_acronym";
+  if (row?.source_lang === "en" && /^[A-Z][a-z]+(?:[- ][A-Z][a-z]+)*$/u.test(word)) {
+    return "english_capitalized_proper_like";
+  }
   if ((row?.source_lang === "en" || row?.source_lang === "pt-BR") && latinOnly && latinLetters.length <= 2) {
     return "very_short_latin";
   }

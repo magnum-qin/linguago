@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v70
+Current production dictionary source of truth is Cloudflare D1 v2. The v71
 baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v70-source-gap-99"`
-- Worker version `c7d2d544-563a-4ae4-bea5-011fa767fccf`
-- `/health` counts: `entries=23743`, `senses=29260`,
-  `sense_localizations=117040`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v71-source-gap-98"`
+- Worker version `8474ca2e-6a2c-4347-a963-4c817ece67cb`
+- `/health` counts: `entries=23841`, `senses=29358`,
+  `sense_localizations=117432`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-02T00:38:14.774Z`
+- D1 `published_at`: `2026-07-02T01:03:18.149Z`
 
 `worker/dictionary.ts` still contains multiple adapters:
 
@@ -122,6 +122,16 @@ English possessive/demonstrative entries. A 20-row A6000 dry-run accepted all
 `17/17` generated rows after three already-complete pt-BR rows were skipped.
 The 100-row draft apply accepted `99/100`; deterministic promote accepted all
 `99` draft senses.
+
+The v71 source-gap follow-up tightened candidate filtering again: English
+capitalized proper-like headwords and zh candidates whose gloss is only a
+Latin proper name are filtered out, and the repeated `audible` football-play
+residual is blocked for generic batches. The strict v71 filter found no clean
+zh candidates; the batch was mostly English high-value gaps. A 20-row A6000
+dry-run accepted `19/20` with only `audible` rejected, then the 100-row draft
+apply accepted `98/100` after skipping three already-complete rows.
+Deterministic promote accepted the `98` new draft senses. Product fast/full
+audits and online API/render checks passed after publishing.
 
 ## Frontend Constraints
 

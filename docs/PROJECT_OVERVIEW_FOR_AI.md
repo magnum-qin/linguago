@@ -216,14 +216,14 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v70:
+The current online D1 baseline is v71:
 
-- Worker cache version: `v70-source-gap-99`.
-- Worker version: `c7d2d544-563a-4ae4-bea5-011fa767fccf`.
-- Published counts: `entries=23743`, `senses=29260`,
-  `sense_localizations=117040`, `examples=3030`,
+- Worker cache version: `v71-source-gap-98`.
+- Worker version: `8474ca2e-6a2c-4347-a963-4c817ece67cb`.
+- Published counts: `entries=23841`, `senses=29358`,
+  `sense_localizations=117432`, `examples=3030`,
   `example_localizations=11898`.
-- D1 `published_at`: `2026-07-02T00:38:14.774Z`.
+- D1 `published_at`: `2026-07-02T01:03:18.149Z`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
@@ -254,6 +254,14 @@ The current online D1 baseline is v70:
   generated rows after three already-complete pt-BR rows were skipped; the
   100-row draft apply accepted `99/100`, and deterministic promote accepted all
   `99` draft senses.
+- The v71 follow-up tightened the source-gap filter to remove English
+  capitalized proper-like headwords and zh rows whose gloss is only a Latin
+  proper name. It also blocks the repeated `audible` football-play residual
+  from generic batches. The strict v71 filter found no clean zh candidates, so
+  the batch was mostly English high-value gaps. The A6000 20-row dry-run
+  accepted `19/20`; the 100-row draft apply accepted `98/100` after three
+  already-complete rows were skipped, and deterministic promote accepted all
+  `98` new draft senses.
 
 Source-gap generation flow:
 
