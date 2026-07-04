@@ -92,7 +92,7 @@
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "wrangler": "^4.103.0"
+    "wrangler": "^4.107.0"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",

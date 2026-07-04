@@ -17,10 +17,17 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
-Current dictionary baseline after the v73 four-node source-gap batch is D1 v2
-with cache version `v73-four-node-source-gap-97` and export counts
-`entries=24054`, `senses=29571`, `sense_localizations=118284`,
+Current dictionary baseline after the v74 WikDict/OMW source-gap batch is D1 v2
+with cache version `v74-wikdict-omw-source-gap-112` and export counts
+`entries=24233`, `senses=29750`, `sense_localizations=119000`,
 `examples=3030`, and `example_localizations=11898`.
+
+The source evidence DB used for coverage-gap selection now includes WikDict and
+Open Multilingual Wordnet in addition to ECDICT, CC-CEDICT, JMdict, Kaikki
+Chinese, and FreeDict. WikDict and OMW are evidence sources only: they help
+select high-value missing entries and provide cross-language hints, but their
+rows must still go through LLM draft generation, deterministic validation, and
+promote before they can affect production D1.
 
 ## Read These First
 
@@ -221,14 +228,14 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v71:
+The current online D1 baseline is v74:
 
-- Worker cache version: `v71-source-gap-98`.
-- Worker version: `8474ca2e-6a2c-4347-a963-4c817ece67cb`.
-- Published counts: `entries=23841`, `senses=29358`,
-  `sense_localizations=117432`, `examples=3030`,
+- Worker cache version: `v74-wikdict-omw-source-gap-112`.
+- Worker version: `b82b58f2-44a8-4231-9062-0dce22a9cab2`.
+- Published counts: `entries=24233`, `senses=29750`,
+  `sense_localizations=119000`, `examples=3030`,
   `example_localizations=11898`.
-- D1 `published_at`: `2026-07-02T01:03:18.149Z`.
+- D1 `published_at`: `2026-07-04T05:23:11.867Z`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
@@ -267,6 +274,21 @@ The current online D1 baseline is v71:
   accepted `19/20`; the 100-row draft apply accepted `98/100` after three
   already-complete rows were skipped, and deterministic promote accepted all
   `98` new draft senses.
+- v72 and v73 used all four active Unsloth nodes together and published clean
+  D1 baselines. v73 promoted `97` new source-gap senses.
+- v74 added WikDict and OMW as
+  source evidence, exposed significant candidate noise, and tightened filters
+  for pt-BR homographs/inflected forms, Japanese single-character or offensive
+  residuals, and Traditional Chinese residuals. The current local work has
+  promoted `112` v74 source-gap senses in total (`69` in the first batch and
+  `43` in the follow-up), moved the remaining source mismatches and
+  `parado/stale` to review, and left local `publishable.senses=29750` with
+  `flagged_senses=0`. A refreshed native product D1 export passed full audit
+  with `entries=24233`, `senses=29750`, and `sense_localizations=119000`, then
+  was pushed to D1 and deployed as the current online production baseline.
+- `wrangler` is now `4.107.0`; `4.103.0` failed on D1 `execute --file` imports
+  with Cloudflare API auth code `10000`, while ordinary D1 commands still
+  worked.
 
 Source-gap generation flow:
 
@@ -275,6 +297,13 @@ Source-gap generation flow:
 3. Apply only to draft/needs-review rows.
 4. Promote only through deterministic validation.
 5. Run product fast/full audits and online focused checks before publishing.
+
+For post-v74 WikDict/OMW batches, use stricter input gates:
+
+- Treat WikDict/OMW as evidence only; never publish raw source rows.
+- Prefer `--strict-zh true` for Chinese source-gap reports.
+- Exclude Japanese single-character/stem candidates from automatic batches.
+- Stop and add residual filters whenever dry-run reveals homograph drift.
 
 ## UI Constraints
 

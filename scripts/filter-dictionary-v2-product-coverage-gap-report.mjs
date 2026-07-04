@@ -62,6 +62,11 @@ const KNOWN_RESIDUAL_KEYS = new Set([
   "en|tram|v. travel by tram",
   "en|minimal|a. the least possible",
   "pt-BR|ouvintes|audience",
+  "pt-BR|seja|are",
+  "pt-BR|ama|lady",
+  "ja|だめ|ruin",
+  "ja|だめ|ruin, spoil",
+  "ja|わけ|difficulty; obstacle",
   "pt-BR|bisavó|great-grandmother"
 ]);
 
@@ -256,9 +261,40 @@ function riskReason(row) {
   if (row?.source_lang === "en" && normalizedWord === "minimal" && /\bleast possible\b/u.test(gloss)) {
     return "known_source_term_residual";
   }
+  if (
+    (row?.source_lang === "pt-BR" && ["seja", "ama"].includes(normalizedWord))
+    || (row?.source_lang === "ja" && ["だめ", "わけ"].includes(normalizedWord))
+  ) {
+    return "known_source_term_residual";
+  }
+  if (
+    (row?.source_lang === "pt-BR" && ["acha", "minutos", "num"].includes(normalizedWord))
+    || (row?.source_lang === "zh" && ["听听", "总会", "出身"].includes(normalizedWord))
+    || (row?.source_lang === "ja" && ["思", "いま", "ピーター"].includes(normalizedWord))
+  ) {
+    return "known_source_term_residual";
+  }
+  if (row?.source_lang === "ja" && [...word].length === 1) return "ja_single_character_source_gap";
+  if (row?.source_lang === "ja" && ["っけ", "受け取", "忘れ", "あいつ", "クソ", "アホ", "いったい"].includes(word)) {
+    return "known_source_term_residual";
+  }
+  if (
+    row?.source_lang === "pt-BR"
+    && ["abra", "apesar", "aposto", "babaca", "branca", "conosco", "dos", "esse", "falo", "for", "indo", "irão", "leva", "levante", "maldita", "pega", "pego", "perca", "porra", "possa", "quer", "regras", "sai", "sei", "trata"].includes(
+      normalizedWord
+    )
+  ) {
+    return "known_source_term_residual";
+  }
+  if (row?.source_lang === "zh" && ["說說", "布洛克", "新书", "要做", "樂部"].includes(word)) {
+    return "known_source_term_residual";
+  }
+  if (row?.source_lang === "ja" && ["いく", "きみ", "たま", "ほんと", "やつ", "アーロン", "ウィル", "ウソ", "ウォルター", "ジェイソン", "ベイビー", "見張"].includes(word)) {
+    return "known_source_term_residual";
+  }
   if (row?.source_lang === "en" && /^[A-Za-z]$/u.test(word)) return "latin_single_letter";
-  if (row?.source_lang === "en" && /^[A-Z]{2,}$/u.test(word)) return "latin_acronym";
-  if (row?.source_lang === "en" && /^[A-Z][a-z]+(?:[- ][A-Z][a-z]+)*$/u.test(word)) {
+  if ((row?.source_lang === "en" || row?.source_lang === "pt-BR") && /^[A-Z]{2,}$/u.test(word)) return "latin_acronym";
+  if ((row?.source_lang === "en" || row?.source_lang === "pt-BR") && /^[A-Z][a-z]+(?:[- ][A-Z][a-z]+)*$/u.test(word)) {
     return "english_capitalized_proper_like";
   }
   if ((row?.source_lang === "en" || row?.source_lang === "pt-BR") && latinOnly && latinLetters.length <= 2) {
@@ -268,13 +304,14 @@ function riskReason(row) {
     return "encyclopedic_or_symbol_gloss";
   }
   if (
-    /\b(surname|given name|family name|male name|female name|personal name|country|province|city|region|republic|administrative region|character from|monkey king)\b/u.test(
+    /\b(surname|given name|male given name|female given name|family name|male name|female name|personal name|country|province|city|region|republic|administrative region|character from|monkey king|mythology|god of|goddess|prophet|poet|painter|composer|writer|novelist|statesman|emperor|king of|queen of|president of|capital of)\b/u.test(
       gloss
     )
     || /(?:女子名|男子名|人名)/u.test(gloss)
   ) {
     return "proper_name_gloss";
   }
+  if (/\b(terms of abuse|offensive term|vulgar|derogatory|slur|the fuck|fuck|shit|dumbass|bastard|idiot|excrement)\b/u.test(gloss)) return "offensive_or_abuse_term";
   if ((row?.source_lang === "zh" || row?.source_lang === "ja") && isMostlyRomanizedCjkNameGloss(gloss)) {
     return "romanized_cjk_proper_name_gloss";
   }

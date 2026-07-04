@@ -8,6 +8,21 @@ import zlib from "node:zlib";
 
 const LANGUAGE_CODES = new Set(["en", "zh", "ja", "pt-BR"]);
 const DEFAULT_DB = "data/processed/linguago_v2_staging.db";
+const WIKDICT_PAIRS = [
+  ["en", "zh"],
+  ["zh", "en"],
+  ["en", "ja"],
+  ["ja", "en"],
+  ["en", "pt"],
+  ["pt", "en"],
+  ["zh", "ja"],
+  ["ja", "zh"],
+  ["zh", "pt"],
+  ["pt", "zh"],
+  ["ja", "pt"],
+  ["pt", "ja"]
+];
+const WIKDICT_SOURCE_KEYS = WIKDICT_PAIRS.map(([from, to]) => `wikdict-${from}-${to}`);
 const DEFAULT_SOURCES = ["ecdict", "kaikki-zh", "cedict", "jmdict", "freedict-eng-por", "freedict-por-eng"];
 
 const args = parseArgs(process.argv.slice(2));
@@ -59,6 +74,7 @@ const importers = {
   "kaikki-zh": importKaikkiChinese,
   cedict: importCcCedict,
   jmdict: importJmDict,
+  "omw-30": importOpenMultilingualWordnet,
   "freedict-eng-por": (options) =>
     importFreeDict({
       ...options,
@@ -80,6 +96,20 @@ const importers = {
       targetLang: "en"
     })
 };
+
+for (const [from, to] of WIKDICT_PAIRS) {
+  const sourceKey = `wikdict-${from}-${to}`;
+  importers[sourceKey] = (options) =>
+    importWikDict({
+      ...options,
+      sourceKey,
+      sourceName: `WikDict ${from}-${to}`,
+      sourceUrl: `https://download.wikdict.com/dictionaries/sqlite/2/${from}-${to}.sqlite3`,
+      file: `data/raw/wikdict/${from}-${to}.sqlite3`,
+      sourceLang: normalizeSourceLang(from),
+      targetLang: normalizeSourceLang(to)
+    });
+}
 
 const summary = [];
 for (const sourceName of sourceNames) {
@@ -396,6 +426,252 @@ async function importFreeDict({ limit, sourceKey, sourceName, sourceUrl, file, s
   return { entries, senses, target_lang: targetLang };
 }
 
+async function importWikDict({ limit, sourceKey, sourceName, sourceUrl, file, sourceLang, targetLang }) {
+  const sourceId = ensureSource({
+    source_key: sourceKey,
+    source_name: sourceName,
+    source_url: sourceUrl,
+    license: "Wiktionary-derived; see WikDict upstream metadata",
+    metadata_json: compactJson({
+      type: "wikdict-sqlite",
+      file,
+      source_lang: sourceLang,
+      target_lang: targetLang,
+      role: "translation-evidence"
+    })
+  });
+
+  const sourcePath = path.resolve(file);
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`Missing WikDict sqlite file for ${sourceKey}: ${sourcePath}`);
+  }
+
+  const sourceDb = new Database(sourcePath, { readonly: true, fileMustExist: true });
+  const rows = sourceDb
+    .prepare(
+      `
+        SELECT
+          rowid,
+          lexentry,
+          sense_num,
+          sense,
+          written_rep,
+          trans_list,
+          score,
+          is_good,
+          importance
+        FROM translation
+        WHERE COALESCE(written_rep, '') <> ''
+          AND COALESCE(trans_list, '') <> ''
+        ORDER BY written_rep, rowid
+        ${limit ? "LIMIT @limit" : ""}
+      `
+    )
+    .all(limit ? { limit } : {});
+
+  const senseOrderByEntry = new Map();
+  const insertMany = db.transaction((items) => {
+    for (const item of items) {
+      insertSourceEntry(item.entry);
+      const sourceEntryId = getSourceEntryId(sourceId, item.entry.source_entry_key);
+      insertSourceSense({
+        source_entry_id: sourceEntryId,
+        source_sense_key: item.sense.source_sense_key,
+        sense_order: item.sense.sense_order,
+        part_of_speech: item.sense.part_of_speech,
+        gloss: item.sense.gloss,
+        raw_json: item.sense.raw_json
+      });
+    }
+  });
+
+  const items = [];
+  let skipped = 0;
+  for (const row of rows) {
+    const word = cleanWikDictText(row.written_rep);
+    const translations = splitWikDictTranslations(row.trans_list)
+      .map(cleanWikDictText)
+      .filter((translation) => isUsefulWikDictText(translation, targetLang))
+      .slice(0, 12);
+
+    if (!isUsefulWikDictText(word, sourceLang) || !translations.length) {
+      skipped++;
+      continue;
+    }
+
+    const sourceEntryKey = normalizeKey(word);
+    const senseOrder = (senseOrderByEntry.get(sourceEntryKey) || 0) + 1;
+    senseOrderByEntry.set(sourceEntryKey, senseOrder);
+    const translationGloss = translations.join("; ");
+    const raw = {
+      target_lang: targetLang,
+      translations,
+      wikdict: {
+        rowid: row.rowid,
+        lexentry: row.lexentry,
+        sense_num: row.sense_num,
+        sense: cleanWikDictText(row.sense),
+        score: row.score,
+        is_good: row.is_good,
+        importance: row.importance
+      }
+    };
+
+    items.push({
+      entry: {
+        source_id: sourceId,
+        source_entry_key: sourceEntryKey,
+        word,
+        normalized_key: sourceEntryKey,
+        lang: sourceLang,
+        raw_json: compactJson({
+          word,
+          target_lang: targetLang,
+          source_file: path.basename(file)
+        })
+      },
+      sense: {
+        source_sense_key: `${sourceEntryKey}:${senseOrder}:${hashText(translationGloss)}`,
+        sense_order: senseOrder,
+        part_of_speech: null,
+        gloss: translationGloss,
+        raw_json: compactJson(raw)
+      }
+    });
+  }
+
+  insertMany(items);
+  sourceDb.close();
+  return {
+    entries: new Set(items.map((item) => item.entry.source_entry_key)).size,
+    senses: items.length,
+    skipped,
+    target_lang: targetLang
+  };
+}
+
+async function importOpenMultilingualWordnet({ limit }) {
+  const sourceKey = "omw-30";
+  const sourceId = ensureSource({
+    source_key: sourceKey,
+    source_name: "Open Multilingual Wordnet 1.x / PWN 3.0 aligned",
+    source_url: "https://github.com/omwn/omw-data",
+    license: "mixed open WordNet licenses; see OMW source metadata",
+    metadata_json: compactJson({
+      type: "omw-tab",
+      role: "concept-aligned-multilingual-evidence",
+      files: {
+        en: "data/raw/omw/wn-data-eng.tab",
+        zh: "data/raw/omw/wn-data-cmn.tab",
+        ja: "data/raw/omw/wn-data-jpn.tab",
+        "pt-BR": "data/raw/omw/wn-data-por.tab"
+      }
+    })
+  });
+
+  const files = [
+    { lang: "en", file: "data/raw/omw/wn-data-eng.tab" },
+    { lang: "zh", file: "data/raw/omw/wn-data-cmn.tab" },
+    { lang: "ja", file: "data/raw/omw/wn-data-jpn.tab" },
+    { lang: "pt-BR", file: "data/raw/omw/wn-data-por.tab" }
+  ];
+  const synsets = new Map();
+  let skipped = 0;
+
+  for (const { lang, file } of files) {
+    const filePath = path.resolve(file);
+    if (!fs.existsSync(filePath)) throw new Error(`Missing OMW tab file: ${filePath}`);
+    const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/u);
+    for (const line of lines) {
+      if (!line || line.startsWith("#")) continue;
+      const parts = line.split("\t");
+      if (parts.length < 3) {
+        skipped++;
+        continue;
+      }
+      const synset = cleanText(parts[0]);
+      const valueType = cleanText(parts[1]);
+      const lemma = cleanOwmLemma(parts.slice(2).join("\t"), lang);
+      if (!synset || !valueType.endsWith("lemma") || !isUsefulWikDictText(lemma, lang)) {
+        skipped++;
+        continue;
+      }
+      const bucket = synsets.get(synset) || { synset, pos: synset.split("-").pop(), localizations: new Map() };
+      const terms = bucket.localizations.get(lang) || [];
+      if (!terms.includes(lemma) && terms.length < 8) terms.push(lemma);
+      bucket.localizations.set(lang, terms);
+      synsets.set(synset, bucket);
+    }
+  }
+
+  const sourceSenseOrder = new Map();
+  const items = [];
+  for (const concept of synsets.values()) {
+    const langs = [...concept.localizations.keys()];
+    if (langs.length < 2) continue;
+    const localizations = Object.fromEntries([...concept.localizations.entries()].map(([lang, terms]) => [lang, terms]));
+    for (const [lang, terms] of concept.localizations.entries()) {
+      for (const term of terms.slice(0, 4)) {
+        const entryKey = `${lang}:${normalizeKey(term)}`;
+        const senseOrder = (sourceSenseOrder.get(entryKey) || 0) + 1;
+        sourceSenseOrder.set(entryKey, senseOrder);
+        const gloss = buildOwmGloss(localizations, lang);
+        items.push({
+          entry: {
+            source_id: sourceId,
+            source_entry_key: entryKey,
+            word: term,
+            normalized_key: normalizeKey(term),
+            lang,
+            raw_json: compactJson({
+              term,
+              lang,
+              synset_counted_source: "omw"
+            })
+          },
+          sense: {
+            source_sense_key: `${entryKey}:${concept.synset}`,
+            sense_order: senseOrder,
+            part_of_speech: omwPartOfSpeech(concept.pos),
+            gloss,
+            raw_json: compactJson({
+              synset: concept.synset,
+              localizations,
+              concept_langs: Object.keys(localizations)
+            })
+          }
+        });
+        if (limit && items.length >= limit) break;
+      }
+      if (limit && items.length >= limit) break;
+    }
+    if (limit && items.length >= limit) break;
+  }
+
+  const insertMany = db.transaction((batch) => {
+    for (const item of batch) {
+      insertSourceEntry(item.entry);
+      const sourceEntryId = getSourceEntryId(sourceId, item.entry.source_entry_key);
+      insertSourceSense({
+        source_entry_id: sourceEntryId,
+        source_sense_key: item.sense.source_sense_key,
+        sense_order: item.sense.sense_order,
+        part_of_speech: item.sense.part_of_speech,
+        gloss: item.sense.gloss,
+        raw_json: item.sense.raw_json
+      });
+    }
+  });
+
+  insertMany(items);
+  return {
+    entries: new Set(items.map((item) => item.entry.source_entry_key)).size,
+    senses: items.length,
+    concepts: synsets.size,
+    skipped
+  };
+}
+
 function ensureSource(source) {
   statements.upsertSource.run(source);
   return statements.getSource.get(source.source_key).id;
@@ -449,8 +725,71 @@ function normalizeKey(value) {
   return cleanText(value).normalize("NFKC").toLocaleLowerCase();
 }
 
+function normalizeSourceLang(lang) {
+  if (lang === "pt") return "pt-BR";
+  if (!LANGUAGE_CODES.has(lang)) throw new Error(`Unsupported source lang: ${lang}`);
+  return lang;
+}
+
 function cleanText(value) {
   return String(value || "").replace(/\s+/gu, " ").trim();
+}
+
+function cleanWikDictText(value) {
+  return cleanText(value)
+    .replace(/^['"]+|['"]+$/gu, "")
+    .replace(/^\(([^)]+)\)$/u, "$1")
+    .trim();
+}
+
+function splitWikDictTranslations(value) {
+  return cleanText(value)
+    .split(/[;,]\s*|\s*\|\s*/u)
+    .map(cleanWikDictText)
+    .filter(Boolean);
+}
+
+function isUsefulWikDictText(value, lang) {
+  const text = cleanWikDictText(value);
+  if (!text) return false;
+  if (/^[-'’]/u.test(text)) return false;
+  if (/&[#A-Za-z0-9]+;/u.test(text)) return false;
+  if (/[<>]/u.test(text)) return false;
+  if (/^[\p{P}\p{S}\s]+$/u.test(text)) return false;
+  if ((lang === "en" || lang === "pt-BR") && !/[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(text)) return false;
+  if (lang === "zh" && !/[\u3400-\u9fff]/u.test(text)) return false;
+  if (lang === "ja" && !/[\u3040-\u30ff\u3400-\u9fff]/u.test(text)) return false;
+  return true;
+}
+
+function hashText(value) {
+  let hash = 2166136261;
+  for (const char of String(value || "")) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function buildOwmGloss(localizations, sourceLang) {
+  return Object.entries(localizations)
+    .filter(([lang]) => lang !== sourceLang)
+    .map(([lang, terms]) => `${lang}: ${asArray(terms).slice(0, 4).join("; ")}`)
+    .join(" | ");
+}
+
+function cleanOwmLemma(value, lang) {
+  const text = cleanText(value).replace(/_/gu, " ");
+  if (lang === "zh" || lang === "ja") return text.replace(/\+/gu, "");
+  return text.replace(/\+/gu, " ");
+}
+
+function omwPartOfSpeech(pos) {
+  if (pos === "n") return "noun";
+  if (pos === "v") return "verb";
+  if (pos === "a" || pos === "s") return "adjective";
+  if (pos === "r") return "adverb";
+  return null;
 }
 
 function compactJson(value) {

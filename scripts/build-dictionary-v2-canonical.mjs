@@ -168,11 +168,12 @@ const buildRows = db.transaction((rows) => {
       confidence: 1
     });
 
-    const localization = toSenseLocalization(row, senseId);
-    if (localization) {
+    const localizations = toSenseLocalizations(row, senseId);
+    for (const localization of localizations) {
       const localizationInsert = statements.insertLocalization.run(localization);
       stats.localizations += localizationInsert.changes;
     }
+    const localization = localizations[0] || null;
 
     for (const [index, example] of extractExamples(row).entries()) {
       const exampleInsert = statements.insertExample.run({
@@ -262,23 +263,57 @@ function toCanonicalSense(row, entryId, senseOrder) {
   };
 }
 
-function toSenseLocalization(row, senseId) {
+function toSenseLocalizations(row, senseId) {
   const entryRaw = parseJson(row.entry_raw_json);
   const senseRaw = parseJson(row.sense_raw_json);
   const lang = normalizeLang(row.lang);
+  const omwLocalizations = toOwmSenseLocalizations(row, senseId, senseRaw);
+  if (omwLocalizations.length) return omwLocalizations;
+
   const translatedLocalization = toTranslatedSenseLocalization(row, senseId, senseRaw);
-  if (translatedLocalization) return translatedLocalization;
+  if (translatedLocalization) {
+    const sourceLocalization = toSourceTranslationEvidenceLocalization(row, senseId, entryRaw, senseRaw, lang);
+    return sourceLocalization && sourceLocalization.lang !== translatedLocalization.lang
+      ? [sourceLocalization, translatedLocalization]
+      : [translatedLocalization];
+  }
 
   const definition = cleanText(row.gloss);
   if (!definition || !definitionMatchesLang(definition, lang)) {
-    return null;
+    return [];
   }
   const readingInfo = extractReading(row.source_key, entryRaw, senseRaw, lang);
+  return [
+    {
+      sense_id: senseId,
+      lang,
+      term: extractTerm(row, entryRaw, senseRaw),
+      normalized_term: normalizeKey(extractTerm(row, entryRaw, senseRaw)),
+      reading: readingInfo.reading,
+      reading_system: readingInfo.reading_system,
+      pronunciation: readingInfo.pronunciation,
+      pronunciation_system: readingInfo.pronunciation_system,
+      definition,
+      usage_note: null,
+      source: row.source_key,
+      confidence: defaultConfidence(row.source_key),
+      needs_review: row.source_key === "ecdict" ? 1 : 0
+    }
+  ];
+}
+
+function toSourceTranslationEvidenceLocalization(row, senseId, entryRaw, senseRaw, lang) {
+  if (!row.source_key.startsWith("wikdict-")) return null;
+  const translations = asArray(senseRaw.translations).map(cleanText).filter(Boolean);
+  const definition = translations.join("; ");
+  if (!definition) return null;
+  const readingInfo = extractReading(row.source_key, entryRaw, senseRaw, lang);
+  const term = extractTerm(row, entryRaw, senseRaw);
   return {
     sense_id: senseId,
     lang,
-    term: extractTerm(row, entryRaw, senseRaw),
-    normalized_term: normalizeKey(extractTerm(row, entryRaw, senseRaw)),
+    term,
+    normalized_term: normalizeKey(term),
     reading: readingInfo.reading,
     reading_system: readingInfo.reading_system,
     pronunciation: readingInfo.pronunciation,
@@ -287,12 +322,39 @@ function toSenseLocalization(row, senseId) {
     usage_note: null,
     source: row.source_key,
     confidence: defaultConfidence(row.source_key),
-    needs_review: row.source_key === "ecdict" ? 1 : 0
+    needs_review: 0
   };
 }
 
+function toOwmSenseLocalizations(row, senseId, senseRaw) {
+  if (row.source_key !== "omw-30") return [];
+  const rawLocalizations = senseRaw.localizations || {};
+  const localizations = [];
+  for (const lang of LANGUAGE_CODES) {
+    const terms = asArray(rawLocalizations[lang]).map(cleanText).filter(Boolean);
+    if (!terms.length) continue;
+    const term = terms.slice(0, 4).join("; ");
+    localizations.push({
+      sense_id: senseId,
+      lang,
+      term,
+      normalized_term: normalizeKey(terms[0]),
+      reading: null,
+      reading_system: null,
+      pronunciation: null,
+      pronunciation_system: null,
+      definition: terms.slice(0, 6).join("; "),
+      usage_note: senseRaw.synset ? `OMW synset ${senseRaw.synset}` : null,
+      source: row.source_key,
+      confidence: defaultConfidence(row.source_key),
+      needs_review: 0
+    });
+  }
+  return localizations;
+}
+
 function toTranslatedSenseLocalization(row, senseId, senseRaw) {
-  if (!row.source_key.startsWith("freedict-")) return null;
+  if (!row.source_key.startsWith("freedict-") && !row.source_key.startsWith("wikdict-")) return null;
   const targetLang = normalizeLang(senseRaw.target_lang);
   const translations = asArray(senseRaw.translations).map(cleanText).filter(Boolean);
   const term = firstText(translations);
@@ -495,6 +557,8 @@ function defaultConfidence(sourceKey) {
   if (sourceKey === "cc-cedict" || sourceKey === "jmdict") return 0.95;
   if (sourceKey === "kaikki-zh") return 0.85;
   if (sourceKey === "ecdict") return 0.75;
+  if (sourceKey === "omw-30") return 0.72;
+  if (sourceKey.startsWith("wikdict-")) return 0.62;
   return 0.5;
 }
 

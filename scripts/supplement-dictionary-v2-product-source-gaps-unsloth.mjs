@@ -552,6 +552,7 @@ function buildCompactPrompt(row) {
     "Use the exact headword as the source-language term.",
     "If source language is zh or ja, en.term and pt-BR.term must be translated dictionary terms in English and Portuguese, not hanzi, kana, pinyin, or the original source spelling.",
     "If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.",
+    "Use one coherent dictionary sense only. WikDict/OMW evidence can contain homographs from unrelated languages; never mix unrelated senses such as Portuguese verb forms with English area unit 'are'.",
     "Definitions must be natural explanations in the same language as the localization; do not copy the English meaning gloss as a definition for other languages.",
     "For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term.",
     "gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.",
@@ -577,6 +578,7 @@ function buildCompactBatchPrompt(rows) {
     "Use exact headword as the source-language term. Use Simplified Chinese for zh. Use kana for ja reading. Use IPA for en and pt-BR.",
     "If source language is zh or ja, en.term and pt-BR.term must be translated dictionary terms in English and Portuguese, not hanzi, kana, pinyin, or the original source spelling.",
     "If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.",
+    "Use one coherent dictionary sense only. WikDict/OMW evidence can contain homographs from unrelated languages; never mix unrelated senses such as Portuguese verb forms with English area unit 'are'.",
     "Definitions must be natural explanations in the same language as the localization; do not copy the English meaning gloss as a definition for other languages.",
     "For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term.",
     "gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.",
@@ -639,6 +641,8 @@ function validateOutput(row, output) {
   if (row.source_lang !== "en" && gloss && enTerm && normalize(enTerm) === normalize(row.word) && normalize(enTerm) !== normalize(gloss)) {
     errors.push("en_term_copies_non_english_source");
   }
+  const knownMismatch = knownSemanticMismatch(row, output);
+  if (knownMismatch) errors.push(knownMismatch);
   return { errors };
 }
 
@@ -668,6 +672,60 @@ function normalizeGeneratedOutput(row, output) {
     };
   }
   return normalized;
+}
+
+function knownSemanticMismatch(row, output) {
+  const key = `${row.source_lang}|${normalize(row.word)}|${normalize(output.gloss_key || "")}`;
+  const enTerm = normalize(output.localizations?.en?.term || "");
+  const zhTerm = normalize(output.localizations?.zh?.term || "");
+  const jaTerm = normalize(output.localizations?.ja?.term || "");
+  const ptTerm = normalize(output.localizations?.["pt-BR"]?.term || "");
+  const word = normalize(row.word);
+
+  if (row.source_lang === "pt-BR" && ["acha", "minutos", "num"].includes(word)) {
+    return "known_semantic_mismatch_pt_residual";
+  }
+  if (
+    row.source_lang === "pt-BR"
+    && ["abra", "apesar", "aposto", "babaca", "branca", "conosco", "dos", "esse", "falo", "for", "indo", "irão", "leva", "levante", "maldita", "pega", "pego", "perca", "porra", "possa", "quer", "regras", "sai", "sei", "trata"].includes(word)
+  ) {
+    return "known_semantic_mismatch_pt_residual";
+  }
+  if (row.source_lang === "zh" && ["听听", "总会", "出身"].includes(word)) {
+    return "known_semantic_mismatch_zh_residual";
+  }
+  if (row.source_lang === "ja" && ["思", "いま", "ピーター"].includes(word)) {
+    return "known_semantic_mismatch_ja_residual";
+  }
+  if (row.source_lang === "ja" && [...String(row.word || "").trim()].length === 1) {
+    return "known_semantic_mismatch_ja_single_character";
+  }
+  if (row.source_lang === "ja" && ["っけ", "受け取", "忘れ", "あいつ", "クソ", "アホ", "いったい"].includes(word)) {
+    return "known_semantic_mismatch_ja_residual";
+  }
+  if (row.source_lang === "zh" && ["說說", "布洛克", "新书", "要做", "樂部"].includes(word)) {
+    return "known_semantic_mismatch_zh_residual";
+  }
+  if (row.source_lang === "ja" && ["いく", "きみ", "たま", "ほんと", "やつ", "アーロン", "ウィル", "ウソ", "ウォルター", "ジェイソン", "ベイビー", "見張"].includes(word)) {
+    return "known_semantic_mismatch_ja_residual";
+  }
+
+  if (row.source_lang === "pt-BR" && normalize(row.word) === "seja") {
+    if (enTerm === "are" || zhTerm === "公亩" || jaTerm === "アール") return "known_semantic_mismatch_pt_seja_are";
+  }
+  if (row.source_lang === "pt-BR" && normalize(row.word) === "ama") {
+    if (enTerm === "lady" || zhTerm === "女士" || jaTerm === "女性") return "known_semantic_mismatch_pt_ama_lady";
+  }
+  if (row.source_lang === "ja" && normalize(row.word) === "だめ") {
+    if (enTerm === "ruin" || enTerm === "spoil" || zhTerm === "毁坏") return "known_semantic_mismatch_ja_dame_ruin";
+  }
+  if (row.source_lang === "ja" && normalize(row.word) === "わけ") {
+    if (enTerm === "difficulty" || enTerm === "obstacle" || zhTerm === "困难") return "known_semantic_mismatch_ja_wake_difficulty";
+  }
+  if (key === "pt-br|seja|are" || key === "pt-br|ama|lady" || key === "ja|だめ|ruin" || key === "ja|わけ|difficulty; obstacle") {
+    return "known_source_gap_semantic_mismatch";
+  }
+  return "";
 }
 
 function isBroadGlossKey(value) {

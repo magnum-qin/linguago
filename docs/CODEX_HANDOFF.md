@@ -79,15 +79,18 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v73
-baseline was published with:
+Current production dictionary source of truth is Cloudflare D1 v2. The v74
+WikDict/OMW source-gap baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v73-four-node-source-gap-97"`
-- Worker version `1ac2e9a2-b452-4ed9-b714-97a5eabb4014`
-- `/health` counts: `entries=24054`, `senses=29571`,
-  `sense_localizations=118284`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v74-wikdict-omw-source-gap-112"`
+- Worker version `b82b58f2-44a8-4231-9062-0dce22a9cab2`
+- `/health` counts: `entries=24233`, `senses=29750`,
+  `sense_localizations=119000`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-02T11:35:54.965Z`
+- D1 `published_at`: `2026-07-04T05:23:11.867Z`
+- `wrangler` was upgraded to `4.107.0` because `4.103.0` returned Cloudflare
+  D1 import `Authentication error [code: 10000]` on `d1 execute --file`, while
+  D1 `--command` and `whoami` were healthy.
 
 `worker/dictionary.ts` still contains multiple adapters:
 
@@ -155,6 +158,50 @@ mismatch residual drafts remain in review. Product fast audit, published-risk
 audit, and full D1 native export audit passed. The export directory is
 `outputs/d1-v2-product-native-export-v73-four-node-source-gap-97`, with
 `entries=24054`, `senses=29571`, and `sense_localizations=118284`.
+
+The post-v73 source evidence DB has been expanded with WikDict and Open
+Multilingual Wordnet:
+
+- WikDict SQLite pairs are stored in `data/raw/wikdict/` for all 12 directions
+  among EN, ZH, JA, and PT.
+- OMW tab files are stored in `data/raw/omw/` for `eng`, `cmn`, `jpn`, and
+  `por`.
+- `scripts/import-dictionary-sources-v2.mjs` supports `wikdict-*` sources and
+  `omw-30`.
+- `scripts/build-dictionary-v2-canonical.mjs` emits multiple
+  `sense_localizations` for translation-evidence sources, so coverage gap can
+  see WikDict target translations and OMW synset-aligned lemmas.
+- The refreshed coverage reports are
+  `logs/product-coverage-gaps-v74-wikdict-omw.json` and
+  `logs/product-coverage-gaps-clean-high-value-balanced-v74-wikdict-omw-500.json`.
+
+Treat WikDict and OMW as source evidence, not publishable dictionary content.
+They improve gap selection, but LLM generation must still write draft rows and
+pass deterministic promote before D1 publication.
+
+The first v74 WikDict/OMW source-gap pass has been published to D1. Important
+results:
+
+- Initial broad candidate generation showed that WikDict/OMW improve coverage
+  but add noisy homograph evidence, especially pt-BR inflected forms, Japanese
+  single-character/stem rows, offensive slang, and Traditional Chinese residuals.
+- The filter and Unsloth validator now block known residuals such as
+  `seja/are`, `ama/lady`, `acha/battle axe`, `minutos/proceedings`,
+  `possa/whitethorn`, `for/for loop`, `pega/magpie`, `听听`, `总会`,
+  `出身`, `いま/today`, `思`, `ピーター`, and noisy Japanese single
+  character source gaps.
+- The successful local v74 batches used all four Unsloth endpoints. The first
+  batch wrote `100` generated rows to draft, manually blocked `30` noisy draft
+  senses, and promoted `69` clean draft senses. The follow-up promoted another
+  `43` clean draft senses after moving `ouvintes`, `bisavó`, Chinese
+  source-mismatch residuals, and `parado/stale` to review.
+- Current local product fast audit after v74 has `publishable.senses=29750`;
+  published-risk remains `flagged_senses=0`.
+- A refreshed native product D1 export was pushed and full export audit passed
+  with `entries=24233`, `senses=29750`, and
+  `sense_localizations=119000`.
+- Next coverage-gap runs should prefer `--strict-zh true` for Chinese source
+  gaps and continue small-batch draft/promote review before any D1 publish.
 
 ## Frontend Constraints
 
