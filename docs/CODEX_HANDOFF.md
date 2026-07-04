@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v77
+Current production dictionary source of truth is Cloudflare D1 v2. The v78
 WikDict/OMW source-gap baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v77-wikdict-omw-source-gap-78"`
-- Worker version `ae59903a-8383-4b6a-b2ee-91d6624d850d`
-- `/health` counts: `entries=24485`, `senses=30002`,
-  `sense_localizations=120008`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v78-wikdict-omw-source-gap-81"`
+- Worker version `da4a5c4a-866d-421b-ad38-ab10e24c8ec6`
+- `/health` counts: `entries=24566`, `senses=30083`,
+  `sense_localizations=120332`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-04T10:46:26.599Z`
+- D1 `published_at`: `2026-07-04T11:04:06.414Z`
 - `wrangler` was upgraded to `4.107.0` because `4.103.0` returned Cloudflare
   D1 import `Authentication error [code: 10000]` on `d1 execute --file`, while
   D1 `--command` and `whoami` were healthy.
@@ -223,6 +223,15 @@ results:
   full D1 native export audit, online dictionary regression, focused API check,
   and render focused check passed. The published D1 export counts are
   `entries=24485`, `senses=30002`, and `sense_localizations=120008`.
+- The v78 follow-up continued the strict post-v77 filter with all four Unsloth
+  endpoints, added the new rejected/review residuals to the filter, accepted
+  `98/100` generated rows in the 100-row apply batch, rejected `rancor` and
+  `center`, moved `15` risky or source-term mismatch drafts to `needs_review`,
+  and promoted `81` clean source-gap draft senses. Product fast audit,
+  published-risk audit, full D1 native export audit, online dictionary
+  regression, focused API check, and render focused check passed. The published
+  D1 export counts are `entries=24566`, `senses=30083`, and
+  `sense_localizations=120332`.
 - Next coverage-gap runs should prefer `--strict-zh true` for Chinese source
   gaps and continue small-batch draft/promote review before any D1 publish.
 
