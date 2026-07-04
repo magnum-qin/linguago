@@ -276,7 +276,7 @@ function riskReason(row) {
   }
   if (
     row?.source_lang === "pt-BR"
-    && ["aceite", "acorda", "bicha", "cole", "mínima", "observando", "promotoria", "saí", "stone", "tento"].includes(normalizedWord)
+    && ["aceite", "acorda", "bicha", "blá", "coca", "colegial", "cole", "mínima", "observando", "promotoria", "saí", "stone", "tento"].includes(normalizedWord)
   ) {
     return "known_source_term_residual";
   }

@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v76
+Current production dictionary source of truth is Cloudflare D1 v2. The v77
 WikDict/OMW source-gap baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v76-wikdict-omw-source-gap-83"`
-- Worker version `1bde54d8-8416-4a76-a013-624840922ae6`
-- `/health` counts: `entries=24407`, `senses=29924`,
-  `sense_localizations=119696`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v77-wikdict-omw-source-gap-78"`
+- Worker version `ae59903a-8383-4b6a-b2ee-91d6624d850d`
+- `/health` counts: `entries=24485`, `senses=30002`,
+  `sense_localizations=120008`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-04T10:28:15.297Z`
+- D1 `published_at`: `2026-07-04T10:46:26.599Z`
 - `wrangler` was upgraded to `4.107.0` because `4.103.0` returned Cloudflare
   D1 import `Authentication error [code: 10000]` on `d1 execute --file`, while
   D1 `--command` and `whoami` were healthy.
@@ -215,6 +215,14 @@ results:
   audit, online dictionary regression, focused API check, and render focused
   check passed. The published D1 export counts are `entries=24407`,
   `senses=29924`, and `sense_localizations=119696`.
+- The v77 follow-up repeated the strict post-v76 filter with all four Unsloth
+  endpoints, added `blá`, `coca`, and `colegial` to the residual blocklist,
+  accepted `97/100` generated rows, rejected `fax`, `cuzão`, and `quites`,
+  conservatively moved `17` risky draft senses to `needs_review`, and promoted
+  `78` clean source-gap draft senses. Product fast audit, published-risk audit,
+  full D1 native export audit, online dictionary regression, focused API check,
+  and render focused check passed. The published D1 export counts are
+  `entries=24485`, `senses=30002`, and `sense_localizations=120008`.
 - Next coverage-gap runs should prefer `--strict-zh true` for Chinese source
   gaps and continue small-batch draft/promote review before any D1 publish.
 
