@@ -315,6 +315,19 @@ The current online D1 baseline is v78:
   regression, focused API check, and render focused check passed. The deployed
   D1 counts are `entries=24566`, `senses=30083`, and
   `sense_localizations=120332`.
+- v79 is prepared but not yet generated. The current local clean report is
+  `logs/product-coverage-gaps-clean-high-value-balanced-v79-strict-r7-500.json`
+  with `500` source-gap candidates: `pt-BR=209` and `ja=291`. Strict filters
+  found no clean zh/en candidates under the current evidence gate. The r7
+  filter adds stronger pt-BR residual blocking, offensive gloss blocking, and
+  Japanese Katakana proper-name filtering. Ready dry-run queues are
+  `logs/product-source-gap-select-only-v79-r7-pt-30.json` and
+  `logs/product-source-gap-select-only-v79-r7-ja-30.json`.
+- v79 generation is currently blocked because `100.99.99.99` is unreachable:
+  the four Unsloth ports `11441`, `11444`, `11447`, `11448`, plus dashboard
+  port `18080`, all time out. After the Tailscale/port-forward route is back,
+  run the r7 20-30 row dry-run first, then only apply drafts if the accepted
+  rate is healthy and validation errors are not systematic.
 - `wrangler` is now `4.107.0`; `4.103.0` failed on D1 `execute --file` imports
   with Cloudflare API auth code `10000`, while ordinary D1 commands still
   worked.

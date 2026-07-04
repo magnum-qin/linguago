@@ -232,6 +232,18 @@ results:
   regression, focused API check, and render focused check passed. The published
   D1 export counts are `entries=24566`, `senses=30083`, and
   `sense_localizations=120332`.
+- The post-v78 v79 source-gap preparation is local-only so far. The clean r7
+  report is `logs/product-coverage-gaps-clean-high-value-balanced-v79-strict-r7-500.json`
+  with `500` candidates: `pt-BR=209`, `ja=291`, `zh=0`, `en=0`. The strict
+  filter now blocks more pt-BR residuals, offensive glosses, and Japanese
+  Katakana proper-name noise such as `Rachel`, `Matthew`, `Thea`, and
+  `Edo language`. The ready select-only queues are
+  `logs/product-source-gap-select-only-v79-r7-pt-30.json` and
+  `logs/product-source-gap-select-only-v79-r7-ja-30.json`.
+- The v79 Unsloth dry-run is blocked by connectivity, not model quality:
+  `100.99.99.99:11441`, `11444`, `11447`, `11448`, and dashboard port `18080`
+  currently time out. When the Tailscale/port-forward path is restored, rerun a
+  20-30 row dry-run against the r7 report before any draft apply.
 - Next coverage-gap runs should prefer `--strict-zh true` for Chinese source
   gaps and continue small-batch draft/promote review before any D1 publish.
 
