@@ -376,6 +376,9 @@ function riskReason(row) {
     return "romanized_cjk_proper_name_gloss";
   }
   if (/\b(brand|trademark|company|corporation|facebook|dvd|bmw)\b/u.test(gloss)) return "brand_or_acronym_gloss";
+  if (row?.source_lang === "ja" && /^[\p{Script=Katakana}ー・]+$/u.test(word) && /\b[A-Z][\p{L}.'-]* language\b/u.test(rawGloss)) {
+    return "ja_katakana_proper_name";
+  }
   if (/\b(variant of|alternative form of|alternative name for|obsolete form of|archaic form of|old variant)\b/u.test(gloss)) {
     return "variant_or_alternative_form";
   }
@@ -416,7 +419,7 @@ function isKatakanaProperNameLike(word, gloss) {
   const cleaned = text.replace(/\b(?:en|pt-BR|pt|zh|ja):\s*/giu, "").replace(/[|,;]+/gu, " ").trim();
   const tokens = cleaned.split(/\s+/u).filter(Boolean);
   if (!tokens.length || tokens.length > 6) return false;
-  return tokens.every((token) => /^[A-Z][a-zA-Z.'-]*$/u.test(token));
+  return tokens.every((token) => /^\p{Lu}[\p{L}.'-]*$/u.test(token));
 }
 
 function qualityBucket(row) {
