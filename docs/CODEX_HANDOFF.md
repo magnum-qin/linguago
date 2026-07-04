@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v74
+Current production dictionary source of truth is Cloudflare D1 v2. The v76
 WikDict/OMW source-gap baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v74-wikdict-omw-source-gap-112"`
-- Worker version `b82b58f2-44a8-4231-9062-0dce22a9cab2`
-- `/health` counts: `entries=24233`, `senses=29750`,
-  `sense_localizations=119000`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v76-wikdict-omw-source-gap-83"`
+- Worker version `1bde54d8-8416-4a76-a013-624840922ae6`
+- `/health` counts: `entries=24407`, `senses=29924`,
+  `sense_localizations=119696`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-04T05:23:11.867Z`
+- D1 `published_at`: `2026-07-04T10:28:15.297Z`
 - `wrangler` was upgraded to `4.107.0` because `4.103.0` returned Cloudflare
   D1 import `Authentication error [code: 10000]` on `d1 execute --file`, while
   D1 `--command` and `whoami` were healthy.
@@ -200,6 +200,21 @@ results:
 - A refreshed native product D1 export was pushed and full export audit passed
   with `entries=24233`, `senses=29750`, and
   `sense_localizations=119000`.
+- The v75 follow-up used all four Unsloth endpoints on the post-v74 gap report,
+  promoted `91` clean source-gap draft senses, and kept `8` source-mismatch or
+  low-confidence rows in `needs_review` (`sai/saí`, `mínima`, `tento`,
+  `aceite`, `acorda`, `cole`, `promotoria`, `observando`). Product fast audit,
+  published-risk audit, full D1 native export audit, online focused API check,
+  online dictionary regression, and render focused check passed. The published
+  D1 export counts are `entries=24324`, `senses=29841`, and
+  `sense_localizations=119364`.
+- The v76 follow-up used all four Unsloth endpoints again on the post-v75 gap
+  report, accepted `97/100` generated rows, conservatively moved `14`
+  semantically risky rows to `needs_review`, and promoted `83` clean source-gap
+  draft senses. Product fast audit, published-risk audit, full D1 native export
+  audit, online dictionary regression, focused API check, and render focused
+  check passed. The published D1 export counts are `entries=24407`,
+  `senses=29924`, and `sense_localizations=119696`.
 - Next coverage-gap runs should prefer `--strict-zh true` for Chinese source
   gaps and continue small-batch draft/promote review before any D1 publish.
 

@@ -274,6 +274,12 @@ function riskReason(row) {
   ) {
     return "known_source_term_residual";
   }
+  if (
+    row?.source_lang === "pt-BR"
+    && ["aceite", "acorda", "bicha", "cole", "mínima", "observando", "promotoria", "saí", "stone", "tento"].includes(normalizedWord)
+  ) {
+    return "known_source_term_residual";
+  }
   if (row?.source_lang === "ja" && [...word].length === 1) return "ja_single_character_source_gap";
   if (row?.source_lang === "ja" && ["っけ", "受け取", "忘れ", "あいつ", "クソ", "アホ", "いったい"].includes(word)) {
     return "known_source_term_residual";
@@ -311,7 +317,7 @@ function riskReason(row) {
   ) {
     return "proper_name_gloss";
   }
-  if (/\b(terms of abuse|offensive term|vulgar|derogatory|slur|the fuck|fuck|shit|dumbass|bastard|idiot|excrement)\b/u.test(gloss)) return "offensive_or_abuse_term";
+  if (/\b(terms of abuse|offensive term|vulgar|derogatory|slur|the fuck|fuck|shit|dumbass|dipshit|bastard|idiot|excrement|bitch|brokeback|porn|porno|whore)\b/u.test(gloss)) return "offensive_or_abuse_term";
   if ((row?.source_lang === "zh" || row?.source_lang === "ja") && isMostlyRomanizedCjkNameGloss(gloss)) {
     return "romanized_cjk_proper_name_gloss";
   }
@@ -378,6 +384,8 @@ function compactRejected(row, reasons) {
 function sourceScriptOk(word, lang) {
   const text = String(word || "").trim();
   if (!text) return false;
+  if ((lang === "en" || lang === "pt-BR") && /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text)) return false;
+  if (containsKnownMojibakeChars(text)) return false;
   const hasLatin = /\p{Script=Latin}/u.test(text);
   const hasHan = /\p{Script=Han}/u.test(text);
   const hasHiragana = /\p{Script=Hiragana}/u.test(text);
@@ -393,6 +401,7 @@ function hasBadEncoding(value, lang) {
   const text = String(value || "").trim();
   if (!text) return false;
   if (/[\uFFFD]/u.test(text)) return true;
+  if (containsKnownMojibakeChars(text)) return true;
   if (/[锟絔]/u.test(text)) return true;
   if (/(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u.test(text)) return true;
   if (/[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u.test(text)) return true;
@@ -401,6 +410,10 @@ function hasBadEncoding(value, lang) {
   if (lang === "zh" && /[閵夐妵閵圿]/u.test(text)) return true;
   if (lang === "ja" && /[閸旈崙閸熼崗閻╃拠鐠愭禍婢归弰閺夊璁砞]/u.test(text)) return true;
   return false;
+}
+
+function containsKnownMojibakeChars(text) {
+  return /[谩茅煤莽铆贸茫锚锛锜鍕囨暍鐨澶ц儐鏈夎儐閲忕殑銇仾仆亞亜伆伨]/u.test(String(text || ""));
 }
 
 function normalize(value) {

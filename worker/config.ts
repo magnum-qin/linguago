@@ -91,7 +91,7 @@ export const MODEL_OPTIONS: Record<Provider, string[]> = {
   deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"]
 };
 
-export const TRANSLATION_CACHE_VERSION = "v74-wikdict-omw-source-gap-112";
+export const TRANSLATION_CACHE_VERSION = "v76-wikdict-omw-source-gap-83";
 export const PREVIEW_TIMEOUT_MS = 10_000;
 export const FULL_TRANSLATION_TIMEOUT_MS = 30_000;
 export const MAX_INPUT_CHARS = 1200;

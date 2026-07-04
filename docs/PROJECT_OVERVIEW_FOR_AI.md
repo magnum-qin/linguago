@@ -17,9 +17,9 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
-Current dictionary baseline after the v74 WikDict/OMW source-gap batch is D1 v2
-with cache version `v74-wikdict-omw-source-gap-112` and export counts
-`entries=24233`, `senses=29750`, `sense_localizations=119000`,
+Current dictionary baseline after the v76 WikDict/OMW source-gap batch is D1 v2
+with cache version `v76-wikdict-omw-source-gap-83` and export counts
+`entries=24407`, `senses=29924`, `sense_localizations=119696`,
 `examples=3030`, and `example_localizations=11898`.
 
 The source evidence DB used for coverage-gap selection now includes WikDict and
@@ -228,14 +228,14 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v74:
+The current online D1 baseline is v76:
 
-- Worker cache version: `v74-wikdict-omw-source-gap-112`.
-- Worker version: `b82b58f2-44a8-4231-9062-0dce22a9cab2`.
-- Published counts: `entries=24233`, `senses=29750`,
-  `sense_localizations=119000`, `examples=3030`,
+- Worker cache version: `v76-wikdict-omw-source-gap-83`.
+- Worker version: `1bde54d8-8416-4a76-a013-624840922ae6`.
+- Published counts: `entries=24407`, `senses=29924`,
+  `sense_localizations=119696`, `examples=3030`,
   `example_localizations=11898`.
-- D1 `published_at`: `2026-07-04T05:23:11.867Z`.
+- D1 `published_at`: `2026-07-04T10:28:15.297Z`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
@@ -285,7 +285,20 @@ The current online D1 baseline is v74:
   `parado/stale` to review, and left local `publishable.senses=29750` with
   `flagged_senses=0`. A refreshed native product D1 export passed full audit
   with `entries=24233`, `senses=29750`, and `sense_localizations=119000`, then
-  was pushed to D1 and deployed as the current online production baseline.
+  was pushed to D1 and deployed as a clean production baseline.
+- v75 continued the post-WikDict/OMW pass with all four Unsloth endpoints
+  (`a6000-143`, `a6000-147`, `rtx4090-47`, `rtx4090-56`), generated a 100-row
+  pt-BR/ja-heavy source-gap batch, promoted `91` clean draft senses, and kept
+  `8` source-mismatch or low-confidence rows in `needs_review`. Product fast
+  audit, published-risk audit, full D1 native export audit, online API check,
+  online dictionary regression, and render focused check passed.
+- v76 continued the post-WikDict/OMW pt-BR/ja-heavy pass with all four Unsloth
+  endpoints, accepted `97/100` generated rows, conservatively moved `14`
+  semantically risky rows to `needs_review`, promoted `83` clean draft senses,
+  and deployed D1 counts `entries=24407`, `senses=29924`, and
+  `sense_localizations=119696`. Product fast audit, published-risk audit, full
+  D1 native export audit, online dictionary regression, focused API check, and
+  render focused check passed.
 - `wrangler` is now `4.107.0`; `4.103.0` failed on D1 `execute --file` imports
   with Cloudflare API auth code `10000`, while ordinary D1 commands still
   worked.
