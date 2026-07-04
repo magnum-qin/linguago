@@ -285,13 +285,23 @@ function riskReason(row) {
       "blá",
       "brilhando",
       "chan",
+      "chapado",
       "coca",
       "colegial",
       "cole",
+      "constar",
+      "curva",
+      "curvas",
       "cuzão",
+      "escória",
       "estimação",
       "fax",
       "ferrado",
+      "fibras",
+      "grãos",
+      "japonesa",
+      "maricas",
+      "mexicana",
       "mínima",
       "observando",
       "pelado",
@@ -299,6 +309,10 @@ function riskReason(row) {
       "promotoria",
       "quites",
       "rancor",
+      "resíduos",
+      "reunidos",
+      "rola",
+      "ruiva",
       "saca",
       "sacanagem",
       "saí",
@@ -309,6 +323,7 @@ function riskReason(row) {
       "transa",
       "vice",
       "viciada",
+      "àquele",
       "center"
     ].includes(normalizedWord)
   ) {
@@ -337,6 +352,9 @@ function riskReason(row) {
   if ((row?.source_lang === "en" || row?.source_lang === "pt-BR") && /^[A-Z][a-z]+(?:[- ][A-Z][a-z]+)*$/u.test(word)) {
     return "english_capitalized_proper_like";
   }
+  if (row?.source_lang === "pt-BR" && /^\p{Lu}/u.test(word)) {
+    return "pt_capitalized_residual";
+  }
   if ((row?.source_lang === "en" || row?.source_lang === "pt-BR") && latinOnly && latinLetters.length <= 2) {
     return "very_short_latin";
   }
@@ -351,7 +369,7 @@ function riskReason(row) {
   ) {
     return "proper_name_gloss";
   }
-  if (/\b(terms of abuse|offensive term|vulgar|derogatory|slur|the fuck|fuck|shit|dumbass|dipshit|bastard|idiot|excrement|bitch|brokeback|porn|porno|whore)\b/u.test(gloss)) return "offensive_or_abuse_term";
+  if (/\b(terms of abuse|offensive term|vulgar|derogatory|slur|the fuck|fuck|fucking|shit|dumbass|dipshit|bastard|idiot|excrement|bitch|brokeback|porn|porno|whore)\b/u.test(gloss)) return "offensive_or_abuse_term";
   if ((row?.source_lang === "zh" || row?.source_lang === "ja") && isMostlyRomanizedCjkNameGloss(gloss)) {
     return "romanized_cjk_proper_name_gloss";
   }
@@ -361,6 +379,8 @@ function riskReason(row) {
   }
   if (/\b(only used in|used only in|used in|ancient name of)\b/u.test(gloss)) return "bound_or_rare_character_gloss";
   if (row?.source_lang === "en" && FUNCTION_GLOSSES.has(gloss)) return "english_function_gloss";
+  if (row?.source_lang === "pt-BR" && FUNCTION_GLOSSES.has(gloss)) return "pt_function_word";
+  if (row?.source_lang === "pt-BR" && ["yes"].includes(normalizedWord)) return "known_source_term_residual";
   if (normalize(gloss) === normalizedWord) return "gloss_repeats_word";
   if (row?.source_lang === "en" && /\b(one's|possessive|demonstrative)\b/u.test(gloss)) {
     return "english_possessive_or_demonstrative";
