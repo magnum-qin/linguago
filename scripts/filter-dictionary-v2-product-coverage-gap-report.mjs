@@ -244,7 +244,8 @@ function unmetLangTargets(rows, targets) {
 
 function riskReason(row) {
   const word = String(row?.word || "").trim();
-  const gloss = String(row?.gloss_key || row?.gloss_preview || "").normalize("NFKC").trim().toLowerCase();
+  const rawGloss = String(row?.gloss_key || row?.gloss_preview || "").normalize("NFKC").trim();
+  const gloss = rawGloss.toLowerCase();
   const normalizedWord = normalize(word);
   const latinLetters = normalizeLatinLetters(word);
   const latinOnly = /^[\p{Script=Latin}\s.'’_-]+$/u.test(word);
@@ -330,6 +331,7 @@ function riskReason(row) {
     return "known_source_term_residual";
   }
   if (row?.source_lang === "ja" && [...word].length === 1) return "ja_single_character_source_gap";
+  if (row?.source_lang === "ja" && isKatakanaProperNameLike(word, rawGloss)) return "ja_katakana_proper_name";
   if (row?.source_lang === "ja" && ["っけ", "受け取", "忘れ", "あいつ", "クソ", "アホ", "いったい"].includes(word)) {
     return "known_source_term_residual";
   }
@@ -369,7 +371,7 @@ function riskReason(row) {
   ) {
     return "proper_name_gloss";
   }
-  if (/\b(terms of abuse|offensive term|vulgar|derogatory|slur|the fuck|fuck|fucking|shit|dumbass|dipshit|bastard|idiot|excrement|bitch|brokeback|porn|porno|whore)\b/u.test(gloss)) return "offensive_or_abuse_term";
+  if (/\b(terms of abuse|offensive term|vulgar|derogatory|slur|the fuck|fuck|fucking|shit|asshole|dumbass|dipshit|bastard|idiot|excrement|bitch|brokeback|porn|porno|whore)\b/u.test(gloss)) return "offensive_or_abuse_term";
   if ((row?.source_lang === "zh" || row?.source_lang === "ja") && isMostlyRomanizedCjkNameGloss(gloss)) {
     return "romanized_cjk_proper_name_gloss";
   }
@@ -402,6 +404,19 @@ function isMostlyRomanizedCjkNameGloss(gloss) {
   const toneTokens = tokens.filter((token) => /^[a-züv]+[1-5]$/u.test(token));
   if (toneTokens.length !== tokens.length) return false;
   return tokens.some((token) => token === "shi4" || token === "xian4" || token === "sheng3" || token === "qu1");
+}
+
+function isKatakanaProperNameLike(word, gloss) {
+  const source = String(word || "").normalize("NFKC").trim();
+  const text = String(gloss || "").normalize("NFKC").trim();
+  if (!/^[\p{Script=Katakana}ー・]+$/u.test(source)) return false;
+  if (!text) return false;
+  if (/\b(noun|verb|adjective|adverb|interjection|pronoun)\b/iu.test(text)) return false;
+  if (/[\u3040-\u30ff\u3400-\u9fff]/u.test(text)) return false;
+  const cleaned = text.replace(/\b(?:en|pt-BR|pt|zh|ja):\s*/giu, "").replace(/[|,;]+/gu, " ").trim();
+  const tokens = cleaned.split(/\s+/u).filter(Boolean);
+  if (!tokens.length || tokens.length > 6) return false;
+  return tokens.every((token) => /^[A-Z][a-zA-Z.'-]*$/u.test(token));
 }
 
 function qualityBucket(row) {
