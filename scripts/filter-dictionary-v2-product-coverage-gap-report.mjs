@@ -276,7 +276,41 @@ function riskReason(row) {
   }
   if (
     row?.source_lang === "pt-BR"
-    && ["aceite", "acorda", "bicha", "blá", "coca", "colegial", "cole", "mínima", "observando", "promotoria", "saí", "stone", "tento"].includes(normalizedWord)
+    && [
+      "aceite",
+      "acorda",
+      "afim",
+      "ataca",
+      "bicha",
+      "blá",
+      "brilhando",
+      "chan",
+      "coca",
+      "colegial",
+      "cole",
+      "cuzão",
+      "estimação",
+      "fax",
+      "ferrado",
+      "mínima",
+      "observando",
+      "pelado",
+      "perpétua",
+      "promotoria",
+      "quites",
+      "rancor",
+      "saca",
+      "sacanagem",
+      "saí",
+      "stone",
+      "tento",
+      "terrestre",
+      "treinando",
+      "transa",
+      "vice",
+      "viciada",
+      "center"
+    ].includes(normalizedWord)
   ) {
     return "known_source_term_residual";
   }
