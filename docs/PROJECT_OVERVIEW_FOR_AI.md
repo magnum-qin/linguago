@@ -17,9 +17,9 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
-Current dictionary baseline after the v78 WikDict/OMW source-gap batch is D1 v2
-with cache version `v78-wikdict-omw-source-gap-81` and export counts
-`entries=24566`, `senses=30083`, `sense_localizations=120332`,
+Current dictionary baseline after the v79 WikDict/OMW source-gap batch is D1 v2
+with cache version `v79-source-gap-r7-97` and export counts
+`entries=24663`, `senses=30180`, `sense_localizations=120720`,
 `examples=3030`, and `example_localizations=11898`.
 
 The source evidence DB used for coverage-gap selection now includes WikDict and
@@ -228,14 +228,14 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v78:
+The current online D1 baseline is v79:
 
-- Worker cache version: `v78-wikdict-omw-source-gap-81`.
-- Worker version: `da4a5c4a-866d-421b-ad38-ab10e24c8ec6`.
-- Published counts: `entries=24566`, `senses=30083`,
-  `sense_localizations=120332`, `examples=3030`,
+- Worker cache version: `v79-source-gap-r7-97`.
+- Worker version: `a805568c-714b-4a31-830b-bf9ec9b16e86`.
+- Published counts: `entries=24663`, `senses=30180`,
+  `sense_localizations=120720`, `examples=3030`,
   `example_localizations=11898`.
-- D1 `published_at`: `2026-07-04T11:04:06.414Z`.
+- D1 `published_at`: `2026-07-05T09:12:12.870Z`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
@@ -315,19 +315,22 @@ The current online D1 baseline is v78:
   regression, focused API check, and render focused check passed. The deployed
   D1 counts are `entries=24566`, `senses=30083`, and
   `sense_localizations=120332`.
-- v79 is prepared but not yet generated. The current local clean report is
-  `logs/product-coverage-gaps-clean-high-value-balanced-v79-strict-r7-500.json`
-  with `500` source-gap candidates: `pt-BR=209` and `ja=291`. Strict filters
-  found no clean zh/en candidates under the current evidence gate. The r7
-  filter adds stronger pt-BR residual blocking, offensive gloss blocking, and
-  Japanese Katakana proper-name filtering. Ready dry-run queues are
-  `logs/product-source-gap-select-only-v79-r7-pt-30.json` and
-  `logs/product-source-gap-select-only-v79-r7-ja-30.json`.
-- v79 generation is currently blocked because `100.99.99.99` is unreachable:
-  the four Unsloth ports `11441`, `11444`, `11447`, `11448`, plus dashboard
-  port `18080`, all time out. After the Tailscale/port-forward route is back,
-  run the r7 20-30 row dry-run first, then only apply drafts if the accepted
-  rate is healthy and validation errors are not systematic.
+- v79 used the strict r7 source-gap report after adding stronger pt-BR residual
+  blocking, offensive gloss blocking, and Japanese Katakana proper-name
+  filtering. The pt-BR and ja dry-runs accepted `30/30` each, the 100-row draft
+  apply accepted all generated rows, and deterministic promote accepted `97`
+  clean source-gap senses. The rejected draft is ja `しろ` with
+  `gloss_key=Shiloh`, where the generated content drifted toward
+  `Battle of Shiloh`; keep it in review. Product fast audit, published-risk
+  audit, full D1 native export audit, online dictionary regression, focused API
+  check, and render focused check passed. The deployed D1 counts are
+  `entries=24663`, `senses=30180`, and `sense_localizations=120720`.
+- Direct `100.99.99.99:11441`, `11444`, `11447`, and `11448` access from this
+  workstation still fails with `Bad access`/timeout. Testing from lab-win shows
+  the Windows portproxy mappings and Unsloth backends are healthy, so the
+  likely blocker is Windows Firewall or Tailscale inbound policy. For v79,
+  temporary local SSH tunnels through lab-win were used instead of changing
+  persistent firewall rules.
 - `wrangler` is now `4.107.0`; `4.103.0` failed on D1 `execute --file` imports
   with Cloudflare API auth code `10000`, while ordinary D1 commands still
   worked.
