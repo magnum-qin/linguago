@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v79
+Current production dictionary source of truth is Cloudflare D1 v2. The v80
 WikDict/OMW source-gap baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v79-source-gap-r7-97"`
-- Worker version `a805568c-714b-4a31-830b-bf9ec9b16e86`
-- `/health` counts: `entries=24663`, `senses=30180`,
-  `sense_localizations=120720`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v80-source-gap-r3-89"`
+- Worker version `b7296b69-f125-47b3-beb9-6c027a5d0992`
+- `/health` counts: `entries=24752`, `senses=30269`,
+  `sense_localizations=121076`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-05T09:12:12.870Z`
+- D1 `published_at`: `2026-07-05T09:43:57.994Z`
 - `wrangler` was upgraded to `4.107.0` because `4.103.0` returned Cloudflare
   D1 import `Authentication error [code: 10000]` on `d1 execute --file`, while
   D1 `--command` and `whoami` were healthy.
@@ -246,6 +246,17 @@ results:
   to Windows Firewall or Tailscale inbound policy blocking external TCP to those
   ports. A local SSH tunnel through lab-win worked for v79 generation; do not
   add persistent firewall rules without explicit user approval.
+- The v80 batch was pushed and deployed. The strict r3 filter produced `423`
+  clean candidates. A 30-row dry-run accepted `30/30`, the 100-row draft apply
+  accepted `96/100`, and deterministic promote accepted `89` senses while
+  leaving `8` source-term mismatch drafts in review. Product fast audit,
+  published-risk audit, full native export audit, online dictionary regression,
+  focused API check, and render focused check passed. The published export is
+  `outputs/d1-v2-product-native-export-v80-r3-89`, with `entries=24752`,
+  `senses=30269`, and `sense_localizations=121076`. Wrangler `d1 execute
+  --file` still failed through Cloudflare's `/import` endpoint with auth code
+  `10000`; the D1 data was restored through `scripts/restore-d1-native-via-query.mjs`,
+  which batches the same SQL through D1's `/query` endpoint.
 - Next coverage-gap runs should prefer `--strict-zh true` for Chinese source
   gaps and continue small-batch draft/promote review before any D1 publish.
 

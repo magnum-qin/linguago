@@ -247,6 +247,28 @@ function riskReason(row) {
   const rawGloss = String(row?.gloss_key || row?.gloss_preview || "").normalize("NFKC").trim();
   const gloss = rawGloss.toLowerCase();
   const normalizedWord = normalize(word);
+  const knownResidualKey = `${row?.source_lang || ""}|${word}`;
+  if (
+    new Set([
+      "pt-BR|consertado",
+      "pt-BR|gritaria",
+      "pt-BR|pub",
+      "pt-BR|rod",
+      "pt-BR|sites",
+      "ja|カーク",
+      "ja|チャ",
+      "ja|ヒマ",
+      "zh|弗林特",
+      "zh|里格",
+      "zh|阿尔卑斯山",
+      "zh|老马"
+    ]).has(knownResidualKey)
+  ) {
+    return "known_source_term_residual";
+  }
+  if (/\b(mountain range|the alps)\b/u.test(gloss)) {
+    return "proper_name_gloss";
+  }
   const latinLetters = normalizeLatinLetters(word);
   const latinOnly = /^[\p{Script=Latin}\s.'’_-]+$/u.test(word);
 
