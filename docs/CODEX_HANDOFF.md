@@ -79,15 +79,15 @@ Supported providers are `auto`, `openrouter`, `dashscope`, `gemini`, and `deepse
 
 ## Dictionary Notes
 
-Current production dictionary source of truth is Cloudflare D1 v2. The v80
+Current production dictionary source of truth is Cloudflare D1 v2. The v81
 WikDict/OMW source-gap baseline was published with:
 
-- `TRANSLATION_CACHE_VERSION = "v80-source-gap-r3-89"`
-- Worker version `b7296b69-f125-47b3-beb9-6c027a5d0992`
-- `/health` counts: `entries=24752`, `senses=30269`,
-  `sense_localizations=121076`, `examples=3030`,
+- `TRANSLATION_CACHE_VERSION = "v81-source-gap-r1-96"`
+- Worker version `af20184d-2d73-47d4-b116-e5a5392e3a15`
+- `/health` counts: `entries=24847`, `senses=30364`,
+  `sense_localizations=121456`, `examples=3030`,
   `example_localizations=11898`
-- D1 `published_at`: `2026-07-05T09:43:57.994Z`
+- D1 `published_at`: `2026-07-07T05:05:29.385Z`
 - `wrangler` was upgraded to `4.107.0` because `4.103.0` returned Cloudflare
   D1 import `Authentication error [code: 10000]` on `d1 execute --file`, while
   D1 `--command` and `whoami` were healthy.
@@ -257,6 +257,22 @@ results:
   --file` still failed through Cloudflare's `/import` endpoint with auth code
   `10000`; the D1 data was restored through `scripts/restore-d1-native-via-query.mjs`,
   which batches the same SQL through D1's `/query` endpoint.
+- The v81 batch regenerated the post-v80 gap report, which found `595` gaps
+  after the first-sense completeness gate. The strict r1 filter left `333`
+  clean candidates (`pt-BR=76`, `zh=33`, `ja=224`). The source-gap validator
+  was fixed so pt-BR/English same-spelling loanwords are allowed when the word
+  appears in English source evidence, rather than being rejected as copied
+  source terms. After that fix, the 30-row dry-run accepted `30/30`, the 100-row
+  draft apply accepted `99/100`, and deterministic promote accepted `96`
+  senses while leaving `10` source-term mismatch drafts in review. The stale
+  accepted `aquecedor` draft with reviewed localizations was moved back to
+  `needs_review`. Product fast audit, published-risk audit, full native export
+  audit, online dictionary regression, focused API check, and render focused
+  check passed. The published export is
+  `outputs/d1-v2-product-native-export-v81-r1-96`, with `entries=24847`,
+  `senses=30364`, and `sense_localizations=121456`. D1 was restored through
+  `scripts/restore-d1-native-via-query.mjs`, then Worker cache was bumped to
+  `v81-source-gap-r1-96`.
 - Next coverage-gap runs should prefer `--strict-zh true` for Chinese source
   gaps and continue small-batch draft/promote review before any D1 publish.
 

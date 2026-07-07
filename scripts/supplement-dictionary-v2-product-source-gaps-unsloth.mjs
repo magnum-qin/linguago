@@ -637,8 +637,14 @@ function validateOutput(row, output) {
   const sourceTerm = output.localizations?.[row.source_lang]?.term;
   if (sourceTerm && normalize(sourceTerm) !== normalize(row.word)) errors.push("source_term_mismatch");
   const enTerm = output.localizations?.en?.term;
-  const gloss = firstGlossToken(row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview);
-  if (row.source_lang !== "en" && gloss && enTerm && normalize(enTerm) === normalize(row.word) && normalize(enTerm) !== normalize(gloss)) {
+  const englishGlossTerms = englishGlossTermSet(row);
+  if (
+    row.source_lang !== "en" &&
+    englishGlossTerms.size &&
+    enTerm &&
+    normalize(enTerm) === normalize(row.word) &&
+    !englishGlossTerms.has(normalize(enTerm))
+  ) {
     errors.push("en_term_copies_non_english_source");
   }
   const knownMismatch = knownSemanticMismatch(row, output);
@@ -1013,6 +1019,29 @@ function firstGlossToken(value) {
   const text = String(value || "").normalize("NFKC").trim().toLowerCase();
   const match = text.match(/^[a-z][a-z -]{0,40}/u);
   return match ? match[0].trim() : "";
+}
+
+function englishGlossTermSet(row) {
+  const terms = new Set();
+  const locs = Array.isArray(row?.first_sense_localizations) ? row.first_sense_localizations : [];
+  const enLoc = locs.find((loc) => loc?.lang === "en" && nonEmpty(loc.term));
+  if (enLoc) {
+    for (const term of String(enLoc.term).split(";")) {
+      const token = firstGlossToken(term);
+      if (token) terms.add(normalize(token));
+    }
+  }
+
+  const text = String(row?.first_gloss_key || row?.first_gloss_preview || row?.gloss_key || row?.gloss_preview || "")
+    .normalize("NFKC")
+    .trim();
+  const labeledEnglish = text.match(/\ben\s*:\s*([^|]+)/iu);
+  const sourceText = labeledEnglish ? labeledEnglish[1] : text;
+  for (const term of sourceText.split(";")) {
+    const token = firstGlossToken(term);
+    if (token) terms.add(normalize(token));
+  }
+  return terms;
 }
 
 function countBy(values) {

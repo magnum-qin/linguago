@@ -17,9 +17,9 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
-Current dictionary baseline after the v80 WikDict/OMW source-gap batch is D1 v2
-with cache version `v80-source-gap-r3-89` and export counts
-`entries=24752`, `senses=30269`, `sense_localizations=121076`,
+Current dictionary baseline after the v81 WikDict/OMW source-gap batch is D1 v2
+with cache version `v81-source-gap-r1-96` and export counts
+`entries=24847`, `senses=30364`, `sense_localizations=121456`,
 `examples=3030`, and `example_localizations=11898`.
 
 The source evidence DB used for coverage-gap selection now includes WikDict and
@@ -228,14 +228,14 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 
 ## Current Dictionary Baseline
 
-The current online D1 baseline is v80:
+The current online D1 baseline is v81:
 
-- Worker cache version: `v80-source-gap-r3-89`.
-- Worker version: `b7296b69-f125-47b3-beb9-6c027a5d0992`.
-- Published counts: `entries=24752`, `senses=30269`,
-  `sense_localizations=121076`, `examples=3030`,
+- Worker cache version: `v81-source-gap-r1-96`.
+- Worker version: `af20184d-2d73-47d4-b116-e5a5392e3a15`.
+- Published counts: `entries=24847`, `senses=30364`,
+  `sense_localizations=121456`, `examples=3030`,
   `example_localizations=11898`.
-- D1 `published_at`: `2026-07-05T09:43:57.994Z`.
+- D1 `published_at`: `2026-07-07T05:05:29.385Z`.
 - The pt-BR source-gap pass is complete for `270/271` candidates. The remaining
   candidate is `ouvintes/ouvinte`, kept in `needs_review` because the plural
   source row was linked to a singular entry.
@@ -344,6 +344,22 @@ The current online D1 baseline is v80:
   --file` still fails through Cloudflare's `/import` endpoint with auth code
   `10000`; v80 was restored through `scripts/restore-d1-native-via-query.mjs`,
   which batches SQL through D1's `/query` endpoint.
+- v81 regenerated the post-v80 coverage-gap report and found `595` gaps after
+  the first-sense completeness gate. The strict r1 filter left `333` clean
+  candidates (`pt-BR=76`, `zh=33`, `ja=224`). The source-gap validator was
+  corrected to allow pt-BR/English same-spelling loanwords when the word appears
+  in English source evidence, instead of treating every same-spelling output as
+  copied source text. After that, the 30-row dry-run accepted `30/30`, the
+  100-row draft apply accepted `99/100`, and deterministic promote accepted
+  `96` senses. Ten source-term mismatch drafts remain in review, mostly
+  singular/plural pt-BR source-link mismatches plus the older `しろ/Shiloh`
+  residual. A stale accepted `aquecedor` sense with reviewed localizations was
+  moved back to `needs_review`. Product fast audit, published-risk audit, full
+  native export audit, online dictionary regression, focused API check, and
+  render focused check passed. The deployed export is
+  `outputs/d1-v2-product-native-export-v81-r1-96` with `entries=24847`,
+  `senses=30364`, and `sense_localizations=121456`; D1 was restored through
+  `scripts/restore-d1-native-via-query.mjs`.
 - `wrangler` is now `4.107.0`; `4.103.0` failed on D1 `execute --file` imports
   with Cloudflare API auth code `10000`, while ordinary D1 commands still
   worked.
