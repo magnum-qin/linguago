@@ -21,7 +21,9 @@ export function normalizeResponse(input: {
   provider: ResponseProvider;
   model: string;
 }): TranslateResponse {
-  const type = input.translated.type === "word" || isLikelyLexicalInput(input.text) ? "word" : "sentence";
+  const type = input.translated.type
+    ? (input.translated.type === "word" ? "word" : "sentence")
+    : (isLikelyLexicalInput(input.text) ? "word" : "sentence");
   const translations = normalizeLocalizedTranslations(input.translated.translations);
   const targetTranslation = translations[input.targetLang]?.text;
   const base = {
@@ -223,14 +225,14 @@ export function isLikelyLexicalInput(text: string): boolean {
   if (/[。！？!?;；:：,，、\n\r]/u.test(value)) return false;
 
   const words = value.split(/\s+/u).filter(Boolean);
-  if (words.length > 4) return false;
+  if (words.length > 2) return false;
 
   const cjkChars = value.match(/[\u3400-\u9fff]/gu)?.length || 0;
   if (cjkChars > 0) {
-    return cjkChars <= 8 && value.length <= 16;
+    return cjkChars <= 4 && value.length <= 8;
   }
 
-  return value.length <= 40;
+  return value.length <= 30;
 }
 
 export function normalizeTargetLang(target?: string): LanguageCode {
