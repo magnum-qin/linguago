@@ -1,9 +1,9 @@
-import { localPronunciationText, normalizeStringOrText } from "./normalization";
+import { localPronunciationText, normalizeStringOrText, isLikelyLexicalInput } from "./normalization";
 import { parseProviderJson } from "./provider-json";
 import { streamProviderJson } from "./provider-clients";
 import { buildUserPrompt, selectProviderSystemPrompt } from "./prompts";
 import { TranslateError } from "./errors";
-import type { LanguageCode, LocalizedText, Provider, ResponseProvider, SentenceResponse, TranslateRequest } from "./types";
+import type { LanguageCode, LocalizedText, Provider, ResponseProvider, SentenceResponse, TranslateRequest, TranslateResponse } from "./types";
 
 interface StreamTranslationInput {
   text: string;
@@ -18,7 +18,7 @@ type StreamFallback = (input: StreamTranslationInput) => Promise<Record<string, 
 
 export async function streamStructuredTranslation(
   input: StreamTranslationInput,
-  onPartial: (partial: SentenceResponse) => void,
+  onPartial: (partial: TranslateResponse) => void,
   fallback: StreamFallback
 ): Promise<Record<string, unknown>> {
   const request = {
@@ -44,8 +44,8 @@ export async function streamStructuredTranslation(
       const partialKey = JSON.stringify({
         translation: partial.translation,
         translations: partial.translations,
-        explanation: partial.explanation,
-        explanations: partial.explanations
+        explanation: "explanation" in partial ? partial.explanation : undefined,
+        explanations: "explanations" in partial ? partial.explanations : undefined
       });
       if (partialKey === lastPartialKey) return;
 
@@ -69,7 +69,7 @@ function buildPartialStructuredResponse(input: {
   targetLang: LanguageCode;
   provider: ResponseProvider;
   model: string;
-}): SentenceResponse | null {
+}): TranslateResponse | null {
   const translation = readJsonStringField(input.rawText, "translation");
   const translations = {
     zh: partialLocalizedText(input.rawText, "translations", "zh"),
@@ -99,19 +99,56 @@ function buildPartialStructuredResponse(input: {
     return null;
   }
 
-  const targetTranslation = translations[input.targetLang].text || translation;
-  return {
-    type: "sentence",
+  const typeField = readJsonStringField(input.rawText, "type");
+  const type = typeField ? (typeField === "word" ? "word" : "sentence") : (isLikelyLexicalInput(input.text) ? "word" : "sentence");
+
+  const base = {
     detected_source_lang: readJsonStringField(input.rawText, "detected_source_lang") || "auto",
     target_lang: input.targetLang,
     original: input.text,
-    translation: targetTranslation,
+    translation: translations[input.targetLang].text || translation,
     translations,
-    explanation: explanations[input.targetLang] || explanation,
-    explanations,
     provider: input.provider,
     model: input.model,
     cached: false
+  };
+
+  if (type === "word") {
+    const word_details = {
+      zh: {
+        word: readSectionLanguageObjectString(input.rawText, "word_details", "zh", "word"),
+        definition: readSectionLanguageObjectString(input.rawText, "word_details", "zh", "definition")
+      },
+      en: {
+        word: readSectionLanguageObjectString(input.rawText, "word_details", "en", "word"),
+        definition: readSectionLanguageObjectString(input.rawText, "word_details", "en", "definition")
+      },
+      "pt-BR": {
+        word: readSectionLanguageObjectString(input.rawText, "word_details", "pt-BR", "word"),
+        definition: readSectionLanguageObjectString(input.rawText, "word_details", "pt-BR", "definition")
+      },
+      ja: {
+        word: readSectionLanguageObjectString(input.rawText, "word_details", "ja", "word"),
+        definition: readSectionLanguageObjectString(input.rawText, "word_details", "ja", "definition")
+      }
+    };
+
+    return {
+      ...base,
+      type: "word",
+      phonetic: "",
+      audio_text: input.text,
+      examples: [],
+      word_details,
+      senses: []
+    };
+  }
+
+  return {
+    ...base,
+    type: "sentence",
+    explanation: explanations[input.targetLang] || explanation,
+    explanations
   };
 }
 

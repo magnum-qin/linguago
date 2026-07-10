@@ -46,7 +46,8 @@ import {
   selectProviderSystemPrompt
 } from "./prompts";
 import { streamStructuredTranslation } from "./streaming";
-import { getStoredModel, handleModels, handleSettings } from "./settings";
+import { getStoredModel, handleModels, handleRefreshOpenRouterModels, handleSettings } from "./settings";
+import { refreshOpenRouterFreeModelsIfStale } from "./openrouter-models";
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -69,7 +70,12 @@ export default {
     }
 
     if (url.pathname === "/api/models" && request.method === "GET") {
-      return handleModels(json);
+      ctx.waitUntil(refreshOpenRouterFreeModelsIfStale(env));
+      return handleModels(env, json);
+    }
+
+    if (url.pathname === "/api/models/openrouter/refresh") {
+      return handleRefreshOpenRouterModels(request, env, json);
     }
 
     if (url.pathname === "/api/settings") {
@@ -89,6 +95,10 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(_event, env, ctx): Promise<void> {
+    ctx.waitUntil(refreshOpenRouterFreeModelsIfStale(env));
   }
 } satisfies ExportedHandler<Env>;
 
@@ -328,7 +338,6 @@ async function handleTranslateStream(
           model: selected.model
         });
         let sentFirstToken = false;
-        const lexicalInput = isLikelyLexicalInput(text);
         const providerResult = await streamStructuredTranslationWithFallback(
           {
             env,
@@ -340,13 +349,16 @@ async function handleTranslateStream(
             apiKey: selected.apiKey
           },
           (partial) => {
-            if (lexicalInput) return;
             if (!sentFirstToken) {
               sentFirstToken = true;
               send("status", { stage: "first_token" });
             }
-            const hasExplanation = Object.values(partial.explanations || {}).some(Boolean);
-            send(hasExplanation ? "partial_explanation" : "partial_translation", partial);
+            if (partial.type === "word") {
+              send("partial_translation", partial);
+            } else {
+              const hasExplanation = Object.values(partial.explanations || {}).some(Boolean);
+              send(hasExplanation ? "partial_explanation" : "partial_translation", partial);
+            }
           },
           translateWithProvider
         );
@@ -736,15 +748,16 @@ function selectFallbackProvider(
   env: Env,
   currentProvider: Exclude<Provider, "auto">
 ): { provider: Exclude<Provider, "auto">; model: string; apiKey: string } | null {
-  if (currentProvider !== "deepseek" && env.DEEPSEEK_API_KEY) {
-    return {
-      provider: "deepseek",
-      model: DEFAULT_MODELS.deepseek,
-      apiKey: env.DEEPSEEK_API_KEY
-    };
-  }
-
-  return null;
+  const candidates: Array<{ provider: Exclude<Provider, "auto">; model: string; apiKey?: string }> = [
+    { provider: "dashscope", model: DEFAULT_MODELS.dashscope, apiKey: env.DASHSCOPE_API_KEY },
+    { provider: "deepseek", model: DEFAULT_MODELS.deepseek, apiKey: env.DEEPSEEK_API_KEY },
+    { provider: "gemini", model: DEFAULT_MODELS.gemini, apiKey: env.GEMINI_API_KEY },
+    { provider: "openrouter", model: DEFAULT_MODELS.openrouter, apiKey: env.OPENROUTER_API_KEY }
+  ];
+  const fallback = candidates.find((candidate) => candidate.provider !== currentProvider && candidate.apiKey);
+  return fallback
+    ? { provider: fallback.provider, model: fallback.model, apiKey: fallback.apiKey || "" }
+    : null;
 }
 
 async function callProvider(input: {
