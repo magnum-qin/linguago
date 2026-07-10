@@ -166,6 +166,12 @@ const currentExamples = computed(() => {
   return resultData.value.examples.filter((e: any) => exampleTranslation(e, activeLang.value));
 });
 
+const currentExplanation = computed(() => {
+  if (!resultData.value) return '';
+  if (resultData.value.type !== 'sentence') return '';
+  return resultData.value.explanations?.[activeLang.value] || resultData.value.explanation || '';
+});
+
 const senseDefinition = (sense: any, lang: string) => {
   return sense?.localizations?.[lang]?.definition || sense?.definitions?.[lang] || '';
 };
@@ -591,6 +597,22 @@ const submitReport = async () => {
             </div>
             <div v-else-if="currentWordDetail && currentWordDetail.definition && currentSenses.length === 0" class="bg-m3-surface-container rounded-[28px] p-6 mt-6 border border-m3-outline-variant/20">
               <p class="text-m3-on-surface text-lg leading-relaxed">{{ currentWordDetail.definition }}</p>
+            </div>
+
+            <!-- Sentence Explanation -->
+            <div v-if="resultData && resultData.type === 'sentence' && currentExplanation" class="flex flex-col pt-3 pb-6 mt-2">
+              <h4 class="text-[0.7rem] font-black uppercase tracking-[0.2em] text-m3-primary/80 mb-3 flex items-center gap-2">
+                <span class="w-1 h-3 rounded-full bg-m3-primary/50"></span>
+                <div class="flex flex-col">
+                  <span>句意解析</span>
+                  <span class="text-[0.6rem] opacity-70 tracking-widest mt-0.5">Explicação</span>
+                </div>
+              </h4>
+              <div class="bg-m3-surface-container rounded-[22px] p-5 border border-m3-outline-variant/15 shadow-inner">
+                <p class="text-m3-on-surface text-[1rem] leading-relaxed whitespace-pre-line font-medium">
+                  <FuriganaText :text="currentExplanation" />
+                </p>
+              </div>
             </div>
 
             <!-- Content Area -->
