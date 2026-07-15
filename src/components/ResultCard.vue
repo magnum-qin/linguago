@@ -527,6 +527,9 @@ const submitReport = async () => {
               <span class="text-[0.55rem] opacity-70 tracking-normal mt-0.5" v-if="resultData.provider === 'dictionary' || (resultData.cache_hit ?? resultData.cached)">
                 {{ resultData.provider === 'dictionary' ? 'Dicionário Principal' : 'Em cache' }}
               </span>
+              <span class="text-[0.55rem] opacity-70 tracking-normal mt-0.5 uppercase" v-else>
+                {{ resultData.provider }}<template v-if="resultData.model"> / {{ resultData.model }}</template>
+              </span>
             </div>
           </span>
           
@@ -752,10 +755,6 @@ const submitReport = async () => {
             </div>
           </div>
           
-        <!-- Footer Reference -->
-        <p class="text-center text-[0.7rem] text-m3-on-surface-variant/50 mt-6 mb-1 font-medium tracking-widest uppercase" v-if="resultData.provider">
-          {{ resultData.provider }}<template v-if="resultData.model && resultData.provider !== 'dictionary'"> / {{ resultData.model }}</template>
-        </p>
       </div>
 
       <!-- Shared Loading / Empty State -->
