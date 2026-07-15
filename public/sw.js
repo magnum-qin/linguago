@@ -1,4 +1,4 @@
-const CACHE_NAME = "linguago-shell-v41-vue";
+const CACHE_NAME = "linguago-shell-v42-vue";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -41,7 +41,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (event.request.mode === "navigate" || url.pathname === "/" || url.pathname === INDEX_PATH) {
-    event.respondWith(networkFirstNavigation(event.request));
+    event.respondWith(staleWhileRevalidateNavigation(event.request));
     return;
   }
 
@@ -64,18 +64,17 @@ async function precacheShell() {
   await Promise.allSettled(APP_SHELL.map((path) => cache.add(path)));
 }
 
-async function networkFirstNavigation(request) {
-  try {
-    const response = await fetch(request);
+async function staleWhileRevalidateNavigation(request) {
+  const cached = await caches.match(INDEX_PATH) || await caches.match("/");
+  const update = fetch(request).then(async (response) => {
     if (response.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(INDEX_PATH, response.clone()).catch(() => {});
     }
     return response;
-  } catch {
-    const cached = (await caches.match(INDEX_PATH)) || (await caches.match("/"));
-    return cached || offlineHtml();
-  }
+  }).catch(() => cached);
+  
+  return cached || update;
 }
 
 async function cacheFirstAsset(request, pathname) {
