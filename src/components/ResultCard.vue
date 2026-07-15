@@ -501,7 +501,10 @@ const submitReport = async () => {
           <span class="text-[0.7rem] font-bold uppercase tracking-widest text-m3-on-surface-variant flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full" :class="resultData.provider === 'dictionary' ? 'bg-[#ff9800]' : ((resultData.cache_hit ?? resultData.cached) ? 'bg-m3-primary' : 'bg-[#008053]')"></span>
             <div class="flex flex-col">
-              <span>{{ resultData.provider === 'dictionary' ? '核心词典' : ((resultData.cache_hit ?? resultData.cached) ? '已缓存' : 'AI') }}</span>
+              <span class="flex items-center gap-1.5">
+                {{ resultData.provider === 'dictionary' ? '核心词典' : ((resultData.cache_hit ?? resultData.cached) ? '已缓存' : 'AI') }}
+                <Loader2 v-if="isTranslating && resultData.provider !== 'dictionary' && !(resultData.cache_hit ?? resultData.cached)" class="w-3 h-3.5 animate-spin text-m3-primary" />
+              </span>
               <span class="text-[0.55rem] opacity-70 tracking-normal mt-0.5" v-if="resultData.provider === 'dictionary' || (resultData.cache_hit ?? resultData.cached)">
                 {{ resultData.provider === 'dictionary' ? 'Dicionário Principal' : 'Em cache' }}
               </span>
@@ -740,16 +743,28 @@ const submitReport = async () => {
       <div v-else class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10">
         <!-- Themed Unified Loader Container -->
         <div 
-          class="relative flex items-center justify-center w-28 h-28 transition-all duration-700 ease-spring"
-          :class="[
-            `theme-loader-${colorScheme}`,
-            isTranslating ? 'theme-loader-active' : 'theme-loader-idle animate-float'
-          ]"
+          class="relative flex items-center justify-center w-28 h-28" 
+          :class="`theme-loader-${colorScheme}`"
         >
-          <!-- Outer themed custom animation elements -->
-          <div class="absolute inset-0 theme-decor-1"></div>
-          <div class="absolute inset-0 theme-decor-2"></div>
-          <div class="absolute inset-0 theme-decor-3"></div>
+          <!-- Idle decor elements (fade in/out smoothly) -->
+          <div 
+            class="absolute inset-0 theme-decor-idle-1 transition-all duration-500 ease-spring"
+            :class="isTranslating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'"
+          ></div>
+          <div 
+            class="absolute inset-0 theme-decor-idle-2 transition-all duration-500 ease-spring"
+            :class="isTranslating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'"
+          ></div>
+
+          <!-- Active decor elements (fade in/out smoothly) -->
+          <div 
+            class="absolute inset-0 theme-decor-active-1 transition-all duration-500 ease-spring"
+            :class="isTranslating ? 'opacity-100 scale-100' : 'opacity-0 scale-90'"
+          ></div>
+          <div 
+            class="absolute inset-0 theme-decor-active-2 transition-all duration-500 ease-spring"
+            :class="isTranslating ? 'opacity-100 scale-100' : 'opacity-0 scale-90'"
+          ></div>
           
           <!-- Inner circle with smooth icon transition -->
           <div class="relative bg-m3-surface-container w-16 h-16 rounded-full flex items-center justify-center shadow-sm border border-m3-outline-variant/10 z-10 text-m3-primary/70 transition-all duration-500">
@@ -948,166 +963,157 @@ const submitReport = async () => {
 
 /* --- Themed wait/load loader animations --- */
 
-.theme-decor-1, .theme-decor-2, .theme-decor-3 {
+.theme-decor-idle-1, .theme-decor-idle-2,
+.theme-decor-active-1, .theme-decor-active-2 {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   border: 2px solid transparent;
-  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
 }
 
 /* --- Blue Theme --- */
-.theme-loader-blue .theme-decor-1 {
+.theme-loader-blue .theme-decor-idle-1 {
   border-color: color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
-}
-.theme-loader-blue .theme-decor-2 {
-  border-color: color-mix(in srgb, var(--color-m3-primary) 15%, transparent);
-}
-.theme-loader-blue.theme-loader-idle .theme-decor-1 {
   animation: pulse-ring 3s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
 }
-.theme-loader-blue.theme-loader-idle .theme-decor-2 {
+.theme-loader-blue .theme-decor-idle-2 {
+  border-color: color-mix(in srgb, var(--color-m3-primary) 15%, transparent);
   animation: pulse-ring 3s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
   animation-delay: 1.5s;
 }
-.theme-loader-blue.theme-loader-active .theme-decor-1 {
+.theme-loader-blue .theme-decor-active-1 {
   border-style: double;
   border-width: 4px;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 50%, transparent);
   animation: classic-gear-cw 3s linear infinite;
-  transform: scale(0.95);
 }
-.theme-loader-blue.theme-loader-active .theme-decor-2 {
+.theme-loader-blue .theme-decor-active-2 {
   border-color: color-mix(in srgb, var(--color-m3-primary) 40%, transparent);
-  transform: scale(1.1);
   animation: classic-gear-ccw 5s linear infinite;
+  margin: -4px;
 }
 
 /* --- Rose Theme --- */
-.theme-loader-rose .theme-decor-1,
-.theme-loader-rose .theme-decor-2 {
+.theme-loader-rose .theme-decor-idle-1,
+.theme-loader-rose .theme-decor-idle-2 {
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
   border-color: color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
 }
-.theme-loader-rose.theme-loader-idle .theme-decor-1 {
+.theme-loader-rose .theme-decor-idle-1 {
   animation: rose-heartbeat 2.4s ease-in-out infinite;
 }
-.theme-loader-rose.theme-loader-idle .theme-decor-2 {
+.theme-loader-rose .theme-decor-idle-2 {
   animation: rose-heartbeat 2.4s ease-in-out infinite;
   animation-delay: 1.2s;
 }
-.theme-loader-rose.theme-loader-active .theme-decor-1 {
+.theme-loader-rose .theme-decor-active-1 {
   animation: rose-morph 4s ease-in-out infinite;
   border-color: color-mix(in srgb, var(--color-m3-primary) 60%, transparent);
-  transform: scale(1.05);
 }
-.theme-loader-rose.theme-loader-active .theme-decor-2 {
+.theme-loader-rose .theme-decor-active-2 {
   animation: rose-morph 6s ease-in-out infinite;
   animation-delay: -2s;
   border-color: color-mix(in srgb, var(--color-m3-primary) 25%, transparent);
-  transform: scale(1.2);
+  margin: -4px;
 }
 
 /* --- Mint Theme --- */
-.theme-loader-mint .theme-decor-1,
-.theme-loader-mint .theme-decor-2 {
+.theme-loader-mint .theme-decor-idle-1,
+.theme-loader-mint .theme-decor-idle-2 {
   border-radius: 60% 40% 60% 40% / 40% 60% 40% 60%;
   border-color: color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
 }
-.theme-loader-mint.theme-loader-idle .theme-decor-1 {
+.theme-loader-mint .theme-decor-idle-1 {
   animation: mint-breath 4s ease-in-out infinite;
 }
-.theme-loader-mint.theme-loader-idle .theme-decor-2 {
+.theme-loader-mint .theme-decor-idle-2 {
   animation: mint-breath 4s ease-in-out infinite;
   animation-delay: 2s;
-  transform: scale(0.85) rotate(90deg);
 }
-.theme-loader-mint.theme-loader-active .theme-decor-1 {
+.theme-loader-mint .theme-decor-active-1 {
   animation: mint-spin-cw 5s linear infinite;
-  transform: scale(1.05);
   border-color: color-mix(in srgb, var(--color-m3-primary) 50%, transparent);
 }
-.theme-loader-mint.theme-loader-active .theme-decor-2 {
+.theme-loader-mint .theme-decor-active-2 {
   animation: mint-spin-ccw 7s linear infinite;
-  transform: scale(1.18);
   border-color: color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
+  margin: -6px;
 }
 
 /* --- Amber Theme --- */
-.theme-loader-amber .theme-decor-1,
-.theme-loader-amber .theme-decor-2 {
+.theme-loader-amber .theme-decor-idle-1,
+.theme-loader-amber .theme-decor-idle-2 {
   border-style: dashed;
   border-width: 2px;
   border-color: color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
 }
-.theme-loader-amber.theme-loader-idle .theme-decor-1 {
+.theme-loader-amber .theme-decor-idle-1 {
   animation: amber-flare 2.5s ease-out infinite;
 }
-.theme-loader-amber.theme-loader-idle .theme-decor-2 {
+.theme-loader-amber .theme-decor-idle-2 {
   animation: amber-flare 2.5s ease-out infinite;
   animation-delay: 1.25s;
 }
-.theme-loader-amber.theme-loader-active .theme-decor-1 {
+.theme-loader-amber .theme-decor-active-1 {
   animation: amber-spin 3s linear infinite;
-  transform: scale(1.08);
   border-color: color-mix(in srgb, var(--color-m3-primary) 60%, transparent);
 }
-.theme-loader-amber.theme-loader-active .theme-decor-2 {
+.theme-loader-amber .theme-decor-active-2 {
   animation: amber-spin 4s linear infinite;
   animation-delay: -1.5s;
-  transform: scale(1.2);
   border-color: color-mix(in srgb, var(--color-m3-primary) 25%, transparent);
+  margin: -5px;
 }
 
 /* --- Violet Theme --- */
-.theme-loader-violet .theme-decor-1,
-.theme-loader-violet .theme-decor-2 {
+.theme-loader-violet .theme-decor-idle-1,
+.theme-loader-violet .theme-decor-idle-2 {
   border-radius: 35% 65% 35% 65% / 65% 35% 65% 35%;
   border-color: color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
 }
-.theme-loader-violet.theme-loader-idle .theme-decor-1 {
+.theme-loader-violet .theme-decor-idle-1 {
   animation: violet-twinkle 4s ease-in-out infinite;
 }
-.theme-loader-violet.theme-loader-idle .theme-decor-2 {
+.theme-loader-violet .theme-decor-idle-2 {
   animation: violet-twinkle 4s ease-in-out infinite;
   animation-delay: 2s;
-  transform: scale(0.9) rotate(45deg);
 }
-.theme-loader-violet.theme-loader-active .theme-decor-1 {
+.theme-loader-violet .theme-decor-active-1 {
   animation: violet-spin 6s linear infinite;
-  transform: scale(1.06);
   border-color: color-mix(in srgb, var(--color-m3-primary) 50%, transparent);
 }
-.theme-loader-violet.theme-loader-active .theme-decor-2 {
+.theme-loader-violet .theme-decor-active-2 {
   animation: violet-spin 9s linear infinite;
   animation-delay: -3s;
-  transform: scale(1.18) rotate(45deg);
   border-color: color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
+  margin: -5px;
 }
 
 /* --- Classic Theme --- */
-.theme-loader-classic .theme-decor-1,
-.theme-loader-classic .theme-decor-2 {
+.theme-loader-classic .theme-decor-idle-1,
+.theme-loader-classic .theme-decor-idle-2 {
   border-color: color-mix(in srgb, var(--color-m3-primary) 25%, transparent);
 }
-.theme-loader-classic.theme-loader-idle .theme-decor-1 {
+.theme-loader-classic .theme-decor-idle-1 {
   animation: classic-tick 4s steps(4, end) infinite;
 }
-.theme-loader-classic.theme-loader-idle .theme-decor-2 {
+.theme-loader-classic .theme-decor-idle-2 {
   animation: classic-tick 4s steps(4, end) infinite;
   animation-delay: 2s;
 }
-.theme-loader-classic.theme-loader-active .theme-decor-1 {
+.theme-loader-classic .theme-decor-active-1 {
   border-style: dotted;
   border-width: 3px;
   animation: classic-gear-cw 12s linear infinite;
-  transform: scale(1.05);
   border-color: color-mix(in srgb, var(--color-m3-primary) 50%, transparent);
 }
-.theme-loader-classic.theme-loader-active .theme-decor-2 {
+.theme-loader-classic .theme-decor-active-2 {
   border-style: dotted;
   border-width: 3px;
   animation: classic-gear-ccw 18s linear infinite;
-  transform: scale(1.2);
   border-color: color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
+  margin: -6px;
 }
 
 /* --- Keyframe Animations --- */
