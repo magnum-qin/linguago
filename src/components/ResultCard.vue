@@ -413,14 +413,33 @@ const speak = (text: string, lang: string) => {
   const targetLangCode = localeMap[lang] || lang;
   utterance.lang = targetLangCode;
   
-  // Explicitly assign a matching voice. If not set, macOS/Windows might use the default English voice,
-  // which will automatically transliterate Chinese/Japanese characters to Pinyin/Romaji and read them with a strong foreign accent.
+  // Explicitly assign a matching high-quality voice. We prioritize online neural/natural voices,
+  // enhanced local voices, and Chrome/Edge specific high-quality voices over standard mechanical local voices.
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) {
-    const voice = voices.find(v => v.lang.replace('_', '-') === targetLangCode) || 
-                  voices.find(v => v.lang.startsWith(targetLangCode.split('-')[0]));
-    if (voice) {
-      utterance.voice = voice;
+    const matchingVoices = voices.filter(v => {
+      const normalizedLang = v.lang.replace('_', '-').toLowerCase();
+      const normalizedTarget = targetLangCode.toLowerCase();
+      return normalizedLang === normalizedTarget || normalizedLang.startsWith(normalizedTarget.split('-')[0]);
+    });
+
+    if (matchingVoices.length > 0) {
+      const sortedVoices = [...matchingVoices].sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        const aIsOnline = !a.localService;
+        const bIsOnline = !b.localService;
+        const aIsNatural = aName.includes('natural') || aName.includes('enhanced') || aName.includes('siri') || aName.includes('google');
+        const bIsNatural = bName.includes('natural') || bName.includes('enhanced') || bName.includes('siri') || bName.includes('google');
+
+        if (aIsNatural && !bIsNatural) return -1;
+        if (!aIsNatural && bIsNatural) return 1;
+        if (aIsOnline && !bIsOnline) return -1;
+        if (!aIsOnline && bIsOnline) return 1;
+        return 0;
+      });
+
+      utterance.voice = sortedVoices[0];
     }
   }
   
