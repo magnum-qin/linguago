@@ -735,7 +735,7 @@ const submitReport = async () => {
 
       <!-- Shared Loading / Empty State -->
       <div v-else class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10">
-        <div class="relative flex items-center justify-center w-24 h-24 animate-float">
+        <div class="relative flex items-center justify-center w-24 h-24" :class="{ 'animate-float': !isTranslating }">
           <div class="absolute inset-0 border-[3px] border-m3-primary/20 rounded-full animate-pulse-ring"></div>
           <div class="absolute inset-0 border-[3px] border-m3-primary/20 rounded-full animate-pulse-ring animation-delay-1500"></div>
           
@@ -744,7 +744,7 @@ const submitReport = async () => {
             <Sparkles v-else class="w-7 h-7" />
           </div>
         </div>
-        <div class="flex flex-col items-center gap-1.5 opacity-80 animate-float" style="animation-delay: 0.2s;">
+        <div class="flex flex-col items-center gap-1.5 opacity-80" :class="{ 'animate-float': !isTranslating }" style="animation-delay: 0.2s;">
           <template v-if="isTranslating">
             <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center">
               解析中<br/><span class="text-[0.7rem] opacity-70 tracking-normal mt-0.5 inline-block">Analisando</span>
