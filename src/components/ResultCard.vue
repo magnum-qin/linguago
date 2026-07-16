@@ -219,8 +219,8 @@ onUnmounted(() => {
               v-for="(lang, i) in langs" 
               :key="lang.code" 
               @click="selectLang(i, lang.code)" 
-              class="custom-tab-btn px-4 py-2.5 rounded-[14px] text-sm font-bold tracking-wide uppercase transition-all duration-300 select-none outline-none text-center cursor-pointer"
-              :class="activeLang === lang.code ? 'text-m3-on-primary' : 'text-m3-on-surface-variant/75 hover:text-m3-on-surface'"
+              class="custom-tab-btn w-full px-4 py-2.5 rounded-[14px] text-sm font-bold tracking-wide uppercase transition-all duration-300 select-none outline-none text-center cursor-pointer flex items-center justify-center"
+              :class="activeLang === lang.code ? '!text-m3-on-primary' : '!text-m3-on-surface-variant/75 hover:!text-m3-on-surface'"
             >
               {{ lang.label }}
             </button>
