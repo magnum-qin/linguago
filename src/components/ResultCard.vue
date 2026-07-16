@@ -49,7 +49,7 @@ const selectLang = (index: number, code: string) => {
 };
 
 const tabContainerRef = ref<HTMLElement | null>(null);
-const indicatorStyle = ref({ width: '0px', transform: 'translate3d(0,0,0)', left: '6px', opacity: 0 });
+const indicatorStyle = ref({ width: '0px', transform: 'translate3d(0,0,0)', left: '0', opacity: 0 });
 
 const updateIndicator = () => {
   if (!tabContainerRef.value) return;
@@ -62,7 +62,7 @@ const updateIndicator = () => {
     indicatorStyle.value = {
       width: `${activeBtn.offsetWidth}px`,
       transform: `translate3d(${activeBtn.offsetLeft}px, 0, 0)`,
-      left: '6px',
+      left: '0',
       opacity: 1
     };
   }
