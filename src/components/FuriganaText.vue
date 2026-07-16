@@ -1,3 +1,9 @@
+<script lang="ts">
+// Module-level caches shared across all component instances to maximize cache hits
+const parseCache = new Map<string, Array<{ text: string; ruby?: string }>>();
+const highlightCache = new Map<string, Array<{ text: string; isHighlight: boolean }>>();
+</script>
+
 <script setup lang="ts">
 import { computed } from 'vue';
 
@@ -6,52 +12,53 @@ const props = defineProps<{
   highlight?: string | string[];
 }>();
 
-// Parse text like "漢[かん]字[じ]" into array of parts
-// e.g. [{ text: "漢", ruby: "かん" }, { text: "字", ruby: "じ" }]
-// If no ruby, just { text: "word" }
+// Parse text like "漢[かん]字[じ]" or "{漢字|かんじ}" into array of segments
 const parsedSegments = computed(() => {
-  if (!props.text) return [];
-  
-  // Regex to match kanji with ruby: {Kanji|ruby} or Kanji[ruby]
+  const input = props.text;
+  if (!input) return [];
+
+  if (parseCache.has(input)) {
+    return parseCache.get(input)!;
+  }
+
+  // Regex to match kanji with ruby annotations
   const regex = /\{([^|{}]+)\|([^|{}]+)\}|([^\s\[\]{}]+)\[([^\]]+)\]/g;
   const segments = [];
   let lastIndex = 0;
-  
+
   let match;
-  while ((match = regex.exec(props.text)) !== null) {
-    // Add text before the match
+  while ((match = regex.exec(input)) !== null) {
     if (match.index > lastIndex) {
       segments.push({
-        text: props.text.substring(lastIndex, match.index)
+        text: input.substring(lastIndex, match.index)
       });
     }
-    
-    let baseText = match[1] || match[3];
-    let rubyText = match[2] || match[4];
 
-    // If base text consists entirely of Japanese Kana (Hiragana/Katakana/Choonpu),
-    // ignore the ruby annotation, as the user only wants Kanji annotated.
+    const baseText = match[1] || match[3];
+    let rubyText = match[2] || match[4] || null;
+
+    // If base text consists entirely of Japanese Kana, ignore the ruby annotation.
     if (/^[\u3040-\u309F\u30A0-\u30FF\uFF66-\uFF9Dー]+$/.test(baseText)) {
       rubyText = null;
     }
 
-    // Add the matched ruby pair
     segments.push({
       text: baseText,
-      ruby: rubyText
+      ruby: rubyText || undefined
     });
-    
+
     lastIndex = regex.lastIndex;
   }
-  
-  // Add remaining text
-  if (lastIndex < props.text.length) {
+
+  if (lastIndex < input.length) {
     segments.push({
-      text: props.text.substring(lastIndex)
+      text: input.substring(lastIndex)
     });
   }
-  
-  return segments.length > 0 ? segments : [{ text: props.text }];
+
+  const result = segments.length > 0 ? segments : [{ text: input }];
+  parseCache.set(input, result);
+  return result;
 });
 
 const highlightTerms = computed(() => {
@@ -92,6 +99,11 @@ const matchesAt = (str: string, lower: string, index: number, term: string) => {
 const highlightParts = (str: string) => {
   if (!highlightTerms.value.length) return [{ text: str, isHighlight: false }];
 
+  const cacheKey = `${str}::${highlightTerms.value.join(',')}`;
+  if (highlightCache.has(cacheKey)) {
+    return highlightCache.get(cacheKey)!;
+  }
+
   const parts: Array<{ text: string; isHighlight: boolean }> = [];
   const lower = str.toLocaleLowerCase();
   let index = 0;
@@ -110,7 +122,9 @@ const highlightParts = (str: string) => {
     index = end;
   }
 
-  return parts.filter((part) => part.text !== '');
+  const result = parts.filter((part) => part.text !== '');
+  highlightCache.set(cacheKey, result);
+  return result;
 };
 
 const findNextMatchIndex = (str: string, lower: string, start: number) => {
@@ -131,7 +145,11 @@ const findNextMatchIndex = (str: string, lower: string, start: number) => {
         <template v-for="(node, nidx) in highlightParts(segment.text)" :key="nidx">
           <span :class="node.isHighlight ? 'text-m3-primary font-bold' : ''">{{ node.text }}</span>
         </template>
-        <rp>(</rp><rt class="text-[0.6em] text-m3-on-surface-variant/80 font-medium tracking-wide select-none px-[0.25em]">{{ segment.ruby }}</rt><rp>)</rp>
+        <rp>(</rp
+        ><rt class="text-[0.6em] text-m3-on-surface-variant/80 font-medium tracking-wide select-none px-[0.25em]">{{
+          segment.ruby
+        }}</rt
+        ><rp>)</rp>
       </ruby>
       <span v-else>
         <template v-for="(node, nidx) in highlightParts(segment.text)" :key="nidx">
