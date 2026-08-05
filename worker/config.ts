@@ -20,45 +20,24 @@ export const MESSAGES = {
 };
 
 export const DEFAULT_MODELS: Record<Provider, string> = {
-  auto: 'qwen3.6-flash',
-  openrouter: 'qwen/qwen3-next-80b-a3b-instruct:free',
+  auto: '@cf/zai-org/glm-4.7-flash',
+  cloudflare: '@cf/zai-org/glm-4.7-flash',
   dashscope: 'qwen3.6-flash',
   gemini: 'gemini-3.5-flash',
   deepseek: 'deepseek-v4-flash'
 };
 
-export const MODEL_OPTIONS_VERSION = 5;
-export const EDITABLE_PROVIDERS: Exclude<Provider, 'auto'>[] = ['openrouter', 'dashscope', 'gemini', 'deepseek'];
+export const MODEL_OPTIONS_VERSION = 6;
+export const EDITABLE_PROVIDERS: Exclude<Provider, 'auto'>[] = ['cloudflare', 'dashscope', 'gemini', 'deepseek'];
 
 export const MODEL_OPTIONS: Record<Provider, string[]> = {
-  auto: ['qwen3.6-flash'],
-  openrouter: [
-    'qwen/qwen3-next-80b-a3b-instruct:free',
-    'openrouter/free',
-    'openrouter/owl-alpha',
-    'deepseek/deepseek-v4-flash:free',
-    'nvidia/nemotron-3-super-120b-a12b:free',
-    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-    'nvidia/nemotron-3-nano-30b-a3b:free',
-    'nvidia/nemotron-nano-12b-v2-vl:free',
-    'nvidia/nemotron-nano-9b-v2:free',
-    'google/gemma-4-31b-it:free',
-    'google/gemma-4-26b-a4b-it:free',
-    'minimax/minimax-m2.5:free',
-    'z-ai/glm-4.5-air:free',
-    'qwen/qwen3-coder:free',
-    'openai/gpt-oss-120b:free',
-    'openai/gpt-oss-20b:free',
-    'baidu/cobuddy:free',
-    'arcee-ai/trinity-large-thinking:free',
-    'poolside/laguna-m.1:free',
-    'poolside/laguna-xs.2:free',
-    'liquid/lfm-2.5-1.2b-thinking:free',
-    'liquid/lfm-2.5-1.2b-instruct:free',
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'meta-llama/llama-3.2-3b-instruct:free',
-    'nousresearch/hermes-3-llama-3.1-405b:free',
-    'cognitivecomputations/dolphin-mistral-24b-venice-edition:free'
+  auto: ['@cf/zai-org/glm-4.7-flash'],
+  cloudflare: [
+    '@cf/zai-org/glm-4.7-flash',
+    '@cf/google/gemma-4-26b-a4b-it',
+    '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    '@cf/qwen/qwen3-30b-a3b-fp8',
+    '@cf/openai/gpt-oss-20b'
   ],
   dashscope: [
     'qwen3.6-flash',
@@ -81,7 +60,7 @@ export const MODEL_OPTIONS: Record<Provider, string[]> = {
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro']
 };
 
-export const TRANSLATION_CACHE_VERSION = 'v83-production-chunk05-29087';
+export const TRANSLATION_CACHE_VERSION = 'v84-controlled-consensus-29587';
 export const PREVIEW_TIMEOUT_MS = 10_000;
 export const FULL_TRANSLATION_TIMEOUT_MS = 30_000;
 export const MAX_INPUT_CHARS = 1200;

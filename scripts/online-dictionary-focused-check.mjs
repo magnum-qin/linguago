@@ -5,9 +5,9 @@ const baseUrl = process.env.PWA_URL || 'https://translation-pwa.qhzggzh-linguago
 const outDir = path.resolve('output/online-dictionary-focused-check');
 const langs = ['zh', 'en', 'pt-BR', 'ja'];
 const expectedCounts = {
-  entries: 29087,
-  senses: 34604,
-  sense_localizations: 138416,
+  entries: 29587,
+  senses: 35103,
+  sense_localizations: 140412,
   examples: 3030,
   example_localizations: 11898
 };
@@ -42,6 +42,14 @@ const cases = [
     minSenses: 2,
     requirePronunciationGroups: true,
     expectedTerms: ['visitor', 'visiting team']
+  },
+  {
+    id: 'pt-supersimetria',
+    term: 'supersimetria',
+    minSenses: 1,
+    requirePronunciationGroups: true,
+    expectedReadings: ['/su.pe.si.me.\u02c8t\u027ei.\u0250/'],
+    expectedTerms: ['supersymmetry', '\u8d85\u5bf9\u79f0', '\u8d85\u5bfe\u79f0\u7406\u8ad6']
   }
 ];
 

@@ -17,18 +17,150 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
-Current production dictionary baseline is v83 D1 v2, deployed on 2026-08-02
-with Worker version `1d5dd96d-f524-4e54-8816-25237302af22`, cache version
-`v83-production-chunk05-29087`, and export counts
-`entries=29087`, `senses=34604`, `sense_localizations=138416`,
+Current production dictionary baseline is v84 D1 v2, deployed on 2026-08-06 JST
+with Worker version `c7a79b71-16e3-4661-8e6f-89a13f0a6154`, cache version
+`v84-controlled-consensus-29587`, and export counts
+`entries=29587`, `senses=35103`, `sense_localizations=140412`,
 `examples=3030`, and `example_localizations=11898`.
 
-The release came from
-`outputs/d1-v2-product-native-export-v83-production-chunk05-complete-validation`.
-Its D1 `published_at` value is `2026-08-02T11:10:10.971Z`. The rollback SQL is
-`backups/linguago-dictionary-before-v83-production-chunk05-20260802-201814.sql`
-with SHA256
-`CC16C61817B06218105190FF91A585B44066C553D04F0CC9AED13D643A9D03E4`.
+The release came from `.tmp/controlled-consensus/d1-v83-plus-supersimetria`.
+Its D1 `published_at` value is `2026-08-05T15:32:23.650Z`. The rollback SQL is
+`backups/linguago-dictionary-before-v84-controlled-consensus-20260806-005750.sql`.
+
+The local product DB and production D1 currently match after the quality-gated
+controlled-consensus release. Historical batch details below remain useful for
+pipeline diagnostics, but no longer describe an undeployed local delta.
+The current local main DB SHA256 is
+`EEC7D7E9BA43D882526D14B9AC4F17CDEE40FAB805BAB9CF88F192578D7AD781`.
+Full native export/import, online API, focused API, and mobile/desktop render
+checks all pass. The known `duplicate_sense_localizations=98` warning remains
+non-blocking.
+
+After batch 12, rebuilding the same strict pool found only `帰省` and `異音`.
+Both passed source review and generation but failed the reverse-evidence gate
+(one unsupported, one manual), so neither reached Gemma review or the product
+DB. The current Kaikki raw two-language strict pool is therefore exhausted for
+automatic promotion. The next expansion must use a newly defined evidence tier
+or new source data, not repeat this selector with looser publication checks.
+
+A balanced 20-row canonical first-sense-two-language Tier C pilot was also
+tested after the Kaikki closeout. Source review approved only 9/20. Enforcing
+reviewer preferred terms yielded 1/9 generation-valid; disabling that brittle
+string gate while retaining quality review yielded 6/9, but reverse evidence
+supported only three and independent Gemma accepted two (`neurocirurgia` and
+`やみ`). Those two passed isolated and main audits. The 2/20 end-to-end yield
+keeps the 440-row Tier C pool closed to batch generation; improve source/sense
+alignment before another pilot.
+
+The Tier C preferred-term contract has since been corrected. Source review now
+hard-binds only the exact source-language headword in `preferred_terms`; target
+language model suggestions are retained separately in `suggested_terms` and
+must be validated by reverse dictionaries and independent Gemma consensus.
+With the same nine approved pilot candidates, the enforced-contract regression
+improved from 1/9 to 8/9 generation-valid without weakening semantic gates.
+Reverse evidence supported four, and Gemma accepted `neurocirurgia`, `やみ`,
+and `しごと`; the first two were already present from the earlier replay, so
+only `しごと` was newly promoted. `くるま` was rejected by consensus and was
+not written. All isolated and main audits pass, but the low 9/20 source-review
+yield still keeps Tier C closed to scale. The next step is deterministic
+candidate sense alignment followed by a fresh 20-row pilot.
+
+Deterministic candidate-sense alignment is now implemented by
+`align-dictionary-v2-product-source-gap-candidate-senses.mjs`. It evaluates
+every clean sense under an entry, requires an exact source-language term, and
+selects only a unique best sense by clean language coverage and confidence. It
+never merges parallel bilingual senses. On the old 440-row Tier C pool, 119
+rows were actually backed by an already complete four-language sense, 137 had
+ambiguous parallel senses, and only 184 remained alignable. Reapplying the
+high-value filter produced a fresh 20-row pilot with 19 pt-BR rows and one ja
+row, each backed by one exact three-language sense. Source review should now be
+run with `--require-sense-alignment true`; old first-sense reports fail this
+gate. The remote pilot then produced `20 source reviewed -> 13 approved -> 9
+generation-valid -> 3 reverse-supported -> 3 Gemma consensus accepts`. Only
+`exploradora`, `eletrodomésticos`, and `preventivo` were promoted after isolated
+and main full audits. The local DB now contains 29,680 entries, 35,197 senses,
+and 140,788 localizations with zero blockers and zero risk flags. Its SHA-256 is
+`39D4E3D543B677D0E9087C6BBF68B5981C704DFAE62C152DE4B56F8ABF6F3B99`.
+Production remains v83. The 3/20 end-to-end yield is still too low for scaling.
+
+A second 20-row pilot added deterministic reverse-dictionary evidence before
+generation. Of the 184 aligned candidates, 44 passed this prefilter. Source
+review then accepted 18/20; after removing one row already covered by an older
+review, generation produced 12 valid rows from 17 new candidates. Reverse
+evidence retained eight, and independent Gemma 4 31B consensus accepted all
+eight: `valquíria`, `legalização`, `cantonês`, `troglodita`, `hipnotismo`,
+`coalhada`, `cesárea`, and `darwinismo`. Exact isolated and main replay passed
+promotion, published-risk, native export, and full in-memory audit. The local
+DB now contains 29,688 entries, 35,205 senses, and 140,820 localizations; its
+SHA-256 is
+`170691083350484ED7C589C3306BF52859F20AD478528191DD29EA7DC82902C8`.
+Production remains v83. The improved 8/20 end-to-end yield is useful validation
+but is not yet approval for an unbounded Tier C run; generation rejects should
+be classified before a 100-row test.
+The five rejected generation rows are now classified: `tesouraria`,
+`dissuadir`, and `prussiano` failed semantic quality review because of Japanese
+term or sense errors; `centésima` and `escoliose` failed the strict JMdict term
+gate. Treat the first group as regeneration candidates and the second as
+Japanese canonical-form/variant matching work; do not weaken the shared gate.
+
+The Japanese gate now has two deliberately narrow deterministic exceptions:
+modern `側弯症`/`脊柱側弯症` are resolved through the corresponding JMdict
+canonical `彎` forms, and exact compositional `百分の一` has the verified reading
+`ひゃくぶんのいち`. Remote integration retest accepted `escoliose`; `centésima`
+still failed independent semantic review because an ordinal and the fraction
+1/100 are not always the same sense. The remaining strong-evidence pool held
+only 24 rows, not 100. After historical-review subtraction, 20 were new:
+generation validated 15, reverse dictionaries supported seven, and independent
+Gemma consensus accepted six. The promoted rows are `subsidiária`, `vidraça`,
+`fotogênico`, `estribo`, `taquigrafia`, and `escarlatina`. Local counts are now
+29,694 entries, 35,211 senses, and 140,844 localizations; SHA-256 is
+`90A25DE7E8E0F3875936740C4419F1A82728111D3C53EC2A26F59B65943AC1E9`.
+Production remains v83.
+
+An expanded rank-500k experiment showed why Tier C cannot scale from WikDict
+agreement alone. A 70,175-row raw gap report filtered to 758 canonical rows;
+product-aware sense alignment retained 503. The aligner now excludes source
+senses already linked to accepted product senses before ranking, while still
+allowing another unlinked sense under the same source entry. The original
+reverse prefilter selected 377 rows, but a balanced 100-row source review
+accepted only 66. Generation validated 42/66 and reverse dictionaries supported
+only four, so the batch was stopped without writes.
+
+The reverse validator now has `--require-source-reverse-evidence true` and
+collapses forward/reverse WikDict records into one `wikdict` evidence family.
+WikDict may no longer certify itself as two independent sources. Kaikki and
+WikDict are both Wiktionary-derived and now share the `wiktionary` evidence
+family, so they also cannot certify each other. This reduced
+the expanded pool to 13 cross-family candidates, 11 of them new. Source review
+accepted 11/11 and generation eventually validated 10/11, but final four-
+language reverse validation supported only `desenvolvedor`. Gemma 4 31B then
+reviewed all ten valid Qwen generations and accepted eight, demonstrating that
+model agreement alone is broader than independent dictionary evidence. A
+strict intersection review targeted only the deterministic-supported row and
+accepted `desenvolvedor` at confidence 1.0. It was replayed as a review draft,
+passed promote dry-run, and was promoted after a database backup. The other
+seven Gemma-accepted rows remain manual or unsupported and were not written.
+The Japanese reading gate also supports a small productive suffix
+whitelist (`化`, `患者`, `可能な`) only when the base reading is present in
+JMdict. This fixed valid compounds while semantic review still rejected
+`認識可能な` for the wrong sense. The local audited export now contains
+29,696 entries, 35,213 senses, and
+140,852 localizations. Product fast/full export audits and published-risk pass;
+production D1 remains v83 and was not deployed.
+
+After adding `kaikki-ja` as strong-but-Wiktionary-family reverse evidence,
+`autenticar` gained independent Japanese agreement from JMdict plus the
+Wiktionary family while retaining CC-CEDICT Chinese support. Gemma 4 31B
+accepted it at confidence 1.0. It was replayed to draft, promoted after backup,
+and passed the complete export audit. No other residual became publishable.
+
+A follow-up derivational-equivalence pass added bounded English morphology for
+pairs such as `authenticate/authentication`, `menstruate/menstruation`, and
+`mitochondrial/mitochondrion`. This corrected false conflict classifications
+for `autenticar`, `menstruar`, and `mitocondrial`, but moved them only to
+`manual_review` because another target language still lacks independent reverse
+evidence. It produced no additional publishable rows. Do not broaden the rule
+into general synonym matching.
 
 The source evidence DB used for coverage-gap selection now includes WikDict and
 Open Multilingual Wordnet in addition to ECDICT, CC-CEDICT, JMdict, Kaikki
@@ -164,7 +296,7 @@ The normalized response includes:
       audio_text: string;
     }
   >;
-  provider: 'dictionary' | 'deepseek' | 'gemini' | 'dashscope' | 'openrouter';
+  provider: 'dictionary' | 'deepseek' | 'gemini' | 'dashscope' | 'cloudflare';
   model: string;
   cached: boolean;
 }
@@ -644,3 +776,38 @@ rows passed generation QA, and seven passed independent reverse evidence. The
 seven were promoted locally after validation-copy and full export audits.
 Current local export counts are 28,282 entries, 33,799 senses, and 135,196
 sense localizations. Production D1 remains v82.
+
+Kaikki Japanese and Portuguese raw sources are now imported into the evidence
+DB, but intentionally not rebuilt into canonical localizations because their
+gloss language is English. The coverage-gap finder/filter expose a default-off
+raw bilingual evidence gate with exact-headword and gloss-overlap checks. The
+current isolated pool has 3,553 eligible rows (3,548 JA, 5 PT) after historical
+attempt exclusions; the next safe action is a 20-row independent evidence
+review, not direct generation or product promotion.
+
+## Final pre-scale evidence gate (2026-08-03)
+
+Kaikki and WikDict are both Wiktionary-derived and always map to the same
+`wiktionary` evidence family. A historical policy-regression audit found 111
+source-gap senses that lost support under this rule; they are publication
+blocked and retained for manual review. The current local export has 29,586
+entries, 35,102 senses, and 140,408 localizations. Full import audit and
+published-risk audit pass with all blockers at zero. Production remains v83.
+
+The original 0/503 scale result was caused by two conservative implementation
+gaps: unique aligned OMW evidence was not counted as an independent family,
+and candidates were filtered before selecting their best sense. The corrected
+sense-first flow found 2,280 strict candidates. A balanced 100-row source
+review passed at 91/100, but generation reached only 80/91 (87.9%) after one
+bounded retry, below the 90% gate. No database write, reverse-validation,
+Gemma-consensus, 500-row, or 2,000-row stage followed. Improve candidate hints
+or generation handling without lowering validators, then rerun a fresh 100.
+
+A stricter fresh batch added deterministic JMdict and Portuguese-pronunciation
+hints. It passed source review at 92/100 and generation at 84/92 (91.3%), but
+only 22/84 rows passed four-language deterministic reverse evidence. The main
+failure is Portuguese target evidence that remains Wiktionary-only. Requiring
+two OMW target languages produces 183 candidates, all English-source, with 163
+fresh. Do not use that English-only pool to claim the balanced four-language
+gate has passed; non-English lanes need another independent reverse source or
+better deterministic target alignment.

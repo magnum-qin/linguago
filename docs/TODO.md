@@ -11,6 +11,14 @@ This is the working backlog for future Codex sessions.
 
 ## Dictionary Pipeline
 
+- Read `docs/dictionary-v83-large-batch-runbook.md` before resuming source-gap
+  generation. Production is v84 and matches the audited local publishable set.
+- Classify the latest Tier B 100-row batch's nine validation rejects and nine
+  evidence rejects. Fix only systematic prompt/filter issues, then run a fresh
+  100-row validation.
+- Do not start the next 500-row batch until raw generation acceptance is at
+  least 90%, infrastructure failures are at most 2%, and deterministic promote
+  remains at least 80%.
 - Continue expanding accepted word entries in batches.
 - Keep validating generated entries before importing them.
 - Track accepted / needs-review counts per batch.

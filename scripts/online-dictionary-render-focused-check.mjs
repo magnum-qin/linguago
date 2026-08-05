@@ -28,7 +28,8 @@ const terms = [
   { term: '\u79d8\u5bc6', expectedText: ['secret'] },
   { term: '\u4f55\u6642', expectedText: ['when', 'what time'] },
   { term: '\u56fd\u969b', expectedText: ['international'] },
-  { term: '\u30d3\u30b8\u30bf\u30fc', expectedText: ['visitor', 'visiting team'] }
+  { term: '\u30d3\u30b8\u30bf\u30fc', expectedText: ['visitor', 'visiting team'] },
+  { term: 'supersimetria', expectedText: ['supersymmetry', 'IPA'] }
 ];
 
 await fs.mkdir(outDir, { recursive: true });
