@@ -39,7 +39,6 @@ if (await exists(edgePath)) {
   launchOptions.executablePath = edgePath;
 }
 
-const browser = await chromium.launch(launchOptions);
 const report = {
   url,
   generated_at: new Date().toISOString(),
@@ -49,22 +48,26 @@ const report = {
 
 try {
   for (const viewport of viewports) {
-    const page = await browser.newPage({
-      viewport: { width: viewport.width, height: viewport.height },
-      deviceScaleFactor: viewport.isMobile ? 2 : 1,
-      isMobile: viewport.isMobile,
-      hasTouch: viewport.hasTouch
-    });
-    const viewportReport = { name: viewport.name, terms: [] };
-    for (const [index, item] of terms.entries()) {
-      viewportReport.terms.push(await checkRenderedTerm(page, item, viewport.name, index + 1));
+    const browser = await chromium.launch(launchOptions);
+    try {
+      const page = await browser.newPage({
+        viewport: { width: viewport.width, height: viewport.height },
+        deviceScaleFactor: viewport.isMobile ? 2 : 1,
+        isMobile: viewport.isMobile,
+        hasTouch: viewport.hasTouch
+      });
+      const viewportReport = { name: viewport.name, terms: [] };
+      for (const [index, item] of terms.entries()) {
+        viewportReport.terms.push(await checkRenderedTerm(page, item, viewport.name, index + 1));
+      }
+      await page.close();
+      report.viewports.push(viewportReport);
+    } finally {
+      await browser.close();
     }
-    await page.close();
-    report.viewports.push(viewportReport);
   }
 } finally {
   await fs.writeFile(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2), 'utf8');
-  await browser.close();
 }
 
 console.log(JSON.stringify(report, null, 2));
@@ -80,6 +83,9 @@ async function checkRenderedTerm(page, item, viewportName, ordinal) {
   await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
   let rendered = false;
   for (let attempt = 1; attempt <= 2 && !rendered; attempt += 1) {
+    if (attempt > 1) {
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+    }
     const textarea = page.locator('textarea').first();
     await textarea.fill(item.term);
     await page.waitForFunction(
@@ -87,6 +93,11 @@ async function checkRenderedTerm(page, item, viewportName, ordinal) {
       item.term,
       { timeout: 5000 }
     );
+    await page.waitForTimeout(500);
+    if ((await textarea.inputValue()) !== item.term) {
+      await textarea.fill(item.term);
+      await page.waitForTimeout(250);
+    }
     const translateButton = page
       .locator('button')
       .filter({ hasText: /\u7ffb\u8bd1|Traduzir/i })
@@ -97,7 +108,7 @@ async function checkRenderedTerm(page, item, viewportName, ordinal) {
       .waitForFunction(
         () => {
           const text = document.body.innerText.toLowerCase();
-          return text.includes('dictionary') || text.includes('dicion') || text.includes('error:');
+          return text.includes('dictionary') || text.includes('dicion');
         },
         undefined,
         { timeout: attempt === 1 ? 15000 : 45000 }

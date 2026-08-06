@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "description": "Explicit pt-BR common-noun casing fixes for the v85 source-gap batch.",
+  "overrides": [
+    { "source_entry_id": 330860, "source_sense_id": 2474309, "language": "pt-BR", "field": "term", "expected": "Amarelinha", "replacement": "amarelinha" },
+    { "source_entry_id": 1396375, "source_sense_id": 2679281, "language": "pt-BR", "field": "term", "expected": "Narciso", "replacement": "narciso" },
+    { "source_entry_id": 1413178, "source_sense_id": 2566830, "language": "pt-BR", "field": "term", "expected": "Peritônio", "replacement": "peritônio" },
+    { "source_entry_id": 719765, "source_sense_id": 1676190, "language": "pt-BR", "field": "term", "expected": "Triptofano", "replacement": "triptofano" },
+    { "source_entry_id": 721585, "source_sense_id": 1871649, "language": "pt-BR", "field": "term", "expected": "Pregado", "replacement": "pregado" },
+    { "source_entry_id": 119337, "source_sense_id": 1646777, "language": "pt-BR", "field": "term", "expected": "Catamarã", "replacement": "catamarã" },
+    { "source_entry_id": 496801, "source_sense_id": 1664629, "language": "pt-BR", "field": "term", "expected": "Ortografia", "replacement": "ortografia" },
+    { "source_entry_id": 1387467, "source_sense_id": 2609320, "language": "pt-BR", "field": "term", "expected": "Wasabi", "replacement": "wasabi" },
+    { "source_entry_id": 521557, "source_sense_id": 2566829, "language": "pt-BR", "field": "term", "expected": "Peritônio", "replacement": "peritônio" },
+    { "source_entry_id": 716741, "source_sense_id": 2492232, "language": "pt-BR", "field": "term", "expected": "Trilobita", "replacement": "trilobita" },
+    { "source_entry_id": 160066, "source_sense_id": 2471612, "language": "pt-BR", "field": "term", "expected": "Contratura", "replacement": "contratura" },
+    { "source_entry_id": 282413, "source_sense_id": 2567281, "language": "pt-BR", "field": "term", "expected": "Gameta", "replacement": "gameta" },
+    { "source_entry_id": 526314, "source_sense_id": 2725677, "language": "pt-BR", "field": "term", "expected": "Fimose", "replacement": "fimose" }
+  ]
+}

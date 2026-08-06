@@ -10,12 +10,22 @@ const outPath = path.resolve(required(args.out, 'out'))
 const confidenceThreshold = boundedNumber(args['confidence-threshold'], 0.95, 0, 1)
 const generationModelFamily = String(args['generation-model-family'] || 'qwen').trim().toLowerCase()
 const consensusModelFamily = String(args['consensus-model-family'] || 'gemma').trim().toLowerCase()
+const finalGenerationPath = optionalPath(args.generation)
+const finalEvidencePath = optionalPath(args.evidence)
+const finalConsensusPath = optionalPath(args.consensus)
+const finalGatePaths = [finalGenerationPath, finalEvidencePath, finalConsensusPath]
+const finalGateEnabled = finalGatePaths.every(Boolean)
+
+if (finalGatePaths.some(Boolean) && !finalGateEnabled) {
+  throw new Error('--generation, --evidence, and --consensus must be provided together')
+}
 
 if (generationModelFamily === consensusModelFamily) {
   throw new Error('Generation and consensus model families must differ')
 }
 
 const report = readJson(reviewPath)
+const finalGate = finalGateEnabled ? loadFinalGate() : null
 const sourceRows = report.selected || []
 const rejected = []
 const selected = []
@@ -48,7 +58,8 @@ const output = {
     consensus_model_family: consensusModelFamily,
     require_deterministic_reverse_evidence: true,
     require_independent_no_correction_consensus: true,
-    automatic_promotion: false
+    automatic_promotion: false,
+    final_generation_evidence_consensus_gate: finalGateEnabled
   },
   summary: {
     reviewed_rows: sourceRows.length,
@@ -73,6 +84,14 @@ function inspect(row) {
   if ((review.risk_flags || []).length) return reject('source_review_has_risk_flags')
   if (!row?.sense_alignment || row.sense_alignment.status !== 'aligned') return reject('sense_not_aligned')
   if (!Number.isInteger(Number(row.first_sense_id))) return reject('missing_source_sense_id')
+
+  if (finalGateEnabled) {
+    const key = candidateKey(row)
+    const gate = finalGate.get(key)
+    if (!gate) return reject('not_accepted_by_final_gate')
+    if (!generationOutputIsComplete(gate.generation, row)) return reject('final_generation_incomplete')
+    return acceptedRow(row)
+  }
 
   const preferredTerms = review.preferred_terms || {}
   const suggestedTerms = review.suggested_terms || {}
@@ -99,6 +118,10 @@ function inspect(row) {
     }
   }
 
+  return acceptedRow(row)
+}
+
+function acceptedRow(row) {
   return {
     ok: true,
     row: {
@@ -108,6 +131,15 @@ function inspect(row) {
         ...(row.candidate_review_provenance || {}),
         kind: 'controlled_model_consensus',
         source_review_report: path.relative(process.cwd(), reviewPath),
+        final_generation_report: finalGenerationPath
+          ? path.relative(process.cwd(), finalGenerationPath)
+          : null,
+        deterministic_evidence_report: finalEvidencePath
+          ? path.relative(process.cwd(), finalEvidencePath)
+          : null,
+        independent_consensus_report: finalConsensusPath
+          ? path.relative(process.cwd(), finalConsensusPath)
+          : null,
         publication_evidence: false,
         suggested_terms_binding: false,
         requires_deterministic_reverse_evidence: true,
@@ -118,6 +150,82 @@ function inspect(row) {
       }
     }
   }
+}
+
+function loadFinalGate() {
+  const generation = readJson(finalGenerationPath)
+  const evidence = readJson(finalEvidencePath)
+  const consensus = readJson(finalConsensusPath)
+  if (evidence?.policy?.require_source_reverse_evidence !== true) {
+    throw new Error('Final evidence report does not require source reverse evidence')
+  }
+  if (consensus?.policy?.independent_model_families !== true) {
+    throw new Error('Final consensus report does not certify independent model families')
+  }
+  if (consensus?.policy?.automatic_promotion !== false) {
+    throw new Error('Final consensus report permits automatic promotion')
+  }
+
+  const generationByKey = new Map(
+    (generation.generated || [])
+      .filter((row) => row?.valid === true)
+      .map((row) => [candidateKey(row), row])
+      .filter(([key]) => key)
+  )
+  const evidenceByKey = new Map(
+    (evidence.validations || [])
+      .filter(
+        (row) =>
+          row?.decision === 'supported' &&
+          LANGS.every((lang) => row?.languages?.[lang]?.decision === 'supported')
+      )
+      .map((row) => [candidateKey(row), row])
+      .filter(([key]) => key)
+  )
+  const consensusByKey = new Map(
+    (consensus.reviews || [])
+      .filter(
+        (row) =>
+          row?.valid === true &&
+          row?.decision === 'accept' &&
+          row?.consensus_accepted === true &&
+          Number(row?.confidence) >= Number(consensus.policy.confidence_threshold || 0.9) &&
+          Array.isArray(row?.corrections) &&
+          row.corrections.length === 0
+      )
+      .map((row) => [candidateKey(row), row])
+      .filter(([key]) => key)
+  )
+
+  const gate = new Map()
+  for (const [key, generated] of generationByKey) {
+    if (!evidenceByKey.has(key) || !consensusByKey.has(key)) continue
+    gate.set(key, {
+      generation: generated,
+      evidence: evidenceByKey.get(key),
+      consensus: consensusByKey.get(key)
+    })
+  }
+  return gate
+}
+
+function generationOutputIsComplete(generation, sourceRow) {
+  const output = generation?.output
+  if (!output || Number(output.source_sense_id) !== Number(sourceRow.first_sense_id)) return false
+  if (normalizeTerm(output.source_word || generation.word, sourceRow.source_lang) !== normalizeTerm(sourceRow.word, sourceRow.source_lang)) {
+    return false
+  }
+  return LANGS.every((lang) => {
+    const localization = output.localizations?.[lang]
+    return cleanText(localization?.term) && cleanText(localization?.definition)
+  })
+}
+
+function candidateKey(row) {
+  const sourceEntryId = Number(row?.source_entry_id)
+  const sourceSenseId = Number(row?.source_sense_id ?? row?.output?.source_sense_id ?? row?.first_sense_id)
+  if (!Number.isInteger(sourceEntryId) || !Number.isInteger(sourceSenseId)) return null
+  return `${sourceEntryId}:${sourceSenseId}`
 }
 
 function normalizeTerm(value, lang) {
@@ -145,6 +253,10 @@ function countBy(rows, getter) {
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
+}
+
+function optionalPath(value) {
+  return value ? path.resolve(String(value)) : null
 }
 
 function required(value, name) {

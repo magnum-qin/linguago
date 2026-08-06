@@ -10,20 +10,21 @@ Production and the final audited local database now match:
 
 | State                    |        Version | Entries | Senses | Sense localizations | Published? |
 | ------------------------ | -------------: | ------: | -----: | ------------------: | ---------- |
-| Cloudflare D1            | v84 controlled consensus | 29,587 | 35,103 | 140,412 | Yes |
-| Local audited product DB | v84 controlled consensus | 29,587 | 35,103 | 140,412 | Yes |
+| Cloudflare D1            | v85b controlled consensus | 29,664 | 35,180 | 140,720 | Yes |
+| Local audited product DB | v85b controlled consensus | 29,664 | 35,180 | 140,720 | Yes |
 
 Production details:
 
-- Worker cache: `v84-controlled-consensus-29587`
-- Worker version: `c7a79b71-16e3-4661-8e6f-89a13f0a6154`
-- D1 `published_at`: `2026-08-05T15:32:23.650Z`
-- Pre-release backup: `backups/linguago-dictionary-before-v84-controlled-consensus-20260806-005750.sql`
-- Backup SHA256: `66B4F5E9EF0EAEDE7C855EEB5B55A55CEC128FD4B12CBF39EC85FD757DAA2950`
+- Worker cache: `v85b-locale-fixed-29664`
+- Worker version: `7c8b4b59-c287-4584-9025-964d034035e8`
+- D1 `published_at`: `2026-08-06T06:29:09.247Z`
+- Pre-release DB backup: `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-v85-locale-fixed-20260806-151653.db`
+- Backup SHA256: `EEC7D7E9BA43D882526D14B9AC4F17CDEE40FAB805BAB9CF88F192578D7AD781`
+- Audited v84 rollback package: `backups/v84-rollback-native-before-v85-20260806-151653`
 
 Latest local audit:
 
-- Export: `.tmp/controlled-consensus/d1-v83-plus-supersimetria`
+- Export: `outputs/d1-v2-product-native-export-v85b-locale-fixed`
 - `flagged_senses=0`
 - `bad_sense_localization_counts=0`
 - `duplicate_sense_orders=0`

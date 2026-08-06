@@ -123,7 +123,9 @@ const replayReportStats = replayReportPath && fs.existsSync(replayReportPath)
   ? JSON.parse(fs.readFileSync(replayReportPath, 'utf8'))?.stats || null
   : null;
 const enforceReviewedPreferredTerms = args['enforce-reviewed-preferred-terms'] === undefined
-  ? replayReportStats?.enforce_reviewed_preferred_terms !== false
+  ? args['controlled-consensus-draft-write'] === 'true'
+    ? false
+    : replayReportStats?.enforce_reviewed_preferred_terms !== false
   : args['enforce-reviewed-preferred-terms'] !== 'false';
 const enforceGenerationHintTerms = args['enforce-generation-hint-terms'] === 'true';
 const qualityReview = args['quality-review'] === 'true';
@@ -603,6 +605,18 @@ function replayGeneratedReport() {
     source_links_upserted: 0
   };
   const writes = apply && accepted.length && !dryRun ? applyOutputs(accepted, replayStats) : [];
+  updateCheckpoint(
+    checkpoint,
+    replayed,
+    writes,
+    {
+      ...replayStats,
+      planned_total: replayed.length,
+      endpoint_metrics: {}
+    },
+    replayed.length ? 1 : 0,
+    replayed.length ? 1 : 0
+  );
   const result = {
     ok: replayStats.rejected === 0,
     generated_at: new Date().toISOString(),
@@ -2987,6 +3001,7 @@ function updateCheckpoint(state, generatedItems, writes, runStats, committedChun
     const write = writesBySource.get(String(item.source_entry_id));
     state.items[String(item.source_entry_id)] = {
       source_entry_id: item.source_entry_id,
+      source_sense_id: Number(item?.source_sense_id ?? item?.output?.source_sense_id) || null,
       word: item.word,
       source_lang: item.source_lang,
       status: item.valid ? 'accepted' : 'rejected',

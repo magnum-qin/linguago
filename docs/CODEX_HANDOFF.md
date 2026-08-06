@@ -138,20 +138,22 @@ Read this before making changes.
 
 ## Current Production Release
 
-Cloudflare production is dictionary v84, deployed on 2026-08-06 JST:
+Cloudflare production is dictionary v85b, deployed on 2026-08-06 JST:
 
-- Worker version: `c7a79b71-16e3-4661-8e6f-89a13f0a6154`
-- Worker cache: `v84-controlled-consensus-29587`
-- D1 `published_at`: `2026-08-05T15:32:23.650Z`
-- Counts: `entries=29587`, `senses=35103`, `sense_localizations=140412`,
+- Worker version: `7c8b4b59-c287-4584-9025-964d034035e8`
+- Worker cache: `v85b-locale-fixed-29664`
+- D1 `published_at`: `2026-08-06T06:29:09.247Z`
+- Counts: `entries=29664`, `senses=35180`, `sense_localizations=140720`,
   `examples=3030`, `example_localizations=11898`
-- Audited export: `.tmp/controlled-consensus/d1-v83-plus-supersimetria`
-- Pre-release D1 backup: `backups/linguago-dictionary-before-v84-controlled-consensus-20260806-005750.sql`
-- Backup SHA256: `66B4F5E9EF0EAEDE7C855EEB5B55A55CEC128FD4B12CBF39EC85FD757DAA2950`
+- Audited export: `outputs/d1-v2-product-native-export-v85b-locale-fixed`
+- Pre-release product DB backup: `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-v85-locale-fixed-20260806-151653.db`
+- Backup SHA256: `EEC7D7E9BA43D882526D14B9AC4F17CDEE40FAB805BAB9CF88F192578D7AD781`
+- Audited v84 rollback SQL package: `backups/v84-rollback-native-before-v85-20260806-151653`
 
 Post-release health, full API regression, focused API checks, and mobile/desktop
-render checks passed. The render check retries the first submission once because
-the initial Service Worker/Vue activation can consume the first automated click.
+render checks passed. Mobile and desktop use separate browser processes because
+sharing one Edge process made the first desktop lookup intermittently return to
+the empty input state after all mobile cases had run.
 
 ## Project Goal
 

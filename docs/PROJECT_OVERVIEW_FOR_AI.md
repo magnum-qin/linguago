@@ -17,21 +17,21 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
-Current production dictionary baseline is v84 D1 v2, deployed on 2026-08-06 JST
-with Worker version `c7a79b71-16e3-4661-8e6f-89a13f0a6154`, cache version
-`v84-controlled-consensus-29587`, and export counts
-`entries=29587`, `senses=35103`, `sense_localizations=140412`,
+Current production dictionary baseline is v85b D1 v2, deployed on 2026-08-06 JST
+with Worker version `7c8b4b59-c287-4584-9025-964d034035e8`, cache version
+`v85b-locale-fixed-29664`, and export counts
+`entries=29664`, `senses=35180`, `sense_localizations=140720`,
 `examples=3030`, and `example_localizations=11898`.
 
-The release came from `.tmp/controlled-consensus/d1-v83-plus-supersimetria`.
-Its D1 `published_at` value is `2026-08-05T15:32:23.650Z`. The rollback SQL is
-`backups/linguago-dictionary-before-v84-controlled-consensus-20260806-005750.sql`.
+The release came from `outputs/d1-v2-product-native-export-v85b-locale-fixed`.
+Its D1 `published_at` value is `2026-08-06T06:29:09.247Z`. The audited v84
+rollback package is `backups/v84-rollback-native-before-v85-20260806-151653`.
 
 The local product DB and production D1 currently match after the quality-gated
 controlled-consensus release. Historical batch details below remain useful for
 pipeline diagnostics, but no longer describe an undeployed local delta.
 The current local main DB SHA256 is
-`EEC7D7E9BA43D882526D14B9AC4F17CDEE40FAB805BAB9CF88F192578D7AD781`.
+`44E26C50A9470B265C24A0B8F0F80EB155F0CAE531E123E2339744D603F7A63A`.
 Full native export/import, online API, focused API, and mobile/desktop render
 checks all pass. The known `duplicate_sense_localizations=98` warning remains
 non-blocking.
