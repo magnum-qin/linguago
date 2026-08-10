@@ -1,17 +1,26 @@
-import { localPronunciationText, normalizeStringOrText, isLikelyLexicalInput } from "./normalization";
-import { parseProviderJson } from "./provider-json";
-import { streamProviderJson } from "./provider-clients";
-import { buildUserPrompt, selectProviderSystemPrompt } from "./prompts";
-import { TranslateError } from "./errors";
-import type { LanguageCode, LocalizedText, Provider, ResponseProvider, SentenceResponse, TranslateRequest, TranslateResponse } from "./types";
+import { localPronunciationText, normalizeStringOrText, isLikelyLexicalInput } from './normalization';
+import { parseProviderJson } from './provider-json';
+import { streamProviderJson } from './provider-clients';
+import { buildUserPrompt, selectProviderSystemPrompt } from './prompts';
+import { TranslateError } from './errors';
+import type {
+  LanguageCode,
+  LocalizedText,
+  Provider,
+  ResponseProvider,
+  SentenceResponse,
+  TranslateRequest,
+  TranslateResponse
+} from './types';
 
 interface StreamTranslationInput {
   text: string;
-  sourceLang: TranslateRequest["source_lang"];
+  sourceLang: TranslateRequest['source_lang'];
   targetLang: LanguageCode;
-  provider: Exclude<Provider, "auto">;
+  provider: Exclude<Provider, 'auto'>;
   model: string;
   apiKey: string;
+  ai?: Ai;
 }
 
 type StreamFallback = (input: StreamTranslationInput) => Promise<Record<string, unknown>>;
@@ -25,10 +34,11 @@ export async function streamStructuredTranslation(
     prompt: buildUserPrompt(input.text, input.sourceLang, input.targetLang),
     model: input.model,
     apiKey: input.apiKey,
+    ai: input.ai,
     systemPrompt: selectProviderSystemPrompt(input.provider)
   };
   let emittedPartial = false;
-  let lastPartialKey = "";
+  let lastPartialKey = '';
 
   try {
     const rawText = await streamProviderJson(input.provider, request, (accumulated) => {
@@ -44,8 +54,8 @@ export async function streamStructuredTranslation(
       const partialKey = JSON.stringify({
         translation: partial.translation,
         translations: partial.translations,
-        explanation: "explanation" in partial ? partial.explanation : undefined,
-        explanations: "explanations" in partial ? partial.explanations : undefined
+        explanation: 'explanation' in partial ? partial.explanation : undefined,
+        explanations: 'explanations' in partial ? partial.explanations : undefined
       });
       if (partialKey === lastPartialKey) return;
 
@@ -56,7 +66,7 @@ export async function streamStructuredTranslation(
 
     return parseProviderJson(rawText, input.provider, input.model, false);
   } catch (error) {
-    if (emittedPartial && !(error instanceof TranslateError && error.code === "PROVIDER_INVALID_JSON")) {
+    if (emittedPartial && !(error instanceof TranslateError && error.code === 'PROVIDER_INVALID_JSON')) {
       throw error;
     }
     return fallback(input);
@@ -70,40 +80,45 @@ function buildPartialStructuredResponse(input: {
   provider: ResponseProvider;
   model: string;
 }): TranslateResponse | null {
-  const translation = readJsonStringField(input.rawText, "translation");
+  const translation = readJsonStringField(input.rawText, 'translation');
   const translations = {
-    zh: partialLocalizedText(input.rawText, "translations", "zh"),
-    en: partialLocalizedText(input.rawText, "translations", "en"),
-    "pt-BR": partialLocalizedText(input.rawText, "translations", "pt-BR"),
-    ja: partialLocalizedText(input.rawText, "translations", "ja")
+    zh: partialLocalizedText(input.rawText, 'translations', 'zh'),
+    en: partialLocalizedText(input.rawText, 'translations', 'en'),
+    'pt-BR': partialLocalizedText(input.rawText, 'translations', 'pt-BR'),
+    ja: partialLocalizedText(input.rawText, 'translations', 'ja')
   };
   if (translation && !translations[input.targetLang].text) {
     translations[input.targetLang] = localPronunciationText(input.targetLang, translation);
   }
 
-  const explanation = readJsonStringField(input.rawText, "explanation");
+  const explanation = readJsonStringField(input.rawText, 'explanation');
   const explanations = {
-    zh: readSectionLanguageString(input.rawText, "explanations", "zh"),
-    en: readSectionLanguageString(input.rawText, "explanations", "en"),
-    "pt-BR": readSectionLanguageString(input.rawText, "explanations", "pt-BR"),
-    ja: readSectionLanguageString(input.rawText, "explanations", "ja")
+    zh: readSectionLanguageString(input.rawText, 'explanations', 'zh'),
+    en: readSectionLanguageString(input.rawText, 'explanations', 'en'),
+    'pt-BR': readSectionLanguageString(input.rawText, 'explanations', 'pt-BR'),
+    ja: readSectionLanguageString(input.rawText, 'explanations', 'ja')
   };
   if (explanation && !explanations[input.targetLang]) {
     explanations[input.targetLang] = explanation;
   }
 
-  const hasAnyTranslation =
-    Boolean(translation) || Object.values(translations).some((item) => Boolean(item.text));
+  const hasAnyTranslation = Boolean(translation) || Object.values(translations).some((item) => Boolean(item.text));
   const hasAnyExplanation = Boolean(explanation) || Object.values(explanations).some(Boolean);
   if (!hasAnyTranslation && !hasAnyExplanation) {
     return null;
   }
 
-  const typeField = readJsonStringField(input.rawText, "type");
-  const type = typeField ? (typeField === "word" ? "word" : "sentence") : (isLikelyLexicalInput(input.text) ? "word" : "sentence");
+  const typeField = readJsonStringField(input.rawText, 'type');
+  const type = typeField
+    ? typeField === 'word'
+      ? 'word'
+      : 'sentence'
+    : isLikelyLexicalInput(input.text)
+      ? 'word'
+      : 'sentence';
 
   const base = {
-    detected_source_lang: readJsonStringField(input.rawText, "detected_source_lang") || "auto",
+    detected_source_lang: readJsonStringField(input.rawText, 'detected_source_lang') || 'auto',
     target_lang: input.targetLang,
     original: input.text,
     translation: translations[input.targetLang].text || translation,
@@ -113,30 +128,30 @@ function buildPartialStructuredResponse(input: {
     cached: false
   };
 
-  if (type === "word") {
+  if (type === 'word') {
     const word_details = {
       zh: {
-        word: readSectionLanguageObjectString(input.rawText, "word_details", "zh", "word"),
-        definition: readSectionLanguageObjectString(input.rawText, "word_details", "zh", "definition")
+        word: readSectionLanguageObjectString(input.rawText, 'word_details', 'zh', 'word'),
+        definition: readSectionLanguageObjectString(input.rawText, 'word_details', 'zh', 'definition')
       },
       en: {
-        word: readSectionLanguageObjectString(input.rawText, "word_details", "en", "word"),
-        definition: readSectionLanguageObjectString(input.rawText, "word_details", "en", "definition")
+        word: readSectionLanguageObjectString(input.rawText, 'word_details', 'en', 'word'),
+        definition: readSectionLanguageObjectString(input.rawText, 'word_details', 'en', 'definition')
       },
-      "pt-BR": {
-        word: readSectionLanguageObjectString(input.rawText, "word_details", "pt-BR", "word"),
-        definition: readSectionLanguageObjectString(input.rawText, "word_details", "pt-BR", "definition")
+      'pt-BR': {
+        word: readSectionLanguageObjectString(input.rawText, 'word_details', 'pt-BR', 'word'),
+        definition: readSectionLanguageObjectString(input.rawText, 'word_details', 'pt-BR', 'definition')
       },
       ja: {
-        word: readSectionLanguageObjectString(input.rawText, "word_details", "ja", "word"),
-        definition: readSectionLanguageObjectString(input.rawText, "word_details", "ja", "definition")
+        word: readSectionLanguageObjectString(input.rawText, 'word_details', 'ja', 'word'),
+        definition: readSectionLanguageObjectString(input.rawText, 'word_details', 'ja', 'definition')
       }
     };
 
     return {
       ...base,
-      type: "word",
-      phonetic: "",
+      type: 'word',
+      phonetic: '',
       audio_text: input.text,
       examples: [],
       word_details,
@@ -146,55 +161,50 @@ function buildPartialStructuredResponse(input: {
 
   return {
     ...base,
-    type: "sentence",
+    type: 'sentence',
     explanation: explanations[input.targetLang] || explanation,
     explanations
   };
 }
 
 function partialLocalizedText(rawText: string, section: string, lang: LanguageCode): LocalizedText {
-  const text = readSectionLanguageObjectString(rawText, section, lang, "text");
+  const text = readSectionLanguageObjectString(rawText, section, lang, 'text');
   return {
     text,
-    phonetic: readSectionLanguageObjectString(rawText, section, lang, "phonetic"),
-    audio_text: readSectionLanguageObjectString(rawText, section, lang, "audio_text") || text
+    phonetic: readSectionLanguageObjectString(rawText, section, lang, 'phonetic'),
+    audio_text: readSectionLanguageObjectString(rawText, section, lang, 'audio_text') || text
   };
 }
 
-function readSectionLanguageObjectString(
-  rawText: string,
-  section: string,
-  lang: LanguageCode,
-  field: string
-): string {
+function readSectionLanguageObjectString(rawText: string, section: string, lang: LanguageCode, field: string): string {
   const sectionText = sliceAfterJsonKey(rawText, section);
-  if (!sectionText) return "";
+  if (!sectionText) return '';
   const pattern = new RegExp(
     `"${escapeRegex(lang)}"\\s*:\\s*\\{[\\s\\S]*?"${escapeRegex(field)}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`,
-    "u"
+    'u'
   );
   return decodeJsonStringMatch(sectionText.match(pattern)?.[1]);
 }
 
 function readSectionLanguageString(rawText: string, section: string, lang: LanguageCode): string {
   const sectionText = sliceAfterJsonKey(rawText, section);
-  if (!sectionText) return "";
-  const pattern = new RegExp(`"${escapeRegex(lang)}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "u");
+  if (!sectionText) return '';
+  const pattern = new RegExp(`"${escapeRegex(lang)}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, 'u');
   return decodeJsonStringMatch(sectionText.match(pattern)?.[1]);
 }
 
 function readJsonStringField(rawText: string, field: string): string {
-  const pattern = new RegExp(`"${escapeRegex(field)}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "u");
+  const pattern = new RegExp(`"${escapeRegex(field)}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, 'u');
   return decodeJsonStringMatch(rawText.match(pattern)?.[1]);
 }
 
 function sliceAfterJsonKey(rawText: string, key: string): string {
   const index = rawText.indexOf(`"${key}"`);
-  return index >= 0 ? rawText.slice(index) : "";
+  return index >= 0 ? rawText.slice(index) : '';
 }
 
 function decodeJsonStringMatch(value?: string): string {
-  if (!value) return "";
+  if (!value) return '';
   try {
     return JSON.parse(`"${value}"`);
   } catch {
@@ -203,5 +213,5 @@ function decodeJsonStringMatch(value?: string): string {
 }
 
 function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

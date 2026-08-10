@@ -10,6 +10,16 @@ const outPath = path.resolve(required(args.out, 'out'))
 const confidenceThreshold = boundedNumber(args['confidence-threshold'], 0.95, 0, 1)
 const generationModelFamily = String(args['generation-model-family'] || 'qwen').trim().toLowerCase()
 const consensusModelFamily = String(args['consensus-model-family'] || 'gemma').trim().toLowerCase()
+const allowUnhintedSuggestions = args['allow-unhinted-suggestions'] === 'true'
+const allowJaNoDerivation = args['allow-ja-no-derivation'] === 'true'
+const bindEvidenceValidatedSuggestions = args['bind-evidence-validated-suggestions'] === 'true'
+const minTargetHintFamilies = boundedInteger(args['min-target-hint-families'], 0, 0)
+const excludedSourceEntryIds = new Set(
+  String(args['exclude-source-entry-ids'] || '')
+    .split(',')
+    .map((value) => Number(value.trim()))
+    .filter(Number.isInteger)
+)
 const finalGenerationPath = optionalPath(args.generation)
 const finalEvidencePath = optionalPath(args.evidence)
 const finalConsensusPath = optionalPath(args.consensus)
@@ -25,6 +35,9 @@ if (generationModelFamily === consensusModelFamily) {
 }
 
 const report = readJson(reviewPath)
+const evidenceValidatedKeys = bindEvidenceValidatedSuggestions
+  ? loadEvidenceValidatedKeys(report)
+  : null
 const finalGate = finalGateEnabled ? loadFinalGate() : null
 const sourceRows = report.selected || []
 const rejected = []
@@ -54,6 +67,11 @@ const output = {
     minimum_source_review_confidence: confidenceThreshold,
     independently_bound_terms_remain_preferred_only: true,
     suggested_terms_are_nonbinding_generation_constraints: true,
+    allow_unhinted_suggestions: allowUnhintedSuggestions,
+    allow_ja_no_derivation: allowJaNoDerivation,
+    minimum_target_hint_families: minTargetHintFamilies,
+    bind_evidence_validated_suggestions: bindEvidenceValidatedSuggestions,
+    excluded_source_entry_ids: [...excludedSourceEntryIds].sort((a, b) => a - b),
     generation_model_family: generationModelFamily,
     consensus_model_family: consensusModelFamily,
     require_deterministic_reverse_evidence: true,
@@ -70,7 +88,19 @@ const output = {
   },
   selected_count: selected.length,
   selected,
-  rejected
+  rejected,
+  ...(finalGateEnabled
+    ? {
+        derived_from: {
+          generation: path.relative(process.cwd(), finalGenerationPath),
+          evidence: path.relative(process.cwd(), finalEvidencePath),
+          consensus: path.relative(process.cwd(), finalConsensusPath)
+        },
+        generated: selected
+          .map((row) => finalGate.get(candidateKey(row))?.generation)
+          .filter(Boolean)
+      }
+    : {})
 }
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true })
@@ -78,12 +108,16 @@ fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, 'utf8')
 console.log(JSON.stringify({ ok: true, out: path.relative(process.cwd(), outPath), summary: output.summary }, null, 2))
 
 function inspect(row) {
+  if (excludedSourceEntryIds.has(Number(row?.source_entry_id))) return reject('manual_exclusion')
   const review = row?.candidate_evidence_review
   if (review?.decision !== 'accept') return reject('source_review_not_accepted')
   if (Number(review.confidence) < confidenceThreshold) return reject('source_review_confidence_below_threshold')
   if ((review.risk_flags || []).length) return reject('source_review_has_risk_flags')
   if (!row?.sense_alignment || row.sense_alignment.status !== 'aligned') return reject('sense_not_aligned')
   if (!Number.isInteger(Number(row.first_sense_id))) return reject('missing_source_sense_id')
+  if (evidenceValidatedKeys && !evidenceValidatedKeys.has(candidateKey(row))) {
+    return reject('suggested_terms_not_reverse_evidence_supported')
+  }
 
   if (finalGateEnabled) {
     const key = candidateKey(row)
@@ -94,15 +128,18 @@ function inspect(row) {
   }
 
   const preferredTerms = review.preferred_terms || {}
-  const suggestedTerms = review.suggested_terms || {}
+  const sourceLang = String(row.source_lang || '')
+  if (!LANGS.includes(sourceLang)) return reject('invalid_source_language')
+  const suggestedTerms = {
+    ...(review.suggested_terms || {}),
+    [sourceLang]: preferredTerms[sourceLang] || row.word
+  }
   const definitions = review.definition_contract || {}
   for (const lang of LANGS) {
     if (!cleanText(suggestedTerms[lang])) return reject(`missing_suggested_term_${lang}`)
     if (!cleanText(definitions[lang])) return reject(`missing_definition_${lang}`)
   }
 
-  const sourceLang = String(row.source_lang || '')
-  if (!LANGS.includes(sourceLang)) return reject('invalid_source_language')
   if (normalizeTerm(suggestedTerms[sourceLang], sourceLang) !== normalizeTerm(row.word, sourceLang)) {
     return reject('source_term_drift')
   }
@@ -113,8 +150,18 @@ function inspect(row) {
   for (const lang of LANGS) {
     if (lang === sourceLang) continue
     const hints = row?.generation_hints?.[lang]?.terms || []
-    if (!hints.some((term) => normalizeTerm(term, lang) === normalizeTerm(suggestedTerms[lang], lang))) {
+    if (
+      !allowUnhintedSuggestions &&
+      !hints.some((term) => generationHintMatches(term, suggestedTerms[lang], lang))
+    ) {
       return reject(`suggested_term_not_in_generation_hints_${lang}`)
+    }
+    if (
+      minTargetHintFamilies > 0 &&
+      lang !== 'en' &&
+      (row?.generation_hints?.[lang]?.evidence_families || []).length < minTargetHintFamilies
+    ) {
+      return reject(`insufficient_generation_hint_families_${lang}`)
     }
   }
 
@@ -122,10 +169,27 @@ function inspect(row) {
 }
 
 function acceptedRow(row) {
+  const review = row?.candidate_evidence_review || {}
+  const sourceLang = String(row.source_lang || '')
+  const normalizedReview = {
+    ...review,
+    suggested_terms: {
+      ...(review.suggested_terms || {}),
+      [sourceLang]: review?.preferred_terms?.[sourceLang] || row.word
+    }
+  }
+  const boundReview = bindEvidenceValidatedSuggestions
+    ? {
+        ...normalizedReview,
+        preferred_term_policy: 'reverse_evidence_validated_suggestion',
+        preferred_terms: { ...normalizedReview.suggested_terms }
+      }
+    : normalizedReview
   return {
     ok: true,
     row: {
       ...row,
+      candidate_evidence_review: boundReview,
       promote_allowed: false,
       candidate_review_provenance: {
         ...(row.candidate_review_provenance || {}),
@@ -141,7 +205,9 @@ function acceptedRow(row) {
           ? path.relative(process.cwd(), finalConsensusPath)
           : null,
         publication_evidence: false,
-        suggested_terms_binding: false,
+        suggested_terms_binding: bindEvidenceValidatedSuggestions,
+        suggested_terms_reverse_evidence_validated: bindEvidenceValidatedSuggestions,
+        unhinted_suggestions_allowed: allowUnhintedSuggestions,
         requires_deterministic_reverse_evidence: true,
         requires_generation_consensus: true,
         requires_generation_model_family: generationModelFamily,
@@ -150,6 +216,20 @@ function acceptedRow(row) {
       }
     }
   }
+}
+
+function loadEvidenceValidatedKeys(sourceReport) {
+  const evidencePathValue = String(sourceReport?.reverse_evidence_report || '').trim()
+  if (!evidencePathValue) {
+    throw new Error('--bind-evidence-validated-suggestions requires a reverse-evidence supported report')
+  }
+  const evidencePath = path.resolve(evidencePathValue)
+  const evidence = readJson(evidencePath)
+  return new Set(
+    (evidence.validations || [])
+      .filter((row) => row?.decision === 'supported')
+      .map((row) => `${Number(row.source_entry_id)}:${Number(row.source_sense_id)}`)
+  )
 }
 
 function loadFinalGate() {
@@ -234,6 +314,13 @@ function normalizeTerm(value, lang) {
   return text
 }
 
+function generationHintMatches(hint, suggestion, lang) {
+  const normalizedHint = normalizeTerm(hint, lang)
+  const normalizedSuggestion = normalizeTerm(suggestion, lang)
+  if (normalizedHint === normalizedSuggestion) return true
+  return allowJaNoDerivation && lang === 'ja' && normalizedSuggestion === `${normalizedHint}の`
+}
+
 function cleanText(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -268,6 +355,14 @@ function boundedNumber(value, fallback, minimum, maximum) {
   const number = value === undefined ? fallback : Number(value)
   if (!Number.isFinite(number) || number < minimum || number > maximum) {
     throw new Error(`Invalid numeric value: ${value}`)
+  }
+  return number
+}
+
+function boundedInteger(value, fallback, minimum) {
+  const number = value === undefined ? fallback : Number(value)
+  if (!Number.isInteger(number) || number < minimum) {
+    throw new Error(`Invalid integer value: ${value}`)
   }
   return number
 }

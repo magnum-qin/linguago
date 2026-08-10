@@ -1,17 +1,19 @@
-import Database from "better-sqlite3";
+import Database from 'better-sqlite3';
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = args.db || "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
-const dryRun = args["dry-run"] === "true" || args["dry-run"] === true;
+const dbPath = args.db || 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
+const dryRun = args['dry-run'] === 'true' || args['dry-run'] === true;
 
 const traditionalChars = new Set(
-  "這裡裏國動請問麼幫與為個會來時後對說經過還發無開關買賣學習體見聽點電話電腦網網頁應該誰讓給們長門間書車東萬風飛馬鳥魚貓龍葉雲愛樂氣頭髮聲區廣廠產業務員師醫藥術畫話語讀寫記錄錄類數據據庫庫頁項目標標題題難簡單舊新實驗驗證選擇擇處理線綫沒興臺雖卻別離顯於潤豐獎敵義鬥佔從勞"
+  '這裡裏國動請問麼幫與為個會來時後對說經過還發無開關買賣學習體見聽點電話電腦網網頁應該誰讓給們長門間書車東萬風飛馬鳥魚貓龍葉雲愛樂氣頭髮聲區廣廠產業務員師醫藥術畫話語讀寫記錄錄類數據據庫庫頁項目標標題題難簡單舊新實驗驗證選擇擇處理線綫沒興臺雖卻別離顯於潤豐獎敵義鬥佔從勞'
 );
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
+db.pragma('foreign_keys = ON');
 
-const examples = db.prepare(`
+const examples = db
+  .prepare(
+    `
   SELECT
     e.id,
     e.product_sense_id,
@@ -33,16 +35,18 @@ const examples = db.prepare(`
    AND en.needs_review = 0
   WHERE e.needs_review = 0
     AND e.source_lang = 'zh'
-`).all();
+`
+  )
+  .all();
 
 const groups = new Map();
 for (const example of examples) {
   const key = [
     example.product_sense_id,
     example.source_lang,
-    normalize(example.en_text || ""),
-    normalize(example.zh_reading || "")
-  ].join("\u001f");
+    normalize(example.en_text || ''),
+    normalize(example.zh_reading || '')
+  ].join('\u001f');
   if (!example.en_text || !example.zh_reading) continue;
   if (!groups.has(key)) groups.set(key, []);
   groups.get(key).push(example);
@@ -80,17 +84,15 @@ const stats = {
 };
 
 if (!dryRun && removals.length) {
-  const deleteLocalizations = db.prepare(
-    "DELETE FROM product_example_localizations WHERE product_example_id = ?"
-  );
-  const deleteExample = db.prepare("DELETE FROM product_examples WHERE id = ?");
+  const deleteLocalizations = db.prepare('DELETE FROM product_example_localizations WHERE product_example_id = ?');
+  const deleteExample = db.prepare('DELETE FROM product_examples WHERE id = ?');
   const examplesForSense = db.prepare(`
     SELECT id
     FROM product_examples
     WHERE product_sense_id = ?
     ORDER BY example_order, id
   `);
-  const updateOrder = db.prepare("UPDATE product_examples SET example_order = ? WHERE id = ?");
+  const updateOrder = db.prepare('UPDATE product_examples SET example_order = ? WHERE id = ?');
 
   const touchedSenseIds = new Set(removals.map((row) => row.product_sense_id));
   const tx = db.transaction(() => {
@@ -123,7 +125,7 @@ function compareExamplePreference(a, b) {
 
 function traditionalScore(value) {
   let score = 0;
-  for (const char of value || "") {
+  for (const char of value || '') {
     if (traditionalChars.has(char)) score++;
   }
   return score;
@@ -131,8 +133,12 @@ function traditionalScore(value) {
 
 function simplifiedHintScore(value) {
   let score = 0;
-  for (const char of value || "") {
-    if ("这这里国动请问么帮与为个会来时后对说经过还发无开关买卖学习体见听点电话电脑网网页应该谁让给们长门间书车东万风飞马鸟鱼猫龙叶云爱乐气头发声区广厂产业务员师医药术画话语读写记录类数据库页项目标题难简单旧新实验验证选择处理线没兴台虽却别离显于润丰奖敌义斗占从劳".includes(char)) {
+  for (const char of value || '') {
+    if (
+      '这这里国动请问么帮与为个会来时后对说经过还发无开关买卖学习体见听点电话电脑网网页应该谁让给们长门间书车东万风飞马鸟鱼猫龙叶云爱乐气头发声区广厂产业务员师医药术画话语读写记录类数据库页项目标题难简单旧新实验验证选择处理线没兴台虽却别离显于润丰奖敌义斗占从劳'.includes(
+        char
+      )
+    ) {
       score++;
     }
   }
@@ -140,21 +146,21 @@ function simplifiedHintScore(value) {
 }
 
 function normalize(value) {
-  return String(value || "")
+  return String(value || '')
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[。！？!?.,，、；;：:]/g, "");
+    .replace(/\s+/g, ' ')
+    .replace(/[。！？!?.,，、；;：:]/g, '');
 }
 
 function parseArgs(argv) {
   const parsed = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[i + 1];
-    if (!next || next.startsWith("--")) {
+    if (!next || next.startsWith('--')) {
       parsed[key] = true;
     } else {
       parsed[key] = next;

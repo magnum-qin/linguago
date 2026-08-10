@@ -1,44 +1,48 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
-const mode = String(args.mode || "full").trim();
-const outDir = path.resolve(args["out-dir"] || "outputs/d1-v2-product-native-export");
-const productDbPath = path.resolve(args.db || "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db");
-const manifestPath = path.join(outDir, "manifest.json");
-const importMode = String(args.import || "memory").trim();
-const auditDbPath = importMode === "memory" ? ":memory:" : path.join(outDir, "audit-import.db");
-const auditPath = path.join(outDir, "audit.json");
-const samplesPath = path.join(outDir, "audit-samples.json");
+const mode = String(args.mode || 'full').trim();
+const outDir = path.resolve(args['out-dir'] || 'outputs/d1-v2-product-native-export');
+const productDbPath = path.resolve(
+  args.db || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db'
+);
+const manifestPath = path.join(outDir, 'manifest.json');
+const importMode = String(args.import || 'memory').trim();
+const auditDbPath = importMode === 'memory' ? ':memory:' : path.join(outDir, 'audit-import.db');
+const auditPath = path.join(outDir, 'audit.json');
+const samplesPath = path.join(outDir, 'audit-samples.json');
 const HTML_ENTITY_RE = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#x[0-9a-fA-F]{1,6});/u;
 const REPLACEMENT_CHAR_RE = /[\uFFFD]/u;
 const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
 const JAPANESE_MOJIBAKE_RE = /[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u;
 
-const sampleTerms = (args.samples || "hello,\u4f60\u597d,\u600e,\u5565,appearance")
-  .split(",")
+const sampleTerms = (args.samples || 'hello,\u4f60\u597d,\u600e,\u5565,appearance')
+  .split(',')
   .map((term) => term.trim())
   .filter(Boolean);
 
-if (!["full", "fast"].includes(mode)) {
+if (!['full', 'fast'].includes(mode)) {
   throw new Error(`Unknown --mode: ${mode}. Use full or fast.`);
 }
 
-if (mode === "fast") {
+if (mode === 'fast') {
   if (!fs.existsSync(productDbPath)) throw new Error(`Missing product DB: ${productDbPath}`);
   const db = new Database(productDbPath, { readonly: true });
   registerFunctions(db);
   const audit = buildFastProductAudit(db);
   const samples = sampleTerms.map((term) => lookupProductSample(db, term));
-  audit.sample_failures = samples.filter((sample) => !sample.ok).map((sample) => ({
-    term: sample.term,
-    reason: sample.reason
-  }));
+  audit.sample_failures = samples
+    .filter((sample) => !sample.ok)
+    .map((sample) => ({
+      term: sample.term,
+      reason: sample.reason
+    }));
   audit.ok = isFastAuditOk(audit);
-  const fastAuditPath = path.resolve(args.out || "logs/product-fast-audit.json");
+  const fastAuditPath = path.resolve(args.out || 'logs/product-fast-audit.json');
   fs.mkdirSync(path.dirname(fastAuditPath), { recursive: true });
-  fs.writeFileSync(fastAuditPath, JSON.stringify({ audit, samples }, null, 2), "utf8");
+  fs.writeFileSync(fastAuditPath, JSON.stringify({ audit, samples }, null, 2), 'utf8');
   console.log(JSON.stringify({ audit, samples, out: path.relative(process.cwd(), fastAuditPath) }, null, 2));
   db.close();
   if (!audit.ok) process.exitCode = 1;
@@ -49,8 +53,8 @@ if (!fs.existsSync(manifestPath)) {
   throw new Error(`Missing product D1 export manifest: ${manifestPath}`);
 }
 
-const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-if (auditDbPath !== ":memory:" && fs.existsSync(auditDbPath)) fs.unlinkSync(auditDbPath);
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+if (auditDbPath !== ':memory:' && fs.existsSync(auditDbPath)) fs.unlinkSync(auditDbPath);
 
 const db = new Database(auditDbPath);
 configureImportDb(db);
@@ -59,7 +63,7 @@ registerFunctions(db);
 for (const relativeFile of [manifest.schema, ...(manifest.chunks || [])]) {
   const sqlPath = path.resolve(relativeFile);
   if (!fs.existsSync(sqlPath)) throw new Error(`Missing SQL file from manifest: ${sqlPath}`);
-  db.exec(fs.readFileSync(sqlPath, "utf8"));
+  db.exec(fs.readFileSync(sqlPath, 'utf8'));
 }
 
 const audit = buildAudit(db, manifest);
@@ -67,14 +71,16 @@ audit.mode = mode;
 audit.import_mode = importMode;
 const samples = sampleTerms.map((term) => lookupSample(db, term));
 
-audit.sample_failures = samples.filter((sample) => !sample.ok).map((sample) => ({
-  term: sample.term,
-  reason: sample.reason
-}));
+audit.sample_failures = samples
+  .filter((sample) => !sample.ok)
+  .map((sample) => ({
+    term: sample.term,
+    reason: sample.reason
+  }));
 audit.ok = isAuditOk(audit);
 
-fs.writeFileSync(auditPath, JSON.stringify(audit, null, 2), "utf8");
-fs.writeFileSync(samplesPath, JSON.stringify(samples, null, 2), "utf8");
+fs.writeFileSync(auditPath, JSON.stringify(audit, null, 2), 'utf8');
+fs.writeFileSync(samplesPath, JSON.stringify(samples, null, 2), 'utf8');
 
 console.log(JSON.stringify({ audit, samples }, null, 2));
 db.close();
@@ -84,25 +90,25 @@ if (!audit.ok) {
 }
 
 function configureImportDb(database) {
-  database.pragma("foreign_keys = ON");
-  database.pragma("journal_mode = OFF");
-  database.pragma("synchronous = OFF");
-  database.pragma("temp_store = MEMORY");
-  database.pragma("cache_size = -200000");
-  if (auditDbPath !== ":memory:") database.pragma("locking_mode = EXCLUSIVE");
+  database.pragma('foreign_keys = ON');
+  database.pragma('journal_mode = OFF');
+  database.pragma('synchronous = OFF');
+  database.pragma('temp_store = MEMORY');
+  database.pragma('cache_size = -200000');
+  if (auditDbPath !== ':memory:') database.pragma('locking_mode = EXCLUSIVE');
 }
 
 function registerFunctions(database) {
-  database.function("invalid_pos", invalidPartOfSpeech);
-  database.function("source_script_mismatch", sourceScriptMismatch);
-  database.function("text_has_mojibake", textHasMojibake);
-  database.function("text_has_html_artifact", textHasHtmlArtifact);
+  database.function('invalid_pos', invalidPartOfSpeech);
+  database.function('source_script_mismatch', sourceScriptMismatch);
+  database.function('text_has_mojibake', textHasMojibake);
+  database.function('text_has_html_artifact', textHasHtmlArtifact);
 }
 
 function buildFastProductAudit(database) {
   const hasTable = (name) =>
     Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
-  const hasBlocks = hasTable("product_sense_publication_blocks");
+  const hasBlocks = hasTable('product_sense_publication_blocks');
   const count = (sql) => scalar(database, sql);
   const publishableClause = hasBlocks
     ? `ps.status = 'accepted' AND NOT EXISTS (SELECT 1 FROM product_sense_publication_blocks b WHERE b.product_sense_id = ps.id)`
@@ -110,14 +116,14 @@ function buildFastProductAudit(database) {
 
   return {
     ok: false,
-    mode: "fast",
+    mode: 'fast',
     db: path.relative(process.cwd(), productDbPath),
     counts: {
-      product_entries: count("SELECT COUNT(*) AS n FROM product_entries"),
-      product_senses: count("SELECT COUNT(*) AS n FROM product_senses"),
-      product_localizations: count("SELECT COUNT(*) AS n FROM product_localizations"),
-      product_examples: count("SELECT COUNT(*) AS n FROM product_examples"),
-      product_example_localizations: count("SELECT COUNT(*) AS n FROM product_example_localizations")
+      product_entries: count('SELECT COUNT(*) AS n FROM product_entries'),
+      product_senses: count('SELECT COUNT(*) AS n FROM product_senses'),
+      product_localizations: count('SELECT COUNT(*) AS n FROM product_localizations'),
+      product_examples: count('SELECT COUNT(*) AS n FROM product_examples'),
+      product_example_localizations: count('SELECT COUNT(*) AS n FROM product_example_localizations')
     },
     publishable: {
       senses: count(`
@@ -241,13 +247,15 @@ function buildFastProductAudit(database) {
            OR text_has_html_artifact(definition, lang)
       `),
       source_script_mismatch_samples: database
-        .prepare(`
+        .prepare(
+          `
           SELECT id AS entry_id, headword AS word, primary_lang AS source_lang, normalized_key
           FROM product_entries
           WHERE source_script_mismatch(headword, primary_lang)
           ORDER BY frequency_rank IS NULL, frequency_rank, id
           LIMIT 20
-        `)
+        `
+        )
         .all()
     },
     warnings: {
@@ -287,22 +295,22 @@ function buildAudit(database, exportManifest) {
     out_dir: path.relative(process.cwd(), outDir),
     manifest_stats: exportManifest.stats || {},
     counts: {
-      entries: count("v2_entries"),
-      entry_forms: count("v2_entry_forms"),
-      pronunciation_groups: count("v2_pronunciation_groups"),
-      senses: count("v2_senses"),
-      sense_localizations: count("v2_sense_localizations"),
-      examples: count("v2_examples"),
-      example_localizations: count("v2_example_localizations")
+      entries: count('v2_entries'),
+      entry_forms: count('v2_entry_forms'),
+      pronunciation_groups: count('v2_pronunciation_groups'),
+      senses: count('v2_senses'),
+      sense_localizations: count('v2_sense_localizations'),
+      examples: count('v2_examples'),
+      example_localizations: count('v2_example_localizations')
     },
     count_mismatches: compareCounts(exportManifest.stats || {}, {
-      entries: count("v2_entries"),
-      entry_forms: count("v2_entry_forms"),
-      pronunciation_groups: count("v2_pronunciation_groups"),
-      senses: count("v2_senses"),
-      sense_localizations: count("v2_sense_localizations"),
-      examples: count("v2_examples"),
-      example_localizations: count("v2_example_localizations")
+      entries: count('v2_entries'),
+      entry_forms: count('v2_entry_forms'),
+      pronunciation_groups: count('v2_pronunciation_groups'),
+      senses: count('v2_senses'),
+      sense_localizations: count('v2_sense_localizations'),
+      examples: count('v2_examples'),
+      example_localizations: count('v2_example_localizations')
     }),
     bad_sense_localization_counts: scalar(
       database,
@@ -705,10 +713,11 @@ function lookupSample(database, term) {
     )
     .get({ normalized });
 
-  if (!entry) return { term, ok: false, reason: "no_match" };
+  if (!entry) return { term, ok: false, reason: 'no_match' };
 
   const senses = database
-    .prepare(`
+    .prepare(
+      `
       SELECT s.id, s.sense_order, s.part_of_speech, s.gloss_key,
         g.lang AS pronunciation_group_lang,
         g.reading AS pronunciation_group_reading,
@@ -718,7 +727,8 @@ function lookupSample(database, term) {
       LEFT JOIN v2_pronunciation_groups g ON g.id=s.pronunciation_group_id
       WHERE s.entry_id=?
       ORDER BY s.sense_order
-    `)
+    `
+    )
     .all(entry.id)
     .map((sense) => ({
       ...sense,
@@ -741,11 +751,13 @@ function lookupSample(database, term) {
         .all(sense.id)
     }));
 
-  const badLocalizationCount = senses.filter((sense) => new Set(sense.localizations.map((row) => row.lang)).size !== 4).length;
+  const badLocalizationCount = senses.filter(
+    (sense) => new Set(sense.localizations.map((row) => row.lang)).size !== 4
+  ).length;
   return {
     term,
     ok: badLocalizationCount === 0,
-    reason: badLocalizationCount ? "sense_not_four_language_complete" : "",
+    reason: badLocalizationCount ? 'sense_not_four_language_complete' : '',
     entry,
     senses: senses.slice(0, 3)
   };
@@ -777,7 +789,7 @@ function lookupProductSample(database, term) {
     )
     .get({ normalized });
 
-  if (!entry) return { term, ok: false, reason: "no_match" };
+  if (!entry) return { term, ok: false, reason: 'no_match' };
 
   const senses = database
     .prepare(
@@ -804,11 +816,13 @@ function lookupProductSample(database, term) {
         .all(sense.id)
     }));
 
-  const badLocalizationCount = senses.filter((sense) => new Set(sense.localizations.filter((row) => !row.needs_review).map((row) => row.lang)).size !== 4).length;
+  const badLocalizationCount = senses.filter(
+    (sense) => new Set(sense.localizations.filter((row) => !row.needs_review).map((row) => row.lang)).size !== 4
+  ).length;
   return {
     term,
     ok: badLocalizationCount === 0,
-    reason: badLocalizationCount ? "sense_not_four_language_complete" : "",
+    reason: badLocalizationCount ? 'sense_not_four_language_complete' : '',
     entry,
     senses
   };
@@ -857,20 +871,22 @@ function scalar(database, sql) {
 }
 
 function normalizeKey(value) {
-  return String(value || "").trim().toLocaleLowerCase();
+  return String(value || '')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function invalidPartOfSpeech(value) {
   const text = normalizeKey(value);
   if (!text) return 0;
   if (/[&;]/.test(text)) return 1;
-  if (["n", "v", "adj", "adv"].includes(text)) return 1;
+  if (['n', 'v', 'adj', 'adv'].includes(text)) return 1;
   return 0;
 }
 
 function sourceScriptMismatch(word, sourceLang) {
-  const text = String(word || "").trim();
-  const lang = String(sourceLang || "").trim();
+  const text = String(word || '').trim();
+  const lang = String(sourceLang || '').trim();
   if (!text || !lang) return 1;
 
   const hasLatin = /\p{Script=Latin}/u.test(text);
@@ -879,20 +895,20 @@ function sourceScriptMismatch(word, sourceLang) {
   const hasKatakana = /\p{Script=Katakana}/u.test(text);
   const hasKana = hasHiragana || hasKatakana || /[\u30fc\uff70]/u.test(text);
 
-  if (lang === "zh") return hasKana || !hasHan ? 1 : 0;
-  if (lang === "ja") return hasHan || hasKana ? 0 : 1;
-  if (lang === "en" || lang === "pt-BR") return hasHan || hasKana ? 1 : 0;
+  if (lang === 'zh') return hasKana || !hasHan ? 1 : 0;
+  if (lang === 'ja') return hasHan || hasKana ? 0 : 1;
+  if (lang === 'en' || lang === 'pt-BR') return hasHan || hasKana ? 1 : 0;
   return 0;
 }
 
 function textHasHtmlArtifact(value, _lang) {
-  const text = String(value || "").trim();
+  const text = String(value || '').trim();
   if (!text) return 0;
   return HTML_ENTITY_RE.test(text) ? 1 : 0;
 }
 
 function textHasMojibake(value, lang) {
-  const text = String(value || "").trim();
+  const text = String(value || '').trim();
   if (!text) return 0;
 
   if (REPLACEMENT_CHAR_RE.test(text)) return 1;
@@ -906,10 +922,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[i + 1];
-    if (!next || next.startsWith("--")) {
+    if (!next || next.startsWith('--')) {
       parsed[key] = true;
     } else {
       parsed[key] = next;

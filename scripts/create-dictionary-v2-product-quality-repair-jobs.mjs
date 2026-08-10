@@ -1,26 +1,26 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
-const DEFAULT_PROVIDER = "ollama";
-const DEFAULT_MODEL = "qwen3.6:latest";
-const DEFAULT_PROMPT_VERSION = "dictionary-v2-product-quality-repair-v2";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
+const DEFAULT_PROVIDER = 'ollama';
+const DEFAULT_MODEL = 'qwen3.6:latest';
+const DEFAULT_PROMPT_VERSION = 'dictionary-v2-product-quality-repair-v2';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const provider = args.provider || DEFAULT_PROVIDER;
 const model = args.model || DEFAULT_MODEL;
-const promptVersion = args["prompt-version"] || DEFAULT_PROMPT_VERSION;
+const promptVersion = args['prompt-version'] || DEFAULT_PROMPT_VERSION;
 const limit = args.limit ? Number(args.limit) : 0;
-const dryRun = args["dry-run"] === "true";
-const targetLangs = String(args["target-langs"] || "zh,ja")
-  .split(",")
+const dryRun = args['dry-run'] === 'true';
+const targetLangs = String(args['target-langs'] || 'zh,ja')
+  .split(',')
   .map((lang) => lang.trim())
   .filter(Boolean);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 ensureSchema(db);
 
 const statements = {
@@ -38,14 +38,14 @@ const statements = {
     JOIN product_senses ps ON ps.id = pl.product_sense_id
     JOIN product_entries pe ON pe.id = ps.product_entry_id
     WHERE pl.needs_review = 0
-      AND pl.lang IN (${targetLangs.map(() => "?").join(", ")})
+      AND pl.lang IN (${targetLangs.map(() => '?').join(', ')})
       AND (
         (pl.lang = 'zh' AND (pl.term GLOB '*[ぁ-んァ-ン]*' OR pl.definition GLOB '*[ぁ-んァ-ン]*'))
         OR
         (pl.lang = 'ja' AND pl.term GLOB '*[A-Za-z]*' AND pl.term NOT GLOB '*[ぁ-んァ-ン一-龯]*')
       )
     ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.normalized_key, ps.sense_order, ps.id, pl.lang
-    ${limit ? "LIMIT ?" : ""}
+    ${limit ? 'LIMIT ?' : ''}
   `),
   existingJob: db.prepare(`
     SELECT id, status
@@ -119,13 +119,7 @@ const stats = {
 };
 
 for (const row of rows) {
-  const existing = statements.existingJob.get(
-    row.product_sense_id,
-    row.lang,
-    provider,
-    model,
-    promptVersion
-  );
+  const existing = statements.existingJob.get(row.product_sense_id, row.lang, provider, model, promptVersion);
   if (existing) {
     stats.skipped_existing_job++;
     continue;
@@ -149,7 +143,8 @@ if (!dryRun && jobs.length) {
 stats.jobs_created = jobs.length;
 
 const queuedByLang = db
-  .prepare(`
+  .prepare(
+    `
     SELECT lang, COUNT(*) AS count
     FROM product_llm_completion_jobs
     WHERE target_type = 'product_sense_localization'
@@ -159,26 +154,33 @@ const queuedByLang = db
       AND status = 'queued'
     GROUP BY lang
     ORDER BY lang
-  `)
+  `
+  )
   .all(provider, model, promptVersion);
 
-console.log(JSON.stringify({
-  ok: true,
-  db: path.relative(process.cwd(), dbPath),
-  provider,
-  model,
-  prompt_version: promptVersion,
-  target_langs: targetLangs,
-  stats,
-  queued_by_lang: queuedByLang,
-  sample_candidates: rows.slice(0, 10).map((row) => ({
-    sense_id: row.product_sense_id,
-    lang: row.lang,
-    term: row.term,
-    reading: row.reading,
-    definition: row.definition
-  }))
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      ok: true,
+      db: path.relative(process.cwd(), dbPath),
+      provider,
+      model,
+      prompt_version: promptVersion,
+      target_langs: targetLangs,
+      stats,
+      queued_by_lang: queuedByLang,
+      sample_candidates: rows.slice(0, 10).map((row) => ({
+        sense_id: row.product_sense_id,
+        lang: row.lang,
+        term: row.term,
+        reading: row.reading,
+        definition: row.definition
+      }))
+    },
+    null,
+    2
+  )
+);
 
 db.close();
 
@@ -188,13 +190,11 @@ function buildInput({ sense, lang, issue }) {
   );
   const examples = statements.examples.all(sense.product_sense_id).map((example) => ({
     ...example,
-    localizations: Object.fromEntries(
-      statements.exampleLocalizations.all(example.id).map((row) => [row.lang, row])
-    )
+    localizations: Object.fromEntries(statements.exampleLocalizations.all(example.id).map((row) => [row.lang, row]))
   }));
 
   return {
-    task: "repair_product_sense_localization_quality_warning",
+    task: 'repair_product_sense_localization_quality_warning',
     target_lang: lang,
     issue,
     requirements: {
@@ -202,12 +202,12 @@ function buildInput({ sense, lang, issue }) {
       complete_only_target_lang: true,
       replace_existing_target_localization: true,
       keep_same_sense: true,
-      use_brazilian_portuguese_for_pt_BR: lang === "pt-BR",
-      include_reading: lang === "zh" || lang === "ja",
-      include_pronunciation: lang === "en" || lang === "pt-BR",
+      use_brazilian_portuguese_for_pt_BR: lang === 'pt-BR',
+      include_reading: lang === 'zh' || lang === 'ja',
+      include_pronunciation: lang === 'en' || lang === 'pt-BR',
       include_example_localizations: true,
-      zh_term_must_be_simplified_chinese_without_kana: lang === "zh",
-      ja_term_must_be_natural_japanese_not_plain_english: lang === "ja"
+      zh_term_must_be_simplified_chinese_without_kana: lang === 'zh',
+      ja_term_must_be_natural_japanese_not_plain_english: lang === 'ja'
     },
     product_entry: {
       id: sense.product_entry_id,
@@ -251,74 +251,76 @@ function compactLocalizations(localizations) {
 }
 
 function issueFor(row) {
-  if (row.lang === "zh") {
+  if (row.lang === 'zh') {
     return {
-      code: "zh_term_or_definition_contains_japanese_kana",
+      code: 'zh_term_or_definition_contains_japanese_kana',
       current_term: row.term,
       current_reading: row.reading,
       current_definition: row.definition,
-      instruction: "Rewrite the Chinese localization as a natural Simplified Chinese dictionary term and Chinese definition. Do not copy Japanese kana into the Chinese term. For Japanese particles or auxiliary forms, use a concise Chinese grammatical label such as 条件助词, 接续助词, 过去助动词, 引用助词, or the best matching Chinese explanation."
+      instruction:
+        'Rewrite the Chinese localization as a natural Simplified Chinese dictionary term and Chinese definition. Do not copy Japanese kana into the Chinese term. For Japanese particles or auxiliary forms, use a concise Chinese grammatical label such as 条件助词, 接续助词, 过去助动词, 引用助词, or the best matching Chinese explanation.'
     };
   }
   return {
-    code: "ja_term_is_plain_latin_text",
+    code: 'ja_term_is_plain_latin_text',
     current_term: row.term,
     current_reading: row.reading,
     current_definition: row.definition,
-    instruction: "Rewrite the Japanese localization as a natural Japanese dictionary term. Do not leave the term as plain English unless it is an official acronym/proper name such as WHO. For English function words, use a Japanese gloss such as 〜のために, 意志, 義務, or another concise Japanese equivalent."
+    instruction:
+      'Rewrite the Japanese localization as a natural Japanese dictionary term. Do not leave the term as plain English unless it is an official acronym/proper name such as WHO. For English function words, use a Japanese gloss such as 〜のために, 意志, 義務, or another concise Japanese equivalent.'
   };
 }
 
 function outputSchema(lang) {
-  const required = ["lang", "term", "definition"];
-  const readingSchema = { type: ["string", "null"] };
-  const readingSystemSchema = { type: ["string", "null"] };
-  const pronunciationSchema = { type: ["string", "null"] };
-  const pronunciationSystemSchema = { type: ["string", "null"] };
+  const required = ['lang', 'term', 'definition'];
+  const readingSchema = { type: ['string', 'null'] };
+  const readingSystemSchema = { type: ['string', 'null'] };
+  const pronunciationSchema = { type: ['string', 'null'] };
+  const pronunciationSystemSchema = { type: ['string', 'null'] };
 
-  if (lang === "zh" || lang === "ja") {
-    required.push("reading", "reading_system");
-    readingSchema.type = "string";
+  if (lang === 'zh' || lang === 'ja') {
+    required.push('reading', 'reading_system');
+    readingSchema.type = 'string';
     readingSchema.minLength = 1;
-    readingSystemSchema.type = "string";
+    readingSystemSchema.type = 'string';
     readingSystemSchema.minLength = 1;
   }
-  if (lang === "en" || lang === "pt-BR") {
-    required.push("pronunciation", "pronunciation_system");
-    pronunciationSchema.type = "string";
+  if (lang === 'en' || lang === 'pt-BR') {
+    required.push('pronunciation', 'pronunciation_system');
+    pronunciationSchema.type = 'string';
     pronunciationSchema.minLength = 1;
-    pronunciationSystemSchema.type = "string";
+    pronunciationSystemSchema.type = 'string';
     pronunciationSystemSchema.minLength = 1;
   }
 
   return {
-    type: "object",
-    required: ["sense_localization", "example_localizations"],
+    type: 'object',
+    required: ['sense_localization', 'example_localizations'],
     properties: {
       sense_localization: {
-        type: "object",
+        type: 'object',
         required,
         properties: {
           lang: { const: lang },
-          term: { type: "string", minLength: 1 },
+          term: { type: 'string', minLength: 1 },
           reading: readingSchema,
           reading_system: readingSystemSchema,
           pronunciation: pronunciationSchema,
           pronunciation_system: pronunciationSystemSchema,
-          definition: { type: "string", minLength: 1 },
-          usage_note: { type: ["string", "null"] }
+          definition: { type: 'string', minLength: 1 },
+          usage_note: { type: ['string', 'null'] }
         }
       },
       example_localizations: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
-          required: ["example_id", "lang", "text"],
+          type: 'object',
+          required: ['example_id', 'lang', 'text'],
           properties: {
-            example_id: { type: "number" },
+            example_id: { type: 'number' },
             lang: { const: lang },
-            text: { type: "string", minLength: 1 },
-            reading: { type: ["string", "null"] }
+            text: { type: 'string', minLength: 1 },
+            reading: { type: ['string', 'null'] }
           }
         }
       }
@@ -357,10 +359,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

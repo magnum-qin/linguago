@@ -16,7 +16,7 @@ if (!fs.existsSync(path.dirname(DB_PATH))) {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 }
 
-console.log("Initializing SQLite Database (WAL Mode)...");
+console.log('Initializing SQLite Database (WAL Mode)...');
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
@@ -67,7 +67,7 @@ function flushBatch() {
       let data = getWordData(word);
       // apply sounds
       for (const s of updates.sounds) {
-        if (!data.sounds.find(ex => ex.value === s.value && ex.type === s.type)) {
+        if (!data.sounds.find((ex) => ex.value === s.value && ex.type === s.type)) {
           data.sounds.push(s);
         }
       }
@@ -75,7 +75,9 @@ function flushBatch() {
       for (const lang of ['zh', 'en', 'ja', 'pt']) {
         if (updates.translations[lang]) {
           for (const t of updates.translations[lang]) {
-            const exists = data.translations[lang].find(ex => ex.word === t.word && ex.pos === t.pos && ex.gloss === t.gloss);
+            const exists = data.translations[lang].find(
+              (ex) => ex.word === t.word && ex.pos === t.pos && ex.gloss === t.gloss
+            );
             if (!exists) data.translations[lang].push(t);
           }
         }
@@ -83,7 +85,7 @@ function flushBatch() {
       saveWordData(word, data);
     }
   });
-  
+
   processBatch(Array.from(batchBuffer.entries()));
   batchBuffer.clear();
 }
@@ -91,7 +93,7 @@ function flushBatch() {
 function queueUpdate(word, soundObj, targetLang, transObj) {
   // Truncate overly long words to avoid junk
   if (word.length > 50) return;
-  
+
   if (!batchBuffer.has(word)) {
     batchBuffer.set(word, { sounds: [], translations: {} });
   }
@@ -101,7 +103,7 @@ function queueUpdate(word, soundObj, targetLang, transObj) {
     if (!entry.translations[targetLang]) entry.translations[targetLang] = [];
     entry.translations[targetLang].push(transObj);
   }
-  
+
   if (batchBuffer.size >= BATCH_SIZE) {
     flushBatch();
   }
@@ -110,12 +112,12 @@ function queueUpdate(word, soundObj, targetLang, transObj) {
 async function parseCCCedict() {
   const filePath = path.join(RAW_DIR, 'CC-CEDICT.txt.gz');
   if (!fs.existsSync(filePath)) return;
-  console.log("\n[1/3] Parsing CC-CEDICT (120K entries)...");
-  
+  console.log('\n[1/3] Parsing CC-CEDICT (120K entries)...');
+
   const fileStream = fs.createReadStream(filePath);
   const gunzip = zlib.createGunzip();
   const rl = readline.createInterface({ input: fileStream.pipe(gunzip), crlfDelay: Infinity });
-  
+
   let lineCount = 0;
   for await (const line of rl) {
     if (line.startsWith('#')) continue;
@@ -124,25 +126,25 @@ async function parseCCCedict() {
       const simplified = match[2];
       const pinyin = match[3];
       const glosses = match[4].split('/');
-      
+
       queueUpdate(simplified, { type: 'pinyin', value: pinyin }, null, null);
-      
+
       for (const gloss of glosses) {
         const mainWordMatch = gloss.match(/[a-zA-Z]+/);
         if (mainWordMatch) {
-           const mainWord = mainWordMatch[0].toLowerCase();
-           queueUpdate(simplified, null, 'en', {
-             word: mainWord,
-             pos: "unknown",
-             gloss: gloss,
-             examples: []
-           });
-           queueUpdate(mainWord, null, 'zh', {
-             word: simplified,
-             pos: "unknown",
-             gloss: gloss,
-             examples: []
-           });
+          const mainWord = mainWordMatch[0].toLowerCase();
+          queueUpdate(simplified, null, 'en', {
+            word: mainWord,
+            pos: 'unknown',
+            gloss: gloss,
+            examples: []
+          });
+          queueUpdate(mainWord, null, 'zh', {
+            word: simplified,
+            pos: 'unknown',
+            gloss: gloss,
+            examples: []
+          });
         }
       }
       lineCount++;
@@ -156,8 +158,8 @@ async function parseCCCedict() {
 async function parseECDICT() {
   const filePath = path.join(RAW_DIR, 'ecdict.csv');
   if (!fs.existsSync(filePath)) return;
-  console.log("\n[2/3] Parsing ECDICT (3.4M entries)...");
-  
+  console.log('\n[2/3] Parsing ECDICT (3.4M entries)...');
+
   let lineCount = 0;
   return new Promise((resolve) => {
     fs.createReadStream(filePath)
@@ -165,40 +167,40 @@ async function parseECDICT() {
       .on('data', (row) => {
         const word = (row.word || '').toLowerCase();
         if (!word) return;
-        
+
         let soundObj = null;
         if (row.phonetic) {
           soundObj = { type: 'ipa', value: row.phonetic };
         }
-        
+
         const transString = row.translation || '';
         if (soundObj || transString) {
           queueUpdate(word, soundObj, null, null);
-          
+
           if (transString) {
             const lines = transString.split('\\n');
             for (const line of lines) {
-               const parts = line.split('.');
-               let pos = "unknown";
-               let glosses = line;
-               if (parts.length > 1 && parts[0].length < 10) {
-                  pos = parts[0].trim();
-                  glosses = parts.slice(1).join('.').trim();
-               }
-               // Extract a clean Chinese word if possible
-               const zhMatch = glosses.match(/[\u4e00-\u9fa5]+/);
-               if (zhMatch) {
-                 queueUpdate(word, null, 'zh', {
-                   word: zhMatch[0],
-                   pos: pos,
-                   gloss: glosses,
-                   examples: []
-                 });
-               }
+              const parts = line.split('.');
+              let pos = 'unknown';
+              let glosses = line;
+              if (parts.length > 1 && parts[0].length < 10) {
+                pos = parts[0].trim();
+                glosses = parts.slice(1).join('.').trim();
+              }
+              // Extract a clean Chinese word if possible
+              const zhMatch = glosses.match(/[\u4e00-\u9fa5]+/);
+              if (zhMatch) {
+                queueUpdate(word, null, 'zh', {
+                  word: zhMatch[0],
+                  pos: pos,
+                  gloss: glosses,
+                  examples: []
+                });
+              }
             }
           }
         }
-        
+
         lineCount++;
         if (lineCount % 100000 === 0) process.stdout.write(`\rProcessed ${lineCount} lines...`);
       })
@@ -213,33 +215,33 @@ async function parseECDICT() {
 async function parseKaikkiChinese() {
   const filePath = path.join(RAW_DIR, 'kaikki_Chinese.jsonl');
   if (!fs.existsSync(filePath)) return;
-  console.log("\n[3/3] Parsing Kaikki Chinese (100K entries)...");
-  
+  console.log('\n[3/3] Parsing Kaikki Chinese (100K entries)...');
+
   const fileStream = fs.createReadStream(filePath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
-  
+
   let lineCount = 0;
   for await (const line of rl) {
     try {
       const entry = JSON.parse(line);
       const word = entry.word;
       if (!word) continue;
-      
-      const pos = entry.pos || "unknown";
+
+      const pos = entry.pos || 'unknown';
       const senses = entry.senses || [];
-      
+
       for (const sense of senses) {
         const glosses = sense.glosses || [];
         for (const gloss of glosses) {
           const mainWordMatch = gloss.match(/[a-zA-Z]+/);
           if (mainWordMatch) {
-             const mainWord = mainWordMatch[0].toLowerCase();
-             queueUpdate(word, null, 'en', {
-               word: mainWord,
-               pos: pos,
-               gloss: gloss,
-               examples: (sense.examples || []).map(e => ({ text: e.text, translation: e.english || '' }))
-             });
+            const mainWord = mainWordMatch[0].toLowerCase();
+            queueUpdate(word, null, 'en', {
+              word: mainWord,
+              pos: pos,
+              gloss: gloss,
+              examples: (sense.examples || []).map((e) => ({ text: e.text, translation: e.english || '' }))
+            });
           }
         }
       }
@@ -257,11 +259,11 @@ async function main() {
   await parseECDICT();
   await parseKaikkiChinese();
   console.timeEnd('Full Fusion Time');
-  
+
   // Compact DB
-  console.log("\nCompacting SQLite Database (VACUUM)...");
+  console.log('\nCompacting SQLite Database (VACUUM)...');
   db.exec('VACUUM');
-  
+
   console.log(`\n✅ Ultimate Full Fusion to SQLite complete!`);
 }
 

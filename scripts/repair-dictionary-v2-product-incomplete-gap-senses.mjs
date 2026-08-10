@@ -1,31 +1,33 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const LANGS = ["en", "pt-BR", "zh", "ja"];
-const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
-const DEFAULT_PRODUCT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_REPORT = "logs/product-incomplete-gap-senses-20260622.json";
-const SOURCE = "deterministic:incomplete-gap-repair";
+const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
+const DEFAULT_SOURCE_DB = 'data/processed/linguago_v2_full.db';
+const DEFAULT_PRODUCT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_REPORT = 'logs/product-incomplete-gap-senses-20260622.json';
+const SOURCE = 'deterministic:incomplete-gap-repair';
 
 const args = parseArgs(process.argv.slice(2));
-const sourceDbPath = path.resolve(args["source-db"] || DEFAULT_SOURCE_DB);
-const productDbPath = path.resolve(args["product-db"] || DEFAULT_PRODUCT_DB);
+const sourceDbPath = path.resolve(args['source-db'] || DEFAULT_SOURCE_DB);
+const productDbPath = path.resolve(args['product-db'] || DEFAULT_PRODUCT_DB);
 const reportPath = path.resolve(args.report || DEFAULT_REPORT);
-const outPath = path.resolve(args.out || `logs/product-incomplete-gap-repair-${args.apply ? "apply" : "dry-run"}-20260622.json`);
+const outPath = path.resolve(
+  args.out || `logs/product-incomplete-gap-repair-${args.apply ? 'apply' : 'dry-run'}-20260622.json`
+);
 const limit = Number(args.limit || 20);
-const apply = args.apply === true || args.apply === "true";
+const apply = args.apply === true || args.apply === 'true';
 const now = new Date().toISOString();
 
 if (!fs.existsSync(sourceDbPath)) throw new Error(`Source DB not found: ${sourceDbPath}`);
 if (!fs.existsSync(productDbPath)) throw new Error(`Product DB not found: ${productDbPath}`);
 if (!fs.existsSync(reportPath)) throw new Error(`Report not found: ${reportPath}`);
 
-const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const selected = (report.selected || []).filter((row) => row.repairable_from_same_entry).slice(0, limit);
 
 const sourceDb = new Database(sourceDbPath, { readonly: true });
-sourceDb.pragma("busy_timeout = 30000");
+sourceDb.pragma('busy_timeout = 30000');
 
 const entryById = sourceDb.prepare(`
   SELECT id, word, normalized_key, source_lang, frequency_rank, status
@@ -104,17 +106,17 @@ const output = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf8');
 console.log(JSON.stringify({ ok: output.ok, out: path.relative(process.cwd(), outPath), stats }, null, 2));
 
 function buildCandidate(row) {
   const errors = [];
   const entry = entryById.get(row.source_entry_id);
-  if (!entry) errors.push("missing_source_entry");
+  if (!entry) errors.push('missing_source_entry');
   const firstSense = senseById.get(row.first_sense_id);
-  if (!firstSense) errors.push("missing_first_sense");
-  if (entry && firstSense && firstSense.entry_id !== entry.id) errors.push("first_sense_entry_mismatch");
-  if (entry && !sourceScriptOk(entry.word, entry.source_lang)) errors.push("source_script_mismatch");
+  if (!firstSense) errors.push('missing_first_sense');
+  if (entry && firstSense && firstSense.entry_id !== entry.id) errors.push('first_sense_entry_mismatch');
+  if (entry && !sourceScriptOk(entry.word, entry.source_lang)) errors.push('source_script_mismatch');
 
   if (errors.length) return { row, valid: false, errors };
 
@@ -140,12 +142,12 @@ function buildCandidate(row) {
     if (!loc) continue;
     if (!nonEmpty(loc.term)) errors.push(`missing_term_${lang}`);
     if (!nonEmpty(loc.definition)) errors.push(`missing_definition_${lang}`);
-    if ((lang === "zh" || lang === "ja") && !nonEmpty(loc.reading)) errors.push(`missing_reading_${lang}`);
+    if ((lang === 'zh' || lang === 'ja') && !nonEmpty(loc.reading)) errors.push(`missing_reading_${lang}`);
   }
 
   const sourceLoc = localizations.find((loc) => loc.lang === entry.source_lang);
   if (sourceLoc && normalize(sourceLoc.term) !== normalize(entry.word)) {
-    errors.push("source_term_does_not_match_headword");
+    errors.push('source_term_does_not_match_headword');
   }
 
   return {
@@ -181,18 +183,18 @@ function cleanLocalizations(rows, senseId) {
 
 function applyRepairs(items, stats) {
   const db = new Database(productDbPath);
-  db.pragma("foreign_keys = ON");
-  db.pragma("busy_timeout = 30000");
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 30000');
 
   const statements = {
-    getEntry: db.prepare("SELECT id FROM product_entries WHERE group_key = ?"),
+    getEntry: db.prepare('SELECT id FROM product_entries WHERE group_key = ?'),
     insertEntry: db.prepare(`
       INSERT INTO product_entries
         (headword, normalized_key, primary_lang, frequency_rank, group_key, group_method, status, source_count, lang_count, created_at)
       VALUES
         (@headword, @normalized_key, @primary_lang, @frequency_rank, @group_key, 'incomplete_gap_repair', 'accepted', 1, 4, @created_at)
     `),
-    getSense: db.prepare("SELECT id FROM product_senses WHERE product_entry_id = ? AND gloss_key = ?"),
+    getSense: db.prepare('SELECT id FROM product_senses WHERE product_entry_id = ? AND gloss_key = ?'),
     insertSense: db.prepare(`
       INSERT INTO product_senses
         (product_entry_id, sense_order, part_of_speech, gloss_key, status, confidence, created_at)
@@ -304,37 +306,42 @@ function compatibleGloss(a, b) {
 }
 
 function normalizeGloss(value) {
-  return String(value || "")
-    .normalize("NFKC")
+  return String(value || '')
+    .normalize('NFKC')
     .toLowerCase()
-    .replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9fff]+/gu, " ")
+    .replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9fff]+/gu, ' ')
     .trim();
 }
 
 function sourceScriptOk(word, lang) {
-  const text = String(word || "").trim();
+  const text = String(word || '').trim();
   if (!text) return false;
   const hasLatin = /\p{Script=Latin}/u.test(text);
   const hasHan = /\p{Script=Han}/u.test(text);
   const hasHiragana = /\p{Script=Hiragana}/u.test(text);
   const hasKatakana = /\p{Script=Katakana}/u.test(text);
   const hasKana = hasHiragana || hasKatakana || /[\u30fc\uff70]/u.test(text);
-  if (lang === "zh") return hasHan && !hasKana;
-  if (lang === "ja") return hasHan || hasKana;
-  if (lang === "en" || lang === "pt-BR") return !hasHan && !hasKana && hasLatin;
+  if (lang === 'zh') return hasHan && !hasKana;
+  if (lang === 'ja') return hasHan || hasKana;
+  if (lang === 'en' || lang === 'pt-BR') return !hasHan && !hasKana && hasLatin;
   return true;
 }
 
 function nonEmpty(value) {
-  return typeof value === "string" && value.trim().length > 0;
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function preview(value, length) {
-  const text = String(value || "").trim().replace(/\s+/g, " ");
+  const text = String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ');
   return text.length > length ? `${text.slice(0, length - 1)}...` : text;
 }
 
@@ -342,10 +349,10 @@ function parseArgs(argv) {
   const result = {};
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const keyName = arg.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) result[keyName] = true;
+    if (!next || next.startsWith('--')) result[keyName] = true;
     else {
       result[keyName] = next;
       index++;

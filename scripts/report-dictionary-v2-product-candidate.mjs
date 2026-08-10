@@ -1,15 +1,15 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_candidate.db";
-const DEFAULT_OUT = "data/processed/product-candidate-report.json";
-const LANGS = ["en", "pt-BR", "zh", "ja"];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_candidate.db';
+const DEFAULT_OUT = 'data/processed/product-candidate-report.json';
+const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
-const sampleLimit = Number.parseInt(args.samples || "80", 10);
+const sampleLimit = Number.parseInt(args.samples || '80', 10);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Product candidate database not found: ${dbPath}`);
 
@@ -19,7 +19,7 @@ const count = (sql) => db.prepare(sql).get().n;
 const rows = (sql) => db.prepare(sql).all();
 const hasTable = (name) =>
   Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
-const hasPublicationBlocks = hasTable("product_sense_publication_blocks");
+const hasPublicationBlocks = hasTable('product_sense_publication_blocks');
 
 const totalSenses = count(`SELECT COUNT(*) AS n FROM product_senses`);
 const fullyLocalized = count(`
@@ -208,7 +208,7 @@ const report = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
 db.close();
 
 console.log(
@@ -243,14 +243,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[i + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       i++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

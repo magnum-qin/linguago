@@ -1,14 +1,14 @@
-import fs from "node:fs";
-import path from "node:path";
-import initSqlJs from "sql.js";
+import fs from 'node:fs';
+import path from 'node:path';
+import initSqlJs from 'sql.js';
 
 const term = process.argv[2];
-const DB_FILE = path.resolve(process.argv[3] || "data/dictionary.sqlite");
-const SQL_WASM = path.resolve("node_modules/sql.js/dist/sql-wasm.wasm");
-const LANGS = ["zh", "en", "pt-BR", "ja"];
+const DB_FILE = path.resolve(process.argv[3] || 'data/dictionary.sqlite');
+const SQL_WASM = path.resolve('node_modules/sql.js/dist/sql-wasm.wasm');
+const LANGS = ['zh', 'en', 'pt-BR', 'ja'];
 
 if (!term) {
-  console.error("Usage: node scripts/query-dictionary.mjs <term> [db-file]");
+  console.error('Usage: node scripts/query-dictionary.mjs <term> [db-file]');
   process.exit(1);
 }
 
@@ -68,7 +68,7 @@ const entries = [...matchById.entries()].map(([id, matchType]) => ({
 const result = entries.map((entry) => {
   const definitions = selectAll(
     db,
-    "SELECT sense_order, lang, definition FROM dictionary_definitions WHERE entry_id = ? ORDER BY sense_order, lang",
+    'SELECT sense_order, lang, definition FROM dictionary_definitions WHERE entry_id = ? ORDER BY sense_order, lang',
     [entry.id]
   );
   const definitionsBySense = new Map();
@@ -98,11 +98,7 @@ const result = entries.map((entry) => {
     ...entry,
     senses,
     translations: byLang(
-      selectAll(
-        db,
-        "SELECT lang, text, confidence FROM dictionary_translations WHERE entry_id = ?",
-        [entry.id]
-      )
+      selectAll(db, 'SELECT lang, text, confidence FROM dictionary_translations WHERE entry_id = ?', [entry.id])
     ),
     definitions: byLang(
       definitions
@@ -110,11 +106,7 @@ const result = entries.map((entry) => {
         .map(({ lang, definition }) => ({ lang, definition }))
     ),
     pronunciations: byLang(
-      selectAll(
-        db,
-        "SELECT lang, phonetic, audio_text FROM dictionary_pronunciations WHERE entry_id = ?",
-        [entry.id]
-      )
+      selectAll(db, 'SELECT lang, phonetic, audio_text FROM dictionary_pronunciations WHERE entry_id = ?', [entry.id])
     ),
     examples: selectAll(
       db,
@@ -146,11 +138,14 @@ function selectOne(db, sql, params = []) {
 function byLang(rows) {
   const output = Object.fromEntries(LANGS.map((lang) => [lang, null]));
   for (const row of rows) {
-    output[row.lang] = Object.fromEntries(Object.entries(row).filter(([key]) => key !== "lang"));
+    output[row.lang] = Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'lang'));
   }
   return output;
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }

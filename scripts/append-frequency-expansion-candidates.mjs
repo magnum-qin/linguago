@@ -1,25 +1,25 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
-const RAW_DIR = path.resolve("data/raw/frequency");
-const OUT_FILE = path.resolve("data/processed/frequency_candidates.jsonl");
-const REPORT_FILE = path.resolve("data/processed/frequency-expansion-report.json");
-const LANG_ORDER = (process.env.EXPANSION_LANG_ORDER || "zh,en,ja")
-  .split(",")
+const RAW_DIR = path.resolve('data/raw/frequency');
+const OUT_FILE = path.resolve('data/processed/frequency_candidates.jsonl');
+const REPORT_FILE = path.resolve('data/processed/frequency-expansion-report.json');
+const LANG_ORDER = (process.env.EXPANSION_LANG_ORDER || 'zh,en,ja')
+  .split(',')
   .map((lang) => lang.trim())
   .filter(Boolean);
 const PER_LANG = Number(process.env.EXPANSION_PER_LANG || 2000);
 const ROUND = process.env.EXPANSION_ROUND || `freq-expansion-${new Date().toISOString().slice(0, 10)}`;
 
 const frequencyFiles = {
-  zh: ["frequencywords-zh_50k.txt", "wordfrequency-zh-CN.txt"],
-  en: ["frequencywords-en_50k.txt", "wordfrequency-en.txt"],
-  ja: ["frequencywords-ja_50k.txt", "wordfrequency-ja.txt"]
+  zh: ['frequencywords-zh_50k.txt', 'wordfrequency-zh-CN.txt'],
+  en: ['frequencywords-en_50k.txt', 'wordfrequency-en.txt'],
+  ja: ['frequencywords-ja_50k.txt', 'wordfrequency-ja.txt']
 };
 
 if (!fs.existsSync(OUT_FILE)) throw new Error(`Candidate file not found: ${OUT_FILE}`);
 
-const existingLines = fs.readFileSync(OUT_FILE, "utf8").split(/\r?\n/).filter(Boolean);
+const existingLines = fs.readFileSync(OUT_FILE, 'utf8').split(/\r?\n/).filter(Boolean);
 const seen = new Set();
 for (const line of existingLines) {
   const row = JSON.parse(line);
@@ -66,7 +66,7 @@ for (const lang of LANG_ORDER) {
         normalized_headword: normalize(headword),
         source_lang: lang,
         source_id: `frequency-expansion-${lang}`,
-        source_license: "Verify upstream frequency list license before redistribution",
+        source_license: 'Verify upstream frequency list license before redistribution',
         source_ref: { frequency_term: term, frequency_source: file },
         hints: {},
         frequency_rank: rank,
@@ -91,7 +91,7 @@ for (const lang of LANG_ORDER) {
 }
 
 if (appended.length) {
-  fs.appendFileSync(OUT_FILE, appended.map((row) => JSON.stringify(row)).join("\n") + "\n");
+  fs.appendFileSync(OUT_FILE, appended.map((row) => JSON.stringify(row)).join('\n') + '\n');
 }
 
 report.appended = appended.length;
@@ -103,7 +103,7 @@ console.log(JSON.stringify(report, null, 2));
 function readFrequencyTerms(file, lang) {
   if (!fs.existsSync(file)) return [];
   return fs
-    .readFileSync(file, "utf8")
+    .readFileSync(file, 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
@@ -117,7 +117,7 @@ function readFrequencyTerms(file, lang) {
 function isHeader(term, lang, index) {
   if (index !== 0) return false;
   const lower = term.toLowerCase();
-  return lower === lang.toLowerCase() || (lang === "zh" && lower === "zh-cn");
+  return lower === lang.toLowerCase() || (lang === 'zh' && lower === 'zh-cn');
 }
 
 function makeKey(lang, term) {
@@ -125,22 +125,25 @@ function makeKey(lang, term) {
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function displayTerm(term, lang) {
-  const normalized = term.normalize("NFKC").trim();
-  return lang === "en" ? normalized.toLocaleLowerCase() : normalized;
+  const normalized = term.normalize('NFKC').trim();
+  return lang === 'en' ? normalized.toLocaleLowerCase() : normalized;
 }
 
 function isGoodTerm(term, lang) {
-  const text = term.normalize("NFKC").trim();
+  const text = term.normalize('NFKC').trim();
   if (!text || /[0-9_/@#%&*=+()[\]{}<>]/.test(text)) return false;
-  if (lang === "zh") return /^[\u3400-\u9fff]{1,6}$/u.test(text);
-  if (lang === "ja") {
+  if (lang === 'zh') return /^[\u3400-\u9fff]{1,6}$/u.test(text);
+  if (lang === 'ja') {
     return /[\u3041-\u3096\u30a1-\u30fa\u3400-\u9fff]/u.test(text) && !/^[a-z]+$/i.test(text) && text.length <= 12;
   }
-  if (lang === "en") {
+  if (lang === 'en') {
     if (/^(don|doesn|didn|isn|aren|wasn|weren|can|couldn|wouldn|shouldn|won|haven|hasn|hadn|ain|let)$/i.test(text)) {
       return false;
     }

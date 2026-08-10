@@ -1,13 +1,13 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_staging.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_staging.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const dryRun = args["dry-run"] === "true";
+const dryRun = args['dry-run'] === 'true';
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
+db.pragma('foreign_keys = ON');
 
 const statements = {
   entries: db.prepare(`
@@ -36,20 +36,24 @@ const statements = {
     VALUES
       (?, ?, ?, ?)
   `),
-  deleteSourceLinks: db.prepare("DELETE FROM sense_source_links WHERE sense_id = ?"),
-  localizations: db.prepare("SELECT * FROM sense_localizations WHERE sense_id = ?"),
-  hasLocalization: db.prepare("SELECT id FROM sense_localizations WHERE sense_id = ? AND lang = ?"),
-  moveLocalization: db.prepare("UPDATE sense_localizations SET sense_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"),
-  deleteLocalization: db.prepare("DELETE FROM sense_localizations WHERE id = ?"),
-  examples: db.prepare("SELECT id FROM examples WHERE sense_id = ? ORDER BY example_order, id"),
-  maxExampleOrder: db.prepare("SELECT COALESCE(MAX(example_order), 0) AS n FROM examples WHERE sense_id = ?"),
-  moveExample: db.prepare("UPDATE examples SET sense_id = ?, example_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"),
+  deleteSourceLinks: db.prepare('DELETE FROM sense_source_links WHERE sense_id = ?'),
+  localizations: db.prepare('SELECT * FROM sense_localizations WHERE sense_id = ?'),
+  hasLocalization: db.prepare('SELECT id FROM sense_localizations WHERE sense_id = ? AND lang = ?'),
+  moveLocalization: db.prepare(
+    'UPDATE sense_localizations SET sense_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ),
+  deleteLocalization: db.prepare('DELETE FROM sense_localizations WHERE id = ?'),
+  examples: db.prepare('SELECT id FROM examples WHERE sense_id = ? ORDER BY example_order, id'),
+  maxExampleOrder: db.prepare('SELECT COALESCE(MAX(example_order), 0) AS n FROM examples WHERE sense_id = ?'),
+  moveExample: db.prepare(
+    'UPDATE examples SET sense_id = ?, example_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ),
   updateSenseIssue: db.prepare(`
     UPDATE quality_issues
     SET entity_id = ?
     WHERE entity_type IN ('sense', 'sense_localization') AND entity_id = ?
   `),
-  deleteSense: db.prepare("DELETE FROM senses WHERE id = ?")
+  deleteSense: db.prepare('DELETE FROM senses WHERE id = ?')
 };
 
 const stats = {
@@ -105,7 +109,7 @@ console.log(JSON.stringify({ ok: true, db: path.relative(process.cwd(), dbPath),
 
 function mergeSense(keep, drop) {
   for (const link of statements.sourceLinks.all(drop.id)) {
-    statements.insertSourceLink.run(keep.id, link.source_sense_id, "exact_gloss", link.confidence);
+    statements.insertSourceLink.run(keep.id, link.source_sense_id, 'exact_gloss', link.confidence);
     stats.source_links_moved++;
   }
   statements.deleteSourceLinks.run(drop.id);
@@ -141,22 +145,22 @@ function chooseKeepSense(a, b) {
 }
 
 function normalizeGloss(value) {
-  return String(value || "")
-    .normalize("NFKC")
+  return String(value || '')
+    .normalize('NFKC')
     .toLocaleLowerCase()
-    .replace(/\([^)]*\)/gu, " ")
-    .replace(/["'“”‘’`]/gu, "")
-    .replace(/[^a-z0-9\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu, " ")
+    .replace(/\([^)]*\)/gu, ' ')
+    .replace(/["'“”‘’`]/gu, '')
+    .replace(/[^a-z0-9\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu, ' ')
     .trim()
-    .replace(/\s+/gu, " ");
+    .replace(/\s+/gu, ' ');
 }
 
 function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg.startsWith("--")) {
-      result[arg.slice(2)] = argv[++i] || "true";
+    if (arg.startsWith('--')) {
+      result[arg.slice(2)] = argv[++i] || 'true';
     }
   }
   return result;

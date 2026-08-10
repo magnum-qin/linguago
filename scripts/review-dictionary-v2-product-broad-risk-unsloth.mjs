@@ -1,48 +1,48 @@
-import fs from "node:fs";
-import path from "node:path";
-import { performance } from "node:perf_hooks";
+import fs from 'node:fs';
+import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
-const DEFAULT_REPORT = "logs/product-broad-risk-triage-20260625.json";
-const DEFAULT_OUT = "logs/product-broad-risk-llm-review-20260625.json";
-const DEFAULT_MODEL = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF";
+const DEFAULT_REPORT = 'logs/product-broad-risk-triage-20260625.json';
+const DEFAULT_OUT = 'logs/product-broad-risk-llm-review-20260625.json';
+const DEFAULT_MODEL = 'unsloth/Qwen3.6-35B-A3B-MTP-GGUF';
 const DEFAULT_ENDPOINTS = [
-  "http://100.99.99.99:11441",
-  "http://100.99.99.99:11444",
-  "http://100.99.99.99:11448",
-  "http://100.99.99.99:11447"
+  'http://100.99.99.99:11441',
+  'http://100.99.99.99:11444',
+  'http://100.99.99.99:11448',
+  'http://100.99.99.99:11447'
 ];
-const LANGS = ["en", "zh", "ja", "pt-BR"];
+const LANGS = ['en', 'zh', 'ja', 'pt-BR'];
 
 const args = parseArgs(process.argv.slice(2));
 const reportPath = path.resolve(args.report || DEFAULT_REPORT);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
 const token = args.token || process.env.UNSLOTH_API_KEY;
 const model = args.model || DEFAULT_MODEL;
-const endpoints = String(args.endpoints || DEFAULT_ENDPOINTS.join(","))
-  .split(",")
-  .map((item) => item.trim().replace(/\/$/u, ""))
+const endpoints = String(args.endpoints || DEFAULT_ENDPOINTS.join(','))
+  .split(',')
+  .map((item) => item.trim().replace(/\/$/u, ''))
   .filter(Boolean);
 const limit = Number(args.limit || 12);
 const concurrency = Number(args.concurrency || Math.min(2, endpoints.length));
-const timeoutMs = Number(args["timeout-ms"] || 180_000);
-const maxTokens = Number(args["max-tokens"] || 900);
-const prewarm = args.prewarm !== "false";
-const dryRun = args["dry-run"] === "true";
-const ggufVariant = args["gguf-variant"] || "UD-IQ4_NL";
-const maxSeqLength = Number(args["max-seq-length"] || 8192);
-const speculativeType = args["speculative-type"] || "mtp";
+const timeoutMs = Number(args['timeout-ms'] || 180_000);
+const maxTokens = Number(args['max-tokens'] || 900);
+const prewarm = args.prewarm !== 'false';
+const dryRun = args['dry-run'] === 'true';
+const ggufVariant = args['gguf-variant'] || 'UD-IQ4_NL';
+const maxSeqLength = Number(args['max-seq-length'] || 8192);
+const speculativeType = args['speculative-type'] || 'mtp';
 const retries = Number(args.retries || 1);
 
 if (!fs.existsSync(reportPath)) throw new Error(`Triage report not found: ${reportPath}`);
 if (!Number.isInteger(limit) || limit < 1) throw new Error(`Invalid --limit: ${args.limit}`);
 if (!Number.isInteger(concurrency) || concurrency < 1) throw new Error(`Invalid --concurrency: ${args.concurrency}`);
-if (!endpoints.length) throw new Error("No endpoints configured");
-if (!dryRun && !token) throw new Error("Missing --token or UNSLOTH_API_KEY");
+if (!endpoints.length) throw new Error('No endpoints configured');
+if (!dryRun && !token) throw new Error('Missing --token or UNSLOTH_API_KEY');
 
-const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const candidates = (report.llm_candidates || []).slice(0, limit).map(toReviewCandidate);
 
-if (!candidates.length) throw new Error("No llm_candidates found in triage report");
+if (!candidates.length) throw new Error('No llm_candidates found in triage report');
 
 if (dryRun) {
   const output = {
@@ -53,7 +53,13 @@ if (dryRun) {
     candidates
   };
   writeJson(outPath, output);
-  console.log(JSON.stringify({ ok: true, dry_run: true, selected: candidates.length, out: path.relative(process.cwd(), outPath) }, null, 2));
+  console.log(
+    JSON.stringify(
+      { ok: true, dry_run: true, selected: candidates.length, out: path.relative(process.cwd(), outPath) },
+      null,
+      2
+    )
+  );
   process.exit(0);
 }
 
@@ -96,7 +102,7 @@ async function runPool(rows) {
       results[current] = result;
       console.log(
         `[${current + 1}/${rows.length}] ${candidate.product_entry.headword} sense=${candidate.product_sense.id} -> ${
-          result.valid ? result.decision : "error"
+          result.valid ? result.decision : 'error'
         }`
       );
     }
@@ -132,7 +138,7 @@ async function reviewCandidate(candidate, endpoint) {
   const requestStarted = performance.now();
   const data = await postJson(
     endpoint,
-    "/v1/chat/completions",
+    '/v1/chat/completions',
     {
       model,
       stream: false,
@@ -140,17 +146,17 @@ async function reviewCandidate(candidate, endpoint) {
       max_tokens: maxTokens,
       messages: [
         {
-          role: "system",
+          role: 'system',
           content:
-            "You audit a four-language dictionary. Return only valid JSON. " +
-            "Judge whether one published product sense is over-broad and should be split, manually repaired, blocked, or kept."
+            'You audit a four-language dictionary. Return only valid JSON. ' +
+            'Judge whether one published product sense is over-broad and should be split, manually repaired, blocked, or kept.'
         },
-        { role: "user", content: buildPrompt(candidate) }
+        { role: 'user', content: buildPrompt(candidate) }
       ]
     },
     timeoutMs
   );
-  const content = data?.choices?.[0]?.message?.content || "";
+  const content = data?.choices?.[0]?.message?.content || '';
   let parsed;
   try {
     parsed = parseJson(content);
@@ -165,10 +171,10 @@ async function reviewCandidate(candidate, endpoint) {
       seconds: secondsSince(requestStarted),
       usage: data.usage || null,
       valid: false,
-      validation_errors: ["json_parse_failed"],
+      validation_errors: ['json_parse_failed'],
       decision: null,
       confidence: null,
-      reason: "",
+      reason: '',
       suggested_senses: [],
       evidence: [],
       candidate,
@@ -190,7 +196,7 @@ async function reviewCandidate(candidate, endpoint) {
     validation_errors: validation.errors,
     decision: parsed?.decision || null,
     confidence: parsed?.confidence ?? null,
-    reason: parsed?.reason || "",
+    reason: parsed?.reason || '',
     suggested_senses: Array.isArray(parsed?.suggested_senses) ? parsed.suggested_senses : [],
     evidence: Array.isArray(parsed?.evidence) ? parsed.evidence : [],
     candidate,
@@ -199,7 +205,7 @@ async function reviewCandidate(candidate, endpoint) {
 }
 
 function shouldRetry(result) {
-  const error = `${result.error || ""} ${(result.validation_errors || []).join(" ")}`;
+  const error = `${result.error || ''} ${(result.validation_errors || []).join(' ')}`;
   return /fetch failed|No model loaded|json_parse_failed|HTTP 5\d\d|ECONNRESET|ETIMEDOUT/iu.test(error);
 }
 
@@ -283,14 +289,16 @@ ${JSON.stringify(candidate, null, 2)}`;
 
 function validateReview(parsed) {
   const errors = [];
-  if (!parsed || typeof parsed !== "object") return { ok: false, errors: ["not_json_object"] };
-  if (!["keep", "split", "manual_repair", "block"].includes(parsed.decision)) errors.push("invalid_decision");
-  if (typeof parsed.confidence !== "number" || parsed.confidence < 0 || parsed.confidence > 1) errors.push("invalid_confidence");
-  if (typeof parsed.reason !== "string" || !parsed.reason.trim()) errors.push("missing_reason");
-  if (!Array.isArray(parsed.evidence) || parsed.evidence.length < 1) errors.push("missing_evidence");
-  if (!Array.isArray(parsed.suggested_senses)) errors.push("missing_suggested_senses");
-  if (parsed.decision === "split" && parsed.suggested_senses?.length < 2) errors.push("split_requires_2_senses");
-  if (parsed.decision !== "split" && parsed.suggested_senses?.length) errors.push("non_split_suggested_senses_must_be_empty");
+  if (!parsed || typeof parsed !== 'object') return { ok: false, errors: ['not_json_object'] };
+  if (!['keep', 'split', 'manual_repair', 'block'].includes(parsed.decision)) errors.push('invalid_decision');
+  if (typeof parsed.confidence !== 'number' || parsed.confidence < 0 || parsed.confidence > 1)
+    errors.push('invalid_confidence');
+  if (typeof parsed.reason !== 'string' || !parsed.reason.trim()) errors.push('missing_reason');
+  if (!Array.isArray(parsed.evidence) || parsed.evidence.length < 1) errors.push('missing_evidence');
+  if (!Array.isArray(parsed.suggested_senses)) errors.push('missing_suggested_senses');
+  if (parsed.decision === 'split' && parsed.suggested_senses?.length < 2) errors.push('split_requires_2_senses');
+  if (parsed.decision !== 'split' && parsed.suggested_senses?.length)
+    errors.push('non_split_suggested_senses_must_be_empty');
   return { ok: errors.length === 0, errors };
 }
 
@@ -302,7 +310,7 @@ async function prewarmEndpoints() {
       try {
         const data = await postJson(
           endpoint,
-          "/v1/load",
+          '/v1/load',
           {
             model_path: model,
             max_seq_length: maxSeqLength,
@@ -312,7 +320,12 @@ async function prewarmEndpoints() {
           },
           300_000
         );
-        results.push({ endpoint, ok: true, seconds: secondsSince(started), active_model: data.model_path || data.display_name || model });
+        results.push({
+          endpoint,
+          ok: true,
+          seconds: secondsSince(started),
+          active_model: data.model_path || data.display_name || model
+        });
       } catch (error) {
         results.push({ endpoint, ok: false, seconds: secondsSince(started), error: errorMessage(error) });
       }
@@ -323,8 +336,8 @@ async function prewarmEndpoints() {
 
 async function postJson(endpoint, pathName, body, timeout) {
   const response = await fetch(`${endpoint}${pathName}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeout)
   });
@@ -338,12 +351,12 @@ async function postJson(endpoint, pathName, body, timeout) {
 }
 
 function parseJson(content) {
-  const text = String(content || "").trim();
+  const text = String(content || '').trim();
   try {
     return JSON.parse(text);
   } catch {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
     if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1));
     throw new Error(`json_parse_failed: ${text.slice(0, 300)}`);
   }
@@ -354,8 +367,10 @@ function summarize(rows) {
     total: rows.length,
     valid: rows.filter((row) => row.valid).length,
     invalid: rows.filter((row) => !row.valid).length,
-    by_decision: countBy(rows.map((row) => (row.valid ? row.decision : "invalid"))),
-    avg_seconds: rows.length ? Number((rows.reduce((sum, row) => sum + (row.seconds || 0), 0) / rows.length).toFixed(2)) : 0
+    by_decision: countBy(rows.map((row) => (row.valid ? row.decision : 'invalid'))),
+    avg_seconds: rows.length
+      ? Number((rows.reduce((sum, row) => sum + (row.seconds || 0), 0) / rows.length).toFixed(2))
+      : 0
   };
 }
 
@@ -367,7 +382,7 @@ function countBy(values) {
 
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8');
 }
 
 function secondsSince(started) {
@@ -382,14 +397,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

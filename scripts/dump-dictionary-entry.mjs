@@ -1,20 +1,20 @@
-import fs from "node:fs";
-import path from "node:path";
-import initSqlJs from "sql.js";
+import fs from 'node:fs';
+import path from 'node:path';
+import initSqlJs from 'sql.js';
 
-const DB_FILE = path.resolve(process.argv[2] || "data/dictionary.sqlite");
+const DB_FILE = path.resolve(process.argv[2] || 'data/dictionary.sqlite');
 const ENTRY_ID_OR_HEADWORD = process.argv[3];
-const SQL_WASM = path.resolve("node_modules/sql.js/dist/sql-wasm.wasm");
+const SQL_WASM = path.resolve('node_modules/sql.js/dist/sql-wasm.wasm');
 
-if (!ENTRY_ID_OR_HEADWORD) throw new Error("Usage: node scripts/dump-dictionary-entry.mjs <db> <entry-id-or-headword>");
+if (!ENTRY_ID_OR_HEADWORD) throw new Error('Usage: node scripts/dump-dictionary-entry.mjs <db> <entry-id-or-headword>');
 if (!fs.existsSync(DB_FILE)) throw new Error(`Database not found: ${DB_FILE}`);
 
 const SQL = await initSqlJs({ wasmBinary: fs.readFileSync(SQL_WASM) });
 const db = new SQL.Database(fs.readFileSync(DB_FILE));
 const entry = Number.isFinite(Number(ENTRY_ID_OR_HEADWORD))
-  ? one("SELECT * FROM dictionary_entries WHERE id = ?", [Number(ENTRY_ID_OR_HEADWORD)])
+  ? one('SELECT * FROM dictionary_entries WHERE id = ?', [Number(ENTRY_ID_OR_HEADWORD)])
   : one(
-      "SELECT * FROM dictionary_entries WHERE normalized_headword = ? OR headword = ? ORDER BY quality_score DESC LIMIT 1",
+      'SELECT * FROM dictionary_entries WHERE normalized_headword = ? OR headword = ? ORDER BY quality_score DESC LIMIT 1',
       [normalize(ENTRY_ID_OR_HEADWORD), ENTRY_ID_OR_HEADWORD]
     );
 
@@ -75,5 +75,8 @@ function all(sql, params = []) {
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }

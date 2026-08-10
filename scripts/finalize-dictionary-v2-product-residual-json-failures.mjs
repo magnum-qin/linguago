@@ -1,12 +1,12 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const dryRun = args["dry-run"] !== "false";
-const source = "known-residual-json-failures-finalize-20260620";
+const dryRun = args['dry-run'] !== 'false';
+const source = 'known-residual-json-failures-finalize-20260620';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
@@ -14,44 +14,45 @@ const fixes = [
   {
     job_id: 53125,
     sense_id: 7922,
-    lang: "ja",
-    term: "得点；走行",
-    reading: "とくてん；そうこう",
-    reading_system: "kana",
+    lang: 'ja',
+    term: '得点；走行',
+    reading: 'とくてん；そうこう',
+    reading_system: 'kana',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "野球などで走者が得る得点、または走ること・試験的な運転や連続した動作を表す語。"
+    definition: '野球などで走者が得る得点、または走ること・試験的な運転や連続した動作を表す語。'
   },
   {
     job_id: 53126,
     sense_id: 11199,
-    lang: "ja",
-    term: "中断；休憩；破損",
-    reading: "ちゅうだん；きゅうけい；はそん",
-    reading_system: "kana",
+    lang: 'ja',
+    term: '中断；休憩；破損',
+    reading: 'ちゅうだん；きゅうけい；はそん',
+    reading_system: 'kana',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "活動を一時的に止めること、休み、または物が割れる・壊れること。"
+    definition: '活動を一時的に止めること、休み、または物が割れる・壊れること。'
   },
   {
     job_id: 53129,
     sense_id: 11199,
-    lang: "pt-BR",
-    term: "pausas; quebras",
+    lang: 'pt-BR',
+    term: 'pausas; quebras',
     reading: null,
     reading_system: null,
-    pronunciation: "/ˈpaw.zas ˈkɛ.bɾas/",
-    pronunciation_system: "IPA",
-    definition: "Interrupções, intervalos ou rupturas; também pode indicar uma ocorrência inesperada que interrompe uma atividade."
+    pronunciation: '/ˈpaw.zas ˈkɛ.bɾas/',
+    pronunciation_system: 'IPA',
+    definition:
+      'Interrupções, intervalos ou rupturas; também pode indicar uma ocorrência inesperada que interrompe uma atividade.'
   }
 ];
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const statements = {
-  findLocalization: db.prepare("SELECT id FROM product_localizations WHERE product_sense_id = ? AND lang = ?"),
+  findLocalization: db.prepare('SELECT id FROM product_localizations WHERE product_sense_id = ? AND lang = ?'),
   updateLocalization: db.prepare(`
     UPDATE product_localizations
     SET term = @term,
@@ -97,14 +98,14 @@ const statements = {
     WHERE id = ?
       AND status IN ('ready_for_llm', 'needs_review', 'draft_fused', 'draft_single_source')
   `),
-  senseEntry: db.prepare("SELECT product_entry_id FROM product_senses WHERE id = ?"),
+  senseEntry: db.prepare('SELECT product_entry_id FROM product_senses WHERE id = ?'),
   entryStatusCounts: db.prepare(`
     SELECT status, COUNT(*) AS count
     FROM product_senses
     WHERE product_entry_id = ?
     GROUP BY status
   `),
-  setEntryStatus: db.prepare("UPDATE product_entries SET status = ? WHERE id = ?")
+  setEntryStatus: db.prepare('UPDATE product_entries SET status = ? WHERE id = ?')
 };
 
 const stats = {
@@ -154,18 +155,18 @@ function applyFix(fix) {
 function updateEntryStatus(productEntryId) {
   const statuses = statements.entryStatusCounts.all(productEntryId);
   const total = statuses.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = statuses.find((row) => row.status === "accepted")?.count || 0;
-  if (accepted === total) statements.setEntryStatus.run("accepted", productEntryId);
+  const accepted = statuses.find((row) => row.status === 'accepted')?.count || 0;
+  if (accepted === total) statements.setEntryStatus.run('accepted', productEntryId);
 }
 
 function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

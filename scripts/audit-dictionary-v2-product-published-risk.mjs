@@ -1,10 +1,10 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_OUT = "data/processed/product-published-risk-audit.json";
-const LANGS = ["en", "pt-BR", "zh", "ja"];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_OUT = 'data/processed/product-published-risk-audit.json';
+const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
@@ -14,7 +14,7 @@ const sampleLimit = boundedLimit(args.samples || 20, 1, 100);
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath, { readonly: true });
-db.pragma("busy_timeout = 30000");
+db.pragma('busy_timeout = 30000');
 
 const hasPublicationBlocks = Boolean(
   db
@@ -172,7 +172,7 @@ const result = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(result, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(result, null, 2), 'utf8');
 
 console.log(
   JSON.stringify(
@@ -191,38 +191,53 @@ db.close();
 
 function classifyRisk(row, localizations) {
   const issues = [];
-  const gloss = String(row.gloss_key || "");
+  const gloss = String(row.gloss_key || '');
   const normalizedGloss = gloss.toLowerCase();
   const shortGloss = gloss.trim().length <= 3;
-  const multiplePosMarkers = countMatches(gloss, /(?:^|\\n|\n)[a-z. &,-]{0,18}\b(?:n|v|a|adv|adj|pron|prep|conj|int|r|s)\./giu);
-  const semicolonParts = gloss.split(";").map((part) => part.trim()).filter(Boolean).length;
-  const distinctSourceWords = splitCsv(
-    row.source_words ||
-      ""
-  ).length;
+  const multiplePosMarkers = countMatches(
+    gloss,
+    /(?:^|\\n|\n)[a-z. &,-]{0,18}\b(?:n|v|a|adv|adj|pron|prep|conj|int|r|s)\./giu
+  );
+  const semicolonParts = gloss
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean).length;
+  const distinctSourceWords = splitCsv(row.source_words || '').length;
 
   if (multiplePosMarkers >= 3 || semicolonParts >= 5) {
-    issues.push("broad_multi_definition_gloss");
+    issues.push('broad_multi_definition_gloss');
   }
 
-  if (row.primary_lang === "en" && localizations.en?.term && isEnglishTermConflict(row.headword, localizations.en.term)) {
-    issues.push("primary_english_term_conflict");
+  if (
+    row.primary_lang === 'en' &&
+    localizations.en?.term &&
+    isEnglishTermConflict(row.headword, localizations.en.term)
+  ) {
+    issues.push('primary_english_term_conflict');
   }
 
   if (shortGloss && !isLikelyAcceptableShortFunctionSense(row, localizations)) {
-    issues.push("short_gloss_needs_review");
+    issues.push('short_gloss_needs_review');
   }
 
-  if (row.entry_source_count >= 6 && row.sense_source_count >= 6 && (multiplePosMarkers >= 3 || semicolonParts >= 4 || distinctSourceWords >= 6)) {
-    issues.push("high_source_count_broad_sense");
+  if (
+    row.entry_source_count >= 6 &&
+    row.sense_source_count >= 6 &&
+    (multiplePosMarkers >= 3 || semicolonParts >= 4 || distinctSourceWords >= 6)
+  ) {
+    issues.push('high_source_count_broad_sense');
   }
 
-  if (row.primary_lang === "en" && localizations.zh?.term === "吗" && !/question|interrog|whether|particle/u.test(normalizedGloss)) {
-    issues.push("suspicious_zh_question_particle");
+  if (
+    row.primary_lang === 'en' &&
+    localizations.zh?.term === '吗' &&
+    !/question|interrog|whether|particle/u.test(normalizedGloss)
+  ) {
+    issues.push('suspicious_zh_question_particle');
   }
 
-  if (row.primary_lang === "ja" && shortGloss && localizations.en?.term && localizations.en.term.length <= 2) {
-    issues.push("short_japanese_particle_or_kana_sense");
+  if (row.primary_lang === 'ja' && shortGloss && localizations.en?.term && localizations.en.term.length <= 2) {
+    issues.push('short_japanese_particle_or_kana_sense');
   }
 
   return [...new Set(issues)];
@@ -235,35 +250,35 @@ function isEnglishTermConflict(headword, term) {
   if (normalizedHeadword === normalizedTerm) return false;
   if (normalizedTerm.includes(normalizedHeadword) || normalizedHeadword.includes(normalizedTerm)) return false;
   const allowedParaphrases = new Set([
-    "be able to",
-    "to be",
-    "to do",
-    "to go",
-    "to have",
-    "to make",
-    "to say",
-    "to see",
-    "to take"
+    'be able to',
+    'to be',
+    'to do',
+    'to go',
+    'to have',
+    'to make',
+    'to say',
+    'to see',
+    'to take'
   ]);
   return !allowedParaphrases.has(normalizedTerm);
 }
 
 function normalizeEnglishTerm(value) {
-  return String(value || "")
+  return String(value || '')
     .toLowerCase()
-    .replace(/^to\s+/u, "")
-    .replace(/[^a-z0-9]+/gu, " ")
+    .replace(/^to\s+/u, '')
+    .replace(/[^a-z0-9]+/gu, ' ')
     .trim()
-    .replace(/\s+/gu, " ");
+    .replace(/\s+/gu, ' ');
 }
 
 function isLikelyAcceptableShortFunctionSense(row, localizations) {
   const pos = cleanPartOfSpeech(row.part_of_speech).toLowerCase();
-  const gloss = String(row.gloss_key || "").trim();
-  const headword = String(row.headword || "");
-  if (["i", "we", "be", "do", "or", "by"].includes(gloss.toLowerCase())) return true;
+  const gloss = String(row.gloss_key || '').trim();
+  const headword = String(row.headword || '');
+  if (['i', 'we', 'be', 'do', 'or', 'by'].includes(gloss.toLowerCase())) return true;
   if (/prt|aux|pn|pron|conj|prep|int/.test(pos)) return true;
-  if (row.primary_lang === "ja" && [...headword].length <= 2) return true;
+  if (row.primary_lang === 'ja' && [...headword].length <= 2) return true;
   const localizedTerms = LANGS.map((lang) => localizations[lang]?.term).filter(Boolean);
   return localizedTerms.length === 4 && new Set(localizedTerms.map((term) => term.toLowerCase())).size >= 3;
 }
@@ -310,32 +325,32 @@ function summarizeBuckets(map, limit) {
 }
 
 function recommend(summary) {
-  if (!summary.flagged_senses) return ["no published high-risk senses were flagged by deterministic checks"];
+  if (!summary.flagged_senses) return ['no published high-risk senses were flagged by deterministic checks'];
   return [
-    "review broad_multi_definition_gloss first; these are likely over-merged senses that need splitting",
-    "use deterministic rules for obvious function-word short glosses and reserve LLM review for broad multi-definition glosses",
-    "after review, create split plans instead of editing localizations when one product sense contains multiple meanings"
+    'review broad_multi_definition_gloss first; these are likely over-merged senses that need splitting',
+    'use deterministic rules for obvious function-word short glosses and reserve LLM review for broad multi-definition glosses',
+    'after review, create split plans instead of editing localizations when one product sense contains multiple meanings'
   ];
 }
 
 function cleanPartOfSpeech(value) {
-  return String(value || "").replace(/^&|;$/gu, "");
+  return String(value || '').replace(/^&|;$/gu, '');
 }
 
 function countMatches(value, regex) {
-  return [...String(value || "").matchAll(regex)].length;
+  return [...String(value || '').matchAll(regex)].length;
 }
 
 function splitCsv(value) {
-  return String(value || "")
-    .split(",")
+  return String(value || '')
+    .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
 function abbreviate(value, maxLength) {
   if (value == null) return null;
-  const text = String(value).replace(/\s+/g, " ").trim();
+  const text = String(value).replace(/\s+/g, ' ').trim();
   return text.length <= maxLength ? text : `${text.slice(0, maxLength - 1)}...`;
 }
 
@@ -349,10 +364,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

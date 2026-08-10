@@ -1,41 +1,41 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
-const DEFAULT_OUT_DB = "data/processed/linguago_v2_product_top5000_pilot.db";
-const LANGS = ["zh", "en", "pt-BR", "ja"];
+const DEFAULT_SOURCE_DB = 'data/processed/linguago_v2_full.db';
+const DEFAULT_OUT_DB = 'data/processed/linguago_v2_product_top5000_pilot.db';
+const LANGS = ['zh', 'en', 'pt-BR', 'ja'];
 const RISKY_FREEDICT_SHORT_GLOSSES = new Set([
-  "a",
-  "an",
-  "the",
-  "of",
-  "at",
-  "by",
-  "as",
-  "if",
-  "in",
-  "on",
-  "or",
-  "to",
-  "no",
-  "it",
-  "us",
-  "he",
-  "we",
-  "my",
-  "her",
-  "his",
-  "its"
+  'a',
+  'an',
+  'the',
+  'of',
+  'at',
+  'by',
+  'as',
+  'if',
+  'in',
+  'on',
+  'or',
+  'to',
+  'no',
+  'it',
+  'us',
+  'he',
+  'we',
+  'my',
+  'her',
+  'his',
+  'its'
 ]);
 
 const args = parseArgs(process.argv.slice(2));
 const sourceDbPath = path.resolve(args.db || DEFAULT_SOURCE_DB);
 const outDbPath = path.resolve(args.out || DEFAULT_OUT_DB);
-const maxRank = Number(args["max-rank"] || 5000);
-const maxSensesPerSourceEntry = Number(args["max-senses-per-entry"] || 3);
-const minGroupLinks = Number(args["min-group-links"] || 1);
-const reset = args.reset !== "false";
+const maxRank = Number(args['max-rank'] || 5000);
+const maxSensesPerSourceEntry = Number(args['max-senses-per-entry'] || 3);
+const minGroupLinks = Number(args['min-group-links'] || 1);
+const reset = args.reset !== 'false';
 
 if (!fs.existsSync(sourceDbPath)) {
   throw new Error(`Source database not found: ${sourceDbPath}`);
@@ -46,8 +46,8 @@ if (reset && fs.existsSync(outDbPath)) fs.rmSync(outDbPath);
 
 const sourceDb = new Database(sourceDbPath, { readonly: true });
 const outDb = new Database(outDbPath);
-outDb.pragma("foreign_keys = ON");
-outDb.pragma("journal_mode = WAL");
+outDb.pragma('foreign_keys = ON');
+outDb.pragma('journal_mode = WAL');
 
 createSchema(outDb);
 
@@ -80,8 +80,14 @@ const sourceRows = sourceDb
   )
   .all({ maxRank, maxSensesPerSourceEntry });
 
-const localizationsBySense = loadLocalizations(sourceDb, sourceRows.map((row) => row.source_sense_id));
-const examplesBySense = loadExamples(sourceDb, sourceRows.map((row) => row.source_sense_id));
+const localizationsBySense = loadLocalizations(
+  sourceDb,
+  sourceRows.map((row) => row.source_sense_id)
+);
+const examplesBySense = loadExamples(
+  sourceDb,
+  sourceRows.map((row) => row.source_sense_id)
+);
 const topEnglishEntries = new Set(
   sourceDb
     .prepare(
@@ -198,7 +204,7 @@ const writeGroups = outDb.transaction((orderedGroups) => {
       sense_order: 1,
       part_of_speech: representative.part_of_speech,
       gloss_key: group.displayGloss || representative.gloss_key,
-      status: group.languages.size >= 2 ? "draft_fused" : "draft_single_source",
+      status: group.languages.size >= 2 ? 'draft_fused' : 'draft_single_source',
       confidence: group.languages.size >= 2 ? 0.82 : 0.62
     });
     const productSenseId = Number(productSenseResult.lastInsertRowid);
@@ -280,13 +286,18 @@ const summary = {
     product_entries_per_scanned_source_sense: round(stats.product_entries / Math.max(stats.source_senses_scanned, 1), 4)
   },
   coverage: {
-    by_lang_rows: all(outDb, `
+    by_lang_rows: all(
+      outDb,
+      `
       SELECT lang, COUNT(*) AS rows
       FROM product_localizations
       GROUP BY lang
       ORDER BY lang
-    `),
-    localization_matrix: all(outDb, `
+    `
+    ),
+    localization_matrix: all(
+      outDb,
+      `
       SELECT localized_langs, COUNT(*) AS product_senses
       FROM (
         SELECT product_sense_id, COUNT(DISTINCT lang) AS localized_langs
@@ -295,8 +306,11 @@ const summary = {
       )
       GROUP BY localized_langs
       ORDER BY localized_langs
-    `),
-    source_lang_matrix: all(outDb, `
+    `
+    ),
+    source_lang_matrix: all(
+      outDb,
+      `
       SELECT linked_source_langs, COUNT(*) AS product_senses
       FROM (
         SELECT product_sense_id, COUNT(DISTINCT source_lang) AS linked_source_langs
@@ -305,8 +319,11 @@ const summary = {
       )
       GROUP BY linked_source_langs
       ORDER BY linked_source_langs
-    `),
-    top_groups: all(outDb, `
+    `
+    ),
+    top_groups: all(
+      outDb,
+      `
       SELECT pe.id, pe.headword, pe.primary_lang, pe.frequency_rank, pe.group_method, pe.source_count, pe.lang_count,
              ps.gloss_key,
              (SELECT group_concat(DISTINCT source_lang) FROM product_sense_source_links WHERE product_sense_id = ps.id) AS source_langs,
@@ -315,11 +332,12 @@ const summary = {
       JOIN product_senses ps ON ps.product_entry_id = pe.id
       ORDER BY pe.frequency_rank, pe.id
       LIMIT 20
-    `)
+    `
+    )
   }
 };
 
-fs.writeFileSync(outDbPath.replace(/\.db$/u, ".summary.json"), JSON.stringify(summary, null, 2));
+fs.writeFileSync(outDbPath.replace(/\.db$/u, '.summary.json'), JSON.stringify(summary, null, 2));
 
 sourceDb.close();
 outDb.close();
@@ -467,10 +485,10 @@ function loadExamples(db, senseIds) {
 function buildGroupKey(row, topEnglishEntries) {
   const pos = normalizePos(row.part_of_speech);
   const glossSignature = normalizeGlossSignature(row.gloss_key);
-  if (row.source_lang === "en") {
+  if (row.source_lang === 'en') {
     return {
       key: `en:${pos}:${row.normalized_key}`,
-      method: "english_headword",
+      method: 'english_headword',
       displayGloss: row.gloss_key
     };
   }
@@ -479,7 +497,7 @@ function buildGroupKey(row, topEnglishEntries) {
   if (directEnglish && topEnglishEntries.has(directEnglish)) {
     return {
       key: `en:${pos}:${directEnglish}`,
-      method: "gloss_to_top_english_headword",
+      method: 'gloss_to_top_english_headword',
       displayGloss: row.gloss_key
     };
   }
@@ -487,14 +505,14 @@ function buildGroupKey(row, topEnglishEntries) {
   if (glossSignature.length >= 4) {
     return {
       key: `gloss:${pos}:${glossSignature}`,
-      method: "normalized_gloss",
+      method: 'normalized_gloss',
       displayGloss: row.gloss_key
     };
   }
 
   return {
     key: `${row.source_lang}:${pos}:${row.normalized_key}`,
-    method: "source_headword_fallback",
+    method: 'source_headword_fallback',
     displayGloss: row.gloss_key
   };
 }
@@ -508,7 +526,7 @@ function productEntryInfo(group, representative) {
     frequency_rank: group.bestRank,
     group_key: group.key,
     group_method: group.method,
-    status: group.languages.size >= 2 ? "draft_fused" : "draft_single_source",
+    status: group.languages.size >= 2 ? 'draft_fused' : 'draft_single_source',
     source_count: group.rows.length,
     lang_count: group.languages.size
   };
@@ -575,7 +593,7 @@ function localizationCompleteness(row) {
 }
 
 function matchesProductProfile(row) {
-  const word = String(row.word || "").trim();
+  const word = String(row.word || '').trim();
   if (!word || word.length > 32) return false;
   if (/^\d+$/u.test(word)) return false;
   if (/[_/@#&+=]/u.test(word)) return false;
@@ -583,8 +601,8 @@ function matchesProductProfile(row) {
   if (/[()"'鈥溾€漖]/u.test(word)) return false;
   if (/^\p{P}+$/u.test(word)) return false;
 
-  const gloss = String(row.gloss_key || "").toLowerCase();
-  if (!gloss || gloss === "missing gloss") return false;
+  const gloss = String(row.gloss_key || '').toLowerCase();
+  if (!gloss || gloss === 'missing gloss') return false;
   if (
     /\b(surname|family name|place name|old name|abbreviation|acronym|internet slang|classifier|radical|unicode|symbol|soft redirect)\b/u.test(
       gloss
@@ -593,59 +611,61 @@ function matchesProductProfile(row) {
     return false;
   }
 
-  if (row.source_lang === "en") return /^[A-Za-z][A-Za-z-]{1,31}$/u.test(word);
-  if (row.source_lang === "zh") return /^[\u3400-\u9fff]{1,8}$/u.test(word);
-  if (row.source_lang === "ja") return /^[\u3040-\u30ff\u3400-\u9fff]{1,12}$/u.test(word);
-  if (row.source_lang === "pt-BR") return /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ-]{1,31}$/u.test(word);
+  if (row.source_lang === 'en') return /^[A-Za-z][A-Za-z-]{1,31}$/u.test(word);
+  if (row.source_lang === 'zh') return /^[\u3400-\u9fff]{1,8}$/u.test(word);
+  if (row.source_lang === 'ja') return /^[\u3040-\u30ff\u3400-\u9fff]{1,12}$/u.test(word);
+  if (row.source_lang === 'pt-BR') return /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ-]{1,31}$/u.test(word);
   return false;
 }
 
 function isRiskyFreeDictRow(row) {
-  if (!String(row.source || "").startsWith("freedict-")) return false;
+  if (!String(row.source || '').startsWith('freedict-')) return false;
   const glossSignature = normalizeGlossSignature(row.gloss_key);
   if (!glossSignature) return true;
   if (RISKY_FREEDICT_SHORT_GLOSSES.has(glossSignature)) return true;
-  if (row.source_lang === "pt-BR" && row.frequency_rank <= 5000 && glossSignature.length <= 3) return true;
+  if (row.source_lang === 'pt-BR' && row.frequency_rank <= 5000 && glossSignature.length <= 3) return true;
   return false;
 }
 
 function normalizePos(pos) {
-  return String(pos || "unknown")
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[^a-z]+/gu, " ")
-    .trim()
-    .split(/\s+/u)
-    .slice(0, 2)
-    .join("_") || "unknown";
+  return (
+    String(pos || 'unknown')
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[^a-z]+/gu, ' ')
+      .trim()
+      .split(/\s+/u)
+      .slice(0, 2)
+      .join('_') || 'unknown'
+  );
 }
 
 function normalizeGlossSignature(value) {
-  return String(value || "")
-    .normalize("NFKC")
+  return String(value || '')
+    .normalize('NFKC')
     .toLowerCase()
-    .replace(/\([^)]*\)/gu, " ")
-    .replace(/["'鈥溾€濃€樷€檂]/gu, "")
-    .replace(/\b(to|a|an|the|one's|ones|someone|somebody|something)\b/gu, " ")
-    .replace(/[^a-z0-9\u3400-\u9fff\u3040-\u30ff]+/gu, " ")
+    .replace(/\([^)]*\)/gu, ' ')
+    .replace(/["'鈥溾€濃€樷€檂]/gu, '')
+    .replace(/\b(to|a|an|the|one's|ones|someone|somebody|something)\b/gu, ' ')
+    .replace(/[^a-z0-9\u3400-\u9fff\u3040-\u30ff]+/gu, ' ')
     .trim()
-    .replace(/\s+/gu, " ")
+    .replace(/\s+/gu, ' ')
     .split(/\s+/u)
     .slice(0, 10)
-    .join(" ");
+    .join(' ');
 }
 
 function directEnglishGloss(signature) {
-  const cleaned = String(signature || "").trim();
+  const cleaned = String(signature || '').trim();
   if (/^[a-z][a-z-]{1,31}$/u.test(cleaned)) return cleaned;
   return null;
 }
 
 function headwordLangScore(lang) {
-  if (lang === "en") return 0;
-  if (lang === "zh") return 1;
-  if (lang === "ja") return 2;
-  if (lang === "pt-BR") return 3;
+  if (lang === 'en') return 0;
+  if (lang === 'zh') return 1;
+  if (lang === 'ja') return 2;
+  if (lang === 'pt-BR') return 3;
   return 9;
 }
 
@@ -662,8 +682,8 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg.startsWith("--")) {
-      result[arg.slice(2)] = argv[++i] || "true";
+    if (arg.startsWith('--')) {
+      result[arg.slice(2)] = argv[++i] || 'true';
     }
   }
   return result;

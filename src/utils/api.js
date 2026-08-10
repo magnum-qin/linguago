@@ -66,12 +66,13 @@ export async function fetchDictionaryStats() {
 }
 
 // Keep stream fetch separate but wrap network check
-export async function openTranslationStream(payload) {
+export async function openTranslationStream(payload, signal) {
   try {
     const response = await fetch('/api/translate-stream', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
@@ -81,6 +82,9 @@ export async function openTranslationStream(payload) {
     }
     return response;
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw err;
+    }
     if (err instanceof Error && err.message === 'Failed to fetch') {
       const offlineMsg = '网络连接失败，请检查您的网络连接 / Sem conexão com a internet';
       window.dispatchEvent(new CustomEvent('api-error', { detail: { message: offlineMsg } }));

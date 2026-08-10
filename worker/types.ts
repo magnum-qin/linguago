@@ -2,7 +2,7 @@ export interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
   CACHE: KVNamespace;
-  OPENROUTER_API_KEY?: string;
+  AI: Ai;
   DASHSCOPE_API_KEY?: string;
   GEMINI_API_KEY?: string;
   DEEPSEEK_API_KEY?: string;
@@ -11,19 +11,19 @@ export interface Env {
   DICTIONARY_ENABLE_LEGACY_SOURCES?: string;
 }
 
-export type LanguageCode = "en" | "zh" | "pt-BR" | "ja";
+export type LanguageCode = 'en' | 'zh' | 'pt-BR' | 'ja';
 export type DisplayLanguageCode = LanguageCode;
-export type Provider = "auto" | "openrouter" | "dashscope" | "gemini" | "deepseek";
-export type ResponseProvider = Exclude<Provider, "auto"> | "dictionary";
+export type Provider = 'auto' | 'cloudflare' | 'dashscope' | 'gemini' | 'deepseek';
+export type ResponseProvider = Exclude<Provider, 'auto'> | 'dictionary';
 export type ErrorCode =
-  | "EMPTY_INPUT"
-  | "INPUT_TOO_LONG"
-  | "RATE_LIMITED"
-  | "PROVIDER_CONFIG_MISSING"
-  | "PROVIDER_API_ERROR"
-  | "PROVIDER_EMPTY_RESPONSE"
-  | "PROVIDER_INVALID_JSON"
-  | "TRANSLATION_FAILED";
+  | 'EMPTY_INPUT'
+  | 'INPUT_TOO_LONG'
+  | 'RATE_LIMITED'
+  | 'PROVIDER_CONFIG_MISSING'
+  | 'PROVIDER_API_ERROR'
+  | 'PROVIDER_EMPTY_RESPONSE'
+  | 'PROVIDER_INVALID_JSON'
+  | 'TRANSLATION_FAILED';
 
 export interface LocalizedText {
   text: string;
@@ -33,7 +33,7 @@ export interface LocalizedText {
 
 export interface TranslateRequest {
   text?: string;
-  source_lang?: LanguageCode | "auto";
+  source_lang?: LanguageCode | 'auto';
   target_lang?: LanguageCode;
   provider?: Provider;
   model?: string;
@@ -44,10 +44,15 @@ export interface WordExample {
   translations: Record<LanguageCode, string>;
   source_lang?: string;
   source_reading?: string;
-  localizations?: Partial<Record<LanguageCode, {
-    text: string;
-    reading?: string;
-  }>>;
+  localizations?: Partial<
+    Record<
+      LanguageCode,
+      {
+        text: string;
+        reading?: string;
+      }
+    >
+  >;
 }
 
 export interface WordDetail {
@@ -63,15 +68,20 @@ export interface WordSense {
   definitions: Record<DisplayLanguageCode, string>;
   domain?: string;
   register_label?: string;
-  localizations?: Partial<Record<DisplayLanguageCode, {
-    term: string;
-    reading: string;
-    reading_system: string;
-    pronunciation: string;
-    pronunciation_system: string;
-    definition: string;
-    usage_note: string;
-  }>>;
+  localizations?: Partial<
+    Record<
+      DisplayLanguageCode,
+      {
+        term: string;
+        reading: string;
+        reading_system: string;
+        pronunciation: string;
+        pronunciation_system: string;
+        definition: string;
+        usage_note: string;
+      }
+    >
+  >;
 }
 
 export interface PronunciationGroupSummary {
@@ -100,7 +110,7 @@ export interface BaseResponse {
 }
 
 export interface WordResponse extends BaseResponse {
-  type: "word";
+  type: 'word';
   phonetic: string;
   audio_text: string;
   examples: WordExample[];
@@ -116,7 +126,7 @@ export interface WordResponse extends BaseResponse {
 }
 
 export interface SentenceResponse extends BaseResponse {
-  type: "sentence";
+  type: 'sentence';
   explanation: string;
   explanations: Record<DisplayLanguageCode, string>;
 }

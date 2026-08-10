@@ -197,7 +197,7 @@ function loadCheckpointSenseIds(filePath) {
   const checkpoint = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   return [
     ...new Set(
-      Object.values(checkpoint?.items || {})
+      checkpointItems(checkpoint)
         .filter((item) => item?.status === 'accepted' && Number.isInteger(Number(item?.product_sense_id)))
         .map((item) => Number(item.product_sense_id))
     )
@@ -207,7 +207,7 @@ function loadCheckpointSenseIds(filePath) {
 function loadCheckpointSourceBySense(filePath) {
   const checkpoint = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   return new Map(
-    Object.values(checkpoint?.items || {})
+    checkpointItems(checkpoint)
       .filter(
         (item) => Number.isInteger(Number(item?.product_sense_id)) && Number.isInteger(Number(item?.source_entry_id))
       )
@@ -218,7 +218,7 @@ function loadCheckpointSourceBySense(filePath) {
 function loadCheckpointProductSenseBySourceSense(filePath) {
   const checkpoint = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   return new Map(
-    Object.values(checkpoint?.items || {})
+    checkpointItems(checkpoint)
       .filter(
         (item) =>
           Number.isInteger(Number(item?.product_sense_id)) &&
@@ -232,13 +232,32 @@ function loadCheckpointProductSenseBySourceSense(filePath) {
   );
 }
 
+function checkpointItems(checkpoint) {
+  const items = Object.values(checkpoint?.items || {});
+  const writes = Array.isArray(checkpoint?.writes)
+    ? checkpoint.writes.map((item) => ({ ...item, status: item?.status || 'accepted' }))
+    : [];
+  return [...items, ...writes];
+}
+
 function loadReportGlosses(filePath) {
   const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   const rows = report?.selected || report?.residuals || [];
+  const generatedGlosses = new Map(
+    (report?.generated || [])
+      .filter(
+        (row) =>
+          row?.valid === true &&
+          Number.isInteger(Number(row?.source_entry_id)) &&
+          String(row?.output?.gloss_key || '').trim()
+      )
+      .map((row) => [Number(row.source_entry_id), String(row.output.gloss_key).trim()])
+  );
   return new Map(
     rows.map((row) => [
       Number(row.source_entry_id),
-      String(row.first_gloss_key || row.gloss_key || row.first_gloss_preview || row.gloss_preview || '').trim()
+      generatedGlosses.get(Number(row.source_entry_id)) ||
+        String(row.first_gloss_key || row.gloss_key || row.first_gloss_preview || row.gloss_preview || '').trim()
     ])
   );
 }

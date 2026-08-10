@@ -1,31 +1,31 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const dryRun = args["dry-run"] === "true";
+const dryRun = args['dry-run'] === 'true';
 
 const blocks = [
   {
     product_sense_id: 24,
-    block_code: "blocked_source_ambiguous",
+    block_code: 'blocked_source_ambiguous',
     rationale:
       "JMdict-derived source is only 'Group for ta'. The gloss is too generic to safely publish a four-language dictionary sense without re-splitting from source.",
-    recommendation: "Rebuild from original JMdict sense details or keep unpublished."
+    recommendation: 'Rebuild from original JMdict sense details or keep unpublished.'
   },
   {
     product_sense_id: 5431,
-    block_code: "blocked_source_unstable",
+    block_code: 'blocked_source_unstable',
     rationale:
       "Source is the Japanese particle/short form 'do' with unstable generated cross-language meanings. Current en/pt-BR/zh outputs disagree and should not be published as a stable lexical sense.",
-    recommendation: "Re-check original JMdict sense and either split a precise particle sense or keep unpublished."
+    recommendation: 'Re-check original JMdict sense and either split a precise particle sense or keep unpublished.'
   }
 ];
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const createTable = db.prepare(`
   CREATE TABLE IF NOT EXISTS product_sense_publication_blocks (
@@ -101,10 +101,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

@@ -20,13 +20,13 @@ let cleanedCount = 0;
 
 for (const row of rows) {
   let jsonStr = row.data;
-  
+
   // Only process if it's suspiciously large (e.g., > 100KB)
   if (jsonStr.length > 100000) {
     try {
       const parsed = JSON.parse(jsonStr);
       let changed = false;
-      
+
       if (parsed.translations) {
         for (const lang of Object.keys(parsed.translations)) {
           if (Array.isArray(parsed.translations[lang]) && parsed.translations[lang].length > 20) {
@@ -35,7 +35,7 @@ for (const row of rows) {
           }
         }
       }
-      
+
       if (changed) {
         jsonStr = JSON.stringify(parsed);
         cleanedCount++;
@@ -44,7 +44,7 @@ for (const row of rows) {
       console.error(`Failed to parse JSON for word: ${row.word}`, e);
     }
   }
-  
+
   insert.run(row.word, jsonStr);
 }
 

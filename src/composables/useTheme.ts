@@ -17,7 +17,7 @@ export function useTheme() {
 
   const toggleTheme = (event?: Event) => {
     const next = currentTheme.value === 'dark' ? 'light' : 'dark';
-    
+
     if (!document.startViewTransition) {
       currentTheme.value = next;
       settings.theme = next;
@@ -48,15 +48,18 @@ export function useTheme() {
     applyTheme(newTheme, settings.colorScheme || 'blue');
   });
 
-  watch(() => settings.colorScheme, (newScheme) => {
-    if (!document.startViewTransition) {
-      applyTheme(currentTheme.value, newScheme || 'blue');
-      return;
+  watch(
+    () => settings.colorScheme,
+    (newScheme) => {
+      if (!document.startViewTransition) {
+        applyTheme(currentTheme.value, newScheme || 'blue');
+        return;
+      }
+      document.startViewTransition(() => {
+        applyTheme(currentTheme.value, newScheme || 'blue');
+      });
     }
-    document.startViewTransition(() => {
-      applyTheme(currentTheme.value, newScheme || 'blue');
-    });
-  });
+  );
 
   return {
     currentTheme,

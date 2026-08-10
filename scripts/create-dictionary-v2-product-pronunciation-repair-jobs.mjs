@@ -1,21 +1,21 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_PROVIDER = "ollama";
-const DEFAULT_MODEL = "qwen3.6:latest";
-const DEFAULT_PROMPT_VERSION = "dictionary-v2-product-pronunciation-repair-v1";
-const LANGS = ["en", "pt-BR"];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_PROVIDER = 'ollama';
+const DEFAULT_MODEL = 'qwen3.6:latest';
+const DEFAULT_PROMPT_VERSION = 'dictionary-v2-product-pronunciation-repair-v1';
+const LANGS = ['en', 'pt-BR'];
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const provider = args.provider || DEFAULT_PROVIDER;
 const model = args.model || DEFAULT_MODEL;
-const promptVersion = args["prompt-version"] || DEFAULT_PROMPT_VERSION;
+const promptVersion = args['prompt-version'] || DEFAULT_PROMPT_VERSION;
 const limit = args.limit ? Number(args.limit) : 0;
-const dryRun = args["dry-run"] === "true";
-const targetLangs = String(args["target-langs"] || LANGS.join(","))
-  .split(",")
+const dryRun = args['dry-run'] === 'true';
+const targetLangs = String(args['target-langs'] || LANGS.join(','))
+  .split(',')
   .map((lang) => lang.trim())
   .filter(Boolean);
 
@@ -25,11 +25,11 @@ for (const lang of targetLangs) {
 if (limit && (!Number.isInteger(limit) || limit < 1)) throw new Error(`Invalid --limit: ${args.limit}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 ensureSchema(db);
 
-const targetLangClause = targetLangs.map(() => "?").join(", ");
+const targetLangClause = targetLangs.map(() => '?').join(', ');
 const statements = {
   candidates: db.prepare(`
     SELECT
@@ -64,7 +64,7 @@ const statements = {
       AND NULLIF(TRIM(pl.definition), '') IS NOT NULL
     ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.normalized_key, ps.sense_order, ps.id,
       CASE pl.lang WHEN 'en' THEN 1 ELSE 2 END
-    ${limit ? "LIMIT ?" : ""}
+    ${limit ? 'LIMIT ?' : ''}
   `),
   sourceLinks: db.prepare(`
     SELECT source_lang, source_word, source_frequency_rank, match_method, confidence
@@ -144,7 +144,8 @@ if (!dryRun && jobs.length) {
 stats.jobs_created = jobs.length;
 
 const queuedByLang = db
-  .prepare(`
+  .prepare(
+    `
     SELECT lang, COUNT(*) AS count
     FROM product_llm_completion_jobs
     WHERE target_type = 'product_sense_localization'
@@ -154,7 +155,8 @@ const queuedByLang = db
       AND status = 'queued'
     GROUP BY lang
     ORDER BY lang
-  `)
+  `
+  )
   .all(provider, model, promptVersion);
 
 console.log(
@@ -185,19 +187,17 @@ db.close();
 function buildInput(row) {
   const examples = statements.examples.all(row.product_sense_id).map((example) => ({
     ...example,
-    localizations: Object.fromEntries(
-      statements.exampleLocalizations.all(example.id).map((item) => [item.lang, item])
-    )
+    localizations: Object.fromEntries(statements.exampleLocalizations.all(example.id).map((item) => [item.lang, item]))
   }));
   return {
-    task: "repair_product_sense_localization_quality_warning",
+    task: 'repair_product_sense_localization_quality_warning',
     target_lang: row.lang,
     issue: {
-      code: "missing_pronunciation",
+      code: 'missing_pronunciation',
       current_term: row.term,
       current_definition: row.definition,
       instruction:
-        "Keep the target language, term, reading, definition, and sense meaning unchanged. Fill only a natural pronunciation for the current term. Use IPA when confident; otherwise use a clear ASCII respelling. Do not replace the term with a synonym or expansion."
+        'Keep the target language, term, reading, definition, and sense meaning unchanged. Fill only a natural pronunciation for the current term. Use IPA when confident; otherwise use a clear ASCII respelling. Do not replace the term with a synonym or expansion.'
     },
     requirements: {
       output_json_only: true,
@@ -208,7 +208,7 @@ function buildInput(row) {
       preserve_current_definition: true,
       include_pronunciation: true,
       include_example_localizations: true,
-      use_brazilian_portuguese_for_pt_BR: row.lang === "pt-BR"
+      use_brazilian_portuguese_for_pt_BR: row.lang === 'pt-BR'
     },
     product_entry: {
       id: row.product_entry_id,
@@ -263,33 +263,33 @@ function buildInput(row) {
 
 function outputSchema(lang) {
   return {
-    type: "object",
-    required: ["sense_localization", "example_localizations"],
+    type: 'object',
+    required: ['sense_localization', 'example_localizations'],
     properties: {
       sense_localization: {
-        type: "object",
-        required: ["lang", "term", "definition", "pronunciation", "pronunciation_system"],
+        type: 'object',
+        required: ['lang', 'term', 'definition', 'pronunciation', 'pronunciation_system'],
         properties: {
           lang: { const: lang },
-          term: { type: "string", minLength: 1 },
-          reading: { type: ["string", "null"] },
-          reading_system: { type: ["string", "null"] },
-          pronunciation: { type: "string", minLength: 1 },
-          pronunciation_system: { type: "string", minLength: 1 },
-          definition: { type: "string", minLength: 1 },
-          usage_note: { type: ["string", "null"] }
+          term: { type: 'string', minLength: 1 },
+          reading: { type: ['string', 'null'] },
+          reading_system: { type: ['string', 'null'] },
+          pronunciation: { type: 'string', minLength: 1 },
+          pronunciation_system: { type: 'string', minLength: 1 },
+          definition: { type: 'string', minLength: 1 },
+          usage_note: { type: ['string', 'null'] }
         }
       },
       example_localizations: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
-          required: ["example_id", "lang", "text"],
+          type: 'object',
+          required: ['example_id', 'lang', 'text'],
           properties: {
-            example_id: { type: "number" },
+            example_id: { type: 'number' },
             lang: { const: lang },
-            text: { type: "string", minLength: 1 },
-            reading: { type: ["string", "null"] }
+            text: { type: 'string', minLength: 1 },
+            reading: { type: ['string', 'null'] }
           }
         }
       }
@@ -328,10 +328,10 @@ function parseArgs(argv) {
   const result = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) result[key] = "true";
+    if (!next || next.startsWith('--')) result[key] = 'true';
     else {
       result[key] = next;
       index++;

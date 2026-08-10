@@ -1,20 +1,20 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const provider = args.provider || "ollama";
-const model = args.model || "qwen3.6:latest";
-const promptVersion = args["prompt-version"] || "dictionary-v2-product-localization-v2-json-retry";
-const dryRun = args["dry-run"] === "true";
+const provider = args.provider || 'ollama';
+const model = args.model || 'qwen3.6:latest';
+const promptVersion = args['prompt-version'] || 'dictionary-v2-product-localization-v2-json-retry';
+const dryRun = args['dry-run'] === 'true';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const statements = {
   failedLatest: db.prepare(`
@@ -77,14 +77,19 @@ for (const row of rows) {
     provider,
     model,
     prompt_version: promptVersion,
-    input_json: JSON.stringify({
-      ...input,
-      retry_context: {
-        previous_job_id: row.id,
-        previous_error: row.error,
-        instruction: "Previous attempt failed to return valid JSON. Return only schema-valid JSON. Keep the same product sense."
-      }
-    }, null, 2)
+    input_json: JSON.stringify(
+      {
+        ...input,
+        retry_context: {
+          previous_job_id: row.id,
+          previous_error: row.error,
+          instruction:
+            'Previous attempt failed to return valid JSON. Return only schema-valid JSON. Keep the same product sense.'
+        }
+      },
+      null,
+      2
+    )
   });
 }
 
@@ -109,12 +114,18 @@ const queuedByLang = db
   )
   .all(provider, model, promptVersion);
 
-console.log(JSON.stringify({ ok: true, provider, model, prompt_version: promptVersion, stats, queued_by_lang: queuedByLang }, null, 2));
+console.log(
+  JSON.stringify(
+    { ok: true, provider, model, prompt_version: promptVersion, stats, queued_by_lang: queuedByLang },
+    null,
+    2
+  )
+);
 db.close();
 
 function parseMaybeJson(value) {
   try {
-    return JSON.parse(String(value || ""));
+    return JSON.parse(String(value || ''));
   } catch {
     return null;
   }
@@ -124,10 +135,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

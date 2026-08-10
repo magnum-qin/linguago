@@ -1,25 +1,25 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
-const LANGUAGE_CODES = new Set(["en", "zh", "ja", "pt-BR"]);
-const DEFAULT_DB = "data/processed/linguago_v2_staging.db";
+const LANGUAGE_CODES = new Set(['en', 'zh', 'ja', 'pt-BR']);
+const DEFAULT_DB = 'data/processed/linguago_v2_staging.db';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const limit = args.limit ? Number(args.limit) : 0;
-const batchSize = args["batch-size"] ? Number(args["batch-size"]) : 5000;
-const resetCanonical = args["reset-canonical"] !== "false";
-const sourceNames = (args.sources || "")
-  .split(",")
+const batchSize = args['batch-size'] ? Number(args['batch-size']) : 5000;
+const resetCanonical = args['reset-canonical'] !== 'false';
+const sourceNames = (args.sources || '')
+  .split(',')
   .map((source) => source.trim())
   .filter(Boolean);
 const sourceParams = Object.fromEntries(sourceNames.map((source, index) => [`source${index}`, source]));
 const sourceFilterSql = sourceNames.length
-  ? `AND ds.source_key IN (${sourceNames.map((_, index) => `@source${index}`).join(", ")})`
-  : "";
+  ? `AND ds.source_key IN (${sourceNames.map((_, index) => `@source${index}`).join(', ')})`
+  : '';
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
+db.pragma('foreign_keys = ON');
 
 if (resetCanonical) {
   db.exec(`
@@ -130,7 +130,9 @@ const stats = {
 
 const nextSenseOrderByEntry = new Map();
 if (!resetCanonical) {
-  for (const row of db.prepare(`SELECT entry_id, MAX(sense_order) + 1 AS next_order FROM senses GROUP BY entry_id`).all()) {
+  for (const row of db
+    .prepare(`SELECT entry_id, MAX(sense_order) + 1 AS next_order FROM senses GROUP BY entry_id`)
+    .all()) {
     nextSenseOrderByEntry.set(row.entry_id, row.next_order || 1);
   }
 }
@@ -147,7 +149,7 @@ const buildRows = db.transaction((rows) => {
       entry_id: entryId,
       lang: entry.source_lang,
       form: entry.word,
-      form_type: "lemma",
+      form_type: 'lemma',
       normalized_form: entry.normalized_key,
       source: row.source_key,
       confidence: 1
@@ -164,7 +166,7 @@ const buildRows = db.transaction((rows) => {
     statements.insertSenseSourceLink.run({
       sense_id: senseId,
       source_sense_id: row.source_sense_id,
-      match_method: "import",
+      match_method: 'import',
       confidence: 1
     });
 
@@ -228,12 +230,12 @@ while (!limit || stats.source_senses_seen < limit) {
 }
 
 const counts = {
-  entries: countTable("entries"),
-  senses: countTable("senses"),
-  sense_localizations: countTable("sense_localizations"),
-  examples: countTable("examples"),
-  example_localizations: countTable("example_localizations"),
-  quality_issues: countTable("quality_issues")
+  entries: countTable('entries'),
+  senses: countTable('senses'),
+  sense_localizations: countTable('sense_localizations'),
+  examples: countTable('examples'),
+  example_localizations: countTable('example_localizations'),
+  quality_issues: countTable('quality_issues')
 };
 
 db.close();
@@ -245,7 +247,7 @@ function toCanonicalEntry(row) {
     normalized_key: row.normalized_key,
     source_lang: normalizeLang(row.lang),
     script_variant: detectScriptVariant(row.word, row.lang),
-    status: "needs_review"
+    status: 'needs_review'
   };
 }
 
@@ -256,10 +258,10 @@ function toCanonicalSense(row, entryId, senseOrder) {
     part_of_speech: cleanNullable(row.part_of_speech),
     domain: cleanNullable(row.domain),
     register_label: cleanNullable(row.register_label),
-    gloss_key: cleanText(row.gloss) || "missing gloss",
+    gloss_key: cleanText(row.gloss) || 'missing gloss',
     source: row.source_key,
     confidence: defaultConfidence(row.source_key),
-    needs_review: row.source_key === "ecdict" ? 1 : 0
+    needs_review: row.source_key === 'ecdict' ? 1 : 0
   };
 }
 
@@ -297,15 +299,15 @@ function toSenseLocalizations(row, senseId) {
       usage_note: null,
       source: row.source_key,
       confidence: defaultConfidence(row.source_key),
-      needs_review: row.source_key === "ecdict" ? 1 : 0
+      needs_review: row.source_key === 'ecdict' ? 1 : 0
     }
   ];
 }
 
 function toSourceTranslationEvidenceLocalization(row, senseId, entryRaw, senseRaw, lang) {
-  if (!row.source_key.startsWith("wikdict-")) return null;
+  if (!row.source_key.startsWith('wikdict-')) return null;
   const translations = asArray(senseRaw.translations).map(cleanText).filter(Boolean);
-  const definition = translations.join("; ");
+  const definition = translations.join('; ');
   if (!definition) return null;
   const readingInfo = extractReading(row.source_key, entryRaw, senseRaw, lang);
   const term = extractTerm(row, entryRaw, senseRaw);
@@ -327,13 +329,13 @@ function toSourceTranslationEvidenceLocalization(row, senseId, entryRaw, senseRa
 }
 
 function toOwmSenseLocalizations(row, senseId, senseRaw) {
-  if (row.source_key !== "omw-30") return [];
+  if (row.source_key !== 'omw-30') return [];
   const rawLocalizations = senseRaw.localizations || {};
   const localizations = [];
   for (const lang of LANGUAGE_CODES) {
     const terms = asArray(rawLocalizations[lang]).map(cleanText).filter(Boolean);
     if (!terms.length) continue;
-    const term = terms.slice(0, 4).join("; ");
+    const term = terms.slice(0, 4).join('; ');
     localizations.push({
       sense_id: senseId,
       lang,
@@ -343,7 +345,7 @@ function toOwmSenseLocalizations(row, senseId, senseRaw) {
       reading_system: null,
       pronunciation: null,
       pronunciation_system: null,
-      definition: terms.slice(0, 6).join("; "),
+      definition: terms.slice(0, 6).join('; '),
       usage_note: senseRaw.synset ? `OMW synset ${senseRaw.synset}` : null,
       source: row.source_key,
       confidence: defaultConfidence(row.source_key),
@@ -354,7 +356,7 @@ function toOwmSenseLocalizations(row, senseId, senseRaw) {
 }
 
 function toTranslatedSenseLocalization(row, senseId, senseRaw) {
-  if (!row.source_key.startsWith("freedict-") && !row.source_key.startsWith("wikdict-")) return null;
+  if (!row.source_key.startsWith('freedict-') && !row.source_key.startsWith('wikdict-')) return null;
   const targetLang = normalizeLang(senseRaw.target_lang);
   const translations = asArray(senseRaw.translations).map(cleanText).filter(Boolean);
   const term = firstText(translations);
@@ -369,7 +371,7 @@ function toTranslatedSenseLocalization(row, senseId, senseRaw) {
     reading_system: null,
     pronunciation: null,
     pronunciation_system: null,
-    definition: translations.join("; "),
+    definition: translations.join('; '),
     usage_note: null,
     source: row.source_key,
     confidence: defaultConfidence(row.source_key),
@@ -378,53 +380,57 @@ function toTranslatedSenseLocalization(row, senseId, senseRaw) {
 }
 
 function extractTerm(row, entryRaw, senseRaw) {
-  if (row.source_key === "ecdict") return cleanText(row.word);
-  if (row.source_key === "cc-cedict") return cleanText(entryRaw.simplified || row.word);
-  if (row.source_key === "jmdict") {
-    return cleanText(firstText(asArray(entryRaw.k_ele).map((item) => item?.keb)) || firstText(asArray(entryRaw.r_ele).map((item) => item?.reb)) || row.word);
+  if (row.source_key === 'ecdict') return cleanText(row.word);
+  if (row.source_key === 'cc-cedict') return cleanText(entryRaw.simplified || row.word);
+  if (row.source_key === 'jmdict') {
+    return cleanText(
+      firstText(asArray(entryRaw.k_ele).map((item) => item?.keb)) ||
+        firstText(asArray(entryRaw.r_ele).map((item) => item?.reb)) ||
+        row.word
+    );
   }
-  if (row.source_key === "kaikki-zh") {
+  if (row.source_key === 'kaikki-zh') {
     return cleanText(senseRaw.word || entryRaw.word || row.word);
   }
   return cleanText(row.word);
 }
 
 function extractReading(sourceKey, entryRaw, senseRaw, lang) {
-  if (sourceKey === "ecdict") {
+  if (sourceKey === 'ecdict') {
     const phonetic = cleanNullable(entryRaw.phonetic);
     return {
       reading: null,
       reading_system: null,
       pronunciation: phonetic,
-      pronunciation_system: phonetic ? "ecdict-phonetic" : null
+      pronunciation_system: phonetic ? 'ecdict-phonetic' : null
     };
   }
 
-  if (sourceKey === "cc-cedict") {
+  if (sourceKey === 'cc-cedict') {
     const pinyin = cleanNullable(senseRaw.pinyin);
     return {
       reading: pinyin,
-      reading_system: pinyin ? "pinyin" : null,
+      reading_system: pinyin ? 'pinyin' : null,
       pronunciation: null,
       pronunciation_system: null
     };
   }
 
-  if (sourceKey === "jmdict") {
+  if (sourceKey === 'jmdict') {
     const reading = cleanNullable(firstText(asArray(entryRaw.r_ele).map((item) => item?.reb)));
     return {
       reading,
-      reading_system: reading ? "kana" : null,
+      reading_system: reading ? 'kana' : null,
       pronunciation: null,
       pronunciation_system: null
     };
   }
 
-  if (sourceKey === "kaikki-zh") {
-    const pinyin = firstTaggedPronunciation(entryRaw.sounds, "Pinyin");
+  if (sourceKey === 'kaikki-zh') {
+    const pinyin = firstTaggedPronunciation(entryRaw.sounds, 'Pinyin');
     return {
       reading: pinyin,
-      reading_system: pinyin ? "pinyin" : null,
+      reading_system: pinyin ? 'pinyin' : null,
       pronunciation: null,
       pronunciation_system: null
     };
@@ -444,9 +450,9 @@ function extractExamples(row) {
   const lang = normalizeLang(row.lang);
   return rawExamples
     .map((example) => {
-      const sourceText = cleanText(example.text || example.source_text || example.jpn || "");
+      const sourceText = cleanText(example.text || example.source_text || example.jpn || '');
       if (!sourceText) return null;
-      const translation = cleanText(example.translation || example.english || example.en || "");
+      const translation = cleanText(example.translation || example.english || example.en || '');
       const localizations = [
         {
           lang,
@@ -456,9 +462,9 @@ function extractExamples(row) {
           needs_review: 0
         }
       ];
-      if (translation && lang !== "en") {
+      if (translation && lang !== 'en') {
         localizations.push({
-          lang: "en",
+          lang: 'en',
           text: translation,
           reading: null,
           confidence: defaultConfidence(row.source_key),
@@ -481,10 +487,10 @@ function addInitialQualityIssues({ row, senseId, localization }) {
   for (const lang of LANGUAGE_CODES) {
     if (localization && lang === localization.lang) continue;
     statements.insertQualityIssue.run({
-      entity_type: "sense",
+      entity_type: 'sense',
       entity_id: senseId,
       issue_code: `missing_${lang}_localization`,
-      severity: "info",
+      severity: 'info',
       message: localization
         ? `Imported ${row.source_key} sense only has ${localization.lang}; ${lang} must be aligned or generated later.`
         : `Imported ${row.source_key} sense has no trusted ${lang} localization yet; it must be aligned or generated later.`
@@ -494,33 +500,33 @@ function addInitialQualityIssues({ row, senseId, localization }) {
 
   if (!localization) {
     statements.insertQualityIssue.run({
-      entity_type: "sense",
+      entity_type: 'sense',
       entity_id: senseId,
-      issue_code: "source_definition_not_localized",
-      severity: "warn",
+      issue_code: 'source_definition_not_localized',
+      severity: 'warn',
       message: `Imported ${row.source_key} ${row.lang} gloss is not written in ${row.lang}; skipped source localization.`
     });
     stats.quality_issues++;
     return;
   }
 
-  if (!localization.reading && (localization.lang === "zh" || localization.lang === "ja")) {
+  if (!localization.reading && (localization.lang === 'zh' || localization.lang === 'ja')) {
     statements.insertQualityIssue.run({
-      entity_type: "sense_localization",
+      entity_type: 'sense_localization',
       entity_id: senseId,
-      issue_code: "missing_reading",
-      severity: "warn",
+      issue_code: 'missing_reading',
+      severity: 'warn',
       message: `${localization.lang} localization has no reading.`
     });
     stats.quality_issues++;
   }
 
-  if (!localization.pronunciation && (localization.lang === "en" || localization.lang === "pt-BR")) {
+  if (!localization.pronunciation && (localization.lang === 'en' || localization.lang === 'pt-BR')) {
     statements.insertQualityIssue.run({
-      entity_type: "sense_localization",
+      entity_type: 'sense_localization',
       entity_id: senseId,
-      issue_code: "missing_pronunciation",
-      severity: "info",
+      issue_code: 'missing_pronunciation',
+      severity: 'info',
       message: `${localization.lang} localization has no pronunciation.`
     });
     stats.quality_issues++;
@@ -528,37 +534,37 @@ function addInitialQualityIssues({ row, senseId, localization }) {
 }
 
 function definitionMatchesLang(definition, lang) {
-  if (lang === "en") return containsLatin(definition);
-  if (lang === "zh") return containsCjk(definition);
-  if (lang === "ja") return containsJapanese(definition);
-  if (lang === "pt-BR") return containsLatin(definition);
+  if (lang === 'en') return containsLatin(definition);
+  if (lang === 'zh') return containsCjk(definition);
+  if (lang === 'ja') return containsJapanese(definition);
+  if (lang === 'pt-BR') return containsLatin(definition);
   return false;
 }
 
 function containsCjk(value) {
-  return /[\u3400-\u9fff]/u.test(String(value || ""));
+  return /[\u3400-\u9fff]/u.test(String(value || ''));
 }
 
 function containsJapanese(value) {
-  return /[\u3040-\u30ff\u3400-\u9fff]/u.test(String(value || ""));
+  return /[\u3040-\u30ff\u3400-\u9fff]/u.test(String(value || ''));
 }
 
 function containsLatin(value) {
-  return /[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(String(value || ""));
+  return /[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(String(value || ''));
 }
 
 function detectScriptVariant(word, lang) {
-  if (lang !== "zh") return null;
-  if (/[\u4e00-\u9fff]/u.test(word)) return "unknown";
+  if (lang !== 'zh') return null;
+  if (/[\u4e00-\u9fff]/u.test(word)) return 'unknown';
   return null;
 }
 
 function defaultConfidence(sourceKey) {
-  if (sourceKey === "cc-cedict" || sourceKey === "jmdict") return 0.95;
-  if (sourceKey === "kaikki-zh") return 0.85;
-  if (sourceKey === "ecdict") return 0.75;
-  if (sourceKey === "omw-30") return 0.72;
-  if (sourceKey.startsWith("wikdict-")) return 0.62;
+  if (sourceKey === 'cc-cedict' || sourceKey === 'jmdict') return 0.95;
+  if (sourceKey === 'kaikki-zh') return 0.85;
+  if (sourceKey === 'ecdict') return 0.75;
+  if (sourceKey === 'omw-30') return 0.72;
+  if (sourceKey.startsWith('wikdict-')) return 0.62;
   return 0.5;
 }
 
@@ -575,17 +581,19 @@ function countTable(table) {
 }
 
 function normalizeLang(lang) {
-  if (lang === "pt") return "pt-BR";
+  if (lang === 'pt') return 'pt-BR';
   if (!LANGUAGE_CODES.has(lang)) throw new Error(`Unsupported language: ${lang}`);
   return lang;
 }
 
 function normalizeKey(value) {
-  return cleanText(value).normalize("NFKC").toLocaleLowerCase();
+  return cleanText(value).normalize('NFKC').toLocaleLowerCase();
 }
 
 function cleanText(value) {
-  return String(value || "").replace(/\s+/gu, " ").trim();
+  return String(value || '')
+    .replace(/\s+/gu, ' ')
+    .trim();
 }
 
 function cleanNullable(value) {
@@ -595,7 +603,7 @@ function cleanNullable(value) {
 
 function parseJson(value) {
   try {
-    return JSON.parse(value || "{}");
+    return JSON.parse(value || '{}');
   } catch {
     return {};
   }
@@ -618,8 +626,8 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg.startsWith("--")) {
-      result[arg.slice(2)] = argv[++i] || "true";
+    if (arg.startsWith('--')) {
+      result[arg.slice(2)] = argv[++i] || 'true';
     }
   }
   return result;

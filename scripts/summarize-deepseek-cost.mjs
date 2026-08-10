@@ -1,16 +1,16 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
-const file = path.resolve(process.argv[2] || "output/batches/deepseek-cost-pro-100/generated.jsonl");
-const model = process.argv[3] || "deepseek-v4-pro";
+const file = path.resolve(process.argv[2] || 'output/batches/deepseek-cost-pro-100/generated.jsonl');
+const model = process.argv[3] || 'deepseek-v4-pro';
 
 const pricesCny = {
-  "deepseek-v4-flash": {
+  'deepseek-v4-flash': {
     cacheHitInput: 0.02,
     cacheMissInput: 1,
     output: 2
   },
-  "deepseek-v4-pro": {
+  'deepseek-v4-pro': {
     cacheHitInput: 0.025,
     cacheMissInput: 3,
     output: 6
@@ -23,7 +23,7 @@ if (!fs.existsSync(file)) {
 }
 
 const rows = fs
-  .readFileSync(file, "utf8")
+  .readFileSync(file, 'utf8')
   .split(/\r?\n/)
   .filter(Boolean)
   .map((line) => JSON.parse(line));
@@ -59,7 +59,7 @@ const totals = rows.reduce(
   }
 );
 
-const price = pricesCny[model] || pricesCny["deepseek-v4-pro"];
+const price = pricesCny[model] || pricesCny['deepseek-v4-pro'];
 const costCny =
   (totals.prompt_cache_hit_tokens / 1_000_000) * price.cacheHitInput +
   (totals.prompt_cache_miss_tokens / 1_000_000) * price.cacheMissInput +

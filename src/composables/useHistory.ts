@@ -19,9 +19,13 @@ try {
   console.error('Failed to load history', e);
 }
 
-watch(historyItems, (items) => {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
-}, { deep: true });
+watch(
+  historyItems,
+  (items) => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+  },
+  { deep: true }
+);
 
 function addHistory(item: Omit<HistoryItem, 'createdAt'>) {
   const text = item.text.trim();

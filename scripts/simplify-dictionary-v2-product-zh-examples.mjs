@@ -1,13 +1,13 @@
-import Database from "better-sqlite3";
-import * as OpenCC from "opencc-js";
+import Database from 'better-sqlite3';
+import * as OpenCC from 'opencc-js';
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = args.db || "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const dryRun = args["dry-run"] === true || args["dry-run"] === "true";
-const converter = OpenCC.Converter({ from: "tw", to: "cn" });
+const dbPath = args.db || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const dryRun = args['dry-run'] === true || args['dry-run'] === 'true';
+const converter = OpenCC.Converter({ from: 'tw', to: 'cn' });
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
+db.pragma('foreign_keys = ON');
 
 const stats = {
   db: dbPath,
@@ -19,19 +19,27 @@ const stats = {
   sample_updates: []
 };
 
-const exampleRows = db.prepare(`
+const exampleRows = db
+  .prepare(
+    `
   SELECT id, source_text
   FROM product_examples
   WHERE source_lang = 'zh'
     AND needs_review = 0
-`).all();
+`
+  )
+  .all();
 
-const localizationRows = db.prepare(`
+const localizationRows = db
+  .prepare(
+    `
   SELECT id, text, reading
   FROM product_example_localizations
   WHERE lang = 'zh'
     AND needs_review = 0
-`).all();
+`
+  )
+  .all();
 
 stats.product_examples_checked = exampleRows.length;
 stats.product_example_localizations_checked = localizationRows.length;
@@ -59,13 +67,13 @@ stats.product_examples_updated = exampleUpdates.length;
 stats.product_example_localizations_updated = localizationUpdates.length;
 stats.sample_updates = [
   ...exampleUpdates.slice(0, 5).map((row) => ({
-    table: "product_examples",
+    table: 'product_examples',
     id: row.id,
     before: row.before.source_text,
     after: row.after.source_text
   })),
   ...localizationUpdates.slice(0, 5).map((row) => ({
-    table: "product_example_localizations",
+    table: 'product_example_localizations',
     id: row.id,
     before: row.before.text,
     after: row.after.text
@@ -105,24 +113,24 @@ function simplify(value) {
 
 function normalizeMainlandParticles(value) {
   return String(value)
-    .replaceAll("什幺", "什么")
-    .replaceAll("为什幺", "为什么")
-    .replaceAll("那幺", "那么")
-    .replaceAll("这幺", "这么")
-    .replaceAll("怎幺", "怎么")
-    .replaceAll("多幺", "多么")
-    .replace(/幺([？?])/gu, "吗$1")
-    .replace(/幺([，,。.!！\s]|$)/gu, "么$1");
+    .replaceAll('什幺', '什么')
+    .replaceAll('为什幺', '为什么')
+    .replaceAll('那幺', '那么')
+    .replaceAll('这幺', '这么')
+    .replaceAll('怎幺', '怎么')
+    .replaceAll('多幺', '多么')
+    .replace(/幺([？?])/gu, '吗$1')
+    .replace(/幺([，,。.!！\s]|$)/gu, '么$1');
 }
 
 function parseArgs(argv) {
   const parsed = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[i + 1];
-    if (!next || next.startsWith("--")) {
+    if (!next || next.startsWith('--')) {
       parsed[key] = true;
     } else {
       parsed[key] = next;

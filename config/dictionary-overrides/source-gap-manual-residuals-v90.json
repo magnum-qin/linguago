@@ -1,0 +1,27 @@
+{
+  "version": "v90-high-frequency-manual-residuals",
+  "created_at": "2026-08-08",
+  "reason": "High-frequency candidates with OMW-only target evidence; retain for human adjudication and exclude from automatic LLM generation.",
+  "selected": [
+    { "source_entry_id": 2537508, "source_sense_id": 2583150, "word": "一段", "lang": "zh", "frequency_rank": 1446 },
+    { "source_entry_id": 2420956, "source_sense_id": 2454811, "word": "致力于", "lang": "zh", "frequency_rank": 5887 },
+    { "source_entry_id": 1147907, "source_sense_id": 2741370, "word": "两周", "lang": "zh", "frequency_rank": 6988 },
+    { "source_entry_id": 2521623, "source_sense_id": 2521623, "word": "图库", "lang": "zh", "frequency_rank": 8482 },
+    { "source_entry_id": 2587028, "source_sense_id": 2587028, "word": "一集", "lang": "zh", "frequency_rank": 11855 },
+    { "source_entry_id": 2615935, "source_sense_id": 2615935, "word": "代表大会", "lang": "zh", "frequency_rank": 15164 },
+    { "source_entry_id": 2194165, "source_sense_id": 2610886, "word": "一串", "lang": "zh", "frequency_rank": 15898 },
+    { "source_entry_id": 2429415, "source_sense_id": 2429415, "word": "あたる", "lang": "ja", "frequency_rank": 5888 },
+    { "source_entry_id": 2415715, "source_sense_id": 2444042, "word": "やってくる", "lang": "ja", "frequency_rank": 6789 },
+    { "source_entry_id": 2414174, "source_sense_id": 2414174, "word": "まとめる", "lang": "ja", "frequency_rank": 8466 },
+    { "source_entry_id": 2352798, "source_sense_id": 2355235, "word": "うらやましい", "lang": "ja", "frequency_rank": 9025 },
+    { "source_entry_id": 2441766, "source_sense_id": 2460997, "word": "わたる", "lang": "ja", "frequency_rank": 9466 },
+    { "source_entry_id": 2399320, "source_sense_id": 2399320, "word": "どうにも", "lang": "ja", "frequency_rank": 9759 },
+    { "source_entry_id": 2411344, "source_sense_id": 2447676, "word": "みえる", "lang": "ja", "frequency_rank": 11390 },
+    { "source_entry_id": 2352933, "source_sense_id": 2378578, "word": "diferenciado", "lang": "pt-BR", "frequency_rank": 12419 },
+    { "source_entry_id": 2734598, "source_sense_id": 2734598, "word": "poluentes", "lang": "pt-BR", "frequency_rank": 16142 },
+    { "source_entry_id": 2578365, "source_sense_id": 2578365, "word": "electrónica", "lang": "pt-BR", "frequency_rank": 17007, "resolution": "locale_alias_to_product_entry_23336" },
+    { "source_entry_id": 2726262, "source_sense_id": 2726262, "word": "sensibilização", "lang": "pt-BR", "frequency_rank": 17381 },
+    { "source_entry_id": 2723445, "source_sense_id": 2723445, "word": "protagonismo", "lang": "pt-BR", "frequency_rank": 18156 },
+    { "source_entry_id": 2696279, "source_sense_id": 2696279, "word": "activos", "lang": "pt-BR", "frequency_rank": 18230, "resolution": "locale_inflected_alias_to_product_entry_30466" }
+  ]
+}

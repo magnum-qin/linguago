@@ -1,224 +1,228 @@
 export const FULL_RESPONSE_SCHEMA = {
-  type: "object",
+  type: 'object',
   properties: {
     type: {
-      type: "string",
-      enum: ["word", "sentence"],
-      description: "Use word for a single lexical item; use sentence for phrases or sentences."
+      type: 'string',
+      enum: ['word', 'sentence'],
+      description: 'Use word for a single lexical item; use sentence for phrases or sentences.'
     },
     detected_source_lang: {
-      type: "string",
-      description: "Detected source language code, such as zh, en, pt-BR, ja, or auto."
+      type: 'string',
+      description: 'Detected source language code, such as zh, en, pt-BR, ja, or auto.'
     },
     translation: {
-      type: "string",
-      description: "Main translation in the requested target language."
+      type: 'string',
+      description: 'Main translation in the requested target language.'
     },
     translations: {
-      type: "object",
+      type: 'object',
       properties: {
         zh: {
-          type: "object",
+          type: 'object',
           properties: {
             text: {
-              type: "string",
-              description: "Simplified Chinese translation text only."
+              type: 'string',
+              description: 'Simplified Chinese translation text only.'
             },
             phonetic: {
-              type: "string",
-              description: "Pinyin reading for the whole Chinese term or phrase, with tone marks."
+              type: 'string',
+              description: 'Pinyin reading for the whole Chinese term or phrase, with tone marks.'
             },
             audio_text: {
-              type: "string",
-              description: "Plain text suitable for text-to-speech, without inline reading markup."
+              type: 'string',
+              description: 'Plain text suitable for text-to-speech, without inline reading markup.'
             }
           },
-          required: ["text"]
+          required: ['text']
         },
         en: {
-          type: "object",
+          type: 'object',
           properties: {
             text: {
-              type: "string",
-              description: "English translation text only."
+              type: 'string',
+              description: 'English translation text only.'
             },
             phonetic: {
-              type: "string",
-              description: "IPA pronunciation for the whole English term or phrase, wrapped in slashes."
+              type: 'string',
+              description: 'IPA pronunciation for the whole English term or phrase, wrapped in slashes.'
             },
             audio_text: {
-              type: "string",
-              description: "Plain text suitable for text-to-speech, without inline IPA markup."
+              type: 'string',
+              description: 'Plain text suitable for text-to-speech, without inline IPA markup.'
             }
           },
-          required: ["text"]
+          required: ['text']
         },
-        "pt-BR": {
-          type: "object",
+        'pt-BR': {
+          type: 'object',
           properties: {
             text: {
-              type: "string",
-              description: "Brazilian Portuguese translation text only."
+              type: 'string',
+              description: 'Brazilian Portuguese translation text only.'
             },
             phonetic: {
-              type: "string",
-              description: "IPA pronunciation for the whole Brazilian Portuguese term or phrase, wrapped in slashes."
+              type: 'string',
+              description: 'IPA pronunciation for the whole Brazilian Portuguese term or phrase, wrapped in slashes.'
             },
             audio_text: {
-              type: "string",
-              description: "Plain text suitable for text-to-speech, without inline IPA markup."
+              type: 'string',
+              description: 'Plain text suitable for text-to-speech, without inline IPA markup.'
             }
           },
-          required: ["text"]
+          required: ['text']
         },
         ja: {
-          type: "object",
+          type: 'object',
           properties: {
             text: {
-              type: "string",
-              description: "Japanese translation text only."
+              type: 'string',
+              description: 'Japanese translation text only.'
             },
             phonetic: {
-              type: "string",
-              description: "Hiragana reading for the whole Japanese term or phrase."
+              type: 'string',
+              description: 'Hiragana reading for the whole Japanese term or phrase.'
             },
             audio_text: {
-              type: "string",
-              description: "Plain text suitable for text-to-speech, without inline reading markup."
+              type: 'string',
+              description: 'Plain text suitable for text-to-speech, without inline reading markup.'
             }
           },
-          required: ["text"]
+          required: ['text']
         }
       },
-      required: ["zh", "en", "pt-BR", "ja"]
+      required: ['zh', 'en', 'pt-BR', 'ja']
     },
     explanations: {
-      type: "object",
+      type: 'object',
       properties: {
         zh: {
-          type: "string",
-          description: "Simplified Chinese explanation for this exact sentence. Do not use Japanese kana or Portuguese."
+          type: 'string',
+          description: 'Simplified Chinese explanation for this exact sentence. Do not use Japanese kana or Portuguese.'
         },
         en: {
-          type: "string",
-          description: "English explanation for this exact sentence."
+          type: 'string',
+          description: 'English explanation for this exact sentence.'
         },
-        "pt-BR": {
-          type: "string",
-          description: "Brazilian Portuguese explanation for this exact sentence."
+        'pt-BR': {
+          type: 'string',
+          description: 'Brazilian Portuguese explanation for this exact sentence.'
         },
         ja: {
-          type: "string",
-          description: "Japanese explanation for this exact sentence."
+          type: 'string',
+          description: 'Japanese explanation for this exact sentence.'
         }
       }
     },
     word_details: {
-      type: "object",
+      type: 'object',
       properties: {
         zh: {
-          type: "object",
+          type: 'object',
           properties: {
-            word: { type: "string", description: "Simplified Chinese word." },
+            word: { type: 'string', description: 'Simplified Chinese word.' },
             definition: {
-              type: "string",
-              description: "Concise Simplified Chinese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents."
+              type: 'string',
+              description:
+                'Concise Simplified Chinese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents.'
             }
           }
         },
         en: {
-          type: "object",
+          type: 'object',
           properties: {
-            word: { type: "string", description: "English word." },
+            word: { type: 'string', description: 'English word.' },
             definition: {
-              type: "string",
-              description: "Concise English definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents."
+              type: 'string',
+              description:
+                'Concise English definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents.'
             }
           }
         },
-        "pt-BR": {
-          type: "object",
+        'pt-BR': {
+          type: 'object',
           properties: {
-            word: { type: "string", description: "Brazilian Portuguese word." },
+            word: { type: 'string', description: 'Brazilian Portuguese word.' },
             definition: {
-              type: "string",
-              description: "Concise Brazilian Portuguese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents."
+              type: 'string',
+              description:
+                'Concise Brazilian Portuguese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents.'
             }
           }
         },
         ja: {
-          type: "object",
+          type: 'object',
           properties: {
-            word: { type: "string", description: "Japanese word." },
+            word: { type: 'string', description: 'Japanese word.' },
             definition: {
-              type: "string",
-              description: "Concise Japanese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents."
+              type: 'string',
+              description:
+                'Concise Japanese definition only. No pronunciation, part-of-speech label, markdown, or cross-language equivalents.'
             }
           }
         }
       }
     },
     examples: {
-      type: "array",
+      type: 'array',
       items: {
-        type: "object",
+        type: 'object',
         properties: {
-          sentence: { type: "string" },
+          sentence: { type: 'string' },
           translations: {
-            type: "object",
+            type: 'object',
             properties: {
-              zh: { type: "string" },
-              en: { type: "string" },
-              "pt-BR": { type: "string" },
-              ja: { type: "string" }
+              zh: { type: 'string' },
+              en: { type: 'string' },
+              'pt-BR': { type: 'string' },
+              ja: { type: 'string' }
             }
           }
         },
-        required: ["sentence", "translations"]
+        required: ['sentence', 'translations']
       }
     },
     senses: {
-      type: "array",
+      type: 'array',
       items: {
-        type: "object",
+        type: 'object',
         properties: {
-          sense_order: { type: "number", description: "1-based order index of this sense" },
-          part_of_speech: { type: "string", description: "Part of speech (e.g. NOUN, VERB, ADJ, ADV)" },
-          gloss_key: { type: "string", description: "A very short core meaning or concept key" },
+          sense_order: { type: 'number', description: '1-based order index of this sense' },
+          part_of_speech: { type: 'string', description: 'Part of speech (e.g. NOUN, VERB, ADJ, ADV)' },
+          gloss_key: { type: 'string', description: 'A very short core meaning or concept key' },
           definitions: {
-            type: "object",
+            type: 'object',
             properties: {
-              zh: { type: "string", description: "Definition in Simplified Chinese" },
-              en: { type: "string", description: "Definition in English" },
-              "pt-BR": { type: "string", description: "Definition in Brazilian Portuguese" },
-              ja: { type: "string", description: "Definition in Japanese" }
+              zh: { type: 'string', description: 'Definition in Simplified Chinese' },
+              en: { type: 'string', description: 'Definition in English' },
+              'pt-BR': { type: 'string', description: 'Definition in Brazilian Portuguese' },
+              ja: { type: 'string', description: 'Definition in Japanese' }
             },
-            required: ["zh", "en", "pt-BR", "ja"]
+            required: ['zh', 'en', 'pt-BR', 'ja']
           }
         },
-        required: ["sense_order", "part_of_speech", "definitions"]
+        required: ['sense_order', 'part_of_speech', 'definitions']
       }
     }
   },
-  required: ["type", "detected_source_lang", "translation", "translations"]
+  required: ['type', 'detected_source_lang', 'translation', 'translations']
 } as const;
 
 export const PREVIEW_RESPONSE_SCHEMA = {
-  type: "object",
+  type: 'object',
   properties: {
-    type: { type: "string", enum: ["sentence"] },
+    type: { type: 'string', enum: ['sentence'] },
     detected_source_lang: {
-      type: "string",
-      description: "Detected source language code."
+      type: 'string',
+      description: 'Detected source language code.'
     },
     translation: {
-      type: "string",
-      description: "Natural translation in the requested target language."
+      type: 'string',
+      description: 'Natural translation in the requested target language.'
     },
     explanation: {
-      type: "string",
-      description: "One concise explanation in the requested target language."
+      type: 'string',
+      description: 'One concise explanation in the requested target language.'
     }
   },
-  required: ["type", "detected_source_lang", "translation", "explanation"]
+  required: ['type', 'detected_source_lang', 'translation', 'explanation']
 } as const;

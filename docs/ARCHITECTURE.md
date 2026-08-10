@@ -20,7 +20,7 @@ Cloudflare Worker API
             +-- DeepSeek
             +-- Gemini
             +-- Alibaba Cloud Bailian / DashScope
-            +-- OpenRouter
+            +-- Cloudflare Workers AI
 ```
 
 ## Frontend
@@ -57,7 +57,7 @@ Supporting modules:
 - `worker/schemas.ts`: structured-output JSON schemas.
 - `worker/prompts.ts`: provider-specific system prompts and prompt selection.
 - `worker/provider-selection.ts`: configured provider/model selection for explicit and `auto` routing.
-- `worker/provider-clients.ts`: DashScope, OpenRouter, DeepSeek, and Gemini clients.
+- `worker/provider-clients.ts`: Cloudflare Workers AI, DashScope, DeepSeek, and Gemini clients.
 - `worker/provider-json.ts`: provider JSON parsing and validation.
 - `worker/normalization.ts`: model/dictionary response normalization and local fallback fields.
 - `worker/dictionary.ts`: dictionary adapters for Cloudflare D1, Louis SQLite API, and a mock JMDict adapter.
@@ -134,7 +134,7 @@ The frontend expects:
 - `original`
 - `translation`
 - `translations`: keyed by `en`, `pt-BR`, `zh`, `ja`.
-- `provider`: `dictionary`, `openrouter`, `dashscope`, `gemini`, or `deepseek`.
+- `provider`: `dictionary`, `cloudflare`, `dashscope`, `gemini`, or `deepseek`.
 - `model`
 - `cached`
 
@@ -149,14 +149,14 @@ Bump `TRANSLATION_CACHE_VERSION` in `worker/config.ts` whenever response shape o
 Supported providers:
 
 - `auto`
-- `openrouter`
+- `cloudflare`
 - `dashscope`
 - `gemini`
 - `deepseek`
 
 Backend defaults and model options live in `worker/config.ts`. Frontend defaults and editable local options live in `src/composables/useSettings.ts`; keep them aligned with `/api/models`.
 
-Explicit provider selections fail with `PROVIDER_CONFIG_MISSING` when the matching secret is absent. Health responses may expose booleans but must not expose secret values.
+Cloudflare uses the native `AI` binding; the other explicit providers fail with `PROVIDER_CONFIG_MISSING` when the matching secret is absent. Health responses may expose booleans but must not expose secret values.
 
 ## Dictionary Layer
 

@@ -64,7 +64,10 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
           </button>
         </div>
 
-        <div v-if="historyItems.length === 0" class="flex-1 flex flex-col items-center justify-center py-12 text-center">
+        <div
+          v-if="historyItems.length === 0"
+          class="flex-1 flex flex-col items-center justify-center py-12 text-center"
+        >
           <History class="w-12 h-12 text-m3-outline-variant/60 mb-4" />
           <p class="text-m3-on-surface-variant text-sm text-center font-medium">
             还没有搜索记录<br />
@@ -102,7 +105,9 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
               >
                 <Trash2 class="w-4 h-4" />
               </button>
-              <ArrowRight class="w-5 h-5 text-m3-outline-variant/50 group-hover:text-m3-primary transition-colors shrink-0" />
+              <ArrowRight
+                class="w-5 h-5 text-m3-outline-variant/50 group-hover:text-m3-primary transition-colors shrink-0"
+              />
             </div>
           </div>
         </div>

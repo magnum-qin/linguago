@@ -1,0 +1,29 @@
+{
+  "version": "v90-targeted-canonical-senses",
+  "created_at": "2026-08-08",
+  "candidates": [
+    {
+      "source_entry_id": 2080404,
+      "source_sense_id": 2080404,
+      "word": "poluente",
+      "lang": "pt-BR",
+      "note": "Canonical noun lemma is absent from product coverage; plural source records provide independently aligned OMW target terms.",
+      "reviewed_form_evidence": [
+        {
+          "relation": "plural_of",
+          "form": "poluentes",
+          "raw_source_entry_id": 3292605,
+          "raw_source_sense_id": 3640040,
+          "source_key": "kaikki-pt"
+        },
+        {
+          "relation": "inflected_concept_evidence",
+          "form": "poluentes",
+          "source_entry_id": 2734598,
+          "source_sense_id": 2734598,
+          "source_key": "omw-30"
+        }
+      ]
+    }
+  ]
+}

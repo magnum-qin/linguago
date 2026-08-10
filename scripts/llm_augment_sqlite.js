@@ -7,33 +7,30 @@ const __dirname = path.dirname(__filename);
 const DB_PATH = path.join(__dirname, '../data/processed/linguago.db');
 
 // We use the two IDLE nodes detected by nvidia-smi
-const ENDPOINTS = [
-  'http://192.168.2.143:11434/api/chat',
-  'http://172.23.4.48:11434/api/chat'
-];
+const ENDPOINTS = ['http://192.168.2.143:11434/api/chat', 'http://172.23.4.48:11434/api/chat'];
 let endpointIndex = 0;
 
 const JSON_SCHEMA = {
-  type: "array",
+  type: 'array',
   items: {
-    type: "object",
+    type: 'object',
     properties: {
-      word: { type: "string" },
-      pos: { type: "string" },
-      gloss: { type: "string" },
-      examples: { 
-        type: "array",
+      word: { type: 'string' },
+      pos: { type: 'string' },
+      gloss: { type: 'string' },
+      examples: {
+        type: 'array',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
-            text: { type: "string" },
-            translation: { type: "string" }
+            text: { type: 'string' },
+            translation: { type: 'string' }
           },
-          required: ["text", "translation"]
+          required: ['text', 'translation']
         }
       }
     },
-    required: ["word", "pos", "gloss", "examples"]
+    required: ['word', 'pos', 'gloss', 'examples']
   }
 };
 
@@ -42,7 +39,7 @@ db.pragma('journal_mode = WAL');
 
 const updateStmt = db.prepare('UPDATE dictionary SET data = ? WHERE word = ?');
 
-// We filter for common words by ensuring there is an English translation, 
+// We filter for common words by ensuring there is an English translation,
 // and that Japanese or Portuguese is missing.
 const queryStmt = db.prepare(`
   SELECT word, data FROM dictionary 
@@ -77,19 +74,22 @@ Return a JSON array of senses. For each sense, provide the translated word, part
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'qwen3.6:latest',
-        messages: [{ role: 'system', content: 'You are a JSON assistant. Output valid JSON array.'}, { role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: 'You are a JSON assistant. Output valid JSON array.' },
+          { role: 'user', content: prompt }
+        ],
         format: JSON_SCHEMA,
         stream: false,
         options: { temperature: 0.1 }
       }),
       signal: AbortSignal.timeout(60000) // 60s timeout for large generation
     });
-    
+
     if (res.ok) {
       const data = await res.json();
       return JSON.parse(data.message.content);
     }
-  } catch(e) {
+  } catch (e) {
     console.error(`Error on ${endpoint}: ${e.message}`);
   }
   return null;
@@ -98,19 +98,21 @@ Return a JSON array of senses. For each sense, provide the translated word, part
 async function processBatch() {
   const rows = queryStmt.all();
   if (rows.length === 0) {
-    console.log("No more words to process. Worker finished!");
+    console.log('No more words to process. Worker finished!');
     return false;
   }
-  
+
   console.log(`Processing batch of ${rows.length} words...`);
   const promises = rows.map(async (row) => {
     let data;
     try {
       data = JSON.parse(row.data);
-    } catch(e) { return; }
-    
+    } catch (e) {
+      return;
+    }
+
     let updated = false;
-    
+
     // Japanese
     if (!data.translations.ja || data.translations.ja.length === 0) {
       const res = await getTranslation(data, 'Japanese');
@@ -119,7 +121,7 @@ async function processBatch() {
         updated = true;
       }
     }
-    
+
     // Portuguese
     if (!data.translations.pt || data.translations.pt.length === 0) {
       const res = await getTranslation(data, 'Portuguese');
@@ -128,23 +130,23 @@ async function processBatch() {
         updated = true;
       }
     }
-    
+
     if (updated) {
       updateStmt.run(JSON.stringify(data), row.word);
       console.log(`[OK] Augmented: ${row.word}`);
     }
   });
-  
+
   await Promise.all(promises);
   return true;
 }
 
 async function main() {
-  console.log("Starting SQLite Distributed LLM Worker...");
+  console.log('Starting SQLite Distributed LLM Worker...');
   console.log(`Loaded endpoints: ${ENDPOINTS.join(', ')}`);
-  
+
   let keepGoing = true;
-  while(keepGoing) {
+  while (keepGoing) {
     keepGoing = await processBatch();
   }
 }

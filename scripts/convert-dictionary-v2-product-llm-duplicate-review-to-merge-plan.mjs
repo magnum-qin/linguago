@@ -1,31 +1,36 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_REVIEW = "logs/product-semantic-duplicate-llm-review-20260624.json";
-const DEFAULT_OUT = "logs/product-llm-approved-duplicate-merge-plan-20260624.json";
+const DEFAULT_REVIEW = 'logs/product-semantic-duplicate-llm-review-20260624.json';
+const DEFAULT_OUT = 'logs/product-llm-approved-duplicate-merge-plan-20260624.json';
 
 const args = parseArgs(process.argv.slice(2));
 const reviewPath = path.resolve(args.review || DEFAULT_REVIEW);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
-const minConfidence = Number(args["min-confidence"] || 0.85);
+const minConfidence = Number(args['min-confidence'] || 0.85);
 
 if (!fs.existsSync(reviewPath)) throw new Error(`LLM review not found: ${reviewPath}`);
 
-const review = JSON.parse(fs.readFileSync(reviewPath, "utf8"));
+const review = JSON.parse(fs.readFileSync(reviewPath, 'utf8'));
 const candidates = [];
 const skipped = [];
 
 for (const row of review.reviews || []) {
   if (!row.valid) {
-    skipped.push({ pair_key: row.pair_key, headword: row.headword, reason: "invalid_review" });
+    skipped.push({ pair_key: row.pair_key, headword: row.headword, reason: 'invalid_review' });
     continue;
   }
-  if (row.decision !== "merge") {
+  if (row.decision !== 'merge') {
     skipped.push({ pair_key: row.pair_key, headword: row.headword, reason: row.decision });
     continue;
   }
   if (Number(row.confidence) < minConfidence) {
-    skipped.push({ pair_key: row.pair_key, headword: row.headword, reason: "low_confidence", confidence: row.confidence });
+    skipped.push({
+      pair_key: row.pair_key,
+      headword: row.headword,
+      reason: 'low_confidence',
+      confidence: row.confidence
+    });
     continue;
   }
   candidates.push({
@@ -34,7 +39,7 @@ for (const row of review.reviews || []) {
     frequency_rank: row.frequency_rank,
     keep_sense_id: row.keep_sense_id,
     remove_sense_id: row.remove_sense_id,
-    reason: "llm_semantic_duplicate_review",
+    reason: 'llm_semantic_duplicate_review',
     confidence: row.confidence,
     llm_reason: row.reason,
     evidence: row.evidence,
@@ -57,7 +62,7 @@ const report = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
 console.log(JSON.stringify({ ok: true, out: path.relative(process.cwd(), outPath), summary: report.summary }, null, 2));
 
 function countBy(values) {
@@ -70,14 +75,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

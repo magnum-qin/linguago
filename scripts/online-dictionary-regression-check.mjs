@@ -1,129 +1,144 @@
-import fs from "node:fs/promises";
-import path from "node:path";
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
-const baseUrl = process.env.PWA_URL || "https://translation-pwa.qhzggzh-linguago.workers.dev";
-const outDir = path.resolve("output/online-dictionary-regression");
-const langs = ["zh", "en", "pt-BR", "ja"];
+const baseUrl = process.env.PWA_URL || 'https://translation-pwa.qhzggzh-linguago.workers.dev';
+const outDir = path.resolve('output/online-dictionary-regression');
+const langs = ['zh', 'en', 'pt-BR', 'ja'];
 
 const cases = [
   {
-    id: "zh-zhong-polyphone",
-    text: "\u4e2d",
-    source_lang: "zh",
+    id: 'zh-zhong-polyphone',
+    text: '\u4e2d',
+    source_lang: 'zh',
     minSenses: 2,
     requirePronunciationGroups: true
   },
   {
-    id: "zh-lingwai-overrides",
-    text: "\u53e6\u5916",
-    source_lang: "zh",
+    id: 'zh-lingwai-overrides',
+    text: '\u53e6\u5916',
+    source_lang: 'zh',
     expectedTermsByOrder: {
-      1: { en: "another", zh: "\u53e6\u5916", ja: "\u5225\u306e" },
-      2: { en: "additionally", zh: "\u53e6\u5916", ja: "\u3055\u3089\u306b" },
-      3: { en: "furthermore", zh: "\u800c\u4e14", ja: "\u305d\u306e\u4e0a" }
+      1: { en: 'another', zh: '\u53e6\u5916', ja: '\u5225\u306e' },
+      2: { en: 'additionally', zh: '\u53e6\u5916', ja: '\u3055\u3089\u306b' },
+      3: { en: 'furthermore', zh: '\u800c\u4e14', ja: '\u305d\u306e\u4e0a' }
     }
   },
   {
-    id: "ja-itsu-sense-order",
-    text: "\u4f55\u6642",
-    source_lang: "ja",
+    id: 'ja-itsu-sense-order',
+    text: '\u4f55\u6642',
+    source_lang: 'ja',
     expectedTermsByOrder: {
-      1: { en: "when", ja: "\u3044\u3064" },
-      2: { en: "what time", ja: "\u4f55\u6642" },
-      3: { en: "normal times", ja: "\u4f55\u6642" }
+      1: { en: 'when', ja: '\u3044\u3064' },
+      2: { en: 'what time', ja: '\u4f55\u6642' },
+      3: { en: 'normal times', ja: '\u4f55\u6642' }
     }
   },
   {
-    id: "ja-kokusai-overrides",
-    text: "\u56fd\u969b",
-    source_lang: "ja",
+    id: 'ja-kokusai-overrides',
+    text: '\u56fd\u969b',
+    source_lang: 'ja',
     expectedTermsByOrder: {
-      1: { en: "international", zh: "\u56fd\u9645\u7684", ja: "\u56fd\u969b" },
-      2: { en: "diplomatic relations", zh: "\u56fd\u9645\u4ea4\u5f80", ja: "\u56fd\u4ea4" }
+      1: { en: 'international', zh: '\u56fd\u9645\u7684', ja: '\u56fd\u969b' },
+      2: { en: 'diplomatic relations', zh: '\u56fd\u9645\u4ea4\u5f80', ja: '\u56fd\u4ea4' }
     }
   },
   {
-    id: "ja-visitor-overrides",
-    text: "\u30d3\u30b8\u30bf\u30fc",
-    source_lang: "ja",
+    id: 'ja-visitor-overrides',
+    text: '\u30d3\u30b8\u30bf\u30fc',
+    source_lang: 'ja',
     expectedTermsByOrder: {
-      1: { en: "visitor", zh: "\u8bbf\u5ba2", ja: "\u30d3\u30b8\u30bf\u30fc" },
-      2: { en: "visiting team", zh: "\u5ba2\u961f", ja: "\u30d3\u30b8\u30bf\u30fc\u30c1\u30fc\u30e0" }
+      1: { en: 'visitor', zh: '\u8bbf\u5ba2', ja: '\u30d3\u30b8\u30bf\u30fc' },
+      2: { en: 'visiting team', zh: '\u5ba2\u961f', ja: '\u30d3\u30b8\u30bf\u30fc\u30c1\u30fc\u30e0' }
     }
   },
   {
-    id: "zh-white-spotfix",
-    text: "\u767d\u8272",
-    source_lang: "zh",
+    id: 'zh-white-spotfix',
+    text: '\u767d\u8272',
+    source_lang: 'zh',
     expectedTermsByOrder: {
-      1: { en: "white terror; reactionary", zh: "\u767d\u8272\u6050\u6016", ja: "\u767d\u8272\u30c6\u30ed", "pt-BR": "terror branco" },
-      2: { en: "white pollution", zh: "\u767d\u8272\u6c61\u67d3", ja: "\u767d\u8272\u6c5a\u67d3", "pt-BR": "polui\u00e7\u00e3o branca" }
+      1: {
+        en: 'white terror; reactionary',
+        zh: '\u767d\u8272\u6050\u6016',
+        ja: '\u767d\u8272\u30c6\u30ed',
+        'pt-BR': 'terror branco'
+      },
+      2: {
+        en: 'white pollution',
+        zh: '\u767d\u8272\u6c61\u67d3',
+        ja: '\u767d\u8272\u6c5a\u67d3',
+        'pt-BR': 'polui\u00e7\u00e3o branca'
+      }
     }
   },
   {
-    id: "zh-gan-spotfix",
-    text: "\u6746",
-    source_lang: "zh",
+    id: 'zh-gan-spotfix',
+    text: '\u6746',
+    source_lang: 'zh',
     expectedTermsByOrder: {
-      1: { en: "pole; post; staff", zh: "\u6746", ja: "\u68d2; \u7aff", "pt-BR": "haste; poste; vara" },
-      2: { en: "shaft; handle; classifier", zh: "\u6746", ja: "\u67c4; \u7aff\u72b6\u306e\u7269\u306e\u52a9\u6570\u8a5e", "pt-BR": "cabo; haste; classificador" }
+      1: { en: 'pole; post; staff', zh: '\u6746', ja: '\u68d2; \u7aff', 'pt-BR': 'haste; poste; vara' },
+      2: {
+        en: 'shaft; handle; classifier',
+        zh: '\u6746',
+        ja: '\u67c4; \u7aff\u72b6\u306e\u7269\u306e\u52a9\u6570\u8a5e',
+        'pt-BR': 'cabo; haste; classificador'
+      }
     }
   },
   {
-    id: "en-people-primary-conflict",
-    text: "people",
-    source_lang: "en",
+    id: 'en-people-primary-conflict',
+    text: 'people',
+    source_lang: 'en',
     maxSenses: 1,
     expectedTermsByOrder: {
-      1: { en: "people", zh: "\u4eba\u4eec; \u4eba\u6c11", ja: "\u4eba\u3005", "pt-BR": "pessoas; povo" }
+      1: { en: 'people', zh: '\u4eba\u4eec; \u4eba\u6c11', ja: '\u4eba\u3005', 'pt-BR': 'pessoas; povo' }
     },
-    forbiddenTerms: ["someone", "\u6709\u4eba", "\u8ab0\u304b", "algu\u00e9m"]
+    forbiddenTerms: ['someone', '\u6709\u4eba', '\u8ab0\u304b', 'algu\u00e9m']
   },
   {
-    id: "en-exchange-blocked-mixed-sense",
-    text: "exchange",
-    source_lang: "en",
+    id: 'en-exchange-blocked-mixed-sense',
+    text: 'exchange',
+    source_lang: 'en',
     maxSenses: 2,
     expectedTermsByOrder: {
-      1: { en: "exchange", zh: "\u4ea4\u6362", ja: "\u4ea4\u63db", "pt-BR": "troca" },
-      2: { en: "currency exchange", zh: "\u5916\u6c47\u5151\u6362", ja: "\u4e21\u66ff", "pt-BR": "c\u00e2mbio" }
+      1: { en: 'exchange', zh: '\u4ea4\u6362', ja: '\u4ea4\u63db', 'pt-BR': 'troca' },
+      2: { en: 'currency exchange', zh: '\u5916\u6c47\u5151\u6362', ja: '\u4e21\u66ff', 'pt-BR': 'c\u00e2mbio' }
     },
-    forbiddenTerms: ["central", "\u4e2d\u592e\u7684", "\u4e2d\u592e\u306e"]
+    forbiddenTerms: ['central', '\u4e2d\u592e\u7684', '\u4e2d\u592e\u306e']
   },
   {
-    id: "en-court-blocked-mixed-sense",
-    text: "court",
-    source_lang: "en",
+    id: 'en-court-blocked-mixed-sense',
+    text: 'court',
+    source_lang: 'en',
     maxSenses: 2,
     expectedTermsByOrder: {
-      1: { en: "court", zh: "\u6cd5\u9662", ja: "\u88c1\u5224\u6240", "pt-BR": "tribunal" },
-      2: { en: "court", zh: "\u7ea6\u4f1a", ja: "\u4ea4\u969b\u3059\u308b", "pt-BR": "namorar" }
+      1: { en: 'court', zh: '\u6cd5\u9662', ja: '\u88c1\u5224\u6240', 'pt-BR': 'tribunal' },
+      2: { en: 'court', zh: '\u7ea6\u4f1a', ja: '\u4ea4\u969b\u3059\u308b', 'pt-BR': 'namorar' }
     },
-    forbiddenTerms: ["backyard", "\u540e\u9662", "\u88cf\u5ead", "quintal"]
+    forbiddenTerms: ['backyard', '\u540e\u9662', '\u88cf\u5ead', 'quintal']
   },
   {
-    id: "zh-bi-overrides",
-    text: "\u9589",
-    source_lang: "zh",
+    id: 'zh-bi-overrides',
+    text: '\u9589',
+    source_lang: 'zh',
     expectedTermsByOrder: {
-      1: { en: "close", ja: "\u9589\u3058\u308b" },
-      2: { en: "obstruct; block up", ja: "\u585e\u3050" },
-      3: { en: "shut; close", ja: "\u9589\u3058\u308b" }
+      1: { en: 'close', ja: '\u9589\u3058\u308b' },
+      2: { en: 'obstruct; block up', ja: '\u585e\u3050' },
+      3: { en: 'shut; close', ja: '\u9589\u3058\u308b' }
     }
   },
   {
-    id: "zh-secret-disambiguation",
-    text: "\u79d8\u5bc6",
-    source_lang: "zh",
+    id: 'zh-secret-disambiguation',
+    text: '\u79d8\u5bc6',
+    source_lang: 'zh',
     minSenses: 1,
-    expectedDetectedSourceLang: "zh"
+    expectedDetectedSourceLang: 'zh'
   },
   {
-    id: "ja-secret-disambiguation",
-    text: "\u79d8\u5bc6",
-    source_lang: "ja",
+    id: 'ja-secret-disambiguation',
+    text: '\u79d8\u5bc6',
+    source_lang: 'ja',
     minSenses: 1,
-    expectedDetectedSourceLang: "ja"
+    expectedDetectedSourceLang: 'ja'
   }
 ];
 
@@ -145,16 +160,16 @@ const failures = [
   ...report.cases.flatMap((item) => item.errors.map((error) => `${item.id}: ${error}`))
 ];
 
-await fs.writeFile(path.join(outDir, "report.json"), JSON.stringify(report, null, 2), "utf8");
+await fs.writeFile(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2), 'utf8');
 console.log(JSON.stringify(report, null, 2));
 
 if (failures.length > 0) {
-  console.error(`Online dictionary regression failed:\n${failures.join("\n")}`);
+  console.error(`Online dictionary regression failed:\n${failures.join('\n')}`);
   process.exit(1);
 }
 
 async function checkHealth() {
-  const response = await fetch(new URL("/health", baseUrl), {
+  const response = await fetch(new URL('/health', baseUrl), {
     signal: AbortSignal.timeout(30000)
   });
   const rawText = await response.text();
@@ -163,15 +178,15 @@ async function checkHealth() {
   const errors = [];
 
   if (!response.ok) errors.push(`HTTP ${response.status}: ${rawText.slice(0, 300)}`);
-  if (!data?.ok) errors.push("health ok is not true");
-  if (stats.source !== "cloudflare-d1-v2") errors.push(`dictionary source is ${stats.source || "missing"}`);
+  if (!data?.ok) errors.push('health ok is not true');
+  if (stats.source !== 'cloudflare-d1-v2') errors.push(`dictionary source is ${stats.source || 'missing'}`);
   if (Number(stats.entries || 0) < 23000) errors.push(`entries ${stats.entries || 0} < 23000`);
   if (Number(stats.senses || 0) < 28000) errors.push(`senses ${stats.senses || 0} < 28000`);
   if (Number(stats.sense_localizations || 0) < 110000) {
     errors.push(`sense_localizations ${stats.sense_localizations || 0} < 110000`);
   }
-  if (stats.policy !== "product_complete_4_lang_accepted_senses_only") {
-    errors.push(`policy is ${stats.policy || "missing"}`);
+  if (stats.policy !== 'product_complete_4_lang_accepted_senses_only') {
+    errors.push(`policy is ${stats.policy || 'missing'}`);
   }
 
   return {
@@ -184,14 +199,14 @@ async function checkHealth() {
 
 async function checkTerm(item) {
   const started = Date.now();
-  const response = await fetch(new URL("/api/translate", baseUrl), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
+  const response = await fetch(new URL('/api/translate', baseUrl), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       text: item.text,
       source_lang: item.source_lang,
-      target_lang: item.target_lang || "en",
-      provider: "auto"
+      target_lang: item.target_lang || 'en',
+      provider: 'auto'
     }),
     signal: AbortSignal.timeout(60000)
   });
@@ -201,14 +216,15 @@ async function checkTerm(item) {
   const errors = [];
 
   if (!response.ok) errors.push(`HTTP ${response.status}: ${rawText.slice(0, 300)}`);
-  if (!data || typeof data !== "object") errors.push("response is not a JSON object");
-  if (data?.provider !== "dictionary") errors.push(`provider is ${data?.provider || "missing"}, expected dictionary`);
-  if (data?.model !== "cloudflare-d1-v2") errors.push(`model is ${data?.model || "missing"}, expected cloudflare-d1-v2`);
-  if (data?.type !== "word") errors.push(`type is ${data?.type || "missing"}, expected word`);
+  if (!data || typeof data !== 'object') errors.push('response is not a JSON object');
+  if (data?.provider !== 'dictionary') errors.push(`provider is ${data?.provider || 'missing'}, expected dictionary`);
+  if (data?.model !== 'cloudflare-d1-v2')
+    errors.push(`model is ${data?.model || 'missing'}, expected cloudflare-d1-v2`);
+  if (data?.type !== 'word') errors.push(`type is ${data?.type || 'missing'}, expected word`);
 
   const detected = data?.detected_source_lang || data?.source_lang;
   if (item.expectedDetectedSourceLang && detected !== item.expectedDetectedSourceLang) {
-    errors.push(`detected source lang is ${detected || "missing"}, expected ${item.expectedDetectedSourceLang}`);
+    errors.push(`detected source lang is ${detected || 'missing'}, expected ${item.expectedDetectedSourceLang}`);
   }
 
   const senses = Array.isArray(data?.senses) ? data.senses : [];
@@ -245,7 +261,7 @@ async function checkTerm(item) {
       order: sense.sense_order,
       en: sense.localizations?.en?.term,
       zh: sense.localizations?.zh?.term,
-      "pt-BR": sense.localizations?.["pt-BR"]?.term,
+      'pt-BR': sense.localizations?.['pt-BR']?.term,
       ja: sense.localizations?.ja?.term
     })),
     pronunciation_groups: Array.isArray(data?.pronunciation_groups)
@@ -271,7 +287,7 @@ function validateSenseOrder(senses, errors) {
 
 function validateLocalizations(senses, errors) {
   for (const sense of senses) {
-    const order = sense.sense_order || "?";
+    const order = sense.sense_order || '?';
     for (const lang of langs) {
       const localization = sense.localizations?.[lang];
       const definition = sense.definitions?.[lang] || localization?.definition;
@@ -292,7 +308,7 @@ function validateExpectedTerms(expectedTermsByOrder, senses, errors) {
     for (const [lang, expectedTerm] of Object.entries(expectedTerms)) {
       const actual = sense.localizations?.[lang]?.term;
       if (actual !== expectedTerm) {
-        errors.push(`sense ${orderText} ${lang} term is ${actual || "missing"}, expected ${expectedTerm}`);
+        errors.push(`sense ${orderText} ${lang} term is ${actual || 'missing'}, expected ${expectedTerm}`);
       }
     }
   }
@@ -305,7 +321,7 @@ function validateForbiddenTerms(forbiddenTerms, senses, errors) {
     for (const lang of langs) {
       const term = sense.localizations?.[lang]?.term;
       if (term && forbidden.has(String(term).toLowerCase())) {
-        errors.push(`sense ${sense.sense_order || "?"} ${lang} term is forbidden: ${term}`);
+        errors.push(`sense ${sense.sense_order || '?'} ${lang} term is forbidden: ${term}`);
       }
     }
   }
@@ -314,13 +330,13 @@ function validateForbiddenTerms(forbiddenTerms, senses, errors) {
 function validatePronunciationGroups(item, data, errors) {
   const groups = Array.isArray(data?.pronunciation_groups) ? data.pronunciation_groups : [];
   if (item.requirePronunciationGroups && groups.length === 0) {
-    errors.push("missing pronunciation_groups");
+    errors.push('missing pronunciation_groups');
   }
   const groupedSenseOrders = groups.flatMap((group) =>
     Array.isArray(group.senses) ? group.senses.map((sense) => sense.sense_order) : []
   );
   if (new Set(groupedSenseOrders).size !== groupedSenseOrders.length) {
-    errors.push("duplicate senses across pronunciation_groups");
+    errors.push('duplicate senses across pronunciation_groups');
   }
 }
 
@@ -329,7 +345,7 @@ function validateExamples(data, errors) {
   for (const [index, example] of examples.entries()) {
     for (const lang of Object.keys(example.localizations || {})) {
       const text = example.localizations?.[lang]?.text;
-      if (typeof text === "string" && /&[A-Za-z0-9#]+;/.test(text)) {
+      if (typeof text === 'string' && /&[A-Za-z0-9#]+;/.test(text)) {
         errors.push(`example ${index + 1} ${lang} contains HTML entity`);
       }
     }

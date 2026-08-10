@@ -1,22 +1,22 @@
-const CACHE_NAME = "linguago-shell-v42-vue";
+const CACHE_NAME = 'linguago-shell-v43-vue';
 const APP_SHELL = [
-  "/",
-  "/index.html",
-  "/manifest.webmanifest",
-  "/icons/icon.svg",
-  "/icons/apple-touch-icon.png",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png"
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/icons/icon.svg',
+  '/icons/apple-touch-icon.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 const APP_SHELL_PATHS = new Set(APP_SHELL);
-const INDEX_PATH = "/index.html";
+const INDEX_PATH = '/index.html';
 
-self.addEventListener("install", (event) => {
+self.addEventListener('install', (event) => {
   event.waitUntil(precacheShell());
   self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
@@ -25,8 +25,14 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") {
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') {
     return;
   }
 
@@ -35,18 +41,23 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  if (event.request.mode === "navigate" || url.pathname === "/" || url.pathname === INDEX_PATH) {
-    event.respondWith(staleWhileRevalidateNavigation(event.request));
+  if (url.searchParams.has('__pwa_update')) {
+    event.respondWith(fetch(new Request(event.request, { cache: 'no-store' })));
+    return;
+  }
+
+  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === INDEX_PATH) {
+    event.respondWith(networkFirstNavigation(event.request));
     return;
   }
 
   // Vite assets (hashed) can be cached safely forever
-  if (url.pathname.startsWith("/assets/")) {
+  if (url.pathname.startsWith('/assets/')) {
     event.respondWith(cacheFirstAsset(event.request, url.pathname));
     return;
   }
@@ -64,23 +75,24 @@ async function precacheShell() {
   await Promise.allSettled(APP_SHELL.map((path) => cache.add(path)));
 }
 
-async function staleWhileRevalidateNavigation(request) {
-  const cached = await caches.match(INDEX_PATH) || await caches.match("/");
-  const update = fetch(request).then(async (response) => {
+async function networkFirstNavigation(request) {
+  try {
+    const response = await fetch(request);
     if (response.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(INDEX_PATH, response.clone()).catch(() => {});
     }
     return response;
-  }).catch(() => cached);
-  
-  return cached || update;
+  } catch {
+    const cached = (await caches.match(INDEX_PATH)) || (await caches.match('/'));
+    return cached || offlineHtml();
+  }
 }
 
 async function cacheFirstAsset(request, pathname) {
   const cached = await caches.match(request);
   if (cached) return cached;
-  
+
   try {
     const response = await fetch(request);
     if (response.ok) {
@@ -89,7 +101,7 @@ async function cacheFirstAsset(request, pathname) {
     }
     return response;
   } catch (error) {
-    return new Response("", { status: 503, statusText: "Offline" });
+    return new Response('', { status: 503, statusText: 'Offline' });
   }
 }
 
@@ -97,15 +109,15 @@ async function networkFirstAsset(request, pathname) {
   try {
     return await fetchAndCache(request);
   } catch {
-    const cached = await caches.match(request) || await caches.match(pathname);
-    return cached || new Response("", { status: 503, statusText: "Offline" });
+    const cached = (await caches.match(request)) || (await caches.match(pathname));
+    return cached || new Response('', { status: 503, statusText: 'Offline' });
   }
 }
 
 async function staleWhileRevalidate(request) {
   const cached = await caches.match(request);
   const update = fetchAndCache(request).catch(() => cached);
-  return cached || update || new Response("", { status: 503, statusText: "Offline" });
+  return cached || update || new Response('', { status: 503, statusText: 'Offline' });
 }
 
 async function fetchAndCache(request) {
@@ -118,7 +130,10 @@ async function fetchAndCache(request) {
 }
 
 function offlineHtml() {
-  return new Response("<!doctype html><html><head><meta charset=\"utf-8\"><title>LinguaGo</title></head><body>LinguaGo</body></html>", {
-    headers: { "content-type": "text/html; charset=utf-8" }
-  });
+  return new Response(
+    '<!doctype html><html><head><meta charset="utf-8"><title>LinguaGo</title></head><body>LinguaGo</body></html>',
+    {
+      headers: { 'content-type': 'text/html; charset=utf-8' }
+    }
+  );
 }

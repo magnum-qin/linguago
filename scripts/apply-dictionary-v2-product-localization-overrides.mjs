@@ -1,24 +1,24 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_OVERRIDES = "config/dictionary-overrides/product-sense-localizations.json";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_OVERRIDES = 'config/dictionary-overrides/product-sense-localizations.json';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const overridesPath = path.resolve(args.overrides || DEFAULT_OVERRIDES);
-const apply = args.apply === "true" || args.apply === true;
+const apply = args.apply === 'true' || args.apply === true;
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!fs.existsSync(overridesPath)) throw new Error(`Overrides not found: ${overridesPath}`);
 
-const overrides = JSON.parse(fs.readFileSync(overridesPath, "utf8"));
-if (!Array.isArray(overrides)) throw new Error("Override file must contain an array.");
+const overrides = JSON.parse(fs.readFileSync(overridesPath, 'utf8'));
+if (!Array.isArray(overrides)) throw new Error('Override file must contain an array.');
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const statements = {
   findByOrder: db.prepare(`
@@ -151,7 +151,7 @@ function normalizeLocalization(localization, lang, row) {
     pronunciation: cleanNullable(localization.pronunciation),
     pronunciation_system: cleanNullable(localization.pronunciation_system),
     definition,
-    source: row.source || "manual:product-localization-override",
+    source: row.source || 'manual:product-localization-override',
     confidence: Number(localization.confidence ?? row.confidence ?? 0.95)
   };
 }
@@ -159,17 +159,17 @@ function normalizeLocalization(localization, lang, row) {
 for (const row of overrides) {
   const sense = resolveSense(row);
   if (!sense) {
-    stats.skipped.push({ target: row.target, reason: "sense_not_found" });
+    stats.skipped.push({ target: row.target, reason: 'sense_not_found' });
     continue;
   }
   const localizations = Object.entries(row.localizations || {}).map(([lang, localization]) => {
-    if (!["en", "zh", "ja", "pt-BR"].includes(lang)) {
+    if (!['en', 'zh', 'ja', 'pt-BR'].includes(lang)) {
       throw new Error(`Invalid lang in override: ${lang}`);
     }
     return normalizeLocalization(localization, lang, row);
   });
   if (!localizations.length) {
-    stats.skipped.push({ target: row.target, reason: "no_localizations" });
+    stats.skipped.push({ target: row.target, reason: 'no_localizations' });
     continue;
   }
   stats.resolved_senses++;
@@ -222,11 +222,11 @@ console.log(
 db.close();
 
 function cleanText(value) {
-  return String(value || "").trim();
+  return String(value || '').trim();
 }
 
 function cleanNullable(value) {
-  const text = typeof value === "string" ? value.trim() : "";
+  const text = typeof value === 'string' ? value.trim() : '';
   return text || null;
 }
 
@@ -234,11 +234,11 @@ function parseArgs(argv) {
   const output = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[i + 1];
-    output[key] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    output[key] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return output;
 }

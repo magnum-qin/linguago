@@ -1,0 +1,25 @@
+{
+  "version": "v90-entry-form-aliases",
+  "aliases": [
+    {
+      "entry_id": 23336,
+      "headword": "eletrônica",
+      "lang": "pt-BR",
+      "form": "electrónica",
+      "form_type": "locale_alias",
+      "source": "manual:v90-pt-locale-alias",
+      "confidence": 1.0,
+      "note": "European Portuguese spelling mapped to the existing Brazilian Portuguese electronics entry."
+    },
+    {
+      "entry_id": 30466,
+      "headword": "bens",
+      "lang": "pt-BR",
+      "form": "activos",
+      "form_type": "locale_inflected_form",
+      "source": "manual:v90-kaikki-omw-form-evidence",
+      "confidence": 1.0,
+      "note": "European Portuguese plural spelling mapped to the existing four-language assets entry."
+    }
+  ]
+}

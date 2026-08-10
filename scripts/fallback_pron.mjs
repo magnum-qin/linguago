@@ -15,19 +15,19 @@ db.exec('BEGIN TRANSACTION');
 for (const entry of entries) {
   const sounds = entry.sounds;
   const defaultPron = sounds[0];
-  
+
   for (const sense of entry.senses) {
     let bestPron = defaultPron;
-    
+
     // Try to extract pinyin hint from gloss like [zha4] or pr. [zhang3]
     const gloss = sense.gloss || '';
     const hintMatch = gloss.match(/\[([a-zA-Z]+\d)\]/);
     if (hintMatch) {
       const hint = hintMatch[1].toLowerCase();
-      const match = sounds.find(s => s.toLowerCase() === hint);
+      const match = sounds.find((s) => s.toLowerCase() === hint);
       if (match) bestPron = match;
     }
-    
+
     updateStmt.run(bestPron, entry.entryId, sense.sense_order);
   }
 }

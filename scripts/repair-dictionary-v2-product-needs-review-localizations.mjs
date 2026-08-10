@@ -1,31 +1,31 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const dryRun = args["dry-run"] !== "false";
+const dryRun = args['dry-run'] !== 'false';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 
 const fixes = new Map([
-  [40, { term: "拨音", reading: "bō yīn", reading_system: "pinyin" }],
-  [82, { term: "口语系词", reading: "kǒu yǔ xì cí", reading_system: "pinyin" }],
-  [143, { term: "条件助词", reading: "tiáo jiàn zhù cí", reading_system: "pinyin" }],
-  [296, { term: "走", reading: "そう", reading_system: "kana" }],
-  [298, { reading: "に", reading_system: "kana" }],
-  [304, { term: "我", reading: "われ", reading_system: "kana" }],
-  [333, { term: "腿", reading: "tuǐ", reading_system: "pinyin" }],
-  [367, { term: "兩", reading: "liǎng", reading_system: "pinyin" }],
-  [429, { pronunciation: "cê", pronunciation_system: "pt-BR respelling" }],
-  [461, { term: "壞", reading: "huài", reading_system: "pinyin" }],
-  [477, { term: "兒子", reading: "ér zi", reading_system: "pinyin" }],
-  [573, { term: "古典过去助动词", reading: "gǔ diǎn guò qù zhù dòng cí", reading_system: "pinyin" }]
+  [40, { term: '拨音', reading: 'bō yīn', reading_system: 'pinyin' }],
+  [82, { term: '口语系词', reading: 'kǒu yǔ xì cí', reading_system: 'pinyin' }],
+  [143, { term: '条件助词', reading: 'tiáo jiàn zhù cí', reading_system: 'pinyin' }],
+  [296, { term: '走', reading: 'そう', reading_system: 'kana' }],
+  [298, { reading: 'に', reading_system: 'kana' }],
+  [304, { term: '我', reading: 'われ', reading_system: 'kana' }],
+  [333, { term: '腿', reading: 'tuǐ', reading_system: 'pinyin' }],
+  [367, { term: '兩', reading: 'liǎng', reading_system: 'pinyin' }],
+  [429, { pronunciation: 'cê', pronunciation_system: 'pt-BR respelling' }],
+  [461, { term: '壞', reading: 'huài', reading_system: 'pinyin' }],
+  [477, { term: '兒子', reading: 'ér zi', reading_system: 'pinyin' }],
+  [573, { term: '古典过去助动词', reading: 'gǔ diǎn guò qù zhù dòng cí', reading_system: 'pinyin' }]
 ]);
 
 const statements = {
@@ -125,18 +125,18 @@ const applyFixes = db.transaction(() => {
   for (const [jobId, patch] of fixes) {
     const job = statements.job.get(jobId);
     if (!job) {
-      stats.skipped.push({ job_id: jobId, reason: "job_not_found_or_not_needs_review" });
+      stats.skipped.push({ job_id: jobId, reason: 'job_not_found_or_not_needs_review' });
       continue;
     }
     if (!job.output_json) {
-      stats.skipped.push({ job_id: jobId, reason: "missing_output_json" });
+      stats.skipped.push({ job_id: jobId, reason: 'missing_output_json' });
       continue;
     }
 
     const output = JSON.parse(job.output_json);
     const loc = output.sense_localization;
     if (!loc || loc.lang !== job.lang) {
-      stats.skipped.push({ job_id: jobId, reason: "bad_output_shape" });
+      stats.skipped.push({ job_id: jobId, reason: 'bad_output_shape' });
       continue;
     }
 
@@ -154,13 +154,13 @@ const applyFixes = db.transaction(() => {
       pronunciation: cleanNullable(fixed.pronunciation),
       pronunciation_system: cleanNullable(fixed.pronunciation_system),
       definition: cleanText(fixed.definition),
-      source: "manual:deterministic-needs-review-repair",
+      source: 'manual:deterministic-needs-review-repair',
       confidence: 0.82,
       needs_review: 0
     };
 
     if (!payload.term || !payload.definition) {
-      stats.skipped.push({ job_id: jobId, reason: "empty_term_or_definition_after_patch" });
+      stats.skipped.push({ job_id: jobId, reason: 'empty_term_or_definition_after_patch' });
       continue;
     }
 
@@ -180,7 +180,7 @@ const applyFixes = db.transaction(() => {
         lang: job.lang,
         text: cleanText(example.text),
         reading: cleanNullable(example.reading),
-        source: "manual:deterministic-needs-review-repair",
+        source: 'manual:deterministic-needs-review-repair',
         confidence: 0.78,
         needs_review: 0
       });
@@ -196,7 +196,9 @@ if (!dryRun) applyFixes();
 else {
   for (const jobId of fixes.keys()) {
     const job = statements.job.get(jobId);
-    stats.skipped.push(job ? { job_id: jobId, reason: "dry_run" } : { job_id: jobId, reason: "job_not_found_or_not_needs_review" });
+    stats.skipped.push(
+      job ? { job_id: jobId, reason: 'dry_run' } : { job_id: jobId, reason: 'job_not_found_or_not_needs_review' }
+    );
   }
 }
 
@@ -217,16 +219,16 @@ function maybeMarkSenseAccepted(productSenseId) {
 function updateEntryStatus(productEntryId) {
   const statuses = statements.entryStatusCounts.all(productEntryId);
   const total = statuses.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = statuses.find((row) => row.status === "accepted")?.count || 0;
-  if (accepted === total) statements.setEntryStatus.run("accepted", productEntryId);
+  const accepted = statuses.find((row) => row.status === 'accepted')?.count || 0;
+  if (accepted === total) statements.setEntryStatus.run('accepted', productEntryId);
 }
 
 function cleanText(value) {
-  return String(value || "").trim();
+  return String(value || '').trim();
 }
 
 function cleanNullable(value) {
-  const text = typeof value === "string" ? value.trim() : "";
+  const text = typeof value === 'string' ? value.trim() : '';
   return text || null;
 }
 
@@ -234,10 +236,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

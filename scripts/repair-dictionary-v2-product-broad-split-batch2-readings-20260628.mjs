@@ -1,77 +1,77 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const apply = args.apply === "true";
+const apply = args.apply === 'true';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const fixes = [
   {
     sense_id: 2449,
-    lang: "en",
-    term: "hot",
-    pronunciation: "/h\u0251\u02d0t/",
-    pronunciation_system: "IPA"
+    lang: 'en',
+    term: 'hot',
+    pronunciation: '/h\u0251\u02d0t/',
+    pronunciation_system: 'IPA'
   },
   {
     sense_id: 2449,
-    lang: "ja",
-    term: "\u71b1\u3044",
-    reading: "\u3042\u3064\u3044",
-    reading_system: "kana"
+    lang: 'ja',
+    term: '\u71b1\u3044',
+    reading: '\u3042\u3064\u3044',
+    reading_system: 'kana'
   },
   {
     sense_id: 29695,
-    lang: "en",
-    term: "hot",
-    pronunciation: "/h\u0251\u02d0t/",
-    pronunciation_system: "IPA"
+    lang: 'en',
+    term: 'hot',
+    pronunciation: '/h\u0251\u02d0t/',
+    pronunciation_system: 'IPA'
   },
   {
     sense_id: 29696,
-    lang: "en",
-    term: "hot",
-    pronunciation: "/h\u0251\u02d0t/",
-    pronunciation_system: "IPA"
+    lang: 'en',
+    term: 'hot',
+    pronunciation: '/h\u0251\u02d0t/',
+    pronunciation_system: 'IPA'
   },
   {
     sense_id: 29697,
-    lang: "en",
-    term: "hot",
-    pronunciation: "/h\u0251\u02d0t/",
-    pronunciation_system: "IPA"
+    lang: 'en',
+    term: 'hot',
+    pronunciation: '/h\u0251\u02d0t/',
+    pronunciation_system: 'IPA'
   },
   {
     sense_id: 29697,
-    lang: "ja",
-    term: "\u6d3e\u624b\u306a",
-    reading: "\u306f\u3067\u306a",
-    reading_system: "kana"
+    lang: 'ja',
+    term: '\u6d3e\u624b\u306a',
+    reading: '\u306f\u3067\u306a',
+    reading_system: 'kana'
   },
   {
     sense_id: 19005,
-    lang: "ja",
-    term: "\u6fc0\u3057\u3044",
-    reading: "\u306f\u3052\u3057\u3044",
-    reading_system: "kana"
+    lang: 'ja',
+    term: '\u6fc0\u3057\u3044',
+    reading: '\u306f\u3052\u3057\u3044',
+    reading_system: 'kana'
   },
   {
     sense_id: 29699,
-    lang: "ja",
-    term: "\u6fc0\u3057\u3044",
-    reading: "\u306f\u3052\u3057\u3044",
-    reading_system: "kana"
+    lang: 'ja',
+    term: '\u6fc0\u3057\u3044',
+    reading: '\u306f\u3052\u3057\u3044',
+    reading_system: 'kana'
   }
 ];
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const getLoc = db.prepare(`
   SELECT product_sense_id, lang, term, reading, pronunciation
@@ -132,14 +132,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

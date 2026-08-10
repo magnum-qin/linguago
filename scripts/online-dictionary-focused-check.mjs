@@ -5,9 +5,9 @@ const baseUrl = process.env.PWA_URL || 'https://translation-pwa.qhzggzh-linguago
 const outDir = path.resolve('output/online-dictionary-focused-check');
 const langs = ['zh', 'en', 'pt-BR', 'ja'];
 const expectedCounts = {
-  entries: 29664,
-  senses: 35180,
-  sense_localizations: 140720,
+  entries: 29912,
+  senses: 35476,
+  sense_localizations: 141904,
   examples: 3030,
   example_localizations: 11898
 };
@@ -43,6 +43,9 @@ const cases = [
     requirePronunciationGroups: true,
     expectedTerms: ['visitor', 'visiting team']
   },
+  { id: 'pt-maremoto', term: 'maremoto', minSenses: 1, expectedTerms: ['seaquake', '\u6d77\u9707'] },
+  { id: 'pt-isomero', term: 'is\u00f4mero', minSenses: 1, expectedTerms: ['isomer', '\u5f02\u6784\u4f53'] },
+  { id: 'pt-eucarionte', term: 'eucarionte', minSenses: 1, expectedTerms: ['eukaryote', '\u771f\u6838\u751f\u7269'] },
   {
     id: 'pt-supersimetria',
     term: 'supersimetria',
@@ -50,6 +53,14 @@ const cases = [
     requirePronunciationGroups: true,
     expectedReadings: ['/su.pe.si.me.\u02c8t\u027ei.\u0250/'],
     expectedTerms: ['supersymmetry', '\u8d85\u5bf9\u79f0', '\u8d85\u5bfe\u79f0\u7406\u8ad6']
+  },
+  {
+    id: 'ja-protractor-form-lookup',
+    term: '\u5206\u5ea6\u5668',
+    minSenses: 1,
+    requirePronunciationGroups: true,
+    expectedReadings: ['\u3076\u3093\u3069\u304d'],
+    expectedTerms: ['protractor', 'transferidor', '\u91cf\u89d2\u5668']
   }
 ];
 

@@ -1,21 +1,21 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const senseIds = parseSenseIds(args.ids);
-const reason = String(args.reason || "manual_needs_review");
-const apply = args.apply === "true" || args.apply === true;
+const reason = String(args.reason || 'manual_needs_review');
+const apply = args.apply === 'true' || args.apply === true;
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
-if (!senseIds.length) throw new Error("No sense ids supplied. Use --ids 1,2,3");
+if (!senseIds.length) throw new Error('No sense ids supplied. Use --ids 1,2,3');
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const statements = {
   getSense: db.prepare(`
@@ -135,8 +135,8 @@ function compactRow(row) {
 }
 
 function parseSenseIds(value) {
-  return String(value || "")
-    .split(",")
+  return String(value || '')
+    .split(',')
     .map((item) => Number.parseInt(item.trim(), 10))
     .filter((item) => Number.isInteger(item) && item > 0);
 }
@@ -145,10 +145,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

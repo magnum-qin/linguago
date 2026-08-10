@@ -1,85 +1,89 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const dryRun = args["dry-run"] !== "false";
-const source = "manual:ready-residual-finalize-20260621";
+const dryRun = args['dry-run'] !== 'false';
+const source = 'manual:ready-residual-finalize-20260621';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const fixes = [
   {
     sense_id: 164,
-    lang: "ja",
-    term: "まだ",
-    reading: "まだ",
-    reading_system: "hiragana",
+    lang: 'ja',
+    term: 'まだ',
+    reading: 'まだ',
+    reading_system: 'hiragana',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "ある状態や動作が現在も続いていること、または期待される結果よりも遅く生じていることを示す副詞。"
+    definition: 'ある状態や動作が現在も続いていること、または期待される結果よりも遅く生じていることを示す副詞。'
   },
   {
     sense_id: 8439,
-    lang: "zh",
-    term: "皇家",
-    reading: "huang jia",
-    reading_system: "pinyin",
+    lang: 'zh',
+    term: '皇家',
+    reading: 'huang jia',
+    reading_system: 'pinyin',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "与君主、王室或皇室成员有关的。"
+    definition: '与君主、王室或皇室成员有关的。'
   },
   {
     sense_id: 8677,
-    lang: "zh",
-    term: "印第安人",
-    reading: "yin di an ren",
-    reading_system: "pinyin",
+    lang: 'zh',
+    term: '印第安人',
+    reading: 'yin di an ren',
+    reading_system: 'pinyin',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "指美洲原住民，或与美洲原住民相关的人。"
+    definition: '指美洲原住民，或与美洲原住民相关的人。'
   },
   {
     sense_id: 18425,
-    lang: "zh",
-    term: "Cookie 文件",
-    reading: "Cookie wen jian",
-    reading_system: "pinyin",
+    lang: 'zh',
+    term: 'Cookie 文件',
+    reading: 'Cookie wen jian',
+    reading_system: 'pinyin',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "网站存储在浏览器或设备上的小型数据文件，用于记住用户信息、偏好设置或登录状态。"
+    definition: '网站存储在浏览器或设备上的小型数据文件，用于记住用户信息、偏好设置或登录状态。'
   }
 ];
 
 const blocked = [
   {
     sense_id: 11949,
-    block_code: "blocked_source_ambiguous",
-    rationale: "The sole Chinese source anchor is 觉, but the current sense is the textile meaning of nap. Do not publish until the sense is backed by a matching source or manually reviewed.",
-    recommendation: "Either move this textile sense to a source-backed group with zh 绒毛/起毛, or keep it out of the published dictionary."
+    block_code: 'blocked_source_ambiguous',
+    rationale:
+      'The sole Chinese source anchor is 觉, but the current sense is the textile meaning of nap. Do not publish until the sense is backed by a matching source or manually reviewed.',
+    recommendation:
+      'Either move this textile sense to a source-backed group with zh 绒毛/起毛, or keep it out of the published dictionary.'
   },
   {
     sense_id: 18316,
-    block_code: "blocked_source_ambiguous",
-    rationale: "The entry headword is 変, but the sole Japanese source anchor is 釣り. The localization describes 変 rather than the source-backed sense.",
-    recommendation: "Relocate or rebuild this sense from matching Japanese source evidence before publication."
+    block_code: 'blocked_source_ambiguous',
+    rationale:
+      'The entry headword is 変, but the sole Japanese source anchor is 釣り. The localization describes 変 rather than the source-backed sense.',
+    recommendation: 'Relocate or rebuild this sense from matching Japanese source evidence before publication.'
   },
   {
     sense_id: 18320,
-    block_code: "blocked_source_ambiguous",
-    rationale: "The entry headword is 姿, but the sole Japanese source anchor is 振り. The localization describes behavior/manner rather than a source-backed 姿 sense.",
-    recommendation: "Relocate or rebuild this sense from matching Japanese source evidence before publication."
+    block_code: 'blocked_source_ambiguous',
+    rationale:
+      'The entry headword is 姿, but the sole Japanese source anchor is 振り. The localization describes behavior/manner rather than a source-backed 姿 sense.',
+    recommendation: 'Relocate or rebuild this sense from matching Japanese source evidence before publication.'
   }
 ];
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const statements = {
-  findLocalization: db.prepare("SELECT id FROM product_localizations WHERE product_sense_id = ? AND lang = ?"),
+  findLocalization: db.prepare('SELECT id FROM product_localizations WHERE product_sense_id = ? AND lang = ?'),
   updateLocalization: db.prepare(`
     UPDATE product_localizations
     SET term = @term,
@@ -162,14 +166,14 @@ const statements = {
       recommendation = excluded.recommendation,
       updated_at = CURRENT_TIMESTAMP
   `),
-  senseEntry: db.prepare("SELECT product_entry_id FROM product_senses WHERE id = ?"),
+  senseEntry: db.prepare('SELECT product_entry_id FROM product_senses WHERE id = ?'),
   entryStatusCounts: db.prepare(`
     SELECT status, COUNT(*) AS count
     FROM product_senses
     WHERE product_entry_id = ?
     GROUP BY status
   `),
-  setEntryStatus: db.prepare("UPDATE product_entries SET status = ? WHERE id = ?")
+  setEntryStatus: db.prepare('UPDATE product_entries SET status = ? WHERE id = ?')
 };
 
 const touchedEntryIds = new Set();
@@ -220,10 +224,17 @@ function maybeMarkSenseAccepted(senseId) {
 function updateEntryStatus(entryId) {
   const statuses = statements.entryStatusCounts.all(entryId);
   const total = statuses.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = statuses.find((row) => row.status === "accepted")?.count || 0;
-  const needsReview = statuses.find((row) => row.status === "needs_review")?.count || 0;
-  const ready = statuses.find((row) => row.status === "ready_for_llm")?.count || 0;
-  const status = accepted === total ? "accepted" : needsReview > 0 ? "needs_review" : ready > 0 ? "ready_for_llm" : "draft_single_source";
+  const accepted = statuses.find((row) => row.status === 'accepted')?.count || 0;
+  const needsReview = statuses.find((row) => row.status === 'needs_review')?.count || 0;
+  const ready = statuses.find((row) => row.status === 'ready_for_llm')?.count || 0;
+  const status =
+    accepted === total
+      ? 'accepted'
+      : needsReview > 0
+        ? 'needs_review'
+        : ready > 0
+          ? 'ready_for_llm'
+          : 'draft_single_source';
   statements.setEntryStatus.run(status, entryId);
 }
 
@@ -247,10 +258,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

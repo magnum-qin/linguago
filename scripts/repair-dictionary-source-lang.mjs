@@ -1,12 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
-import initSqlJs from "sql.js";
+import fs from 'node:fs';
+import path from 'node:path';
+import initSqlJs from 'sql.js';
 
-const LANGS = new Set(["zh", "en", "pt-BR", "ja"]);
-const DB_FILE = path.resolve(process.argv[2] || "data/dictionary.sqlite");
-const INPUT_DIR = path.resolve(process.argv[3] || "incoming");
-const SOURCE_CANDIDATES_FILE = path.resolve(process.argv[4] || "data/processed/frequency_candidates.jsonl");
-const SQL_WASM = path.resolve("node_modules/sql.js/dist/sql-wasm.wasm");
+const LANGS = new Set(['zh', 'en', 'pt-BR', 'ja']);
+const DB_FILE = path.resolve(process.argv[2] || 'data/dictionary.sqlite');
+const INPUT_DIR = path.resolve(process.argv[3] || 'incoming');
+const SOURCE_CANDIDATES_FILE = path.resolve(process.argv[4] || 'data/processed/frequency_candidates.jsonl');
+const SQL_WASM = path.resolve('node_modules/sql.js/dist/sql-wasm.wasm');
 
 if (!fs.existsSync(DB_FILE)) throw new Error(`Database not found: ${DB_FILE}`);
 if (!fs.existsSync(INPUT_DIR)) throw new Error(`Incoming directory not found: ${INPUT_DIR}`);
@@ -16,7 +16,7 @@ const db = new SQL.Database(fs.readFileSync(DB_FILE));
 
 const files = fs
   .readdirSync(INPUT_DIR)
-  .filter((name) => name.endsWith(".accepted.jsonl"))
+  .filter((name) => name.endsWith('.accepted.jsonl'))
   .sort()
   .map((name) => path.join(INPUT_DIR, name));
 const sourceLangHintsByFile = loadSourceLangHintsByFile(files, SOURCE_CANDIDATES_FILE);
@@ -30,26 +30,26 @@ const selectWrong = db.prepare(`
 `);
 
 const childTables = [
-  "dictionary_senses",
-  "dictionary_translations",
-  "dictionary_definitions",
-  "dictionary_examples",
-  "dictionary_pronunciations"
+  'dictionary_senses',
+  'dictionary_translations',
+  'dictionary_definitions',
+  'dictionary_examples',
+  'dictionary_pronunciations'
 ];
 
 const deleteChildren = childTables.map((table) => db.prepare(`DELETE FROM ${table} WHERE entry_id = ?`));
-const deleteEntry = db.prepare("DELETE FROM dictionary_entries WHERE id = ?");
+const deleteEntry = db.prepare('DELETE FROM dictionary_entries WHERE id = ?');
 
 let scanned = 0;
 let deleted = 0;
 const byWrongLang = {};
 
-db.run("BEGIN");
+db.run('BEGIN');
 try {
   for (const file of files) {
     const basename = path.basename(file);
     const importedLike = `%${basename}%`;
-    const lines = fs.readFileSync(file, "utf8").split(/\r?\n/).filter(Boolean);
+    const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean);
 
     for (const line of lines) {
       const row = JSON.parse(line);
@@ -78,9 +78,9 @@ try {
     }
   }
 
-  db.run("COMMIT");
+  db.run('COMMIT');
 } catch (error) {
-  db.run("ROLLBACK");
+  db.run('ROLLBACK');
   throw error;
 } finally {
   selectWrong.free();
@@ -94,14 +94,17 @@ db.close();
 console.log(JSON.stringify({ scanned, deleted, by_wrong_lang: byWrongLang }, null, 2));
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function loadSourceLangHintsByFile(files, candidatesFile) {
   const out = new Map();
   if (!fs.existsSync(candidatesFile)) return out;
 
-  const candidateLines = fs.readFileSync(candidatesFile, "utf8").split(/\r?\n/).filter(Boolean);
+  const candidateLines = fs.readFileSync(candidatesFile, 'utf8').split(/\r?\n/).filter(Boolean);
   for (const file of files) {
     const basename = path.basename(file);
     const match = basename.match(/qwen35b-prod-(\d+)-(\d+)\.accepted\.jsonl$/);

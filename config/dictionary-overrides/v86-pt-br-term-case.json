@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "description": "Explicit pt-BR common-noun casing fix for the v86 source-gap batch.",
+  "overrides": [
+    {
+      "source_entry_id": 119337,
+      "source_sense_id": 2519885,
+      "language": "pt-BR",
+      "field": "term",
+      "expected": "Catamarã",
+      "replacement": "catamarã"
+    }
+  ]
+}

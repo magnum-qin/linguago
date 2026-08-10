@@ -1,15 +1,15 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_OUT = "logs/product-duplicate-localization-triage.json";
-const LANGS = ["en", "pt-BR", "zh", "ja"];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_OUT = 'logs/product-duplicate-localization-triage.json';
+const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
-const sampleLimit = Number.parseInt(args.samples || "80", 10);
+const sampleLimit = Number.parseInt(args.samples || '80', 10);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
@@ -85,10 +85,10 @@ const summary = {
   pair_reviews: pairReviews.length,
   recommendations: countBy(pairReviews.map((pair) => pair.recommendation)),
   duplicate_langs: countBy(groups.map((group) => group.duplicate_lang)),
-  safe_auto_merge_pairs: pairReviews.filter((pair) => pair.recommendation === "safe_auto_merge").length,
-  needs_llm_review_pairs: pairReviews.filter((pair) => pair.recommendation === "llm_semantic_review").length,
-  manual_review_pairs: pairReviews.filter((pair) => pair.recommendation === "manual_review").length,
-  likely_keep_pairs: pairReviews.filter((pair) => pair.recommendation === "likely_keep").length
+  safe_auto_merge_pairs: pairReviews.filter((pair) => pair.recommendation === 'safe_auto_merge').length,
+  needs_llm_review_pairs: pairReviews.filter((pair) => pair.recommendation === 'llm_semantic_review').length,
+  manual_review_pairs: pairReviews.filter((pair) => pair.recommendation === 'manual_review').length,
+  likely_keep_pairs: pairReviews.filter((pair) => pair.recommendation === 'likely_keep').length
 };
 
 const report = {
@@ -101,7 +101,7 @@ const report = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
 db.close();
 
 console.log(
@@ -117,7 +117,7 @@ console.log(
 );
 
 function buildGroup(row) {
-  const senseIds = unique(row.sense_ids.split(",").map((id) => Number.parseInt(id, 10))).sort((a, b) => a - b);
+  const senseIds = unique(row.sense_ids.split(',').map((id) => Number.parseInt(id, 10))).sort((a, b) => a - b);
   const senses = senseIds.map(loadSense);
   const pairReviews = [];
   for (let i = 0; i < senses.length; i++) {
@@ -158,28 +158,28 @@ function loadSense(id) {
 function classifyPair(group, left, right) {
   const metrics = compareSenses(left, right);
   const reasons = [];
-  let recommendation = "manual_review";
+  let recommendation = 'manual_review';
 
   if (metrics.term_definition_matches === LANGS.length) {
-    recommendation = "safe_auto_merge";
-    reasons.push("all four language terms and definitions match exactly");
+    recommendation = 'safe_auto_merge';
+    reasons.push('all four language terms and definitions match exactly');
   } else if (metrics.term_matches === LANGS.length && metrics.definition_matches >= 3 && metrics.source_overlap > 0) {
-    recommendation = "llm_semantic_review";
-    reasons.push("all four terms match, most definitions match, and source evidence overlaps");
+    recommendation = 'llm_semantic_review';
+    reasons.push('all four terms match, most definitions match, and source evidence overlaps');
   } else if (metrics.term_definition_matches >= 3 && metrics.source_overlap > 0) {
-    recommendation = "llm_semantic_review";
-    reasons.push("three language term-definition pairs match and source evidence overlaps");
+    recommendation = 'llm_semantic_review';
+    reasons.push('three language term-definition pairs match and source evidence overlaps');
   } else if (metrics.term_definition_matches <= 1 && metrics.other_lang_term_differences >= 2) {
-    recommendation = "likely_keep";
-    reasons.push("only the duplicate language matches while other localized terms diverge");
+    recommendation = 'likely_keep';
+    reasons.push('only the duplicate language matches while other localized terms diverge');
   } else if (metrics.source_overlap === 0 && metrics.other_lang_definition_differences >= 2) {
-    recommendation = "likely_keep";
-    reasons.push("no source overlap and multiple other-language definitions diverge");
+    recommendation = 'likely_keep';
+    reasons.push('no source overlap and multiple other-language definitions diverge');
   } else if (metrics.duplicate_lang_reading_differs) {
-    recommendation = "likely_keep";
-    reasons.push("duplicate-language reading or pronunciation differs");
+    recommendation = 'likely_keep';
+    reasons.push('duplicate-language reading or pronunciation differs');
   } else {
-    reasons.push("ambiguous partial duplicate; inspect before merge");
+    reasons.push('ambiguous partial duplicate; inspect before merge');
   }
 
   return {
@@ -211,8 +211,8 @@ function compareSenses(left, right) {
   for (const lang of LANGS) {
     const a = left.localizations_by_lang[lang];
     const b = right.localizations_by_lang[lang];
-    const sameTerm = norm(a?.term) === norm(b?.term) && norm(a?.term) !== "";
-    const sameDefinition = norm(a?.definition) === norm(b?.definition) && norm(a?.definition) !== "";
+    const sameTerm = norm(a?.term) === norm(b?.term) && norm(a?.term) !== '';
+    const sameDefinition = norm(a?.definition) === norm(b?.definition) && norm(a?.definition) !== '';
     if (sameTerm) termMatches++;
     if (sameDefinition) definitionMatches++;
     if (sameTerm && sameDefinition) termDefinitionMatches++;
@@ -221,16 +221,17 @@ function compareSenses(left, right) {
     perLang[lang] = {
       same_term: sameTerm,
       same_definition: sameDefinition,
-      left_term: a?.term || "",
-      right_term: b?.term || "",
-      left_definition: a?.definition || "",
-      right_definition: b?.definition || ""
+      left_term: a?.term || '',
+      right_term: b?.term || '',
+      left_definition: a?.definition || '',
+      right_definition: b?.definition || ''
     };
   }
 
   const duplicateLang = Object.keys(perLang).find((lang) => perLang[lang].same_term && perLang[lang].same_definition);
   const duplicateLangReadingDiffers = duplicateLang
-    ? readingSignature(left.localizations_by_lang[duplicateLang]) !== readingSignature(right.localizations_by_lang[duplicateLang])
+    ? readingSignature(left.localizations_by_lang[duplicateLang]) !==
+      readingSignature(right.localizations_by_lang[duplicateLang])
     : false;
 
   return {
@@ -252,12 +253,14 @@ function sourceOverlap(left, right) {
 }
 
 function sourceKey(row) {
-  return [norm(row.source_lang), norm(row.source_word), norm(row.source_sense_id)].join("\t");
+  return [norm(row.source_lang), norm(row.source_word), norm(row.source_sense_id)].join('\t');
 }
 
 function readingSignature(row) {
-  if (!row) return "";
-  return [norm(row.reading), norm(row.reading_system), norm(row.pronunciation), norm(row.pronunciation_system)].join("\t");
+  if (!row) return '';
+  return [norm(row.reading), norm(row.reading_system), norm(row.pronunciation), norm(row.pronunciation_system)].join(
+    '\t'
+  );
 }
 
 function summarizeSense(sense) {
@@ -273,10 +276,10 @@ function summarizeSense(sense) {
         return [
           lang,
           {
-            term: row.term || "",
-            reading: row.reading || "",
-            pronunciation: row.pronunciation || "",
-            definition: row.definition || ""
+            term: row.term || '',
+            reading: row.reading || '',
+            pronunciation: row.pronunciation || '',
+            definition: row.definition || ''
           }
         ];
       })
@@ -286,7 +289,11 @@ function summarizeSense(sense) {
 }
 
 function norm(value) {
-  return String(value ?? "").normalize("NFKC").trim().replace(/\s+/gu, " ").toLocaleLowerCase();
+  return String(value ?? '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLocaleLowerCase();
 }
 
 function unique(values) {
@@ -303,14 +310,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

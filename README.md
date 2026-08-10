@@ -16,7 +16,7 @@ The current app flow is:
 - Vue 3 + Vuetify frontend with Tailwind CSS utilities.
 - Four-language result tabs: EN, PT-BR, Chinese, and Japanese.
 - Dictionary-first lookup through Cloudflare D1 and/or the Louis dictionary API.
-- Model fallback through OpenRouter, Alibaba Cloud Bailian, Gemini, DeepSeek, or automatic routing.
+- Model fallback through Cloudflare Workers AI, Alibaba Cloud Bailian, Gemini, DeepSeek, or automatic routing.
 - Backend-stored provider/model settings exposed through the settings overlay.
 - Cloudflare KV cache for repeated translation results and backend settings.
 - Structured provider errors and `/api/health` observability for KV, dictionary, and provider configuration.
@@ -110,7 +110,6 @@ Configure these as Cloudflare Worker secrets or variables where applicable:
 
 - `DICTIONARY_API_URL`: Louis dictionary API base URL.
 - `DICTIONARY_API_TOKEN`: Bearer token for Louis dictionary API.
-- `OPENROUTER_API_KEY`: OpenRouter API key.
 - `DASHSCOPE_API_KEY`: Alibaba Cloud Bailian API key.
 - `GEMINI_API_KEY`: Gemini API key.
 - `DEEPSEEK_API_KEY`: DeepSeek API key.
@@ -121,6 +120,7 @@ Cloudflare bindings are configured in `wrangler.jsonc`:
 - `ASSETS`: Workers Assets from `./dist`.
 - `CACHE`: KV namespace for translation cache, rate limit counters, and model settings.
 - `DB`: D1 database for dictionary lookup.
+- `AI`: native Cloudflare Workers AI inference binding.
 
 ## Worker API
 
@@ -137,10 +137,10 @@ Cloudflare bindings are configured in `wrangler.jsonc`:
 
 ```json
 {
-  "error": "OpenRouter API Key is not configured.",
+  "error": "DashScope API Key is not configured.",
   "error_code": "PROVIDER_CONFIG_MISSING",
-  "provider": "openrouter",
-  "model": "qwen/qwen3-next-80b-a3b-instruct:free"
+  "provider": "dashscope",
+  "model": "qwen3.6-flash"
 }
 ```
 
@@ -174,12 +174,12 @@ Authorization: Bearer <UNSLOTH_API_KEY>
 
 Current jump-host forwarding for the nodes used by this project:
 
-| Node | Base URL | Target |
-| --- | --- | --- |
-| `a6000-143` | `http://100.99.99.99:11441` | `192.168.2.143:8888` |
-| `a6000-147` | `http://100.99.99.99:11444` | `172.23.4.53:8888` |
-| `rtx4090-47` | `http://100.99.99.99:11448` | `172.23.4.47:8888` |
-| `rtx4090-56` | `http://100.99.99.99:11447` | `172.23.4.56:8888` |
+| Node         | Base URL                    | Target               |
+| ------------ | --------------------------- | -------------------- |
+| `a6000-143`  | `http://100.99.99.99:11441` | `192.168.2.143:8888` |
+| `a6000-147`  | `http://100.99.99.99:11444` | `172.23.4.53:8888`   |
+| `rtx4090-47` | `http://100.99.99.99:11448` | `172.23.4.47:8888`   |
+| `rtx4090-56` | `http://100.99.99.99:11447` | `172.23.4.56:8888`   |
 
 Smoke-test the cluster with:
 
@@ -208,11 +208,11 @@ Current dictionary-generation model choice, verified on 2026-06-23:
 
 Verified source-gap dry-run benchmarks:
 
-| Node(s) | Variant | Result | Throughput |
-| --- | --- | --- | --- |
-| `a6000-155` | `UD-IQ4_NL` | 48/50 accepted | 38.96 accepted/min |
-| `rtx4090-56` | `UD-IQ4_NL` | 47/50 accepted | 51.66 accepted/min |
-| `rtx4090-47` | `UD-IQ4_NL` | 47/50 accepted | 46.64 accepted/min |
+| Node(s)                     | Variant     | Result          | Throughput                           |
+| --------------------------- | ----------- | --------------- | ------------------------------------ |
+| `a6000-155`                 | `UD-IQ4_NL` | 48/50 accepted  | 38.96 accepted/min                   |
+| `rtx4090-56`                | `UD-IQ4_NL` | 47/50 accepted  | 51.66 accepted/min                   |
+| `rtx4090-47`                | `UD-IQ4_NL` | 47/50 accepted  | 46.64 accepted/min                   |
 | `rtx4090-56` + `rtx4090-47` | `UD-IQ4_NL` | 96/100 accepted | about 90-100 accepted/min wall-clock |
 
 On both 4090 nodes, `UD-IQ4_NL` loaded with `-ngl -1`, `--flash-attn on`, `--spec-type draft-mtp`, and about 19.8 GB / 24.6 GB VRAM used. This is effectively full GPU offload for the model layers; observed CPU usage is normal llama-server scheduling, tokenization, HTTP, and sampling overhead.
@@ -232,6 +232,7 @@ README.md
 docs/PROJECT_OVERVIEW_FOR_AI.md
 docs/ARCHITECTURE.md
 docs/CODEX_HANDOFF.md
+docs/dictionary-v83-large-batch-runbook.md
 docs/DECISIONS.md
 docs/TODO.md
 ```

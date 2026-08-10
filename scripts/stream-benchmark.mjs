@@ -1,14 +1,14 @@
-const base = process.env.API_BASE_URL || "https://translation-pwa.qhzggzh-linguago.workers.dev";
-const models = (process.env.BENCHMARK_MODELS || "")
-  .split(",")
+const base = process.env.API_BASE_URL || 'https://translation-pwa.qhzggzh-linguago.workers.dev';
+const models = (process.env.BENCHMARK_MODELS || '')
+  .split(',')
   .map((item) => item.trim())
   .filter(Boolean);
-const provider = process.env.BENCHMARK_PROVIDER || "auto";
-const targetLang = process.env.BENCHMARK_TARGET || "en";
-const text = process.env.BENCHMARK_TEXT || "这个景点很漂亮";
+const provider = process.env.BENCHMARK_PROVIDER || 'auto';
+const targetLang = process.env.BENCHMARK_TARGET || 'en';
+const text = process.env.BENCHMARK_TEXT || '这个景点很漂亮';
 
 if (!models.length) {
-  console.error("Set BENCHMARK_MODELS to a comma-separated model list.");
+  console.error('Set BENCHMARK_MODELS to a comma-separated model list.');
   process.exit(2);
 }
 
@@ -20,12 +20,12 @@ async function runOne(model) {
   let parseOk = false;
   let outputLength = 0;
 
-  const response = await fetch(new URL("/api/translate-stream", base), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
+  const response = await fetch(new URL('/api/translate-stream', base), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       text,
-      source_lang: "auto",
+      source_lang: 'auto',
       target_lang: targetLang,
       provider,
       model
@@ -45,24 +45,24 @@ async function runOne(model) {
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
+  let buffer = '';
 
   while (true) {
     const { value, done } = await reader.read();
     buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
 
     for (const line of lines) {
       if (!line.trim()) continue;
       const message = JSON.parse(line);
       if (
         firstDeltaMs == null &&
-        ["delta", "partial", "partial_translation", "partial_explanation"].includes(message.event)
+        ['delta', 'partial', 'partial_translation', 'partial_explanation'].includes(message.event)
       ) {
         firstDeltaMs = Math.round(performance.now() - started);
       }
-      if (message.event === "final") {
+      if (message.event === 'final') {
         finalMs = Math.round(performance.now() - started);
         finalData = message.data;
         outputLength = JSON.stringify(message.data || {}).length;
@@ -87,16 +87,16 @@ async function runOne(model) {
 }
 
 function summarizeQuality(data) {
-  if (!data) return "no final payload";
+  if (!data) return 'no final payload';
   const notes = [];
-  if (!data.translation) notes.push("missing translation");
-  if (data.type === "sentence" && !data.explanation && !data.explanations?.[targetLang]) {
-    notes.push("missing explanation");
+  if (!data.translation) notes.push('missing translation');
+  if (data.type === 'sentence' && !data.explanation && !data.explanations?.[targetLang]) {
+    notes.push('missing explanation');
   }
-  if (data.type === "word" && !data.word_details?.[targetLang]?.definition) {
-    notes.push("missing target definition");
+  if (data.type === 'word' && !data.word_details?.[targetLang]?.definition) {
+    notes.push('missing target definition');
   }
-  return notes.length ? notes.join("; ") : "basic fields present";
+  return notes.length ? notes.join('; ') : 'basic fields present';
 }
 
 const results = [];

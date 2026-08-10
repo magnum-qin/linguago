@@ -1,4 +1,4 @@
-import type { ErrorCode, ResponseProvider } from "./types";
+import type { ErrorCode, ResponseProvider } from './types';
 
 export class TranslateError extends Error {
   constructor(

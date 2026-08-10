@@ -1,17 +1,17 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
-const RAW_DIR = path.resolve("data/raw");
-const OUT_DIR = path.resolve("data/processed");
-const CANDIDATES_FILE = path.join(OUT_DIR, "candidate_terms.jsonl");
-const REPORT_FILE = path.join(OUT_DIR, "clean-report.json");
+const RAW_DIR = path.resolve('data/raw');
+const OUT_DIR = path.resolve('data/processed');
+const CANDIDATES_FILE = path.join(OUT_DIR, 'candidate_terms.jsonl');
+const REPORT_FILE = path.join(OUT_DIR, 'clean-report.json');
 
 const MAX_PER_SOURCE = Number(process.env.MAX_PER_SOURCE || 25_000);
-const LANGS = new Set(["zh", "en", "pt-BR", "ja"]);
+const LANGS = new Set(['zh', 'en', 'pt-BR', 'ja']);
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-const manifest = readJson(path.join(RAW_DIR, "manifest.json"), { sources: [] });
+const manifest = readJson(path.join(RAW_DIR, 'manifest.json'), { sources: [] });
 const sourceMeta = new Map(manifest.sources.map((source) => [source.id, source]));
 const candidates = [];
 const seen = new Map();
@@ -31,8 +31,8 @@ const report = {
 
 parseCedict();
 parseJmdict();
-parseFreeDict("freedict-eng-por", "en", "pt-BR");
-parseFreeDict("freedict-por-eng", "pt-BR", "en");
+parseFreeDict('freedict-eng-por', 'en', 'pt-BR');
+parseFreeDict('freedict-por-eng', 'pt-BR', 'en');
 
 candidates.sort((a, b) => {
   const byLang = a.source_lang.localeCompare(b.source_lang);
@@ -40,13 +40,13 @@ candidates.sort((a, b) => {
   return a.normalized_headword.localeCompare(b.normalized_headword);
 });
 
-fs.writeFileSync(CANDIDATES_FILE, candidates.map((row) => JSON.stringify(row)).join("\n") + "\n");
+fs.writeFileSync(CANDIDATES_FILE, candidates.map((row) => JSON.stringify(row)).join('\n') + '\n');
 
 report.output = {
   file: path.relative(process.cwd(), CANDIDATES_FILE),
   count: candidates.length,
-  by_lang: countBy(candidates, "source_lang"),
-  by_source: countBy(candidates, "source_id")
+  by_lang: countBy(candidates, 'source_lang'),
+  by_source: countBy(candidates, 'source_id')
 };
 
 fs.writeFileSync(REPORT_FILE, `${JSON.stringify(report, null, 2)}\n`);
@@ -55,39 +55,39 @@ console.log(`[done] wrote ${path.relative(process.cwd(), CANDIDATES_FILE)}`);
 console.log(`[done] wrote ${path.relative(process.cwd(), REPORT_FILE)}`);
 
 function readJson(file, fallback) {
-  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback;
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : fallback;
 }
 
 function readRaw(sourceId) {
   const meta = sourceMeta.get(sourceId);
-  if (!meta) return "";
+  if (!meta) return '';
   const file = path.join(RAW_DIR, meta.file);
-  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
 }
 
 function parseCedict() {
-  const sourceId = "cc-cedict";
+  const sourceId = 'cc-cedict';
   const text = readRaw(sourceId);
   let parsed = 0;
 
   for (const line of text.split(/\r?\n/)) {
-    if (!line || line.startsWith("#")) continue;
+    if (!line || line.startsWith('#')) continue;
     const match = line.match(/^(\S+)\s+(\S+)\s+\[([^\]]+)]\s+\/(.+)\/$/);
     if (!match) continue;
 
     const [, traditional, simplified, pinyin, defs] = match;
-    const definitions = defs.split("/").map(cleanText).filter(Boolean).slice(0, 6);
+    const definitions = defs.split('/').map(cleanText).filter(Boolean).slice(0, 6);
     const headword = cleanText(simplified || traditional);
     const candidate = {
       headword,
-      normalized_headword: normalize(headword, "zh"),
-      source_lang: "zh",
+      normalized_headword: normalize(headword, 'zh'),
+      source_lang: 'zh',
       source_id: sourceId,
       source_license: licenseOf(sourceId),
       source_ref: { traditional, simplified, pinyin, definitions },
       hints: {
         zh: { word: headword, phonetic: pinyin },
-        en: { definition: definitions.join("; ") }
+        en: { definition: definitions.join('; ') }
       }
     };
 
@@ -99,7 +99,7 @@ function parseCedict() {
 }
 
 function parseJmdict() {
-  const sourceId = "jmdict";
+  const sourceId = 'jmdict';
   const xml = readRaw(sourceId);
   let parsed = 0;
   const entries = xml.match(/<entry>[\s\S]*?<\/entry>/g) || [];
@@ -118,14 +118,14 @@ function parseJmdict() {
 
     const candidate = {
       headword,
-      normalized_headword: normalize(headword, "ja"),
-      source_lang: "ja",
+      normalized_headword: normalize(headword, 'ja'),
+      source_lang: 'ja',
       source_id: sourceId,
       source_license: licenseOf(sourceId),
       source_ref: { kanji: keb, reading: reb, glosses, pos },
       hints: {
         ja: { word: headword, phonetic: reb || headword },
-        en: { definition: glosses.join("; ") }
+        en: { definition: glosses.join('; ') }
       }
     };
 
@@ -143,7 +143,7 @@ function parseFreeDict(sourceId, sourceLang, targetLang) {
 
   for (const entry of entries) {
     const orth = first(entry, /<orth[^>]*>([\s\S]*?)<\/orth>/);
-    const headword = cleanText(decodeXml(stripTags(orth || "")));
+    const headword = cleanText(decodeXml(stripTags(orth || '')));
     if (!headword) continue;
 
     const translations = [...entry.matchAll(/<cit[^>]*type=["']trans["'][\s\S]*?<\/cit>/g)]
@@ -189,7 +189,7 @@ function addCandidate(candidate) {
   }
   const row = {
     ...candidate,
-    status: "candidate",
+    status: 'candidate',
     created_at: new Date().toISOString()
   };
   seen.set(key, row);
@@ -205,13 +205,16 @@ function mergeCandidate(existing, incoming) {
 function mergeSourceRef(existing = {}, incoming = {}) {
   const merged = { ...existing };
   for (const [key, value] of Object.entries(incoming)) {
-    if (value == null || value === "") continue;
+    if (value == null || value === '') continue;
     if (Array.isArray(value)) {
       merged[key] = unique([...(Array.isArray(merged[key]) ? merged[key] : []), ...value]);
-    } else if (typeof value === "object") {
+    } else if (typeof value === 'object') {
       merged[key] = mergeSourceRef(merged[key], value);
     } else if (merged[key] && merged[key] !== value) {
-      merged[`${key}_variants`] = unique([...(Array.isArray(merged[`${key}_variants`]) ? merged[`${key}_variants`] : [merged[key]]), value]);
+      merged[`${key}_variants`] = unique([
+        ...(Array.isArray(merged[`${key}_variants`]) ? merged[`${key}_variants`] : [merged[key]]),
+        value
+      ]);
     } else {
       merged[key] = value;
     }
@@ -228,49 +231,49 @@ function mergeHints(existing = {}, incoming = {}) {
 }
 
 function unique(values) {
-  return [...new Set(values.filter((value) => value != null && value !== ""))];
+  return [...new Set(values.filter((value) => value != null && value !== ''))];
 }
 
 function validateCandidate(candidate) {
   const errors = [];
   if (!LANGS.has(candidate.source_lang) || !candidate.headword || !candidate.normalized_headword) {
-    errors.push("invalid");
+    errors.push('invalid');
   }
   if (isTooLong(candidate.headword, candidate.source_lang)) {
-    errors.push("too_long");
+    errors.push('too_long');
   }
   if (looksMojibake(candidate.headword)) {
-    errors.push("mojibake");
+    errors.push('mojibake');
   }
   if (!isWordLike(candidate.headword, candidate.source_lang)) {
-    errors.push("not_word_like");
+    errors.push('not_word_like');
   }
   return errors;
 }
 
 function normalize(text, lang) {
-  const cleaned = cleanText(text).normalize("NFKC");
-  if (lang === "en" || lang === "pt-BR") return cleaned.toLocaleLowerCase();
+  const cleaned = cleanText(text).normalize('NFKC');
+  if (lang === 'en' || lang === 'pt-BR') return cleaned.toLocaleLowerCase();
   return cleaned;
 }
 
 function cleanText(value) {
-  return decodeXml(stripTags(String(value || "")))
-    .replace(/\s+/g, " ")
+  return decodeXml(stripTags(String(value || '')))
+    .replace(/\s+/g, ' ')
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
     .trim();
 }
 
 function stripTags(value) {
-  return String(value || "").replace(/<[^>]+>/g, "");
+  return String(value || '').replace(/<[^>]+>/g, '');
 }
 
 function decodeXml(value) {
-  return String(value || "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
@@ -279,20 +282,20 @@ function decodeXml(value) {
 
 function first(text, regex) {
   const match = text.match(regex);
-  return match ? match[1] : "";
+  return match ? match[1] : '';
 }
 
 function licenseOf(sourceId) {
-  return sourceMeta.get(sourceId)?.license || "unknown";
+  return sourceMeta.get(sourceId)?.license || 'unknown';
 }
 
 function isTooLong(text, lang) {
-  if (lang === "zh" || lang === "ja") return [...text].length > 12;
+  if (lang === 'zh' || lang === 'ja') return [...text].length > 12;
   return text.split(/\s+/).length > 4 || text.length > 48;
 }
 
 function looksMojibake(text) {
-  const value = String(text || "");
+  const value = String(text || '');
   if (!value) return false;
   if (/[\uFFFD]/u.test(value)) return true;
   if (/[ÃÂ][\u0080-\u00ff]?|â[€™€œ€]|å[^\s]?|ã[^\s]?/u.test(value)) return true;
@@ -300,22 +303,22 @@ function looksMojibake(text) {
 }
 
 function isWordLike(text, lang) {
-  const value = String(text || "").trim();
+  const value = String(text || '').trim();
   if (!value) return false;
   if (/^[々〻〡〢〣ゝゞヽヾ〃]+$/u.test(value)) return false;
   if (/^[-‐‑‒–—]|[-‐‑‒–—]$/.test(value)) return false;
   if (/^[\p{P}\p{S}\d\s]+$/u.test(value)) return false;
 
-  if (lang === "zh") {
+  if (lang === 'zh') {
     return /[\u3400-\u9fff]/u.test(value);
   }
-  if (lang === "ja") {
+  if (lang === 'ja') {
     return /[\u3400-\u9fff\u3041-\u3096\u30a1-\u30fa]/u.test(value);
   }
-  if (lang === "en") {
+  if (lang === 'en') {
     return /^[a-z]+(?:[ '-][a-z]+){0,3}$/i.test(value);
   }
-  if (lang === "pt-BR") {
+  if (lang === 'pt-BR') {
     return /^[\p{Script=Latin}]+(?:[ '-][\p{Script=Latin}]+){0,3}$/u.test(value);
   }
   return true;

@@ -1,146 +1,146 @@
-import fs from "node:fs";
-import path from "node:path";
-import { performance } from "node:perf_hooks";
+import fs from 'node:fs';
+import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
-const OLLAMA_HOST = (process.env.OLLAMA_HOST || "http://192.168.2.152:11434").replace(/\/$/, "");
-const MODEL = process.env.OLLAMA_MODEL || "qwen3.6:27b";
-const OUT_DIR = path.resolve("output");
-const LANGS = ["zh", "en", "pt-BR", "ja"];
+const OLLAMA_HOST = (process.env.OLLAMA_HOST || 'http://192.168.2.152:11434').replace(/\/$/, '');
+const MODEL = process.env.OLLAMA_MODEL || 'qwen3.6:27b';
+const OUT_DIR = path.resolve('output');
+const LANGS = ['zh', 'en', 'pt-BR', 'ja'];
 
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 1) {
   const current = process.argv[i];
-  if (current.startsWith("--")) {
+  if (current.startsWith('--')) {
     const next = process.argv[i + 1];
-    args.set(current.slice(2), next && !next.startsWith("--") ? next : "true");
-    if (next && !next.startsWith("--")) i += 1;
+    args.set(current.slice(2), next && !next.startsWith('--') ? next : 'true');
+    if (next && !next.startsWith('--')) i += 1;
   }
 }
 
 function readJobs() {
-  if (args.has("candidates-file")) {
+  if (args.has('candidates-file')) {
     return fs
-      .readFileSync(path.resolve(args.get("candidates-file")), "utf8")
+      .readFileSync(path.resolve(args.get('candidates-file')), 'utf8')
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
         const candidate = JSON.parse(line);
         return {
-          term: String(candidate.headword || candidate.normalized_headword || "").trim(),
+          term: String(candidate.headword || candidate.normalized_headword || '').trim(),
           candidate
         };
       })
       .filter((job) => job.term);
   }
 
-  if (args.has("terms-file")) {
+  if (args.has('terms-file')) {
     return fs
-      .readFileSync(path.resolve(args.get("terms-file")), "utf8")
+      .readFileSync(path.resolve(args.get('terms-file')), 'utf8')
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith("#"))
+      .filter((line) => line && !line.startsWith('#'))
       .map((term) => ({ term }));
   }
 
-  if (args.has("term")) return [{ term: args.get("term") }];
-  return [{ term: "hello" }, { term: "我爱你" }, { term: "ありがとう" }, { term: "saudade" }];
+  if (args.has('term')) return [{ term: args.get('term') }];
+  return [{ term: 'hello' }, { term: '我爱你' }, { term: 'ありがとう' }, { term: 'saudade' }];
 }
 
-const limit = Number(args.get("limit") || 0);
+const limit = Number(args.get('limit') || 0);
 const jobs = limit > 0 ? readJobs().slice(0, limit) : readJobs();
-const maxRetries = Number(args.get("retries") || 2);
-const timeoutMs = Number(args.get("timeout") || 180_000);
-const maxTokens = Number(args.get("max-tokens") || 2600);
-const wordOnly = args.get("word-only") === "true";
-const OUT_FILE = path.resolve(args.get("out") || path.join(OUT_DIR, "ollama-dictionary-test.jsonl"));
-const FAIL_FILE = path.resolve(args.get("fail-out") || path.join(OUT_DIR, "ollama-dictionary-test.failed.jsonl"));
-const resetOutput = args.get("reset") === "true";
-const resume = args.get("resume") !== "false";
+const maxRetries = Number(args.get('retries') || 2);
+const timeoutMs = Number(args.get('timeout') || 180_000);
+const maxTokens = Number(args.get('max-tokens') || 2600);
+const wordOnly = args.get('word-only') === 'true';
+const OUT_FILE = path.resolve(args.get('out') || path.join(OUT_DIR, 'ollama-dictionary-test.jsonl'));
+const FAIL_FILE = path.resolve(args.get('fail-out') || path.join(OUT_DIR, 'ollama-dictionary-test.failed.jsonl'));
+const resetOutput = args.get('reset') === 'true';
+const resume = args.get('resume') !== 'false';
 
 const localizedTextSchema = {
-  type: "object",
+  type: 'object',
   properties: {
-    text: { type: "string" },
-    phonetic: { type: "string" },
-    audio_text: { type: "string" }
+    text: { type: 'string' },
+    phonetic: { type: 'string' },
+    audio_text: { type: 'string' }
   },
-  required: ["text", "phonetic", "audio_text"]
+  required: ['text', 'phonetic', 'audio_text']
 };
 
 const wordDetailSchema = {
-  type: "object",
+  type: 'object',
   properties: {
-    word: { type: "string" },
-    definition: { type: "string" }
+    word: { type: 'string' },
+    definition: { type: 'string' }
   },
-  required: ["word", "definition"]
+  required: ['word', 'definition']
 };
 
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
-    type: { type: "string", enum: ["word", "sentence"] },
-    source_text: { type: "string" },
-    normalized_text: { type: "string" },
+    type: { type: 'string', enum: ['word', 'sentence'] },
+    source_text: { type: 'string' },
+    normalized_text: { type: 'string' },
     translations: {
-      type: "object",
+      type: 'object',
       properties: {
         zh: localizedTextSchema,
         en: localizedTextSchema,
-        "pt-BR": localizedTextSchema,
+        'pt-BR': localizedTextSchema,
         ja: localizedTextSchema
       },
       required: LANGS
     },
     word_details: {
-      type: "object",
+      type: 'object',
       properties: Object.fromEntries(LANGS.map((lang) => [lang, wordDetailSchema])),
       required: LANGS
     },
     senses: {
-      type: "array",
+      type: 'array',
       items: {
-        type: "object",
+        type: 'object',
         properties: {
-          sense_order: { type: "number" },
-          part_of_speech: { type: "string" },
-          gloss_key: { type: "string" },
-          register_label: { type: "string" },
-          domain_label: { type: "string" },
-          confidence: { type: "number" },
+          sense_order: { type: 'number' },
+          part_of_speech: { type: 'string' },
+          gloss_key: { type: 'string' },
+          register_label: { type: 'string' },
+          domain_label: { type: 'string' },
+          confidence: { type: 'number' },
           definitions: {
-            type: "object",
-            properties: Object.fromEntries(LANGS.map((lang) => [lang, { type: "string" }])),
+            type: 'object',
+            properties: Object.fromEntries(LANGS.map((lang) => [lang, { type: 'string' }])),
             required: LANGS
           }
         },
-        required: ["sense_order", "part_of_speech", "gloss_key", "definitions"]
+        required: ['sense_order', 'part_of_speech', 'gloss_key', 'definitions']
       }
     },
     examples: {
-      type: "array",
+      type: 'array',
       items: {
-        type: "object",
+        type: 'object',
         properties: {
-          sense_order: { type: "number" },
-          sentence: { type: "string" },
+          sense_order: { type: 'number' },
+          sentence: { type: 'string' },
           translations: {
-            type: "object",
-            properties: Object.fromEntries(LANGS.map((lang) => [lang, { type: "string" }])),
+            type: 'object',
+            properties: Object.fromEntries(LANGS.map((lang) => [lang, { type: 'string' }])),
             required: LANGS
           }
         },
-        required: ["sense_order", "sentence", "translations"]
+        required: ['sense_order', 'sentence', 'translations']
       }
     },
     explanations: {
-      type: "object",
-      properties: Object.fromEntries(LANGS.map((lang) => [lang, { type: "string" }])),
+      type: 'object',
+      properties: Object.fromEntries(LANGS.map((lang) => [lang, { type: 'string' }])),
       required: LANGS
     }
   },
-  required: ["type", "source_text", "normalized_text", "translations"]
+  required: ['type', 'source_text', 'normalized_text', 'translations']
 };
 
 const systemPrompt = `You generate production-ready multilingual dictionary data.
@@ -170,14 +170,14 @@ The response must be valid JSON.`;
 
 function userPrompt(job, previousErrors = []) {
   const feedback = previousErrors.length
-    ? `\nPrevious output failed validation. Fix these exact issues:\n- ${previousErrors.join("\n- ")}`
-    : "";
+    ? `\nPrevious output failed validation. Fix these exact issues:\n- ${previousErrors.join('\n- ')}`
+    : '';
   const sourceFacts = job.candidate
     ? `\nSource dictionary facts and frequency metadata:\n${JSON.stringify(compactCandidate(job.candidate), null, 2)}\n`
-    : "";
+    : '';
 
   return `Create one dictionary entry for: ${job.term}
-${wordOnly ? 'This test is word-only. The entry type must be "word". Treat short greetings and common expressions as lexical dictionary items when possible.' : ""}
+${wordOnly ? 'This test is word-only. The entry type must be "word". Treat short greetings and common expressions as lexical dictionary items when possible.' : ''}
 ${sourceFacts}
 Return this JSON shape:
 {
@@ -239,18 +239,18 @@ async function callOllama(job, previousErrors) {
 
   try {
     const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
-      method: "POST",
+      method: 'POST',
       signal: controller.signal,
-      headers: { "content-type": "application/json" },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         model: MODEL,
         stream: false,
         think: false,
         format: schema,
-        keep_alive: "30m",
+        keep_alive: '30m',
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt(job, previousErrors) }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt(job, previousErrors) }
         ],
         options: {
           temperature: 0,
@@ -268,7 +268,7 @@ async function callOllama(job, previousErrors) {
     return {
       seconds: Number(((performance.now() - started) / 1000).toFixed(2)),
       envelope,
-      content: envelope?.message?.content || envelope?.response || ""
+      content: envelope?.message?.content || envelope?.response || ''
     };
   } finally {
     clearTimeout(timer);
@@ -276,60 +276,60 @@ async function callOllama(job, previousErrors) {
 }
 
 function parseJson(content) {
-  const trimmed = String(content || "").trim();
-  if (!trimmed) throw new Error("empty model content");
+  const trimmed = String(content || '').trim();
+  if (!trimmed) throw new Error('empty model content');
   try {
     return JSON.parse(trimmed);
   } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
     if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
-    throw new Error("content is not JSON");
+    throw new Error('content is not JSON');
   }
 }
 
 function valueAt(object, dottedPath) {
-  return dottedPath.split(".").reduce((value, key) => value?.[key], object);
+  return dottedPath.split('.').reduce((value, key) => value?.[key], object);
 }
 
 function requireString(errors, object, dottedPath) {
   const value = valueAt(object, dottedPath);
-  if (typeof value !== "string" || !value.trim()) errors.push(`missing non-empty string: ${dottedPath}`);
+  if (typeof value !== 'string' || !value.trim()) errors.push(`missing non-empty string: ${dottedPath}`);
 }
 
 function validate(entry, term) {
   const errors = [];
-  if (!["word", "sentence"].includes(entry.type)) errors.push("type must be word or sentence");
-  if (wordOnly && entry.type !== "word") errors.push("word-only test requires type=word");
+  if (!['word', 'sentence'].includes(entry.type)) errors.push('type must be word or sentence');
+  if (wordOnly && entry.type !== 'word') errors.push('word-only test requires type=word');
 
-  requireString(errors, entry, "source_text");
-  requireString(errors, entry, "normalized_text");
+  requireString(errors, entry, 'source_text');
+  requireString(errors, entry, 'normalized_text');
   for (const lang of LANGS) {
     requireString(errors, entry, `translations.${lang}.text`);
     requireString(errors, entry, `translations.${lang}.phonetic`);
     requireString(errors, entry, `translations.${lang}.audio_text`);
   }
 
-  if (entry.type === "word") {
+  if (entry.type === 'word') {
     for (const lang of LANGS) {
       requireString(errors, entry, `word_details.${lang}.word`);
       requireString(errors, entry, `word_details.${lang}.definition`);
     }
     if (!Array.isArray(entry.senses) || entry.senses.length < 1) {
-      errors.push("word entries require at least one sense");
+      errors.push('word entries require at least one sense');
     } else {
       for (const [index, sense] of entry.senses.entries()) {
         if (!Number.isFinite(Number(sense.sense_order || index + 1))) {
           errors.push(`senses.${index}.sense_order must be numeric`);
         }
-        requireString(errors, sense, "gloss_key");
+        requireString(errors, sense, 'gloss_key');
         for (const lang of LANGS) requireString(errors, sense, `definitions.${lang}`);
       }
     }
     if (!Array.isArray(entry.examples) || entry.examples.length < 1) {
-      errors.push("word entries require at least one example");
+      errors.push('word entries require at least one example');
     } else {
-      requireString(errors, entry, "examples.0.sentence");
+      requireString(errors, entry, 'examples.0.sentence');
       for (const lang of LANGS) requireString(errors, entry, `examples.0.translations.${lang}`);
     }
   }
@@ -347,8 +347,8 @@ async function runJob(job) {
     try {
       result = await callOllama(job, previousErrors);
     } catch (error) {
-      previousErrors = [`request failed: ${error.name || "Error"} ${error.message || String(error)}`];
-      console.log(`[retry] ${job.term} attempt ${attempt}: ${previousErrors.join("; ")}`);
+      previousErrors = [`request failed: ${error.name || 'Error'} ${error.message || String(error)}`];
+      console.log(`[retry] ${job.term} attempt ${attempt}: ${previousErrors.join('; ')}`);
       continue;
     }
 
@@ -357,7 +357,7 @@ async function runJob(job) {
       entry = parseJson(result.content);
     } catch (error) {
       previousErrors = [error.message];
-      console.log(`[retry] ${job.term} attempt ${attempt}: ${previousErrors.join("; ")}`);
+      console.log(`[retry] ${job.term} attempt ${attempt}: ${previousErrors.join('; ')}`);
       continue;
     }
 
@@ -376,7 +376,7 @@ async function runJob(job) {
     }
 
     previousErrors = errors;
-    console.log(`[retry] ${job.term} attempt ${attempt}: ${errors.join("; ")}`);
+    console.log(`[retry] ${job.term} attempt ${attempt}: ${errors.join('; ')}`);
   }
   return {
     ok: false,
@@ -396,8 +396,8 @@ const doneTerms = resume ? new Set(readExistingTerms(OUT_FILE)) : new Set();
 const failedTerms = resume ? new Set(readExistingTerms(FAIL_FILE)) : new Set();
 
 if (resetOutput) {
-  fs.writeFileSync(OUT_FILE, "");
-  fs.writeFileSync(FAIL_FILE, "");
+  fs.writeFileSync(OUT_FILE, '');
+  fs.writeFileSync(FAIL_FILE, '');
   doneTerms.clear();
   failedTerms.clear();
 }
@@ -421,7 +421,7 @@ for (const job of pendingJobs) {
     console.log(`[ok] ${job.term} attempt=${result.attempt} seconds=${result.seconds}`);
   } else {
     fs.appendFileSync(FAIL_FILE, line);
-    console.log(`[failed] ${job.term}: ${result.errors.join("; ")}`);
+    console.log(`[failed] ${job.term}: ${result.errors.join('; ')}`);
   }
 }
 
@@ -432,7 +432,7 @@ console.log(`Failed file: ${FAIL_FILE}`);
 function readExistingTerms(file) {
   if (!fs.existsSync(file)) return [];
   return fs
-    .readFileSync(file, "utf8")
+    .readFileSync(file, 'utf8')
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => {

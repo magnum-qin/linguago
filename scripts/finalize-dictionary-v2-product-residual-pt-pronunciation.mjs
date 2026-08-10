@@ -1,12 +1,12 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const dryRun = args["dry-run"] !== "false";
-const source = "known-residual-pt-pronunciation-finalize-20260620";
+const dryRun = args['dry-run'] !== 'false';
+const source = 'known-residual-pt-pronunciation-finalize-20260620';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
@@ -14,65 +14,66 @@ const fixes = [
   {
     job_id: 16664,
     sense_id: 5796,
-    lang: "pt-BR",
-    term: "cor",
-    pronunciation: "/ˈkɔʁ/",
-    pronunciation_system: "IPA",
-    definition: "Qualidade que permite distinguir os objetos pela luz refletida ou emitida por eles; matiz."
+    lang: 'pt-BR',
+    term: 'cor',
+    pronunciation: '/ˈkɔʁ/',
+    pronunciation_system: 'IPA',
+    definition: 'Qualidade que permite distinguir os objetos pela luz refletida ou emitida por eles; matiz.'
   },
   {
     job_id: 52835,
     sense_id: 10607,
-    lang: "pt-BR",
-    term: "gee",
-    pronunciation: "/dʒiː/",
-    pronunciation_system: "IPA",
-    definition: "Comando dado a um cavalo para virar para a direita."
+    lang: 'pt-BR',
+    term: 'gee',
+    pronunciation: '/dʒiː/',
+    pronunciation_system: 'IPA',
+    definition: 'Comando dado a um cavalo para virar para a direita.'
   },
   {
     job_id: 52836,
     sense_id: 10622,
-    lang: "pt-BR",
-    term: "e",
-    pronunciation: "/i/",
-    pronunciation_system: "IPA",
-    definition: "Conjunção aditiva que liga palavras ou orações."
+    lang: 'pt-BR',
+    term: 'e',
+    pronunciation: '/i/',
+    pronunciation_system: 'IPA',
+    definition: 'Conjunção aditiva que liga palavras ou orações.'
   },
   {
     job_id: 52858,
     sense_id: 11654,
-    lang: "pt-BR",
-    term: "gaio",
-    pronunciation: "/ˈɡaj.u/",
-    pronunciation_system: "IPA",
-    definition: "Ave de plumagem vistosa; também usado em nome próprio histórico quando se refere a Jay."
+    lang: 'pt-BR',
+    term: 'gaio',
+    pronunciation: '/ˈɡaj.u/',
+    pronunciation_system: 'IPA',
+    definition: 'Ave de plumagem vistosa; também usado em nome próprio histórico quando se refere a Jay.'
   },
   {
     job_id: 52954,
     sense_id: 15804,
-    lang: "pt-BR",
-    term: "cã",
-    pronunciation: "/kɐ̃/",
-    pronunciation_system: "IPA",
-    definition: "Título medieval dado ao governante de uma tribo tártara."
+    lang: 'pt-BR',
+    term: 'cã',
+    pronunciation: '/kɐ̃/',
+    pronunciation_system: 'IPA',
+    definition: 'Título medieval dado ao governante de uma tribo tártara.'
   },
   {
     job_id: 52970,
     sense_id: 16470,
-    lang: "pt-BR",
-    term: "ai",
-    pronunciation: "/aj/",
-    pronunciation_system: "IPA",
-    definition: "Interjeição que expressa dor, surpresa ou lamento; também forma afirmativa equivalente a 'sim' em certos usos."
+    lang: 'pt-BR',
+    term: 'ai',
+    pronunciation: '/aj/',
+    pronunciation_system: 'IPA',
+    definition:
+      "Interjeição que expressa dor, surpresa ou lamento; também forma afirmativa equivalente a 'sim' em certos usos."
   }
 ];
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const statements = {
-  findLocalization: db.prepare("SELECT id FROM product_localizations WHERE product_sense_id = ? AND lang = ?"),
+  findLocalization: db.prepare('SELECT id FROM product_localizations WHERE product_sense_id = ? AND lang = ?'),
   updateLocalization: db.prepare(`
     UPDATE product_localizations
     SET term = @term,
@@ -118,14 +119,14 @@ const statements = {
     WHERE id = ?
       AND status IN ('ready_for_llm', 'needs_review', 'draft_fused', 'draft_single_source')
   `),
-  senseEntry: db.prepare("SELECT product_entry_id FROM product_senses WHERE id = ?"),
+  senseEntry: db.prepare('SELECT product_entry_id FROM product_senses WHERE id = ?'),
   entryStatusCounts: db.prepare(`
     SELECT status, COUNT(*) AS count
     FROM product_senses
     WHERE product_entry_id = ?
     GROUP BY status
   `),
-  setEntryStatus: db.prepare("UPDATE product_entries SET status = ? WHERE id = ?")
+  setEntryStatus: db.prepare('UPDATE product_entries SET status = ? WHERE id = ?')
 };
 
 const stats = {
@@ -175,18 +176,18 @@ function applyFix(fix) {
 function updateEntryStatus(productEntryId) {
   const statuses = statements.entryStatusCounts.all(productEntryId);
   const total = statuses.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = statuses.find((row) => row.status === "accepted")?.count || 0;
-  if (accepted === total) statements.setEntryStatus.run("accepted", productEntryId);
+  const accepted = statuses.find((row) => row.status === 'accepted')?.count || 0;
+  if (accepted === total) statements.setEntryStatus.run('accepted', productEntryId);
 }
 
 function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

@@ -17,9 +17,13 @@ try {
 }
 
 // Persist to localStorage whenever it changes
-watch(bookmarks, (newVal) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal));
-}, { deep: true });
+watch(
+  bookmarks,
+  (newVal) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal));
+  },
+  { deep: true }
+);
 
 export function useBookmarks() {
   const toggleBookmark = (word: string) => {

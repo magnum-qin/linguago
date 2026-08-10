@@ -1,22 +1,22 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_full.db";
-const DEFAULT_OVERRIDES = "config/dictionary-overrides/function-words-v2.json";
-const SOURCE = "manual:function-word-override";
+const DEFAULT_DB = 'data/processed/linguago_v2_full.db';
+const DEFAULT_OVERRIDES = 'config/dictionary-overrides/function-words-v2.json';
+const SOURCE = 'manual:function-word-override';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const overridesPath = path.resolve(args.overrides || DEFAULT_OVERRIDES);
-const dryRun = args["dry-run"] === "true";
+const dryRun = args['dry-run'] === 'true';
 
-const overrides = JSON.parse(fs.readFileSync(overridesPath, "utf8"));
-if (!Array.isArray(overrides)) throw new Error("Override file must contain an array.");
+const overrides = JSON.parse(fs.readFileSync(overridesPath, 'utf8'));
+if (!Array.isArray(overrides)) throw new Error('Override file must contain an array.');
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 
 const statements = {
   senseExists: db.prepare(`
@@ -83,7 +83,7 @@ const applyOverrides = db.transaction((rows) => {
     const sense = statements.senseExists.get(normalized.sense_id);
     if (!sense) {
       stats.skipped_invalid++;
-      problems.push({ override: row, error: "sense_id not found" });
+      problems.push({ override: row, error: 'sense_id not found' });
       continue;
     }
 
@@ -120,7 +120,7 @@ else {
     const normalized = normalizeOverride(row);
     if (!statements.senseExists.get(normalized.sense_id)) {
       stats.skipped_invalid++;
-      problems.push({ override: row, error: "sense_id not found" });
+      problems.push({ override: row, error: 'sense_id not found' });
     } else {
       stats.applied++;
     }
@@ -128,13 +128,15 @@ else {
 }
 
 const remainingNeedsReview = db
-  .prepare(`
+  .prepare(
+    `
     SELECT lang, COUNT(*) AS c
     FROM llm_completion_jobs
     WHERE status = 'needs_review'
     GROUP BY lang
     ORDER BY lang
-  `)
+  `
+  )
   .all();
 
 db.close();
@@ -158,7 +160,7 @@ function normalizeOverride(row) {
   const senseId = Number(row.sense_id);
   if (!Number.isInteger(senseId) || senseId <= 0) throw new Error(`Invalid sense_id: ${row.sense_id}`);
   const lang = cleanText(row.lang);
-  if (!["en", "zh", "ja", "pt-BR"].includes(lang)) throw new Error(`Invalid lang: ${lang}`);
+  if (!['en', 'zh', 'ja', 'pt-BR'].includes(lang)) throw new Error(`Invalid lang: ${lang}`);
   const term = cleanText(row.term);
   const definition = cleanText(row.definition);
   if (!term || !definition) throw new Error(`Override ${senseId}:${lang} needs term and definition.`);
@@ -179,11 +181,11 @@ function normalizeOverride(row) {
 }
 
 function cleanText(value) {
-  return String(value || "").trim();
+  return String(value || '').trim();
 }
 
 function cleanNullable(value) {
-  const text = typeof value === "string" ? value.trim() : "";
+  const text = typeof value === 'string' ? value.trim() : '';
   return text || null;
 }
 
@@ -191,10 +193,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

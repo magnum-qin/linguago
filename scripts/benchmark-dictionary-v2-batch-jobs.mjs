@@ -1,26 +1,26 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
-import { performance } from "node:perf_hooks";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = path.resolve(args.db || "data/processed/linguago_v2_full.db");
-const endpoint = String(args.endpoint || "http://100.99.99.99:11441").replace(/\/$/, "");
-const model = args.model || "qwen3.6:latest";
-const sourceModel = args["source-model"] || "qwen3.6:latest";
-const langs = String(args.langs || "en,zh,ja,pt-BR")
-  .split(",")
+const dbPath = path.resolve(args.db || 'data/processed/linguago_v2_full.db');
+const endpoint = String(args.endpoint || 'http://100.99.99.99:11441').replace(/\/$/, '');
+const model = args.model || 'qwen3.6:latest';
+const sourceModel = args['source-model'] || 'qwen3.6:latest';
+const langs = String(args.langs || 'en,zh,ja,pt-BR')
+  .split(',')
   .map((lang) => lang.trim())
   .filter(Boolean);
-const perLang = Number(args["per-lang"] || 6);
-const batchSize = Number(args["batch-size"] || 3);
-const timeoutMs = Number(args["timeout-ms"] || 240_000);
-const maxTokens = Number(args["max-tokens"] || 2400);
-const outPath = path.resolve(args.out || "output/dictionary-v2-batch-benchmark.json");
+const perLang = Number(args['per-lang'] || 6);
+const batchSize = Number(args['batch-size'] || 3);
+const timeoutMs = Number(args['timeout-ms'] || 240_000);
+const maxTokens = Number(args['max-tokens'] || 2400);
+const outPath = path.resolve(args.out || 'output/dictionary-v2-batch-benchmark.json');
 
 const tasks = loadTasks();
 if (!tasks.length) {
-  console.error("No accepted llm_completion_jobs found for benchmark sampling.");
+  console.error('No accepted llm_completion_jobs found for benchmark sampling.');
   process.exit(2);
 }
 
@@ -36,7 +36,7 @@ for (const [index, batch] of batches.entries()) {
   console.log(
     `[batch] ${index + 1}/${batches.length} size=${batch.length} seconds=${result.seconds} ok=${result.ok_count}/${
       batch.length
-    } errors=${result.batch_errors.length ? result.batch_errors.join("; ") : "none"}`
+    } errors=${result.batch_errors.length ? result.batch_errors.join('; ') : 'none'}`
   );
   rows.push(...result.rows);
 }
@@ -122,32 +122,32 @@ async function runBatch(batch) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${endpoint}/api/chat`, {
-      method: "POST",
+      method: 'POST',
       signal: controller.signal,
-      headers: { "content-type": "application/json" },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         model,
         stream: false,
         think: false,
-        keep_alive: "20m",
+        keep_alive: '20m',
         format: batchOutputSchema(),
         messages: [
           {
-            role: "system",
+            role: 'system',
             content: [
-              "You complete multiple missing localizations for a multilingual dictionary.",
-              "Return JSON only with an items array.",
-              "Return exactly one output item per input job_id.",
-              "Complete only the requested target language for each item.",
-              "Preserve each given sense meaning and do not create new senses.",
-              "sense_localization.term must be written in that item target language; never copy the source word when it is written in a different language.",
-              "If there is no direct lexical equivalent, use a natural functional equivalent or grammar label in the target language.",
-              "For zh, reading must be pinyin. For ja, reading must be kana.",
-              "For en and pt-BR, pronunciation must be non-empty.",
-              "The definition must be written in the target language."
-            ].join(" ")
+              'You complete multiple missing localizations for a multilingual dictionary.',
+              'Return JSON only with an items array.',
+              'Return exactly one output item per input job_id.',
+              'Complete only the requested target language for each item.',
+              'Preserve each given sense meaning and do not create new senses.',
+              'sense_localization.term must be written in that item target language; never copy the source word when it is written in a different language.',
+              'If there is no direct lexical equivalent, use a natural functional equivalent or grammar label in the target language.',
+              'For zh, reading must be pinyin. For ja, reading must be kana.',
+              'For en and pt-BR, pronunciation must be non-empty.',
+              'The definition must be written in the target language.'
+            ].join(' ')
           },
-          { role: "user", content: buildBatchPrompt(batch) }
+          { role: 'user', content: buildBatchPrompt(batch) }
         ],
         options: {
           temperature: 0,
@@ -160,7 +160,7 @@ async function runBatch(batch) {
     const text = await response.text();
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${text.slice(0, 500)}`);
     const envelope = JSON.parse(text);
-    const content = envelope?.message?.content || envelope?.response || "";
+    const content = envelope?.message?.content || envelope?.response || '';
     const output = parseJson(content);
     return validateBatch(output, batch, secondsSince(started));
   } catch (error) {
@@ -168,7 +168,7 @@ async function runBatch(batch) {
     return {
       seconds,
       ok_count: 0,
-      batch_errors: [`${error.name || "Error"}: ${error.message || String(error)}`],
+      batch_errors: [`${error.name || 'Error'}: ${error.message || String(error)}`],
       rows: batch.map((task) => ({
         job_id: task.job_id,
         target_id: task.target_id,
@@ -211,40 +211,40 @@ Return JSON only:
 
 function batchOutputSchema() {
   return {
-    type: "object",
-    required: ["items"],
+    type: 'object',
+    required: ['items'],
     properties: {
       items: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
-          required: ["job_id", "sense_localization", "example_localizations"],
+          type: 'object',
+          required: ['job_id', 'sense_localization', 'example_localizations'],
           properties: {
-            job_id: { type: "number" },
+            job_id: { type: 'number' },
             sense_localization: {
-              type: "object",
-              required: ["lang", "term", "definition"],
+              type: 'object',
+              required: ['lang', 'term', 'definition'],
               properties: {
-                lang: { enum: ["en", "zh", "ja", "pt-BR"] },
-                term: { type: "string", minLength: 1 },
-                reading: { type: ["string", "null"] },
-                reading_system: { type: ["string", "null"] },
-                pronunciation: { type: ["string", "null"] },
-                pronunciation_system: { type: ["string", "null"] },
-                definition: { type: "string", minLength: 1 },
-                usage_note: { type: ["string", "null"] }
+                lang: { enum: ['en', 'zh', 'ja', 'pt-BR'] },
+                term: { type: 'string', minLength: 1 },
+                reading: { type: ['string', 'null'] },
+                reading_system: { type: ['string', 'null'] },
+                pronunciation: { type: ['string', 'null'] },
+                pronunciation_system: { type: ['string', 'null'] },
+                definition: { type: 'string', minLength: 1 },
+                usage_note: { type: ['string', 'null'] }
               }
             },
             example_localizations: {
-              type: "array",
+              type: 'array',
               items: {
-                type: "object",
-                required: ["example_id", "lang", "text"],
+                type: 'object',
+                required: ['example_id', 'lang', 'text'],
                 properties: {
-                  example_id: { type: "number" },
-                  lang: { enum: ["en", "zh", "ja", "pt-BR"] },
-                  text: { type: "string", minLength: 1 },
-                  reading: { type: ["string", "null"] }
+                  example_id: { type: 'number' },
+                  lang: { enum: ['en', 'zh', 'ja', 'pt-BR'] },
+                  text: { type: 'string', minLength: 1 },
+                  reading: { type: ['string', 'null'] }
                 }
               }
             }
@@ -257,13 +257,13 @@ function batchOutputSchema() {
 
 function validateBatch(output, batch, seconds) {
   const batchErrors = [];
-  if (!Array.isArray(output?.items)) batchErrors.push("missing items array");
+  if (!Array.isArray(output?.items)) batchErrors.push('missing items array');
   const items = Array.isArray(output?.items) ? output.items : [];
   const byJob = new Map(items.map((item) => [Number(item.job_id), item]));
   const rows = batch.map((task) => {
     const item = byJob.get(Number(task.job_id));
     const validation = validateOutput(item, task.input);
-    if (!item) validation.errors.unshift("missing output item for job_id");
+    if (!item) validation.errors.unshift('missing output item for job_id');
     return {
       job_id: task.job_id,
       target_id: task.target_id,
@@ -292,28 +292,28 @@ function validateOutput(output, input) {
   const loc = output?.sense_localization;
   const lang = input.target_lang;
 
-  if (loc && typeof loc === "object") score++;
-  else errors.push("missing sense_localization object");
+  if (loc && typeof loc === 'object') score++;
+  else errors.push('missing sense_localization object');
   if (loc?.lang === lang) score++;
   else errors.push(`lang must be ${lang}`);
   if (nonEmpty(loc?.term)) score++;
-  else errors.push("missing term");
+  else errors.push('missing term');
   if (nonEmpty(loc?.definition)) score++;
-  else errors.push("missing definition");
+  else errors.push('missing definition');
 
-  if (lang === "zh" || lang === "ja") {
+  if (lang === 'zh' || lang === 'ja') {
     if (readingLooksRight(loc?.reading, lang)) score++;
-    else errors.push(lang === "zh" ? "reading must look like pinyin" : "reading must contain kana");
-  } else if (lang === "en" || lang === "pt-BR") {
+    else errors.push(lang === 'zh' ? 'reading must look like pinyin' : 'reading must contain kana');
+  } else if (lang === 'en' || lang === 'pt-BR') {
     if (nonEmpty(loc?.pronunciation)) score++;
-    else errors.push("missing pronunciation");
+    else errors.push('missing pronunciation');
   }
 
-  if (!termLanguageLooksRight(loc?.term, lang)) errors.push("term language looks suspicious");
+  if (!termLanguageLooksRight(loc?.term, lang)) errors.push('term language looks suspicious');
   if (definitionLanguageLooksRight(loc?.definition, lang)) score++;
-  else errors.push("definition language looks suspicious");
+  else errors.push('definition language looks suspicious');
   if (Array.isArray(output?.example_localizations)) score++;
-  else errors.push("missing example_localizations array");
+  else errors.push('missing example_localizations array');
 
   const knownExampleIds = new Set((input.examples || []).map((example) => Number(example.id)));
   for (const example of output?.example_localizations || []) {
@@ -321,7 +321,7 @@ function validateOutput(output, input) {
     if (!knownExampleIds.has(Number(example.example_id))) errors.push(`unknown example_id: ${example.example_id}`);
     if (!nonEmpty(example.text)) errors.push(`empty example text: ${example.example_id}`);
   }
-  if (!errors.some((error) => error.startsWith("example"))) score++;
+  if (!errors.some((error) => error.startsWith('example'))) score++;
   return { score, max_score: maxScore, errors };
 }
 
@@ -363,15 +363,15 @@ function countErrors(rows) {
 }
 
 function parseJson(content) {
-  const trimmed = String(content || "").trim();
-  if (!trimmed) throw new Error("empty model content");
+  const trimmed = String(content || '').trim();
+  if (!trimmed) throw new Error('empty model content');
   try {
     return JSON.parse(trimmed);
   } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
     if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
-    throw new Error("content is not JSON");
+    throw new Error('content is not JSON');
   }
 }
 
@@ -398,53 +398,53 @@ function percentile(values, p) {
 }
 
 function percent(numerator, denominator) {
-  if (!denominator) return "0%";
+  if (!denominator) return '0%';
   return `${Number(((numerator / denominator) * 100).toFixed(1))}%`;
 }
 
 function nonEmpty(value) {
-  return typeof value === "string" && value.trim().length > 0;
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function containsCjk(value) {
-  return /[\u3400-\u9fff]/u.test(String(value || ""));
+  return /[\u3400-\u9fff]/u.test(String(value || ''));
 }
 
 function containsJapanese(value) {
-  return /[\u3040-\u30ff\u3400-\u9fff]/u.test(String(value || ""));
+  return /[\u3040-\u30ff\u3400-\u9fff]/u.test(String(value || ''));
 }
 
 function containsLatin(value) {
-  return /[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(String(value || ""));
+  return /[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(String(value || ''));
 }
 
 function containsKana(value) {
-  return /[\u3040-\u30ff]/u.test(String(value || ""));
+  return /[\u3040-\u30ff]/u.test(String(value || ''));
 }
 
 function readingLooksRight(value, lang) {
-  const text = String(value || "").trim();
+  const text = String(value || '').trim();
   if (!text) return false;
-  if (lang === "zh") return /[A-Za-züÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/u.test(text);
-  if (lang === "ja") return containsKana(text);
+  if (lang === 'zh') return /[A-Za-züÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/u.test(text);
+  if (lang === 'ja') return containsKana(text);
   return true;
 }
 
 function termLanguageLooksRight(value, lang) {
-  const text = String(value || "");
-  if (lang === "zh") return containsCjk(text);
-  if (lang === "ja") return containsJapanese(text);
-  if (lang === "pt-BR") return containsLatin(text);
-  if (lang === "en") return containsLatin(text);
+  const text = String(value || '');
+  if (lang === 'zh') return containsCjk(text);
+  if (lang === 'ja') return containsJapanese(text);
+  if (lang === 'pt-BR') return containsLatin(text);
+  if (lang === 'en') return containsLatin(text);
   return false;
 }
 
 function definitionLanguageLooksRight(value, lang) {
-  const text = String(value || "");
-  if (lang === "zh") return containsCjk(text);
-  if (lang === "ja") return containsJapanese(text);
-  if (lang === "pt-BR") return containsLatin(text);
-  if (lang === "en") return containsLatin(text);
+  const text = String(value || '');
+  if (lang === 'zh') return containsCjk(text);
+  if (lang === 'ja') return containsJapanese(text);
+  if (lang === 'pt-BR') return containsLatin(text);
+  if (lang === 'en') return containsLatin(text);
   return false;
 }
 
@@ -452,10 +452,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

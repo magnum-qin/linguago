@@ -93,7 +93,7 @@ Decision:
 
 ## 7. Provider Support And Health
 
-The Worker supports OpenRouter, DashScope, Gemini, DeepSeek, and automatic routing.
+The Worker supports Cloudflare Workers AI, DashScope, Gemini, DeepSeek, and automatic routing.
 
 Reason:
 

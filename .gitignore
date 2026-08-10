@@ -1,6 +1,7 @@
 node_modules
 .wrangler
 .dev.vars
+.env.local
 dist
 dist-worker
 data
@@ -34,3 +35,11 @@ find_db*.ps1
 start_wmi.ps1
 start_worker.bat
 start_worker*.ps1
+.tmp/
+__pycache__/
+*.pyc
+.codex/
+.pnpm-store/
+backups/
+logs/
+/1

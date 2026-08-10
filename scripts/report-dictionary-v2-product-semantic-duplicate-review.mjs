@@ -1,16 +1,16 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_OUT = "logs/product-semantic-duplicate-review-20260624.json";
-const LANGS = ["en", "pt-BR", "zh", "ja"];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_OUT = 'logs/product-semantic-duplicate-review-20260624.json';
+const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
-const markdownPath = args.markdown ? path.resolve(args.markdown) : outPath.replace(/\.json$/u, ".md");
-const sampleLimit = Number.parseInt(args.samples || "80", 10);
+const markdownPath = args.markdown ? path.resolve(args.markdown) : outPath.replace(/\.json$/u, '.md');
+const sampleLimit = Number.parseInt(args.samples || '80', 10);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
@@ -67,13 +67,13 @@ const sourceLinksBySense = db.prepare(`
 `);
 
 const groups = duplicateRows.map((row) => {
-  const senseIds = unique(row.sense_ids.split(",").map((id) => Number.parseInt(id, 10))).sort((a, b) => a - b);
+  const senseIds = unique(row.sense_ids.split(',').map((id) => Number.parseInt(id, 10))).sort((a, b) => a - b);
   const senses = senseIds.map((id) => describeSense(id));
   const pairFeatures = compareSenses(senses);
   const mojibakeHits = senses.flatMap((sense) => collectMojibakeHits(sense));
   const review = classifyReview({ row, senses, pairFeatures, mojibakeHits });
   return {
-    pair_key: senseIds.join(":"),
+    pair_key: senseIds.join(':'),
     entry_id: row.entry_id,
     headword: row.headword,
     primary_lang: row.primary_lang,
@@ -126,8 +126,8 @@ const report = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
-fs.writeFileSync(markdownPath, renderMarkdown(report, sampleLimit), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
+fs.writeFileSync(markdownPath, renderMarkdown(report, sampleLimit), 'utf8');
 db.close();
 
 console.log(
@@ -169,7 +169,8 @@ function compareSenses(senses) {
     const terms = senses.map((sense) => sense.terms_by_lang[lang]).filter(Boolean);
     const definitions = senses.map((sense) => sense.definitions_by_lang[lang]).filter(Boolean);
     features.matching_terms_by_lang[lang] = terms.length === senses.length && unique(terms).length === 1;
-    features.matching_definitions_by_lang[lang] = definitions.length === senses.length && unique(definitions).length === 1;
+    features.matching_definitions_by_lang[lang] =
+      definitions.length === senses.length && unique(definitions).length === 1;
   }
   features.matching_term_langs = Object.entries(features.matching_terms_by_lang)
     .filter(([, matches]) => matches)
@@ -183,29 +184,30 @@ function compareSenses(senses) {
 function classifyReview({ row, senses, pairFeatures, mojibakeHits }) {
   if (mojibakeHits.length >= 2 || mojibakeHits.some((hit) => hit.score >= 3)) {
     return {
-      recommendation: "encoding_repair_first",
-      primary_reason: "mojibake_detected",
-      note: "Fix encoded/corrupted localization text before deciding whether these senses are semantically duplicate."
+      recommendation: 'encoding_repair_first',
+      primary_reason: 'mojibake_detected',
+      note: 'Fix encoded/corrupted localization text before deciding whether these senses are semantically duplicate.'
     };
   }
   if (pairFeatures.shared_source_links > 0 || pairFeatures.matching_definition_langs.length >= 2) {
     return {
-      recommendation: "llm_semantic_review",
-      primary_reason: pairFeatures.shared_source_links > 0 ? "source_overlap" : "multiple_matching_definitions",
-      note: "Likely duplicate enough for model-assisted keep/merge review, but not safe for deterministic merge."
+      recommendation: 'llm_semantic_review',
+      primary_reason: pairFeatures.shared_source_links > 0 ? 'source_overlap' : 'multiple_matching_definitions',
+      note: 'Likely duplicate enough for model-assisted keep/merge review, but not safe for deterministic merge.'
     };
   }
   if (pairFeatures.matching_term_langs.length >= 2 || row.duplicate_count > 2) {
     return {
-      recommendation: "manual_keep_or_merge_review",
-      primary_reason: pairFeatures.matching_term_langs.length >= 2 ? "multiple_matching_terms" : "multi_sense_duplicate_group",
-      note: "Terms overlap but definitions or source evidence differ; review in context."
+      recommendation: 'manual_keep_or_merge_review',
+      primary_reason:
+        pairFeatures.matching_term_langs.length >= 2 ? 'multiple_matching_terms' : 'multi_sense_duplicate_group',
+      note: 'Terms overlap but definitions or source evidence differ; review in context.'
     };
   }
   return {
-    recommendation: "likely_keep_separate",
-    primary_reason: "single_language_overlap_only",
-    note: "Only one localization row overlaps; this is often a legitimate polysemy or translation collision."
+    recommendation: 'likely_keep_separate',
+    primary_reason: 'single_language_overlap_only',
+    note: 'Only one localization row overlaps; this is often a legitimate polysemy or translation collision.'
   };
 }
 
@@ -241,7 +243,7 @@ function countSourceOverlaps(senses) {
   let overlaps = 0;
   for (const sense of senses) {
     for (const link of sense.source_links) {
-      const key = [link.source_lang, norm(link.source_word), link.source_sense_id].join("\t");
+      const key = [link.source_lang, norm(link.source_word), link.source_sense_id].join('\t');
       if (!key.trim()) continue;
       if (seen.has(key) && seen.get(key) !== sense.id) overlaps++;
       else seen.set(key, sense.id);
@@ -253,17 +255,18 @@ function countSourceOverlaps(senses) {
 function collectMojibakeHits(sense) {
   const hits = [];
   for (const loc of sense.localizations) {
-    for (const field of ["term", "reading", "pronunciation", "definition"]) {
+    for (const field of ['term', 'reading', 'pronunciation', 'definition']) {
       const value = loc[field];
       const score = mojibakeScore(value);
-      if (score > 0) hits.push({ sense_id: sense.id, lang: loc.lang, field, score, value: String(value).slice(0, 120) });
+      if (score > 0)
+        hits.push({ sense_id: sense.id, lang: loc.lang, field, score, value: String(value).slice(0, 120) });
     }
   }
   return hits;
 }
 
 function mojibakeScore(value) {
-  const text = String(value || "");
+  const text = String(value || '');
   if (!text) return 0;
   let score = 0;
   if (/[�锟]/u.test(text)) score += 4;
@@ -276,12 +279,12 @@ function mojibakeScore(value) {
 
 function renderMarkdown(report, sampleLimit) {
   const lines = [
-    "# Product Semantic Duplicate Review",
-    "",
+    '# Product Semantic Duplicate Review',
+    '',
     `Generated: ${report.generated_at}`,
-    "",
-    "## Summary",
-    "",
+    '',
+    '## Summary',
+    '',
     `- Duplicate groups: ${report.summary.duplicate_groups}`,
     `- Unique sense pairs: ${report.summary.unique_sense_pairs}`,
     `- Affected entries: ${report.summary.affected_entries}`,
@@ -289,50 +292,50 @@ function renderMarkdown(report, sampleLimit) {
     `- By recommendation: ${JSON.stringify(report.summary.by_recommendation)}`,
     `- Unique pairs by recommendation: ${JSON.stringify(report.summary.unique_pairs_by_recommendation)}`,
     `- By reason: ${JSON.stringify(report.summary.by_reason)}`,
-    "",
-    "## Unique Sense Pairs",
-    "",
-    "| Entry | Rank | Recommendation | Reasons | Duplicate Langs | Senses | Headword |",
-    "| --- | ---: | --- | --- | --- | --- | --- |"
+    '',
+    '## Unique Sense Pairs',
+    '',
+    '| Entry | Rank | Recommendation | Reasons | Duplicate Langs | Senses | Headword |',
+    '| --- | ---: | --- | --- | --- | --- | --- |'
   ];
   for (const pair of report.pair_review.slice(0, Number.isFinite(sampleLimit) ? sampleLimit : 80)) {
     lines.push(
-      `| ${pair.entry_id} | ${pair.frequency_rank ?? ""} | ${pair.recommendation} | ${pair.reasons.join(", ")} | ${pair.duplicate_langs.join(", ")} | ${pair.sense_ids.join(", ")} | ${escapeCell(pair.headword)} |`
+      `| ${pair.entry_id} | ${pair.frequency_rank ?? ''} | ${pair.recommendation} | ${pair.reasons.join(', ')} | ${pair.duplicate_langs.join(', ')} | ${pair.sense_ids.join(', ')} | ${escapeCell(pair.headword)} |`
     );
   }
   lines.push(
-    "",
-    "## Review Queue",
-    "",
-    "| Entry | Rank | Lang | Recommendation | Reason | Senses | Headword |",
-    "| --- | ---: | --- | --- | --- | --- | --- |"
+    '',
+    '## Review Queue',
+    '',
+    '| Entry | Rank | Lang | Recommendation | Reason | Senses | Headword |',
+    '| --- | ---: | --- | --- | --- | --- | --- |'
   );
   for (const group of report.groups.slice(0, Number.isFinite(sampleLimit) ? sampleLimit : 80)) {
     lines.push(
-      `| ${group.entry_id} | ${group.frequency_rank ?? ""} | ${group.duplicate_lang} | ${group.review.recommendation} | ${group.review.primary_reason} | ${group.senses.map((sense) => `${sense.id}#${sense.sense_order}`).join(", ")} | ${escapeCell(group.headword)} |`
+      `| ${group.entry_id} | ${group.frequency_rank ?? ''} | ${group.duplicate_lang} | ${group.review.recommendation} | ${group.review.primary_reason} | ${group.senses.map((sense) => `${sense.id}#${sense.sense_order}`).join(', ')} | ${escapeCell(group.headword)} |`
     );
   }
-  lines.push("", "## First Samples", "");
+  lines.push('', '## First Samples', '');
   for (const group of report.groups.slice(0, Math.min(20, sampleLimit))) {
     lines.push(`### ${group.headword} (${group.entry_id}) - ${group.review.recommendation}`);
-    lines.push("");
+    lines.push('');
     lines.push(`Duplicate ${group.duplicate_lang}: ${group.duplicate_term}`);
-    lines.push("");
+    lines.push('');
     for (const sense of group.senses) {
       const en = sense.localizations.en;
       const zh = sense.localizations.zh;
       const ja = sense.localizations.ja;
-      lines.push(`- sense ${sense.id} order ${sense.sense_order}: ${sense.gloss_key || ""}`);
-      lines.push(`  - en: ${en?.term || ""} | ${en?.definition || ""}`);
-      lines.push(`  - zh: ${zh?.term || ""} | ${zh?.definition || ""}`);
-      lines.push(`  - ja: ${ja?.term || ""} | ${ja?.definition || ""}`);
+      lines.push(`- sense ${sense.id} order ${sense.sense_order}: ${sense.gloss_key || ''}`);
+      lines.push(`  - en: ${en?.term || ''} | ${en?.definition || ''}`);
+      lines.push(`  - zh: ${zh?.term || ''} | ${zh?.definition || ''}`);
+      lines.push(`  - ja: ${ja?.term || ''} | ${ja?.definition || ''}`);
     }
     if (group.mojibake_hits.length) {
-      lines.push(`- mojibake hits: ${group.mojibake_hits.map((hit) => `${hit.lang}.${hit.field}`).join(", ")}`);
+      lines.push(`- mojibake hits: ${group.mojibake_hits.map((hit) => `${hit.lang}.${hit.field}`).join(', ')}`);
     }
-    lines.push("");
+    lines.push('');
   }
-  return `${lines.join("\n")}\n`;
+  return `${lines.join('\n')}\n`;
 }
 
 function summarizePairs(groups) {
@@ -385,7 +388,11 @@ function recommendationPriority(value) {
 }
 
 function norm(value) {
-  return String(value ?? "").normalize("NFKC").trim().replace(/\s+/gu, " ").toLocaleLowerCase();
+  return String(value ?? '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLocaleLowerCase();
 }
 
 function unique(values) {
@@ -399,21 +406,23 @@ function countBy(values) {
 }
 
 function escapeCell(value) {
-  return String(value ?? "").replace(/\|/gu, "\\|").replace(/\n/gu, " ");
+  return String(value ?? '')
+    .replace(/\|/gu, '\\|')
+    .replace(/\n/gu, ' ');
 }
 
 function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

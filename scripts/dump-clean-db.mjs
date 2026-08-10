@@ -12,19 +12,19 @@ out.write('DROP TABLE IF EXISTS dictionary;\n');
 const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
 for (const table of tables) {
   if (table.name === 'sqlite_sequence') continue;
-  
+
   // Dump schema
   const schema = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='${table.name}'`).get();
   if (schema) out.write(`${schema.sql};\n`);
-  
+
   // Dump data
   const rows = db.prepare(`SELECT * FROM ${table.name}`).all();
   if (rows.length === 0) continue;
-  
+
   const columns = Object.keys(rows[0]);
-  
+
   for (const row of rows) {
-    const values = columns.map(c => {
+    const values = columns.map((c) => {
       const val = row[c];
       if (val === null) return 'NULL';
       if (typeof val === 'number') return val;

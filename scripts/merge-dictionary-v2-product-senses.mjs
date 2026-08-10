@@ -1,18 +1,18 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const dryRun = args["dry-run"] === "true";
+const dryRun = args['dry-run'] === 'true';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 
 const statements = {
   multiSenseEntries: db.prepare(`
@@ -173,7 +173,8 @@ const summary = {
     .prepare(`SELECT status, COUNT(*) AS count FROM product_senses GROUP BY status ORDER BY status`)
     .all(),
   sample_multi_sense_entries: db
-    .prepare(`
+    .prepare(
+      `
       SELECT pe.headword, pe.frequency_rank, pe.status, COUNT(ps.id) AS senses,
              group_concat(ps.sense_order || ':' || ps.status || ':' || ps.gloss_key, ' | ') AS glosses
       FROM product_entries pe
@@ -182,11 +183,12 @@ const summary = {
       HAVING senses > 1
       ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.id
       LIMIT 20
-    `)
+    `
+    )
     .all()
 };
 
-fs.writeFileSync(dbPath.replace(/\.db$/u, ".sense-merge.summary.json"), JSON.stringify(summary, null, 2));
+fs.writeFileSync(dbPath.replace(/\.db$/u, '.sense-merge.summary.json'), JSON.stringify(summary, null, 2));
 db.close();
 console.log(JSON.stringify(summary, null, 2));
 
@@ -249,15 +251,11 @@ function findRuleDuplicatePairs(senses) {
 }
 
 function duplicateReason(a, b) {
-  if (a.normalized_gloss && a.normalized_gloss === b.normalized_gloss) return "same_gloss";
-  if (
-    a.term_signature &&
-    a.term_signature === b.term_signature &&
-    hasSetOverlap(a.source_words, b.source_words)
-  ) {
-    return "same_terms_with_source_overlap";
+  if (a.normalized_gloss && a.normalized_gloss === b.normalized_gloss) return 'same_gloss';
+  if (a.term_signature && a.term_signature === b.term_signature && hasSetOverlap(a.source_words, b.source_words)) {
+    return 'same_terms_with_source_overlap';
   }
-  return "";
+  return '';
 }
 
 function chooseKeeper(a, b) {
@@ -303,16 +301,7 @@ function mergeSensePair({ keeper, loser, reason }) {
   }
 
   for (const job of statements.loserJobs.all(loser.id)) {
-    if (
-      statements.keeperJob.get(
-        job.target_type,
-        keeper.id,
-        job.lang,
-        job.provider,
-        job.model,
-        job.prompt_version
-      )
-    ) {
+    if (statements.keeperJob.get(job.target_type, keeper.id, job.lang, job.provider, job.model, job.prompt_version)) {
       statements.deleteJob.run(job.id);
       stats.jobs_deleted++;
     } else {
@@ -333,8 +322,10 @@ function mergeSensePair({ keeper, loser, reason }) {
 }
 
 function chooseGloss(keeper, loser, reason) {
-  if (reason === "same_gloss") return keeper.gloss_key;
-  return String(keeper.gloss_key || "").length <= String(loser.gloss_key || "").length ? keeper.gloss_key : loser.gloss_key;
+  if (reason === 'same_gloss') return keeper.gloss_key;
+  return String(keeper.gloss_key || '').length <= String(loser.gloss_key || '').length
+    ? keeper.gloss_key
+    : loser.gloss_key;
 }
 
 function chooseStatus(keeper, loser) {
@@ -350,10 +341,10 @@ function renumberEntry(productEntryId) {
 function refreshEntryStatus(productEntryId) {
   const statuses = statements.entryStatusCounts.all(productEntryId);
   const total = statuses.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = statuses.find((row) => row.status === "accepted")?.count || 0;
-  const hasNeedsReview = statuses.some((row) => row.status === "needs_review");
-  const hasDraft = statuses.some((row) => row.status.startsWith("draft_"));
-  const status = accepted === total ? "accepted" : hasNeedsReview || hasDraft ? "needs_review" : "ready_for_llm";
+  const accepted = statuses.find((row) => row.status === 'accepted')?.count || 0;
+  const hasNeedsReview = statuses.some((row) => row.status === 'needs_review');
+  const hasDraft = statuses.some((row) => row.status.startsWith('draft_'));
+  const status = accepted === total ? 'accepted' : hasNeedsReview || hasDraft ? 'needs_review' : 'ready_for_llm';
   statements.updateEntryStatus.run(status, productEntryId);
 }
 
@@ -366,24 +357,27 @@ function countRuleDuplicates() {
 }
 
 function normalizeGloss(value) {
-  return String(value || "")
-    .normalize("NFKC")
+  return String(value || '')
+    .normalize('NFKC')
     .toLowerCase()
-    .replace(/[()[\]'"`]/gu, " ")
-    .replace(/\s+/gu, " ")
+    .replace(/[()[\]'"`]/gu, ' ')
+    .replace(/\s+/gu, ' ')
     .trim();
 }
 
 function normalizeWord(value) {
-  return String(value || "").normalize("NFKC").toLowerCase().trim();
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .trim();
 }
 
 function buildTermSignature(localizations) {
-  if (!localizations.length) return "";
+  if (!localizations.length) return '';
   return localizations
     .map((loc) => `${loc.lang}:${normalizeWord(loc.term)}`)
     .sort()
-    .join("|");
+    .join('|');
 }
 
 function hasSetOverlap(a, b) {
@@ -392,11 +386,11 @@ function hasSetOverlap(a, b) {
 }
 
 function statusRank(status) {
-  if (status === "accepted") return 1;
-  if (status === "ready_for_llm") return 2;
-  if (status === "needs_review") return 3;
-  if (status === "draft_fused") return 4;
-  if (status === "draft_single_source") return 5;
+  if (status === 'accepted') return 1;
+  if (status === 'ready_for_llm') return 2;
+  if (status === 'needs_review') return 3;
+  if (status === 'draft_fused') return 4;
+  if (status === 'draft_single_source') return 5;
   return 9;
 }
 
@@ -404,10 +398,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

@@ -1,27 +1,27 @@
-import fs from "node:fs";
-import path from "node:path";
-import { spawnSync } from "node:child_process";
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
-const batchFile = path.resolve(process.argv[2] || "data/processed/generation_batch_frequency_400.txt");
-const runName = process.argv[3] || `batch-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}`;
+const batchFile = path.resolve(process.argv[2] || 'data/processed/generation_batch_frequency_400.txt');
+const runName = process.argv[3] || `batch-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`;
 const limit = Number(process.argv[4] || process.env.BATCH_LIMIT || 0);
-const outputDir = path.resolve("output/batches", runName);
-const successFile = path.join(outputDir, "generated.jsonl");
-const failedFile = path.join(outputDir, "generated.failed.jsonl");
-const summaryFile = path.join(outputDir, "summary.json");
-const ollamaHost = (process.env.OLLAMA_HOST || "http://192.168.2.152:11434").replace(/\/$/, "");
+const outputDir = path.resolve('output/batches', runName);
+const successFile = path.join(outputDir, 'generated.jsonl');
+const failedFile = path.join(outputDir, 'generated.failed.jsonl');
+const summaryFile = path.join(outputDir, 'summary.json');
+const ollamaHost = (process.env.OLLAMA_HOST || 'http://192.168.2.152:11434').replace(/\/$/, '');
 
 fs.mkdirSync(outputDir, { recursive: true });
 
 const terms = fs
-  .readFileSync(batchFile, "utf8")
+  .readFileSync(batchFile, 'utf8')
   .split(/\r?\n/)
   .map((line) => line.trim())
   .filter(Boolean);
 
 const planned = limit > 0 ? terms.slice(0, limit) : terms;
-const plannedFile = path.join(outputDir, "planned_terms.txt");
-fs.writeFileSync(plannedFile, planned.join("\n") + "\n");
+const plannedFile = path.join(outputDir, 'planned_terms.txt');
+fs.writeFileSync(plannedFile, planned.join('\n') + '\n');
 
 console.log(`[batch] name=${runName}`);
 console.log(`[batch] terms=${planned.length}`);
@@ -31,18 +31,18 @@ console.log(`[batch] ollama=${ollamaHost}`);
 await assertOllamaReachable();
 
 runNode([
-  "scripts/ollama-schema-test.mjs",
-  "--terms-file",
+  'scripts/ollama-schema-test.mjs',
+  '--terms-file',
   plannedFile,
-  "--word-only",
-  "--out",
+  '--word-only',
+  '--out',
   successFile,
-  "--fail-out",
+  '--fail-out',
   failedFile
 ]);
 
-runNode(["scripts/validate-generated-dictionary.mjs", successFile, runName]);
-runNode(["scripts/import-generated-dictionary.mjs", path.resolve(`data/processed/${runName}.accepted.jsonl`)]);
+runNode(['scripts/validate-generated-dictionary.mjs', successFile, runName]);
+runNode(['scripts/import-generated-dictionary.mjs', path.resolve(`data/processed/${runName}.accepted.jsonl`)]);
 
 const summary = {
   generated_at: new Date().toISOString(),
@@ -61,17 +61,17 @@ console.log(`[done] wrote ${path.relative(process.cwd(), summaryFile)}`);
 function runNode(args) {
   const result = spawnSync(process.execPath, args, {
     cwd: process.cwd(),
-    stdio: "inherit",
+    stdio: 'inherit',
     env: process.env
   });
 
-  if (result.status !== 0) throw new Error(`Command failed: node ${args.join(" ")}`);
+  if (result.status !== 0) throw new Error(`Command failed: node ${args.join(' ')}`);
 }
 
 async function assertOllamaReachable() {
   try {
     const response = await fetch(`${ollamaHost}/api/tags`, {
-      headers: { accept: "application/json" },
+      headers: { accept: 'application/json' },
       signal: AbortSignal.timeout(8000)
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);

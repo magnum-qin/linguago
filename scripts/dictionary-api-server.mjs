@@ -1,15 +1,15 @@
-import fs from "node:fs";
-import http from "node:http";
-import path from "node:path";
-import { URL } from "node:url";
-import initSqlJs from "sql.js";
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+import { URL } from 'node:url';
+import initSqlJs from 'sql.js';
 
-const HOST = process.env.DICTIONARY_HOST || "0.0.0.0";
+const HOST = process.env.DICTIONARY_HOST || '0.0.0.0';
 const PORT = Number(process.env.DICTIONARY_PORT || 8787);
-const TOKEN = process.env.DICTIONARY_API_TOKEN || "";
-const DB_FILE = path.resolve(process.env.DICTIONARY_DB || "data/dictionary.sqlite");
-const SQL_WASM = path.resolve(process.env.SQL_WASM || "node_modules/sql.js/dist/sql-wasm.wasm");
-const LANGS = ["zh", "en", "pt-BR", "ja"];
+const TOKEN = process.env.DICTIONARY_API_TOKEN || '';
+const DB_FILE = path.resolve(process.env.DICTIONARY_DB || 'data/dictionary.sqlite');
+const SQL_WASM = path.resolve(process.env.SQL_WASM || 'node_modules/sql.js/dist/sql-wasm.wasm');
+const LANGS = ['zh', 'en', 'pt-BR', 'ja'];
 
 let SQL;
 let db;
@@ -19,9 +19,9 @@ await loadDatabase(true);
 
 const server = http.createServer(async (request, response) => {
   try {
-    const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
-    if (url.pathname === "/health") {
+    if (url.pathname === '/health') {
       return sendJson(response, 200, {
         ok: true,
         db_loaded: Boolean(db),
@@ -29,39 +29,41 @@ const server = http.createServer(async (request, response) => {
       });
     }
 
-    if (url.pathname === "/admin/reload") {
-      if (!authorized(request)) return sendJson(response, 401, { error: "unauthorized" });
+    if (url.pathname === '/admin/reload') {
+      if (!authorized(request)) return sendJson(response, 401, { error: 'unauthorized' });
       await loadDatabase(true);
       return sendJson(response, 200, { ok: true, updated_at: dbUpdatedAt() });
     }
 
-    if (!url.pathname.startsWith("/api/")) {
-      return sendJson(response, 404, { error: "not found" });
+    if (!url.pathname.startsWith('/api/')) {
+      return sendJson(response, 404, { error: 'not found' });
     }
 
     if (!authorized(request)) {
-      return sendJson(response, 401, { error: "unauthorized" });
+      return sendJson(response, 401, { error: 'unauthorized' });
     }
 
     await loadDatabase(false);
 
-    if (url.pathname === "/api/dictionary/stats") {
+    if (url.pathname === '/api/dictionary/stats') {
       return sendJson(response, 200, dictionaryStats());
     }
 
-    if (url.pathname === "/api/dictionary/lookup") {
-      const term = normalize(url.searchParams.get("term") || "");
-      if (!term) return sendJson(response, 400, { error: "missing term" });
+    if (url.pathname === '/api/dictionary/lookup') {
+      const term = normalize(url.searchParams.get('term') || '');
+      if (!term) return sendJson(response, 400, { error: 'missing term' });
       return sendJson(response, 200, lookupTerm(term));
     }
 
-    if (url.pathname === "/api/dictionary/report" && request.method === "POST") {
-      let body = "";
-      for await (const chunk of request) { body += chunk; }
+    if (url.pathname === '/api/dictionary/report' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) {
+        body += chunk;
+      }
       try {
         const payload = JSON.parse(body);
-        if (!payload.term) return sendJson(response, 400, { error: "missing term" });
-        
+        if (!payload.term) return sendJson(response, 400, { error: 'missing term' });
+
         const report = {
           term: payload.term,
           target_lang: payload.target_lang,
@@ -69,17 +71,17 @@ const server = http.createServer(async (request, response) => {
           reported_at: new Date().toISOString(),
           status: 'pending'
         };
-        fs.appendFileSync(path.resolve("data/error_reports.jsonl"), JSON.stringify(report) + "\n");
+        fs.appendFileSync(path.resolve('data/error_reports.jsonl'), JSON.stringify(report) + '\n');
         return sendJson(response, 200, { ok: true });
       } catch (e) {
-        return sendJson(response, 400, { error: "invalid format" });
+        return sendJson(response, 400, { error: 'invalid format' });
       }
     }
 
-    return sendJson(response, 404, { error: "not found" });
+    return sendJson(response, 404, { error: 'not found' });
   } catch (error) {
     console.error(error);
-    return sendJson(response, 500, { error: "internal error" });
+    return sendJson(response, 500, { error: 'internal error' });
   }
 });
 
@@ -144,9 +146,7 @@ function lookupTerm(normalizedTerm) {
     if (!matchById.has(match.id)) matchById.set(match.id, match.match_type);
   }
 
-  const entries = [...matchById.entries()].map(([id, matchType]) =>
-    buildEntry(Number(id), String(matchType))
-  );
+  const entries = [...matchById.entries()].map(([id, matchType]) => buildEntry(Number(id), String(matchType)));
 
   return {
     term: normalizedTerm,
@@ -166,26 +166,20 @@ function buildEntry(id, matchType) {
   );
 
   const translations = byLang(
-    selectAll(
-      "SELECT lang, text, confidence FROM dictionary_translations WHERE entry_id = ?",
-      [id]
-    )
+    selectAll('SELECT lang, text, confidence FROM dictionary_translations WHERE entry_id = ?', [id])
   );
   const pronunciations = byLang(
-    selectAll(
-      "SELECT lang, phonetic, audio_text FROM dictionary_pronunciations WHERE entry_id = ?",
-      [id]
-    )
+    selectAll('SELECT lang, phonetic, audio_text FROM dictionary_pronunciations WHERE entry_id = ?', [id])
   );
 
   const definitions = selectAll(
-    "SELECT sense_order, lang, definition FROM dictionary_definitions WHERE entry_id = ? ORDER BY sense_order, lang",
+    'SELECT sense_order, lang, definition FROM dictionary_definitions WHERE entry_id = ? ORDER BY sense_order, lang',
     [id]
   );
   const definitionsBySense = new Map();
   for (const definition of definitions) {
     if (!definitionsBySense.has(definition.sense_order)) {
-      definitionsBySense.set(definition.sense_order, Object.fromEntries(LANGS.map((lang) => [lang, ""])));
+      definitionsBySense.set(definition.sense_order, Object.fromEntries(LANGS.map((lang) => [lang, ''])));
     }
     definitionsBySense.get(definition.sense_order)[definition.lang] = definition.definition;
   }
@@ -201,7 +195,7 @@ function buildEntry(id, matchType) {
     [id]
   ).map((sense) => ({
     ...sense,
-    definitions: definitionsBySense.get(sense.sense_order) || Object.fromEntries(LANGS.map((lang) => [lang, ""]))
+    definitions: definitionsBySense.get(sense.sense_order) || Object.fromEntries(LANGS.map((lang) => [lang, '']))
   }));
 
   const examples = selectAll(
@@ -220,7 +214,7 @@ function buildEntry(id, matchType) {
     translations: {
       zh: example.zh,
       en: example.en,
-      "pt-BR": example["pt-BR"],
+      'pt-BR': example['pt-BR'],
       ja: example.ja
     }
   }));
@@ -238,7 +232,7 @@ function buildEntry(id, matchType) {
 function byLang(rows) {
   const output = Object.fromEntries(LANGS.map((lang) => [lang, null]));
   for (const row of rows) {
-    output[row.lang] = Object.fromEntries(Object.entries(row).filter(([key]) => key !== "lang"));
+    output[row.lang] = Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'lang'));
   }
   return output;
 }
@@ -260,7 +254,10 @@ function selectOne(sql, params = []) {
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function dbUpdatedAt() {
@@ -273,8 +270,8 @@ function dbUpdatedAt() {
 
 function sendJson(response, status, data) {
   response.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store"
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store'
   });
   response.end(JSON.stringify(data));
 }

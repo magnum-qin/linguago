@@ -1,23 +1,25 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const LANGS = ["en", "pt-BR", "zh", "ja"];
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_REPORT = "logs/product-coverage-gaps-autopromote-top50-20260622.json";
-const SOURCE = "deterministic:coverage-gap-promote";
+const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_REPORT = 'logs/product-coverage-gaps-autopromote-top50-20260622.json';
+const SOURCE = 'deterministic:coverage-gap-promote';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const reportPath = path.resolve(args.report || DEFAULT_REPORT);
 const limit = Number(args.limit || 20);
-const apply = args.apply === true || args.apply === "true";
-const outPath = path.resolve(args.out || `logs/product-coverage-gap-promote-${apply ? "apply" : "dry-run"}-20260622.json`);
+const apply = args.apply === true || args.apply === 'true';
+const outPath = path.resolve(
+  args.out || `logs/product-coverage-gap-promote-${apply ? 'apply' : 'dry-run'}-20260622.json`
+);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Product DB not found: ${dbPath}`);
 if (!fs.existsSync(reportPath)) throw new Error(`Gap report not found: ${reportPath}`);
 
-const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const selected = (report.selected || []).slice(0, limit);
 const now = new Date().toISOString();
 
@@ -71,17 +73,17 @@ const output = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf8');
 console.log(JSON.stringify({ ok: output.ok, out: path.relative(process.cwd(), outPath), stats }, null, 2));
 
 function validateCandidate(candidate) {
   const errors = [];
-  if (!candidate?.source_entry_id) errors.push("missing_source_entry_id");
-  if (!candidate?.first_sense_id) errors.push("missing_first_sense_id");
-  if (!LANGS.includes(candidate.source_lang)) errors.push("invalid_source_lang");
-  if (!nonEmpty(candidate.word)) errors.push("missing_word");
-  if (!nonEmpty(candidate.normalized_key)) errors.push("missing_normalized_key");
-  if (!nonEmpty(candidate.gloss_key)) errors.push("missing_gloss_key");
+  if (!candidate?.source_entry_id) errors.push('missing_source_entry_id');
+  if (!candidate?.first_sense_id) errors.push('missing_first_sense_id');
+  if (!LANGS.includes(candidate.source_lang)) errors.push('invalid_source_lang');
+  if (!nonEmpty(candidate.word)) errors.push('missing_word');
+  if (!nonEmpty(candidate.normalized_key)) errors.push('missing_normalized_key');
+  if (!nonEmpty(candidate.gloss_key)) errors.push('missing_gloss_key');
   const locs = candidate.first_sense_localizations || [];
   for (const lang of LANGS) {
     const loc = locs.find((row) => row.lang === lang && !row.needs_review);
@@ -91,30 +93,30 @@ function validateCandidate(candidate) {
     }
     if (!nonEmpty(loc.term)) errors.push(`missing_term_${lang}`);
     if (!nonEmpty(loc.definition)) errors.push(`missing_definition_${lang}`);
-    if (lang === "zh" && !nonEmpty(loc.reading)) errors.push("missing_zh_reading");
-    if (lang === "ja" && !nonEmpty(loc.reading)) errors.push("missing_ja_reading");
+    if (lang === 'zh' && !nonEmpty(loc.reading)) errors.push('missing_zh_reading');
+    if (lang === 'ja' && !nonEmpty(loc.reading)) errors.push('missing_ja_reading');
   }
   const sourceLoc = locs.find((row) => row.lang === candidate.source_lang && !row.needs_review);
   if (sourceLoc && normalize(sourceLoc.term) !== normalize(candidate.word)) {
-    errors.push("source_term_does_not_match_headword");
+    errors.push('source_term_does_not_match_headword');
   }
   return { candidate, valid: errors.length === 0, errors };
 }
 
 function applyPromotions(items, stats) {
   const db = new Database(dbPath);
-  db.pragma("foreign_keys = ON");
-  db.pragma("busy_timeout = 30000");
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 30000');
 
   const statements = {
-    getEntry: db.prepare("SELECT id FROM product_entries WHERE group_key = ?"),
+    getEntry: db.prepare('SELECT id FROM product_entries WHERE group_key = ?'),
     insertEntry: db.prepare(`
       INSERT INTO product_entries
         (headword, normalized_key, primary_lang, frequency_rank, group_key, group_method, status, source_count, lang_count, created_at)
       VALUES
         (@headword, @normalized_key, @primary_lang, @frequency_rank, @group_key, 'coverage_gap_promote', 'accepted', 1, 4, @created_at)
     `),
-    getSense: db.prepare("SELECT id FROM product_senses WHERE product_entry_id = ? AND gloss_key = ?"),
+    getSense: db.prepare('SELECT id FROM product_senses WHERE product_entry_id = ? AND gloss_key = ?'),
     insertSense: db.prepare(`
       INSERT INTO product_senses
         (product_entry_id, sense_order, part_of_speech, gloss_key, status, confidence, created_at)
@@ -143,7 +145,7 @@ function applyPromotions(items, stats) {
         confidence = excluded.confidence,
         needs_review = 0
     `),
-    getExample: db.prepare("SELECT id FROM product_examples WHERE product_sense_id = ? AND source_example_id = ?"),
+    getExample: db.prepare('SELECT id FROM product_examples WHERE product_sense_id = ? AND source_example_id = ?'),
     insertExample: db.prepare(`
       INSERT INTO product_examples
         (product_sense_id, source_example_id, example_order, source_lang, source_text, source, confidence, needs_review)
@@ -267,21 +269,24 @@ function applyPromotions(items, stats) {
 }
 
 function nonEmpty(value) {
-  return typeof value === "string" && value.trim().length > 0;
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function parseArgs(argv) {
   const result = {};
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) result[key] = true;
+    if (!next || next.startsWith('--')) result[key] = true;
     else {
       result[key] = next;
       index++;

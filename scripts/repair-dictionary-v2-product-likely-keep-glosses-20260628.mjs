@@ -1,21 +1,21 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_TRIAGE = "logs/product-broad-risk-triage-batch13-20260628.json";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_TRIAGE = 'logs/product-broad-risk-triage-batch13-20260628.json';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const triagePath = path.resolve(args.triage || DEFAULT_TRIAGE);
-const apply = args.apply === "true";
+const apply = args.apply === 'true';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!fs.existsSync(triagePath)) throw new Error(`Triage report not found: ${triagePath}`);
 
-const triage = JSON.parse(fs.readFileSync(triagePath, "utf8"));
+const triage = JSON.parse(fs.readFileSync(triagePath, 'utf8'));
 const repairs = (triage.rows || [])
-  .filter((row) => row.triage?.recommendation === "likely_keep")
+  .filter((row) => row.triage?.recommendation === 'likely_keep')
   .map((row) => {
     const gloss = buildGloss(row);
     return {
@@ -26,10 +26,10 @@ const repairs = (triage.rows || [])
     };
   });
 
-if (!repairs.length) throw new Error("No likely_keep rows found");
+if (!repairs.length) throw new Error('No likely_keep rows found');
 
 const db = new Database(dbPath);
-db.pragma("busy_timeout = 30000");
+db.pragma('busy_timeout = 30000');
 
 const updateSense = db.prepare(`
   UPDATE product_senses
@@ -38,7 +38,7 @@ const updateSense = db.prepare(`
   WHERE id = ?
 `);
 
-const verifySense = db.prepare("SELECT id FROM product_senses WHERE id = ?");
+const verifySense = db.prepare('SELECT id FROM product_senses WHERE id = ?');
 
 const transaction = db.transaction(() => {
   for (const repair of repairs) {
@@ -76,12 +76,7 @@ db.close();
 
 function buildGloss(row) {
   const en = row.localizations?.en || {};
-  const candidates = [
-    en.definition,
-    en.term,
-    row.gloss_key,
-    row.headword
-  ];
+  const candidates = [en.definition, en.term, row.gloss_key, row.headword];
 
   for (const candidate of candidates) {
     const cleaned = cleanGloss(candidate);
@@ -91,27 +86,29 @@ function buildGloss(row) {
 }
 
 function cleanGloss(value) {
-  let text = String(value || "")
-    .replace(/\\n|\r|\n/gu, " ")
-    .replace(/\b(?:n|v|a|adj|adv|pron|prep|conj|interj|imp|s|r)\.\s*/giu, "")
-    .replace(/\s*;\s*/gu, ", ")
-    .replace(/\s*--\s*/gu, " ")
-    .replace(/\s+/gu, " ")
+  let text = String(value || '')
+    .replace(/\\n|\r|\n/gu, ' ')
+    .replace(/\b(?:n|v|a|adj|adv|pron|prep|conj|interj|imp|s|r)\.\s*/giu, '')
+    .replace(/\s*;\s*/gu, ', ')
+    .replace(/\s*--\s*/gu, ' ')
+    .replace(/\s+/gu, ' ')
     .trim();
 
   text = text
-    .replace(/,\s*,+/gu, ", ")
-    .replace(/^[,.\s]+/u, "")
-    .replace(/\s+([,.;:!?])/gu, "$1")
+    .replace(/,\s*,+/gu, ', ')
+    .replace(/^[,.\s]+/u, '')
+    .replace(/\s+([,.;:!?])/gu, '$1')
     .trim();
 
-  if (!text) return "";
+  if (!text) return '';
   if (text.length > 180) text = `${text.slice(0, 177).trimEnd()}...`;
   return text;
 }
 
 function abbreviate(value, maxLength) {
-  const text = String(value || "").replace(/\s+/gu, " ").trim();
+  const text = String(value || '')
+    .replace(/\s+/gu, ' ')
+    .trim();
   return text.length <= maxLength ? text : `${text.slice(0, maxLength - 3)}...`;
 }
 
@@ -119,14 +116,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

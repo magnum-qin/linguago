@@ -1,27 +1,27 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const limit = args.limit ? Number(args.limit) : 0;
-const dryRun = args["dry-run"] === "true";
+const dryRun = args['dry-run'] === 'true';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (limit && (!Number.isInteger(limit) || limit < 1)) throw new Error(`Invalid --limit: ${args.limit}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 
-db.function("status_rank", (status) => {
-  if (status === "accepted") return 1;
-  if (status === "ready_for_llm") return 2;
-  if (status === "needs_review") return 3;
-  if (status === "draft_fused") return 4;
-  if (status === "draft_single_source") return 5;
+db.function('status_rank', (status) => {
+  if (status === 'accepted') return 1;
+  if (status === 'ready_for_llm') return 2;
+  if (status === 'needs_review') return 3;
+  if (status === 'draft_fused') return 4;
+  if (status === 'draft_single_source') return 5;
   return 9;
 });
 
@@ -32,7 +32,7 @@ const statements = {
     GROUP BY normalized_key, primary_lang
     HAVING COUNT(*) > 1
     ORDER BY MIN(frequency_rank) IS NULL, MIN(frequency_rank), normalized_key, primary_lang
-    ${limit ? "LIMIT ?" : ""}
+    ${limit ? 'LIMIT ?' : ''}
   `),
   entriesForGroup: db.prepare(`
     SELECT id, headword, normalized_key, primary_lang, frequency_rank, group_key, group_method,
@@ -139,7 +139,8 @@ const summary = {
   ok: true,
   stats,
   duplicate_groups_remaining: db
-    .prepare(`
+    .prepare(
+      `
       SELECT COUNT(*) AS count
       FROM (
         SELECT 1
@@ -147,18 +148,22 @@ const summary = {
         GROUP BY normalized_key, primary_lang
         HAVING COUNT(*) > 1
       )
-    `)
+    `
+    )
     .get().count,
   product_entry_status: db
-    .prepare(`
+    .prepare(
+      `
       SELECT status, COUNT(*) AS count
       FROM product_entries
       GROUP BY status
       ORDER BY status
-    `)
+    `
+    )
     .all(),
   merged_sample: db
-    .prepare(`
+    .prepare(
+      `
       SELECT pe.headword, pe.primary_lang, pe.frequency_rank, pe.status, COUNT(ps.id) AS senses
       FROM product_entries pe
       JOIN product_senses ps ON ps.product_entry_id = pe.id
@@ -166,11 +171,12 @@ const summary = {
       HAVING senses > 1
       ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.id
       LIMIT 20
-    `)
+    `
+    )
     .all()
 };
 
-fs.writeFileSync(dbPath.replace(/\.db$/u, ".entry-merge.summary.json"), JSON.stringify(summary, null, 2));
+fs.writeFileSync(dbPath.replace(/\.db$/u, '.entry-merge.summary.json'), JSON.stringify(summary, null, 2));
 db.close();
 console.log(JSON.stringify(summary, null, 2));
 
@@ -197,7 +203,7 @@ function mergeGroup(group, write) {
     const loserIds = new Set(losers.map((entry) => entry.id));
     const moved = db
       .prepare(
-        `SELECT COUNT(*) AS count FROM product_senses WHERE product_entry_id IN (${losers.map(() => "?").join(",")})`
+        `SELECT COUNT(*) AS count FROM product_senses WHERE product_entry_id IN (${losers.map(() => '?').join(',')})`
       )
       .get(...losers.map((entry) => entry.id)).count;
     stats.senses_moved += moved;
@@ -220,11 +226,11 @@ function chooseKeeper(entries) {
 }
 
 function statusRank(status) {
-  if (status === "accepted") return 1;
-  if (status === "ready_for_llm") return 2;
-  if (status === "needs_review") return 3;
-  if (status === "draft_fused") return 4;
-  if (status === "draft_single_source") return 5;
+  if (status === 'accepted') return 1;
+  if (status === 'ready_for_llm') return 2;
+  if (status === 'needs_review') return 3;
+  if (status === 'draft_fused') return 4;
+  if (status === 'draft_single_source') return 5;
   return 9;
 }
 
@@ -238,11 +244,10 @@ function refreshEntry(keeper, entries) {
   const aggregate = statements.aggregateEntry.get(keeper.id);
   const statuses = statements.statusCounts.all(keeper.id);
   const total = statuses.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = statuses.find((row) => row.status === "accepted")?.count || 0;
-  const hasNeedsReview = statuses.some((row) => row.status === "needs_review");
-  const hasDraft = statuses.some((row) => row.status.startsWith("draft_"));
-  const status =
-    accepted === total ? "accepted" : hasNeedsReview || hasDraft ? "needs_review" : "ready_for_llm";
+  const accepted = statuses.find((row) => row.status === 'accepted')?.count || 0;
+  const hasNeedsReview = statuses.some((row) => row.status === 'needs_review');
+  const hasDraft = statuses.some((row) => row.status.startsWith('draft_'));
+  const status = accepted === total ? 'accepted' : hasNeedsReview || hasDraft ? 'needs_review' : 'ready_for_llm';
   const methods = [...new Set(entries.map((entry) => entry.group_method).filter(Boolean))];
 
   statements.updateEntry.run({
@@ -251,7 +256,7 @@ function refreshEntry(keeper, entries) {
     source_count: aggregate.source_count || 0,
     lang_count: aggregate.lang_count || 0,
     frequency_rank: aggregate.frequency_rank,
-    group_method: methods.length > 1 ? "merged_product_entry" : keeper.group_method
+    group_method: methods.length > 1 ? 'merged_product_entry' : keeper.group_method
   });
 }
 
@@ -259,10 +264,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

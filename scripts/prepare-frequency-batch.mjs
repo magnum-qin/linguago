@@ -1,24 +1,24 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
-const CANDIDATES_FILE = path.resolve("data/processed/candidate_terms.jsonl");
-const FREQ_DIR = path.resolve("data/raw/frequency");
-const OUT_DIR = path.resolve("data/processed");
-const CANDIDATES_OUT = path.join(OUT_DIR, "frequency_candidates.jsonl");
-const BATCH_OUT = path.join(OUT_DIR, "generation_batch_frequency_400.txt");
-const BATCH_JSONL_OUT = path.join(OUT_DIR, "generation_batch_frequency_400.jsonl");
-const REPORT_OUT = path.join(OUT_DIR, "frequency-batch-report.json");
+const CANDIDATES_FILE = path.resolve('data/processed/candidate_terms.jsonl');
+const FREQ_DIR = path.resolve('data/raw/frequency');
+const OUT_DIR = path.resolve('data/processed');
+const CANDIDATES_OUT = path.join(OUT_DIR, 'frequency_candidates.jsonl');
+const BATCH_OUT = path.join(OUT_DIR, 'generation_batch_frequency_400.txt');
+const BATCH_JSONL_OUT = path.join(OUT_DIR, 'generation_batch_frequency_400.jsonl');
+const REPORT_OUT = path.join(OUT_DIR, 'frequency-batch-report.json');
 const BATCH_PER_LANG = Number(process.env.BATCH_PER_LANG || 100);
 
 const frequencyFiles = {
-  en: "frequencywords-en_50k.txt",
-  zh: "frequencywords-zh_50k.txt",
-  ja: "frequencywords-ja_50k.txt",
-  "pt-BR": "frequencywords-pt_br_50k.txt"
+  en: 'frequencywords-en_50k.txt',
+  zh: 'frequencywords-zh_50k.txt',
+  ja: 'frequencywords-ja_50k.txt',
+  'pt-BR': 'frequencywords-pt_br_50k.txt'
 };
 
 const candidates = fs
-  .readFileSync(CANDIDATES_FILE, "utf8")
+  .readFileSync(CANDIDATES_FILE, 'utf8')
   .split(/\r?\n/)
   .filter(Boolean)
   .map((line) => JSON.parse(line));
@@ -83,7 +83,6 @@ for (const [lang, file] of Object.entries(frequencyFiles)) {
     };
     langRows.push(row);
     frequencyCandidates.push(row);
-
   }
 
   const fallbackRows = candidates
@@ -107,14 +106,14 @@ for (const [lang, file] of Object.entries(frequencyFiles)) {
   };
 }
 
-fs.writeFileSync(CANDIDATES_OUT, frequencyCandidates.map((row) => JSON.stringify(row)).join("\n") + "\n");
-fs.writeFileSync(BATCH_OUT, selected.map((row) => row.headword).join("\n") + "\n");
-fs.writeFileSync(BATCH_JSONL_OUT, selected.map((row) => JSON.stringify(row)).join("\n") + "\n");
+fs.writeFileSync(CANDIDATES_OUT, frequencyCandidates.map((row) => JSON.stringify(row)).join('\n') + '\n');
+fs.writeFileSync(BATCH_OUT, selected.map((row) => row.headword).join('\n') + '\n');
+fs.writeFileSync(BATCH_JSONL_OUT, selected.map((row) => JSON.stringify(row)).join('\n') + '\n');
 
 report.total = {
   frequency_candidates: frequencyCandidates.length,
   selected: selected.length,
-  selected_by_lang: countBy(selected, "source_lang")
+  selected_by_lang: countBy(selected, 'source_lang')
 };
 
 fs.writeFileSync(REPORT_OUT, `${JSON.stringify(report, null, 2)}\n`);
@@ -127,7 +126,7 @@ console.log(`[done] wrote ${path.relative(process.cwd(), REPORT_OUT)}`);
 
 function readFrequencyTerms(file, lang) {
   const lines = fs
-    .readFileSync(file, "utf8")
+    .readFileSync(file, 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -135,9 +134,9 @@ function readFrequencyTerms(file, lang) {
   const out = [];
   for (const [index, line] of lines.entries()) {
     if (index === 0 && line.toLowerCase() === lang.toLowerCase()) continue;
-    if (index === 0 && lang === "zh" && line.toLowerCase() === "zh-cn") continue;
-    if (index === 0 && lang === "pt-BR" && line.toLowerCase() === "pt") continue;
-    if (index === 0 && lang === "ja" && line.toLowerCase() === "ja") continue;
+    if (index === 0 && lang === 'zh' && line.toLowerCase() === 'zh-cn') continue;
+    if (index === 0 && lang === 'pt-BR' && line.toLowerCase() === 'pt') continue;
+    if (index === 0 && lang === 'ja' && line.toLowerCase() === 'ja') continue;
 
     const term = line.split(/\s+/)[0]?.trim();
     if (!term) continue;
@@ -151,12 +150,12 @@ function makeKey(lang, term) {
 }
 
 function normalize(term) {
-  return term.normalize("NFKC").trim().toLocaleLowerCase();
+  return term.normalize('NFKC').trim().toLocaleLowerCase();
 }
 
 function displayTerm(term, lang) {
-  const normalized = term.normalize("NFKC").trim();
-  if (lang === "en" || lang === "pt-BR") return normalized.toLocaleLowerCase();
+  const normalized = term.normalize('NFKC').trim();
+  if (lang === 'en' || lang === 'pt-BR') return normalized.toLocaleLowerCase();
   return normalized;
 }
 
@@ -166,17 +165,17 @@ function isGoodFirstPassTerm(term, lang) {
   if (/[0-9_/@#%&*=+()[\]{}<>]/.test(text)) return false;
   if (text.length > 24) return false;
 
-  if (lang === "zh") {
+  if (lang === 'zh') {
     return /^[\u3400-\u9fff]{1,6}$/u.test(text);
   }
-  if (lang === "ja") {
+  if (lang === 'ja') {
     return /[\u3041-\u3096\u30a1-\u30fa\u3400-\u9fff]/u.test(text) && !/^[a-z]+$/i.test(text);
   }
-  if (lang === "en") {
+  if (lang === 'en') {
     if (isContractionFragment(text)) return false;
     return /^[a-z][a-z'-]{1,18}$/i.test(text);
   }
-  if (lang === "pt-BR") {
+  if (lang === 'pt-BR') {
     if (isContractionFragment(text)) return false;
     return /^[\p{Script=Latin}][\p{Script=Latin}'-]{1,18}$/u.test(text);
   }
@@ -188,8 +187,8 @@ function isContractionFragment(text) {
 }
 
 function isGoodDictionaryMatch(term, candidate, lang) {
-  const sourceHeadword = String(candidate.headword || "");
-  if ((lang === "en" || lang === "pt-BR") && /^[a-z]/.test(term) && /^[A-Z]{2,}$/.test(sourceHeadword)) {
+  const sourceHeadword = String(candidate.headword || '');
+  if ((lang === 'en' || lang === 'pt-BR') && /^[a-z]/.test(term) && /^[A-Z]{2,}$/.test(sourceHeadword)) {
     return false;
   }
   return true;

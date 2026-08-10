@@ -1,61 +1,63 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
-import { performance } from "node:perf_hooks";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
-const DEFAULT_ENDPOINT = "http://100.99.99.99:11441";
-const DEFAULT_MODEL = "qwen3.6:latest";
-const DEFAULT_PROMPT_VERSION = "dictionary-v2-product-fusion-review-v1";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
+const DEFAULT_ENDPOINT = 'http://100.99.99.99:11441';
+const DEFAULT_MODEL = 'qwen3.6:latest';
+const DEFAULT_PROMPT_VERSION = 'dictionary-v2-product-fusion-review-v1';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const endpoint = String(args.endpoint || process.env.OLLAMA_HOST || DEFAULT_ENDPOINT).replace(/\/$/u, "");
+const endpoint = String(args.endpoint || process.env.OLLAMA_HOST || DEFAULT_ENDPOINT).replace(/\/$/u, '');
 const model = args.model || process.env.OLLAMA_MODEL || DEFAULT_MODEL;
-const promptVersion = args["prompt-version"] || DEFAULT_PROMPT_VERSION;
+const promptVersion = args['prompt-version'] || DEFAULT_PROMPT_VERSION;
 const limit = Number(args.limit || 20);
-const minSourceCount = Number(args["min-source-count"] || 2);
-const shardCount = Number(args["shard-count"] || 1);
-const shardIndex = Number(args["shard-index"] || 0);
-const timeoutMs = Number(args["timeout-ms"] || 180_000);
-const prewarmTimeoutMs = Number(args["prewarm-timeout-ms"] || 180_000);
-const dryRun = args["dry-run"] === "true";
-const retryNeedsReview = args["retry-needs-review"] === "true";
-const maxTokens = Number(args["max-tokens"] || 1200);
-const candidateFilter = args["candidate-filter"] || "source-count";
-const riskSourceCount = Number(args["risk-source-count"] || 6);
-const maxShortGlossLength = Number(args["max-short-gloss-length"] || 3);
-const selectOnly = args["select-only"] === "true";
+const minSourceCount = Number(args['min-source-count'] || 2);
+const shardCount = Number(args['shard-count'] || 1);
+const shardIndex = Number(args['shard-index'] || 0);
+const timeoutMs = Number(args['timeout-ms'] || 180_000);
+const prewarmTimeoutMs = Number(args['prewarm-timeout-ms'] || 180_000);
+const dryRun = args['dry-run'] === 'true';
+const retryNeedsReview = args['retry-needs-review'] === 'true';
+const maxTokens = Number(args['max-tokens'] || 1200);
+const candidateFilter = args['candidate-filter'] || 'source-count';
+const riskSourceCount = Number(args['risk-source-count'] || 6);
+const maxShortGlossLength = Number(args['max-short-gloss-length'] || 3);
+const selectOnly = args['select-only'] === 'true';
 const candidatesOutPath = path.resolve(
-  args["candidates-out"] || dbPath.replace(/\.db$/u, ".fusion-review-candidates.json")
+  args['candidates-out'] || dbPath.replace(/\.db$/u, '.fusion-review-candidates.json')
 );
-const senseIds = loadSenseIds(args["sense-ids"], args["sense-ids-file"]);
+const senseIds = loadSenseIds(args['sense-ids'], args['sense-ids-file']);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
-if (!Number.isInteger(shardCount) || shardCount < 1) throw new Error("--shard-count must be a positive integer");
+if (!Number.isInteger(shardCount) || shardCount < 1) throw new Error('--shard-count must be a positive integer');
 if (!Number.isInteger(shardIndex) || shardIndex < 0 || shardIndex >= shardCount) {
-  throw new Error("--shard-index must be between 0 and shard-count - 1");
+  throw new Error('--shard-index must be between 0 and shard-count - 1');
 }
-if (!["source-count", "high-risk", "short-gloss", "same-lang-mismatch", "sense-ids"].includes(candidateFilter)) {
-  throw new Error("--candidate-filter must be one of: source-count, high-risk, short-gloss, same-lang-mismatch, sense-ids");
+if (!['source-count', 'high-risk', 'short-gloss', 'same-lang-mismatch', 'sense-ids'].includes(candidateFilter)) {
+  throw new Error(
+    '--candidate-filter must be one of: source-count, high-risk, short-gloss, same-lang-mismatch, sense-ids'
+  );
 }
-if (candidateFilter === "sense-ids" && !senseIds.length) {
-  throw new Error("--candidate-filter sense-ids requires --sense-ids or --sense-ids-file");
+if (candidateFilter === 'sense-ids' && !senseIds.length) {
+  throw new Error('--candidate-filter sense-ids requires --sense-ids or --sense-ids-file');
 }
 if (!Number.isFinite(riskSourceCount) || riskSourceCount < 1) {
-  throw new Error("--risk-source-count must be a positive number");
+  throw new Error('--risk-source-count must be a positive number');
 }
 if (!Number.isFinite(maxShortGlossLength) || maxShortGlossLength < 1) {
-  throw new Error("--max-short-gloss-length must be a positive number");
+  throw new Error('--max-short-gloss-length must be a positive number');
 }
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 ensureReviewSchema(db);
 
 const candidateWhere = candidateFilterClause(candidateFilter);
-const senseIdClause = senseIds.length ? `AND ps.id IN (${senseIds.join(",")})` : "";
+const senseIdClause = senseIds.length ? `AND ps.id IN (${senseIds.join(',')})` : '';
 const candidates = db
   .prepare(
     `
@@ -151,7 +153,9 @@ if (selectOnly) {
   fs.writeFileSync(candidatesOutPath, JSON.stringify(selection, null, 2));
   db.close();
   console.log(`Wrote candidate selection: ${path.relative(process.cwd(), candidatesOutPath)}`);
-  console.log(JSON.stringify({ ok: true, selected: selection.selected, out: path.relative(process.cwd(), candidatesOutPath) }));
+  console.log(
+    JSON.stringify({ ok: true, selected: selection.selected, out: path.relative(process.cwd(), candidatesOutPath) })
+  );
   process.exit(0);
 }
 
@@ -167,8 +171,8 @@ const insertReview = db.prepare(`
 if (candidates.length) {
   const prewarm = await prewarmModel();
   console.log(
-    `[prewarm] ok=${prewarm.ok} seconds=${prewarm.seconds} load_seconds=${prewarm.load_seconds ?? "n/a"}${
-      prewarm.error ? ` error=${prewarm.error}` : ""
+    `[prewarm] ok=${prewarm.ok} seconds=${prewarm.seconds} load_seconds=${prewarm.load_seconds ?? 'n/a'}${
+      prewarm.error ? ` error=${prewarm.error}` : ''
     }`
   );
 }
@@ -190,10 +194,10 @@ for (const candidate of candidates) {
   try {
     const envelope = await callOllama(input);
     const seconds = Number(((performance.now() - started) / 1000).toFixed(2));
-    const content = envelope?.message?.content || envelope?.response || "";
+    const content = envelope?.message?.content || envelope?.response || '';
     const output = parseJson(content);
     const validation = validateReview(output, input);
-    const status = validation.errors.length ? "needs_review" : "accepted";
+    const status = validation.errors.length ? 'needs_review' : 'accepted';
     if (!dryRun) {
       insertReview.run({
         product_entry_id: candidate.product_entry_id,
@@ -207,21 +211,21 @@ for (const candidate of candidates) {
         rationale: cleanNullable(output.rationale),
         suggested_groups_json: JSON.stringify(output.suggested_groups || []),
         output_json: JSON.stringify(output, null, 2),
-        error: validation.errors.join("; ") || null,
+        error: validation.errors.join('; ') || null,
         seconds
       });
     }
 
     stats[status]++;
     const decision = normalizeDecision(output.decision);
-    if (decision === "keep") stats.keep++;
-    else if (decision === "split") stats.split++;
+    if (decision === 'keep') stats.keep++;
+    else if (decision === 'split') stats.split++;
     else stats.model_needs_review++;
 
     console.log(
       `[${status}] entry=${candidate.product_entry_id} sense=${candidate.product_sense_id} headword=${candidate.headword} decision=${decision} confidence=${normalizedConfidence(output.confidence)} seconds=${seconds}`
     );
-    if (validation.errors.length) console.log(`  errors: ${validation.errors.join("; ")}`);
+    if (validation.errors.length) console.log(`  errors: ${validation.errors.join('; ')}`);
   } catch (error) {
     stats.failed++;
     const seconds = Number(((performance.now() - started) / 1000).toFixed(2));
@@ -231,14 +235,14 @@ for (const candidate of candidates) {
         product_sense_id: candidate.product_sense_id,
         model,
         prompt_version: promptVersion,
-        status: "failed",
-        decision: "needs_review",
+        status: 'failed',
+        decision: 'needs_review',
         confidence: 0,
         same_sense_score: 0,
         rationale: null,
-        suggested_groups_json: "[]",
+        suggested_groups_json: '[]',
         output_json: null,
-        error: `${error.name || "Error"}: ${error.message || String(error)}`,
+        error: `${error.name || 'Error'}: ${error.message || String(error)}`,
         seconds
       });
     }
@@ -288,7 +292,7 @@ const summary = {
     .all(model, promptVersion)
 };
 
-fs.writeFileSync(dbPath.replace(/\.db$/u, ".fusion-review.summary.json"), JSON.stringify(summary, null, 2));
+fs.writeFileSync(dbPath.replace(/\.db$/u, '.fusion-review.summary.json'), JSON.stringify(summary, null, 2));
 db.close();
 console.log(JSON.stringify(summary, null, 2));
 
@@ -322,10 +326,10 @@ function ensureReviewSchema(database) {
 }
 
 function candidateFilterClause(filter) {
-  if (filter === "sense-ids") {
+  if (filter === 'sense-ids') {
     return "ps.status IN ('accepted', 'ready_for_llm', 'needs_review', 'draft_fused')";
   }
-  if (filter === "same-lang-mismatch") {
+  if (filter === 'same-lang-mismatch') {
     return `
       ps.status IN ('accepted', 'ready_for_llm')
       AND EXISTS (
@@ -342,13 +346,13 @@ function candidateFilterClause(filter) {
       ) > 1
     `;
   }
-  if (filter === "high-risk") {
-    return "(pe.source_count >= @riskSourceCount OR length(trim(ps.gloss_key)) <= @maxShortGlossLength)";
+  if (filter === 'high-risk') {
+    return '(pe.source_count >= @riskSourceCount OR length(trim(ps.gloss_key)) <= @maxShortGlossLength)';
   }
-  if (filter === "short-gloss") {
-    return "length(trim(ps.gloss_key)) <= @maxShortGlossLength";
+  if (filter === 'short-gloss') {
+    return 'length(trim(ps.gloss_key)) <= @maxShortGlossLength';
   }
-  return "pe.source_count >= @minSourceCount";
+  return 'pe.source_count >= @minSourceCount';
 }
 
 function buildReviewInput(candidate) {
@@ -375,7 +379,7 @@ function buildReviewInput(candidate) {
     .all(candidate.product_sense_id);
 
   return {
-    task: "review_product_sense_fusion",
+    task: 'review_product_sense_fusion',
     requirements: {
       decide_whether_all_source_links_represent_one_dictionary_sense: true,
       keep_means_all_sources_can_remain_under_one_product_sense: true,
@@ -413,15 +417,15 @@ async function prewarmModel() {
   const timer = setTimeout(() => controller.abort(), prewarmTimeoutMs);
   try {
     const response = await fetch(`${endpoint}/api/generate`, {
-      method: "POST",
+      method: 'POST',
       signal: controller.signal,
-      headers: { "content-type": "application/json" },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         model,
         stream: false,
         think: false,
-        keep_alive: "20m",
-        prompt: "Return only OK.",
+        keep_alive: '20m',
+        prompt: 'Return only OK.',
         options: { temperature: 0, num_predict: 2 }
       })
     });
@@ -437,7 +441,7 @@ async function prewarmModel() {
     return {
       ok: false,
       seconds: Number(((performance.now() - started) / 1000).toFixed(2)),
-      error: `${error.name || "Error"}: ${error.message || String(error)}`
+      error: `${error.name || 'Error'}: ${error.message || String(error)}`
     };
   } finally {
     clearTimeout(timer);
@@ -449,31 +453,31 @@ async function callOllama(input) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${endpoint}/api/chat`, {
-      method: "POST",
+      method: 'POST',
       signal: controller.signal,
-      headers: { "content-type": "application/json" },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         model,
         stream: false,
         think: false,
-        keep_alive: "20m",
+        keep_alive: '20m',
         format: reviewSchema(),
         messages: [
           {
-            role: "system",
+            role: 'system',
             content: [
-              "You are reviewing dictionary sense fusion quality.",
-              "Decide whether the grouped source dictionary senses describe the same lexical sense.",
-              "Return JSON only.",
+              'You are reviewing dictionary sense fusion quality.',
+              'Decide whether the grouped source dictionary senses describe the same lexical sense.',
+              'Return JSON only.',
               "Use decision='keep' only when all source links can safely remain in one product sense.",
               "Use decision='split' when different meanings, parts of speech, or unrelated uses are mixed.",
               "Use decision='needs_review' when the evidence is too broad, obsolete, contradictory, or ambiguous.",
-              "Do not translate. Do not add new definitions. Only review the grouping.",
-              "When suggesting split groups, use source_link_ids from the numbered source_links array, not database ids."
-            ].join(" ")
+              'Do not translate. Do not add new definitions. Only review the grouping.',
+              'When suggesting split groups, use source_link_ids from the numbered source_links array, not database ids.'
+            ].join(' ')
           },
           {
-            role: "user",
+            role: 'user',
             content: `Review this product fusion candidate.\n\n${JSON.stringify(input, null, 2)}\n\nReturn JSON only.`
           }
         ],
@@ -495,22 +499,22 @@ async function callOllama(input) {
 
 function reviewSchema() {
   return {
-    type: "object",
-    required: ["decision", "confidence", "same_sense_score", "rationale", "suggested_groups"],
+    type: 'object',
+    required: ['decision', 'confidence', 'same_sense_score', 'rationale', 'suggested_groups'],
     properties: {
-      decision: { type: "string", enum: ["keep", "split", "needs_review"] },
-      confidence: { type: "number", minimum: 0, maximum: 1 },
-      same_sense_score: { type: "number", minimum: 0, maximum: 1 },
-      rationale: { type: "string", minLength: 1 },
+      decision: { type: 'string', enum: ['keep', 'split', 'needs_review'] },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      same_sense_score: { type: 'number', minimum: 0, maximum: 1 },
+      rationale: { type: 'string', minLength: 1 },
       suggested_groups: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
-          required: ["label", "source_link_ids", "reason"],
+          type: 'object',
+          required: ['label', 'source_link_ids', 'reason'],
           properties: {
-            label: { type: "string", minLength: 1 },
-            source_link_ids: { type: "array", items: { type: "number" } },
-            reason: { type: "string", minLength: 1 }
+            label: { type: 'string', minLength: 1 },
+            source_link_ids: { type: 'array', items: { type: 'number' } },
+            reason: { type: 'string', minLength: 1 }
           }
         }
       }
@@ -520,20 +524,23 @@ function reviewSchema() {
 
 function validateReview(output, input) {
   const errors = [];
-  if (!["keep", "split", "needs_review"].includes(output?.decision)) errors.push("invalid decision");
-  if (!Number.isFinite(Number(output?.confidence))) errors.push("invalid confidence");
-  if (!Number.isFinite(Number(output?.same_sense_score))) errors.push("invalid same_sense_score");
-  if (!cleanNullable(output?.rationale)) errors.push("missing rationale");
-  if (!Array.isArray(output?.suggested_groups)) errors.push("suggested_groups must be an array");
-  if (output?.decision === "split" && (!Array.isArray(output?.suggested_groups) || output.suggested_groups.length < 2)) {
-    errors.push("split decision requires at least two suggested groups");
+  if (!['keep', 'split', 'needs_review'].includes(output?.decision)) errors.push('invalid decision');
+  if (!Number.isFinite(Number(output?.confidence))) errors.push('invalid confidence');
+  if (!Number.isFinite(Number(output?.same_sense_score))) errors.push('invalid same_sense_score');
+  if (!cleanNullable(output?.rationale)) errors.push('missing rationale');
+  if (!Array.isArray(output?.suggested_groups)) errors.push('suggested_groups must be an array');
+  if (
+    output?.decision === 'split' &&
+    (!Array.isArray(output?.suggested_groups) || output.suggested_groups.length < 2)
+  ) {
+    errors.push('split decision requires at least two suggested groups');
   }
   const sourceLinkIds = new Set(input.source_links.map((link) => Number(link.link_id)));
   for (const group of output?.suggested_groups || []) {
-    if (!cleanNullable(group.label)) errors.push("suggested group missing label");
-    if (!cleanNullable(group.reason)) errors.push("suggested group missing reason");
+    if (!cleanNullable(group.label)) errors.push('suggested group missing label');
+    if (!cleanNullable(group.reason)) errors.push('suggested group missing reason');
     if (!Array.isArray(group.source_link_ids) || !group.source_link_ids.length) {
-      errors.push("suggested group missing source_link_ids");
+      errors.push('suggested group missing source_link_ids');
       continue;
     }
     for (const id of group.source_link_ids) {
@@ -544,20 +551,20 @@ function validateReview(output, input) {
 }
 
 function parseJson(content) {
-  const trimmed = String(content || "").trim();
-  if (!trimmed) throw new Error("empty model content");
+  const trimmed = String(content || '').trim();
+  if (!trimmed) throw new Error('empty model content');
   try {
     return JSON.parse(trimmed);
   } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
     if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
-    throw new Error("content is not JSON");
+    throw new Error('content is not JSON');
   }
 }
 
 function normalizeDecision(value) {
-  return ["keep", "split", "needs_review"].includes(value) ? value : "needs_review";
+  return ['keep', 'split', 'needs_review'].includes(value) ? value : 'needs_review';
 }
 
 function normalizedConfidence(value) {
@@ -567,20 +574,20 @@ function normalizedConfidence(value) {
 }
 
 function cleanNullable(value) {
-  const text = typeof value === "string" ? value.trim() : "";
+  const text = typeof value === 'string' ? value.trim() : '';
   return text || null;
 }
 
 function loadSenseIds(inlineValue, fileValue) {
   const ids = new Set();
-  for (const value of String(inlineValue || "").split(",")) {
+  for (const value of String(inlineValue || '').split(',')) {
     const id = Number(value.trim());
     if (Number.isInteger(id) && id > 0) ids.add(id);
   }
 
   if (fileValue) {
     const filePath = path.resolve(fileValue);
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     const values = Array.isArray(parsed)
       ? parsed
       : Array.isArray(parsed.flagged_sense_ids)
@@ -601,10 +608,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

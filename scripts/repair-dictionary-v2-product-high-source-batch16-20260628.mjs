@@ -1,23 +1,23 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_RISK = "logs/product-published-risk-after-japanese-short-batch15-20260628.json";
-const SOURCE = "manual:high-source-batch16-20260628";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_RISK = 'logs/product-published-risk-after-japanese-short-batch15-20260628.json';
+const SOURCE = 'manual:high-source-batch16-20260628';
 const MAX_LINKS_PER_SENSE = 5;
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const riskPath = path.resolve(args.risk || DEFAULT_RISK);
-const apply = args.apply === "true";
+const apply = args.apply === 'true';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!fs.existsSync(riskPath)) throw new Error(`Risk audit not found: ${riskPath}`);
 
-const risk = JSON.parse(fs.readFileSync(riskPath, "utf8"));
+const risk = JSON.parse(fs.readFileSync(riskPath, 'utf8'));
 const riskSenseIds = (risk.flagged_senses || [])
-  .filter((item) => item.issues?.includes("high_source_count_broad_sense"))
+  .filter((item) => item.issues?.includes('high_source_count_broad_sense'))
   .map((item) => Number(item.sense_id))
   .filter((id) => Number.isInteger(id));
 
@@ -26,8 +26,8 @@ if (riskSenseIds.length !== 51) {
 }
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const getSense = db.prepare(`
   SELECT ps.id, ps.part_of_speech, ps.gloss_key, pe.headword
@@ -68,7 +68,7 @@ const markSource = db.prepare(`
   WHERE product_sense_id = ?
     AND needs_review = 0
 `);
-const deleteLink = db.prepare("DELETE FROM product_sense_source_links WHERE id = ?");
+const deleteLink = db.prepare('DELETE FROM product_sense_source_links WHERE id = ?');
 
 const repairs = riskSenseIds.map((senseId) => buildRepair(senseId));
 const stats = {
@@ -108,16 +108,16 @@ function buildRepair(senseId) {
   if (!sense) throw new Error(`Missing product_sense ${senseId}`);
 
   const localizations = getLocalizations.all(senseId);
-  if (localizations.length !== 4) throw new Error(`Expected 4 localizations for sense ${senseId}, got ${localizations.length}`);
+  if (localizations.length !== 4)
+    throw new Error(`Expected 4 localizations for sense ${senseId}, got ${localizations.length}`);
 
   const locMap = Object.fromEntries(localizations.map((loc) => [loc.lang, loc]));
   const gloss = cleanGloss(locMap.en?.definition || locMap.en?.term || sense.gloss_key || sense.headword);
   const partOfSpeech = inferPartOfSpeech(sense.part_of_speech, gloss);
 
-  const keepTokens = new Set([
-    sense.headword,
-    ...localizations.map((loc) => loc.term)
-  ].map(normalizeToken).filter(Boolean));
+  const keepTokens = new Set(
+    [sense.headword, ...localizations.map((loc) => loc.term)].map(normalizeToken).filter(Boolean)
+  );
 
   const links = getLinks.all(senseId);
   const ranked = links
@@ -125,11 +125,12 @@ function buildRepair(senseId) {
       ...link,
       score: scoreLink(link, keepTokens)
     }))
-    .sort((a, b) =>
-      b.score - a.score ||
-      Number(a.source_frequency_rank == null) - Number(b.source_frequency_rank == null) ||
-      Number(a.source_frequency_rank || 999999) - Number(b.source_frequency_rank || 999999) ||
-      a.id - b.id
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        Number(a.source_frequency_rank == null) - Number(b.source_frequency_rank == null) ||
+        Number(a.source_frequency_rank || 999999) - Number(b.source_frequency_rank || 999999) ||
+        a.id - b.id
     );
 
   const keep = ranked.slice(0, Math.min(MAX_LINKS_PER_SENSE, ranked.length));
@@ -152,26 +153,26 @@ function scoreLink(link, keepTokens) {
   const token = normalizeToken(link.source_word);
   let score = 0;
   if (keepTokens.has(token)) score += 100;
-  if (link.match_method === "source_headword_fallback") score += 20;
-  if (link.match_method === "gloss_to_top_english_headword") score += 10;
+  if (link.match_method === 'source_headword_fallback') score += 20;
+  if (link.match_method === 'gloss_to_top_english_headword') score += 10;
   score += Math.max(0, Math.min(10, Number(link.confidence || 0) * 10));
   if (link.source_frequency_rank != null) score += Math.max(0, 10 - Math.log10(Number(link.source_frequency_rank) + 1));
   return score;
 }
 
 function cleanGloss(value) {
-  let text = String(value || "")
-    .replace(/\\n|\r|\n/gu, " ")
-    .replace(/\b(?:n|v|a|adj|adv|pron|prep|conj|interj|imp|s|r)\.\s*/giu, "")
-    .replace(/\s*;\s*/gu, ", ")
-    .replace(/\s+/gu, " ")
+  let text = String(value || '')
+    .replace(/\\n|\r|\n/gu, ' ')
+    .replace(/\b(?:n|v|a|adj|adv|pron|prep|conj|interj|imp|s|r)\.\s*/giu, '')
+    .replace(/\s*;\s*/gu, ', ')
+    .replace(/\s+/gu, ' ')
     .trim();
   text = text
-    .replace(/,\s*,+/gu, ", ")
-    .replace(/^[,.\s]+/u, "")
-    .replace(/\s+([,.;:!?])/gu, "$1")
+    .replace(/,\s*,+/gu, ', ')
+    .replace(/^[,.\s]+/u, '')
+    .replace(/\s+([,.;:!?])/gu, '$1')
     .trim();
-  if (!text) return "dictionary sense";
+  if (!text) return 'dictionary sense';
   if (text.length > 180) text = `${text.slice(0, 177).trimEnd()}...`;
   return text;
 }
@@ -179,30 +180,32 @@ function cleanGloss(value) {
 function inferPartOfSpeech(current, gloss) {
   const cleaned = cleanPartOfSpeech(current);
   if (cleaned) return cleaned;
-  const lower = String(gloss || "").toLowerCase();
-  if (/^to\b/u.test(lower)) return "verb";
-  if (/\bpronoun\b/u.test(lower)) return "pronoun";
-  if (/\badverb\b/u.test(lower)) return "adverb";
-  if (/\badjective\b/u.test(lower)) return "adjective";
-  return "noun";
+  const lower = String(gloss || '').toLowerCase();
+  if (/^to\b/u.test(lower)) return 'verb';
+  if (/\bpronoun\b/u.test(lower)) return 'pronoun';
+  if (/\badverb\b/u.test(lower)) return 'adverb';
+  if (/\badjective\b/u.test(lower)) return 'adjective';
+  return 'noun';
 }
 
 function cleanPartOfSpeech(value) {
-  return String(value || "")
-    .replace(/[&;]/gu, "")
+  return String(value || '')
+    .replace(/[&;]/gu, '')
     .trim();
 }
 
 function normalizeToken(value) {
-  return String(value || "")
+  return String(value || '')
     .toLowerCase()
-    .normalize("NFKC")
-    .replace(/\s+/gu, " ")
+    .normalize('NFKC')
+    .replace(/\s+/gu, ' ')
     .trim();
 }
 
 function abbreviate(value, maxLength) {
-  const text = String(value || "").replace(/\s+/gu, " ").trim();
+  const text = String(value || '')
+    .replace(/\s+/gu, ' ')
+    .trim();
   return text.length <= maxLength ? text : `${text.slice(0, maxLength - 3)}...`;
 }
 
@@ -210,14 +213,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

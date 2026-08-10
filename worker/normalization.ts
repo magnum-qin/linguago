@@ -1,6 +1,6 @@
-import { pinyin } from "pinyin-pro";
+import { pinyin } from 'pinyin-pro';
 
-import { DEFAULT_MODELS } from "./config";
+import { DEFAULT_MODELS } from './config';
 import type {
   DisplayLanguageCode,
   LanguageCode,
@@ -12,7 +12,7 @@ import type {
   WordDetail,
   WordExample,
   WordSense
-} from "./types";
+} from './types';
 
 export function normalizeResponse(input: {
   translated: Record<string, unknown>;
@@ -22,28 +22,32 @@ export function normalizeResponse(input: {
   model: string;
 }): TranslateResponse {
   const type = input.translated.type
-    ? (input.translated.type === "word" ? "word" : "sentence")
-    : (isLikelyLexicalInput(input.text) ? "word" : "sentence");
+    ? input.translated.type === 'word'
+      ? 'word'
+      : 'sentence'
+    : isLikelyLexicalInput(input.text)
+      ? 'word'
+      : 'sentence';
   const translations = normalizeLocalizedTranslations(input.translated.translations);
   const targetTranslation = translations[input.targetLang]?.text;
   const base = {
-    detected_source_lang: String(input.translated.detected_source_lang ?? "auto"),
+    detected_source_lang: String(input.translated.detected_source_lang ?? 'auto'),
     target_lang: input.targetLang,
     original: input.text,
-    translation: String(input.translated.translation ?? targetTranslation ?? ""),
+    translation: String(input.translated.translation ?? targetTranslation ?? ''),
     translations,
     provider: input.provider,
     model: input.model,
     cached: false
   };
 
-  if (type === "word") {
+  if (type === 'word') {
     const wordDetails = normalizeWordDetails(input.translated.word_details, translations, input.translated);
     const senses = normalizeWordSenses(input.translated.senses, translations, wordDetails);
     return {
       ...base,
       type,
-      phonetic: "",
+      phonetic: '',
       audio_text: input.text,
       examples: normalizeExamples(input.translated.examples),
       word_details: wordDetails,
@@ -67,31 +71,29 @@ export function normalizePreviewResponse(input: {
   model: string;
 }): SentenceResponse {
   const translation =
-    normalizeStringOrText(input.translated.translation) ||
-    normalizeStringOrText(input.translated.translations);
+    normalizeStringOrText(input.translated.translation) || normalizeStringOrText(input.translated.translations);
   const explanation =
-    normalizeStringOrText(input.translated.explanation) ||
-    normalizeStringOrText(input.translated.explanations);
+    normalizeStringOrText(input.translated.explanation) || normalizeStringOrText(input.translated.explanations);
 
   return {
-    type: "sentence",
-    detected_source_lang: String(input.translated.detected_source_lang ?? "auto"),
+    type: 'sentence',
+    detected_source_lang: String(input.translated.detected_source_lang ?? 'auto'),
     target_lang: input.targetLang,
     original: input.text,
     translation,
     translations: {
       zh: emptyLocalizedText(),
       en: emptyLocalizedText(),
-      "pt-BR": emptyLocalizedText(),
+      'pt-BR': emptyLocalizedText(),
       ja: emptyLocalizedText(),
       [input.targetLang]: localPronunciationText(input.targetLang, translation)
     },
     explanation,
     explanations: {
-      zh: "",
-      en: "",
-      "pt-BR": "",
-      ja: "",
+      zh: '',
+      en: '',
+      'pt-BR': '',
+      ja: '',
       [input.targetLang]: explanation
     },
     provider: input.provider,
@@ -101,22 +103,18 @@ export function normalizePreviewResponse(input: {
 }
 
 export function emptyLocalizedText(): LocalizedText {
-  return { text: "", phonetic: "", audio_text: "" };
+  return { text: '', phonetic: '', audio_text: '' };
 }
 
-function selectTargetExplanation(
-  translated: Record<string, unknown>,
-  targetLang: LanguageCode
-): string {
+function selectTargetExplanation(translated: Record<string, unknown>, targetLang: LanguageCode): string {
   const explanations = normalizeSentenceExplanations(translated, targetLang);
   if (explanations[targetLang]) {
     return explanations[targetLang];
   }
 
   const fallback =
-    normalizeStringOrText(translated.explanation) ||
-    normalizeStringOrText(translated.sentence_explanation);
-  return isUsableExplanation(targetLang, fallback) ? fallback : "";
+    normalizeStringOrText(translated.explanation) || normalizeStringOrText(translated.sentence_explanation);
+  return isUsableExplanation(targetLang, fallback) ? fallback : '';
 }
 
 function normalizeSentenceExplanations(
@@ -129,35 +127,34 @@ function normalizeSentenceExplanations(
     translated.localized_explanations
   ];
   const normalized = {
-    zh: "",
-    en: "",
-    "pt-BR": "",
-    ja: ""
+    zh: '',
+    en: '',
+    'pt-BR': '',
+    ja: ''
   };
 
   for (const source of explanationSources) {
-    if (!source || typeof source !== "object") continue;
+    if (!source || typeof source !== 'object') continue;
     const items = source as Record<string, unknown>;
     normalized.zh ||= normalizeStringOrText(items.zh);
     normalized.en ||= normalizeStringOrText(items.en);
-    normalized["pt-BR"] ||= normalizeStringOrText(items["pt-BR"]);
+    normalized['pt-BR'] ||= normalizeStringOrText(items['pt-BR']);
     normalized.ja ||= normalizeStringOrText(items.ja);
   }
 
   const fallback =
-    normalizeStringOrText(translated.explanation) ||
-    normalizeStringOrText(translated.sentence_explanation);
+    normalizeStringOrText(translated.explanation) || normalizeStringOrText(translated.sentence_explanation);
   if (fallback) {
     normalized[targetLang] ||= fallback;
   }
 
   return {
-    zh: isUsableExplanation("zh", normalized.zh) ? normalized.zh : fallbackExplanation("zh", translated),
-    en: isUsableExplanation("en", normalized.en) ? normalized.en : fallbackExplanation("en", translated),
-    "pt-BR": isUsableExplanation("pt-BR", normalized["pt-BR"])
-      ? normalized["pt-BR"]
-      : fallbackExplanation("pt-BR", translated),
-    ja: isUsableExplanation("ja", normalized.ja) ? normalized.ja : fallbackExplanation("ja", translated)
+    zh: isUsableExplanation('zh', normalized.zh) ? normalized.zh : fallbackExplanation('zh', translated),
+    en: isUsableExplanation('en', normalized.en) ? normalized.en : fallbackExplanation('en', translated),
+    'pt-BR': isUsableExplanation('pt-BR', normalized['pt-BR'])
+      ? normalized['pt-BR']
+      : fallbackExplanation('pt-BR', translated),
+    ja: isUsableExplanation('ja', normalized.ja) ? normalized.ja : fallbackExplanation('ja', translated)
   };
 }
 
@@ -169,32 +166,32 @@ function isPlaceholderExplanation(text: string): boolean {
   const value = text.trim().toLocaleLowerCase();
   if (!value) return false;
   return [
-    "english explanation of meaning",
-    "meaning, tone, and usage",
-    "real english explanation for this exact sentence",
-    "real simplified chinese explanation",
-    "real brazilian portuguese explanation",
-    "real japanese explanation",
-    "a concise explanation in the requested target language",
-    "explicação em português do brasil sobre significado",
-    "explicacao em portugues do brasil sobre significado",
-    "简体中文解释含义",
-    "解释含义、语气和用法",
-    "不要使用日语假名"
+    'english explanation of meaning',
+    'meaning, tone, and usage',
+    'real english explanation for this exact sentence',
+    'real simplified chinese explanation',
+    'real brazilian portuguese explanation',
+    'real japanese explanation',
+    'a concise explanation in the requested target language',
+    'explicação em português do brasil sobre significado',
+    'explicacao em portugues do brasil sobre significado',
+    '简体中文解释含义',
+    '解释含义、语气和用法',
+    '不要使用日语假名'
   ].some((placeholder) => value.includes(placeholder));
 }
 
 function fallbackExplanation(lang: LanguageCode, translated: Record<string, unknown>): string {
   const translation = normalizeStringOrText(translated.translation);
-  if (!translation) return "";
+  if (!translation) return '';
 
-  if (lang === "zh") {
+  if (lang === 'zh') {
     return `这句话的意思是：${translation}`;
   }
-  if (lang === "ja") {
+  if (lang === 'ja') {
     return `この文の意味は「${translation}」です。`;
   }
-  if (lang === "pt-BR") {
+  if (lang === 'pt-BR') {
     return `A frase significa: ${translation}`;
   }
   return `The sentence means: ${translation}`;
@@ -204,11 +201,11 @@ function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolea
   const value = text.trim();
   if (!value) return true;
 
-  if (lang === "zh") {
+  if (lang === 'zh') {
     return /[\u4e00-\u9fff]/u.test(value) && !/[\u3040-\u30ff]/u.test(value);
   }
 
-  if (lang === "ja") {
+  if (lang === 'ja') {
     return /[\u3040-\u30ff]/u.test(value);
   }
 
@@ -216,7 +213,7 @@ function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolea
 }
 
 export function normalizeText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 export function isLikelyLexicalInput(text: string): boolean {
@@ -236,26 +233,21 @@ export function isLikelyLexicalInput(text: string): boolean {
 }
 
 export function normalizeTargetLang(target?: string): LanguageCode {
-  if (target === "en" || target === "zh" || target === "pt-BR" || target === "ja") {
+  if (target === 'en' || target === 'zh' || target === 'pt-BR' || target === 'ja') {
     return target;
   }
-  return "zh";
+  return 'zh';
 }
 
 export function normalizeProvider(provider?: string): Provider {
-  if (
-    provider === "openrouter" ||
-    provider === "dashscope" ||
-    provider === "gemini" ||
-    provider === "deepseek"
-  ) {
+  if (provider === 'cloudflare' || provider === 'dashscope' || provider === 'gemini' || provider === 'deepseek') {
     return provider;
   }
-  return "auto";
+  return 'auto';
 }
 
 export function normalizeModel(model: unknown, provider: Provider): string {
-  const normalized = String(model ?? "").trim();
+  const normalized = String(model ?? '').trim();
   return normalized || DEFAULT_MODELS[provider] || DEFAULT_MODELS.auto;
 }
 
@@ -265,10 +257,9 @@ export function normalizeExamples(value: unknown): WordExample[] {
   }
 
   return value.slice(0, 3).map((item) => {
-    const example =
-      item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const example = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
     return {
-      sentence: String(example.sentence ?? ""),
+      sentence: String(example.sentence ?? ''),
       translations: normalizeExampleTranslations(example.translations),
       localizations: normalizeExampleLocalizations(example.translations)
     };
@@ -276,38 +267,33 @@ export function normalizeExamples(value: unknown): WordExample[] {
 }
 
 function normalizeExampleTranslations(value: unknown): Record<LanguageCode, string> {
-  const translations =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const translations = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
   return {
     zh: normalizeStringOrText(translations.zh),
     en: normalizeStringOrText(translations.en),
-    "pt-BR": normalizeStringOrText(translations["pt-BR"]),
+    'pt-BR': normalizeStringOrText(translations['pt-BR']),
     ja: normalizeStringOrText(translations.ja)
   };
 }
 
-function normalizeLocalizedTranslations(
-  value: unknown
-): Record<DisplayLanguageCode, LocalizedText> {
-  const translations =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+function normalizeLocalizedTranslations(value: unknown): Record<DisplayLanguageCode, LocalizedText> {
+  const translations = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
   return {
-    zh: normalizeLocalizedText(translations.zh, "zh"),
-    en: normalizeLocalizedText(translations.en, "en"),
-    "pt-BR": normalizeLocalizedText(translations["pt-BR"], "pt-BR"),
-    ja: normalizeLocalizedText(translations.ja, "ja")
+    zh: normalizeLocalizedText(translations.zh, 'zh'),
+    en: normalizeLocalizedText(translations.en, 'en'),
+    'pt-BR': normalizeLocalizedText(translations['pt-BR'], 'pt-BR'),
+    ja: normalizeLocalizedText(translations.ja, 'ja')
   };
 }
 
 function normalizeLocalizedText(value: unknown, lang: DisplayLanguageCode): LocalizedText {
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return localPronunciationText(lang, value);
   }
 
-  const item =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const item = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const text = normalizeStringOrText(item.text);
   const generated = localPronunciationText(lang, text);
   const phonetic =
@@ -333,15 +319,19 @@ function normalizeWordSenses(
     .slice(0, 8)
     .map((sense, index) => {
       const definitionsValue =
-        sense.definitions && typeof sense.definitions === "object"
+        sense.definitions && typeof sense.definitions === 'object'
           ? (sense.definitions as Record<string, unknown>)
           : {};
       const senseOrder = Number(sense.sense_order || index + 1);
       const definitions = {
-        zh: cleanWordDefinition("zh", translations.zh.text, normalizeStringOrText(definitionsValue.zh)),
-        en: cleanWordDefinition("en", translations.en.text, normalizeStringOrText(definitionsValue.en)),
-        "pt-BR": cleanWordDefinition("pt-BR", translations["pt-BR"].text, normalizeStringOrText(definitionsValue["pt-BR"])),
-        ja: cleanWordDefinition("ja", translations.ja.text, normalizeStringOrText(definitionsValue.ja))
+        zh: cleanWordDefinition('zh', translations.zh.text, normalizeStringOrText(definitionsValue.zh)),
+        en: cleanWordDefinition('en', translations.en.text, normalizeStringOrText(definitionsValue.en)),
+        'pt-BR': cleanWordDefinition(
+          'pt-BR',
+          translations['pt-BR'].text,
+          normalizeStringOrText(definitionsValue['pt-BR'])
+        ),
+        ja: cleanWordDefinition('ja', translations.ja.text, normalizeStringOrText(definitionsValue.ja))
       };
 
       return {
@@ -359,14 +349,14 @@ function normalizeWordSenses(
   const fallbackDefinitions = {
     zh: wordDetails.zh.definition,
     en: wordDetails.en.definition,
-    "pt-BR": wordDetails["pt-BR"].definition,
+    'pt-BR': wordDetails['pt-BR'].definition,
     ja: wordDetails.ja.definition
   };
 
   return [
     {
       sense_order: 1,
-      part_of_speech: "",
+      part_of_speech: '',
       gloss_key: fallbackDefinitions.en || translations.en.text,
       definitions: fallbackDefinitions,
       localizations: senseLocalizationsFromDefinitions(translations, fallbackDefinitions)
@@ -377,90 +367,90 @@ function normalizeWordSenses(
 function senseLocalizationsFromDefinitions(
   translations: Record<DisplayLanguageCode, LocalizedText>,
   definitions: Record<DisplayLanguageCode, string>
-): NonNullable<WordSense["localizations"]> {
+): NonNullable<WordSense['localizations']> {
   return {
     zh: {
       term: translations.zh.text,
-      reading: "",
-      reading_system: "",
+      reading: '',
+      reading_system: '',
       pronunciation: translations.zh.phonetic,
-      pronunciation_system: "",
+      pronunciation_system: '',
       definition: definitions.zh,
-      usage_note: ""
+      usage_note: ''
     },
     en: {
       term: translations.en.text,
-      reading: "",
-      reading_system: "",
+      reading: '',
+      reading_system: '',
       pronunciation: translations.en.phonetic,
-      pronunciation_system: "",
+      pronunciation_system: '',
       definition: definitions.en,
-      usage_note: ""
+      usage_note: ''
     },
-    "pt-BR": {
-      term: translations["pt-BR"].text,
-      reading: "",
-      reading_system: "",
-      pronunciation: translations["pt-BR"].phonetic,
-      pronunciation_system: "",
-      definition: definitions["pt-BR"],
-      usage_note: ""
+    'pt-BR': {
+      term: translations['pt-BR'].text,
+      reading: '',
+      reading_system: '',
+      pronunciation: translations['pt-BR'].phonetic,
+      pronunciation_system: '',
+      definition: definitions['pt-BR'],
+      usage_note: ''
     },
     ja: {
       term: translations.ja.text,
-      reading: "",
-      reading_system: "",
+      reading: '',
+      reading_system: '',
       pronunciation: translations.ja.phonetic,
-      pronunciation_system: "",
+      pronunciation_system: '',
       definition: definitions.ja,
-      usage_note: ""
+      usage_note: ''
     }
   };
 }
 
-function normalizeExampleLocalizations(value: unknown): NonNullable<WordExample["localizations"]> {
+function normalizeExampleLocalizations(value: unknown): NonNullable<WordExample['localizations']> {
   const translations = normalizeExampleTranslations(value);
   return {
-    zh: { text: translations.zh, reading: "" },
-    en: { text: translations.en, reading: "" },
-    "pt-BR": { text: translations["pt-BR"], reading: "" },
-    ja: { text: translations.ja, reading: "" }
+    zh: { text: translations.zh, reading: '' },
+    en: { text: translations.en, reading: '' },
+    'pt-BR': { text: translations['pt-BR'], reading: '' },
+    ja: { text: translations.ja, reading: '' }
   };
 }
 
 export function stripPronunciationBrackets(text: string): string {
-  return text.replace(/\{([^|{}]+)\|([^|{}]+)\}/g, "$1");
+  return text.replace(/\{([^|{}]+)\|([^|{}]+)\}/g, '$1');
 }
 
 export function localPronunciationText(lang: DisplayLanguageCode, text: string): LocalizedText {
   const normalized = normalizeText(text);
-  const cleanText = (lang === "ja" || lang === "en") ? stripPronunciationBrackets(normalized) : normalized;
-  
-  if (lang === "zh" && /[\u4e00-\u9fff]/u.test(cleanText)) {
+  const cleanText = lang === 'ja' || lang === 'en' ? stripPronunciationBrackets(normalized) : normalized;
+
+  if (lang === 'zh' && /[\u4e00-\u9fff]/u.test(cleanText)) {
     return {
       text: applyInlinePinyin(cleanText),
-      phonetic: "", // Clear badge, since we are using inline pinyin
+      phonetic: '', // Clear badge, since we are using inline pinyin
       audio_text: cleanText
     };
   }
 
   return {
     text: normalized,
-    phonetic: "",
+    phonetic: '',
     audio_text: cleanText
   };
 }
 
 function applyInlinePinyin(text: string): string {
-  if (!text) return "";
+  if (!text) return '';
   try {
     const pinyins = pinyin(text, {
-      type: "array",
-      toneType: "symbol",
-      nonZh: "removed"
+      type: 'array',
+      toneType: 'symbol',
+      nonZh: 'removed'
     });
-    
-    let result = "";
+
+    let result = '';
     let pinyinIdx = 0;
     for (const char of text) {
       if (/[\u4e00-\u9fff]/.test(char)) {
@@ -482,14 +472,13 @@ function normalizeWordDetails(
   translations: Record<DisplayLanguageCode, LocalizedText>,
   translated: Record<string, unknown>
 ): Record<DisplayLanguageCode, WordDetail> {
-  const details =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const details = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
   return {
-    zh: normalizeWordDetail(details.zh, "zh", translations.zh.text, translated),
-    en: normalizeWordDetail(details.en, "en", translations.en.text, translated),
-    "pt-BR": normalizeWordDetail(details["pt-BR"], "pt-BR", translations["pt-BR"].text, translated),
-    ja: normalizeWordDetail(details.ja, "ja", translations.ja.text, translated)
+    zh: normalizeWordDetail(details.zh, 'zh', translations.zh.text, translated),
+    en: normalizeWordDetail(details.en, 'en', translations.en.text, translated),
+    'pt-BR': normalizeWordDetail(details['pt-BR'], 'pt-BR', translations['pt-BR'].text, translated),
+    ja: normalizeWordDetail(details.ja, 'ja', translations.ja.text, translated)
   };
 }
 
@@ -499,8 +488,7 @@ function normalizeWordDetail(
   fallbackWord: string,
   translated: Record<string, unknown>
 ): WordDetail {
-  const detail =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const detail = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const word = normalizeStringOrText(detail.word) || fallbackWord;
   const fallbackDefinition = wordDefinitionFallback(lang, translated);
 
@@ -510,37 +498,30 @@ function normalizeWordDetail(
   };
 }
 
-function wordDefinitionFallback(
-  lang: DisplayLanguageCode,
-  translated: Record<string, unknown>
-): string {
+function wordDefinitionFallback(lang: DisplayLanguageCode, translated: Record<string, unknown>): string {
   const explanations = normalizeSentenceExplanations(translated, lang);
   return explanations[lang] || normalizeStringOrText(translated.explanation);
 }
 
-function cleanWordDefinition(
-  lang: DisplayLanguageCode,
-  word: string,
-  definition: string
-): string {
+function cleanWordDefinition(lang: DisplayLanguageCode, word: string, definition: string): string {
   let value = normalizeText(definition)
-    .replace(/^[-*•]\s*/u, "")
-    .replace(/\s+[-–—]\s*$/u, "")
+    .replace(/^[-*•]\s*/u, '')
+    .replace(/\s+[-–—]\s*$/u, '')
     .trim();
 
-  if (!value) return "";
+  if (!value) return '';
 
-  const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   if (escapedWord) {
     value = value
-      .replace(new RegExp(`^${escapedWord}\\s*(?:\\([^)]*\\))?\\s*[-–—:：]\\s*`, "iu"), "")
-      .replace(new RegExp(`^${escapedWord}\\s*(?:\\([^)]*\\))?\\s*`, "iu"), "");
+      .replace(new RegExp(`^${escapedWord}\\s*(?:\\([^)]*\\))?\\s*[-–—:：]\\s*`, 'iu'), '')
+      .replace(new RegExp(`^${escapedWord}\\s*(?:\\([^)]*\\))?\\s*`, 'iu'), '');
   }
 
   const crossLanguageMarkers: Record<DisplayLanguageCode, RegExp> = {
     zh: /(?:在(?:中文|英语|英文|日语|葡萄牙语)|对应|英语中|日语中|葡语中|Portuguese|English|Japanese|ダイエット|lose weight|perder peso)/iu,
     en: /(?:in Chinese|in Japanese|in Portuguese|corresponds to|equivalent to|中文|日语|葡萄牙语)/iu,
-    "pt-BR": /(?:em chin[eê]s|em japon[eê]s|em ingl[eê]s|equivale a|corresponde a|中文|日语|英语)/iu,
+    'pt-BR': /(?:em chin[eê]s|em japon[eê]s|em ingl[eê]s|equivale a|corresponde a|中文|日语|英语)/iu,
     ja: /(?:中国語では|英語では|ポルトガル語では|対応|equivalent|中文|英语|葡萄牙语)/iu
   };
   const marker = value.search(crossLanguageMarkers[lang]);
@@ -548,23 +529,23 @@ function cleanWordDefinition(
     value = value.slice(0, marker).trim();
   }
 
-  value = value.replace(/\s+[-–—]\s*$/u, "").trim();
-  const sentenceLimit = lang === "zh" || lang === "ja" ? 2 : 1;
+  value = value.replace(/\s+[-–—]\s*$/u, '').trim();
+  const sentenceLimit = lang === 'zh' || lang === 'ja' ? 2 : 1;
   return limitSentences(value, sentenceLimit) || value;
 }
 
 function limitSentences(text: string, maxSentences: number): string {
   const matches = text.match(/[^。.!！？!?]+[。.!！？!?]?/gu) || [];
-  return matches.slice(0, maxSentences).join("").trim();
+  return matches.slice(0, maxSentences).join('').trim();
 }
 
 export function normalizeStringOrText(value: unknown): string {
   if (value == null) {
-    return "";
+    return '';
   }
-  if (typeof value === "object") {
+  if (typeof value === 'object') {
     const item = value as Record<string, unknown>;
-    return String(item.text ?? item.translation ?? "");
+    return String(item.text ?? item.translation ?? '');
   }
   return String(value);
 }

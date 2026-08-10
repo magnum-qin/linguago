@@ -78,21 +78,21 @@ function escapeSql(str) {
 for (const table of tables) {
   const rows = db.prepare(`SELECT * FROM ${table}`).iterate();
   let cols;
-  
+
   for (const row of rows) {
     if (!cols) {
       cols = Object.keys(row);
     }
-    
-    const values = cols.map(c => escapeSql(row[c])).join(', ');
+
+    const values = cols.map((c) => escapeSql(row[c])).join(', ');
     const sql = `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values});\n`;
-    
+
     fileStream.write(sql);
     currentLine++;
-    
+
     if (currentLine >= MAX_LINES_PER_CHUNK) {
       fileStream.end();
-      
+
       currentChunk++;
       currentLine = 0;
       fileStream = createChunkStream(currentChunk);

@@ -5,7 +5,7 @@ const dbPath = 'data/processed/linguago_d1_ready.db';
 const db = new Database(dbPath, { readonly: true });
 
 const idsRow = db.prepare('SELECT id FROM entries ORDER BY RANDOM() LIMIT 100;').all();
-const ids = idsRow.map(r => r.id);
+const ids = idsRow.map((r) => r.id);
 
 const sql = `
 SELECT json_object(
@@ -51,21 +51,21 @@ markdown += `> [!NOTE]\n> 这是从 D1 规范化数据库中通过 \`JSON_GROUP_
 rows.forEach((row, idx) => {
   const entry = JSON.parse(row.data);
   markdown += `### ${idx + 1}. **${entry.word}** (${entry.source_lang})\n\n`;
-  
+
   if (entry.senses && entry.senses.length > 0) {
     markdown += `**义项 (Senses):**\n`;
-    entry.senses.forEach(sense => {
+    entry.senses.forEach((sense) => {
       const pos = sense.part_of_speech ? `[${sense.part_of_speech}]` : '';
       const gloss = sense.gloss_key ? `*${sense.gloss_key}*` : '';
       markdown += `- **${sense.sense_order}**. ${pos} ${gloss}\n`;
-      
+
       const defs = sense.definitions || {};
       const defStrings = [];
       if (defs.zh) defStrings.push(`🇨🇳 ${defs.zh}`);
       if (defs.ja) defStrings.push(`🇯🇵 ${defs.ja}`);
       if (defs['pt-BR']) defStrings.push(`🇧🇷 ${defs['pt-BR']}`);
       if (defs.en) defStrings.push(`🇬🇧 ${defs.en}`);
-      
+
       if (defStrings.length > 0) {
         markdown += `  - 释义: ${defStrings.join(' | ')}\n`;
       }
@@ -76,7 +76,7 @@ rows.forEach((row, idx) => {
 
   if (entry.examples && entry.examples.length > 0) {
     markdown += `\n**例句 (Examples):**\n`;
-    entry.examples.forEach(ex => {
+    entry.examples.forEach((ex) => {
       markdown += `- ${ex.sentence}\n`;
       const trans = ex.translations || {};
       const trStrings = [];
@@ -88,7 +88,7 @@ rows.forEach((row, idx) => {
       }
     });
   }
-  
+
   markdown += `\n---\n\n`;
 });
 

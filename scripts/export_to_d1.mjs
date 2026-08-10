@@ -48,9 +48,13 @@ dbOut.exec(`
 `);
 
 const insertEntry = dbOut.prepare('INSERT OR IGNORE INTO entries (word, source_lang) VALUES (?, ?)');
-const insertSense = dbOut.prepare('INSERT INTO senses (entry_id, sense_order, pos, gloss, pronunciation) VALUES (?, ?, ?, ?, ?)');
+const insertSense = dbOut.prepare(
+  'INSERT INTO senses (entry_id, sense_order, pos, gloss, pronunciation) VALUES (?, ?, ?, ?, ?)'
+);
 const insertDef = dbOut.prepare('INSERT INTO definitions (sense_id, lang, translation) VALUES (?, ?, ?)');
-const insertEx = dbOut.prepare('INSERT INTO examples (sense_id, source_sentence, translation_zh, translation_en, translation_ja, translation_pt) VALUES (?, ?, ?, ?, ?, ?)');
+const insertEx = dbOut.prepare(
+  'INSERT INTO examples (sense_id, source_sentence, translation_zh, translation_en, translation_ja, translation_pt) VALUES (?, ?, ?, ?, ?, ?)'
+);
 
 // ─── Helpers ───
 function isChinese(word) {
@@ -77,14 +81,19 @@ let noPronCount = 0;
 // Track multi-pronunciation entries for later LLM processing
 const multiPronEntries = [];
 
-console.log("Starting export pipeline with sense-level pronunciation...");
+console.log('Starting export pipeline with sense-level pronunciation...');
 dbOut.exec('BEGIN TRANSACTION');
 
 const rows = dbIn.prepare('SELECT word, data FROM dictionary').iterate();
 
 for (const row of rows) {
   let parsed;
-  try { parsed = JSON.parse(row.data); } catch { skippedCount++; continue; }
+  try {
+    parsed = JSON.parse(row.data);
+  } catch {
+    skippedCount++;
+    continue;
+  }
 
   const enTrans = parsed.translations?.en;
   if (!enTrans || !Array.isArray(enTrans) || enTrans.length === 0) {
@@ -99,12 +108,14 @@ for (const row of rows) {
     const result = insertEntry.run(row.word, sourceLang);
     entryId = result.lastInsertRowid;
     if (result.changes === 0) continue; // duplicate
-  } catch { continue; }
+  } catch {
+    continue;
+  }
 
   // ─── Determine pronunciation strategy ───
   const sounds = parsed.sounds || [];
   const senses = enTrans.slice(0, 15);
-  
+
   let pronunciationStrategy; // 'single' | 'pinyin-pro' | 'multi' | 'none'
   let singlePron = null;
   let pinyinProPron = null;
@@ -135,7 +146,7 @@ for (const row of rows) {
     multiPronEntries.push({
       entryId,
       word: row.word,
-      sounds: sounds.map(s => s.value),
+      sounds: sounds.map((s) => s.value),
       senses: senses.map((s, i) => ({ sense_order: i + 1, gloss: s.gloss || '' }))
     });
   } else {
@@ -159,7 +170,7 @@ for (const row of rows) {
 
     // Definitions
     if (enSense.word) insertDef.run(senseId, 'en', enSense.word);
-    ['zh', 'ja', 'pt'].forEach(lang => {
+    ['zh', 'ja', 'pt'].forEach((lang) => {
       const transArr = parsed.translations[lang];
       if (transArr && Array.isArray(transArr) && transArr[index] && transArr[index].word) {
         const dbLang = lang === 'pt' ? 'pt-BR' : lang;
@@ -169,8 +180,8 @@ for (const row of rows) {
 
     // Examples
     const examples = enSense.examples || [];
-    examples.slice(0, 5).forEach(ex => {
-      const sourceSentence = ex.text || ex.en || ex.source_sentence || "";
+    examples.slice(0, 5).forEach((ex) => {
+      const sourceSentence = ex.text || ex.en || ex.source_sentence || '';
       if (sourceSentence) {
         insertEx.run(
           senseId,

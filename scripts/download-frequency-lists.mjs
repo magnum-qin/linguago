@@ -1,73 +1,73 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
-const RAW_DIR = path.resolve("data/raw/frequency");
-const MANIFEST_FILE = path.join(RAW_DIR, "manifest.json");
+const RAW_DIR = path.resolve('data/raw/frequency');
+const MANIFEST_FILE = path.join(RAW_DIR, 'manifest.json');
 
 const sources = [
   {
-    id: "frequencywords-en",
-    lang: "en",
-    url: "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/en/en_50k.txt",
-    file: "frequencywords-en_50k.txt",
-    homepage: "https://github.com/hermitdave/FrequencyWords",
-    license: "Verify upstream repository license before redistribution"
+    id: 'frequencywords-en',
+    lang: 'en',
+    url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/en/en_50k.txt',
+    file: 'frequencywords-en_50k.txt',
+    homepage: 'https://github.com/hermitdave/FrequencyWords',
+    license: 'Verify upstream repository license before redistribution'
   },
   {
-    id: "frequencywords-zh",
-    lang: "zh",
-    url: "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/zh/zh_50k.txt",
-    file: "frequencywords-zh_50k.txt",
-    homepage: "https://github.com/hermitdave/FrequencyWords",
-    license: "Verify upstream repository license before redistribution"
+    id: 'frequencywords-zh',
+    lang: 'zh',
+    url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/zh/zh_50k.txt',
+    file: 'frequencywords-zh_50k.txt',
+    homepage: 'https://github.com/hermitdave/FrequencyWords',
+    license: 'Verify upstream repository license before redistribution'
   },
   {
-    id: "frequencywords-ja",
-    lang: "ja",
-    url: "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/ja/ja_50k.txt",
-    file: "frequencywords-ja_50k.txt",
-    homepage: "https://github.com/hermitdave/FrequencyWords",
-    license: "Verify upstream repository license before redistribution"
+    id: 'frequencywords-ja',
+    lang: 'ja',
+    url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/ja/ja_50k.txt',
+    file: 'frequencywords-ja_50k.txt',
+    homepage: 'https://github.com/hermitdave/FrequencyWords',
+    license: 'Verify upstream repository license before redistribution'
   },
   {
-    id: "frequencywords-pt-br",
-    lang: "pt-BR",
-    url: "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/pt_br/pt_br_50k.txt",
-    file: "frequencywords-pt_br_50k.txt",
-    homepage: "https://github.com/hermitdave/FrequencyWords",
-    license: "Verify upstream repository license before redistribution"
+    id: 'frequencywords-pt-br',
+    lang: 'pt-BR',
+    url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/pt_br/pt_br_50k.txt',
+    file: 'frequencywords-pt_br_50k.txt',
+    homepage: 'https://github.com/hermitdave/FrequencyWords',
+    license: 'Verify upstream repository license before redistribution'
   },
   {
-    id: "wordfreq-en",
-    lang: "en",
-    url: "https://raw.githubusercontent.com/frekwencja/most-common-words-multilingual/main/data/wordfrequency.info/en.txt",
-    file: "wordfrequency-en.txt",
-    homepage: "https://github.com/frekwencja/most-common-words-multilingual",
-    license: "Verify upstream repository license before redistribution"
+    id: 'wordfreq-en',
+    lang: 'en',
+    url: 'https://raw.githubusercontent.com/frekwencja/most-common-words-multilingual/main/data/wordfrequency.info/en.txt',
+    file: 'wordfrequency-en.txt',
+    homepage: 'https://github.com/frekwencja/most-common-words-multilingual',
+    license: 'Verify upstream repository license before redistribution'
   },
   {
-    id: "wordfreq-zh-cn",
-    lang: "zh",
-    url: "https://raw.githubusercontent.com/frekwencja/most-common-words-multilingual/main/data/wordfrequency.info/zh-CN.txt",
-    file: "wordfrequency-zh-CN.txt",
-    homepage: "https://github.com/frekwencja/most-common-words-multilingual",
-    license: "Verify upstream repository license before redistribution"
+    id: 'wordfreq-zh-cn',
+    lang: 'zh',
+    url: 'https://raw.githubusercontent.com/frekwencja/most-common-words-multilingual/main/data/wordfrequency.info/zh-CN.txt',
+    file: 'wordfrequency-zh-CN.txt',
+    homepage: 'https://github.com/frekwencja/most-common-words-multilingual',
+    license: 'Verify upstream repository license before redistribution'
   },
   {
-    id: "wordfreq-ja",
-    lang: "ja",
-    url: "https://raw.githubusercontent.com/frekwencja/most-common-words-multilingual/main/data/wordfrequency.info/ja.txt",
-    file: "wordfrequency-ja.txt",
-    homepage: "https://github.com/frekwencja/most-common-words-multilingual",
-    license: "Verify upstream repository license before redistribution"
+    id: 'wordfreq-ja',
+    lang: 'ja',
+    url: 'https://raw.githubusercontent.com/frekwencja/most-common-words-multilingual/main/data/wordfrequency.info/ja.txt',
+    file: 'wordfrequency-ja.txt',
+    homepage: 'https://github.com/frekwencja/most-common-words-multilingual',
+    license: 'Verify upstream repository license before redistribution'
   },
   {
-    id: "wordfreq-pt",
-    lang: "pt-BR",
-    url: "https://raw.githubusercontent.com/frekwencja/most-common-words-multilingual/main/data/wordfrequency.info/pt.txt",
-    file: "wordfrequency-pt.txt",
-    homepage: "https://github.com/frekwencja/most-common-words-multilingual",
-    license: "Verify upstream repository license before redistribution"
+    id: 'wordfreq-pt',
+    lang: 'pt-BR',
+    url: 'https://raw.githubusercontent.com/frekwencja/most-common-words-multilingual/main/data/wordfrequency.info/pt.txt',
+    file: 'wordfrequency-pt.txt',
+    homepage: 'https://github.com/frekwencja/most-common-words-multilingual',
+    license: 'Verify upstream repository license before redistribution'
   }
 ];
 

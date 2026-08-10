@@ -9,13 +9,13 @@ const __dirname = path.dirname(__filename);
 const RAW_DIR = path.join(__dirname, '../data/raw');
 
 async function analyzeKaikki() {
-  console.log("=== KAIKKI CHINESE (JSONL) ===");
+  console.log('=== KAIKKI CHINESE (JSONL) ===');
   const filePath = path.join(RAW_DIR, 'kaikki_Chinese.jsonl');
   if (!fs.existsSync(filePath)) return;
-  
+
   const fileStream = fs.createReadStream(filePath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
-  
+
   let count = 0;
   for await (const line of rl) {
     if (count > 2) break;
@@ -28,14 +28,14 @@ async function analyzeKaikki() {
 }
 
 async function analyzeCCCedict() {
-  console.log("=== CC-CEDICT (TXT.GZ) ===");
+  console.log('=== CC-CEDICT (TXT.GZ) ===');
   const filePath = path.join(RAW_DIR, 'CC-CEDICT.txt.gz');
   if (!fs.existsSync(filePath)) return;
-  
+
   const fileStream = fs.createReadStream(filePath);
   const gunzip = zlib.createGunzip();
   const rl = readline.createInterface({ input: fileStream.pipe(gunzip), crlfDelay: Infinity });
-  
+
   let count = 0;
   for await (const line of rl) {
     if (line.startsWith('#')) continue; // skip comments

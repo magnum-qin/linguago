@@ -15,27 +15,27 @@
     <script>
       (() => {
         try {
-          const settings = JSON.parse(localStorage.getItem("linguago-settings-v1") || "{}");
+          const settings = JSON.parse(localStorage.getItem('linguago-settings-v1') || '{}');
           const themeSettingsVersion = 2;
           const preference =
             settings.themeSettingsVersion === themeSettingsVersion &&
-            ["light", "dark", "system"].includes(settings.theme)
+            ['light', 'dark', 'system'].includes(settings.theme)
               ? settings.theme
-              : "system";
+              : 'system';
           const resolved =
-            preference === "system" && matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : preference === "dark"
-                ? "dark"
-                : "light";
+            preference === 'system' && matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : preference === 'dark'
+                ? 'dark'
+                : 'light';
           document.documentElement.dataset.theme = resolved;
           document.documentElement.dataset.themePreference = preference;
-          document.documentElement.style.backgroundColor = resolved === "dark" ? "#060606" : "#ffffff";
+          document.documentElement.style.backgroundColor = resolved === 'dark' ? '#060606' : '#ffffff';
         } catch {
-          const resolved = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          const resolved = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           document.documentElement.dataset.theme = resolved;
-          document.documentElement.dataset.themePreference = "system";
-          document.documentElement.style.backgroundColor = resolved === "dark" ? "#060606" : "#ffffff";
+          document.documentElement.dataset.themePreference = 'system';
+          document.documentElement.style.backgroundColor = resolved === 'dark' ? '#060606' : '#ffffff';
         }
       })();
     </script>

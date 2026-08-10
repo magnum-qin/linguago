@@ -1,24 +1,24 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
-const DEFAULT_OUT = "data/processed/product-multi-source-mismatch-splits.json";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
+const DEFAULT_OUT = 'data/processed/product-multi-source-mismatch-splits.json';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
-const dryRun = args["dry-run"] === "true";
-const apply = args.apply === "true";
+const dryRun = args['dry-run'] === 'true';
+const apply = args.apply === 'true';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!dryRun && !apply) {
-  throw new Error("Pass --dry-run true to inspect or --apply true to split mismatches.");
+  throw new Error('Pass --dry-run true to inspect or --apply true to split mismatches.');
 }
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 
 const statements = {
   candidates: db.prepare(`
@@ -343,10 +343,10 @@ function refreshEntry(productEntryId) {
   const aggregate = statements.aggregateEntry.get(productEntryId);
   const statuses = statements.statusCounts.all(productEntryId);
   const total = statuses.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = statuses.find((row) => row.status === "accepted")?.count || 0;
-  const hasNeedsReview = statuses.some((row) => row.status === "needs_review");
-  const hasDraft = statuses.some((row) => String(row.status).startsWith("draft_"));
-  const status = accepted === total ? "accepted" : hasNeedsReview || hasDraft ? "needs_review" : "ready_for_llm";
+  const accepted = statuses.find((row) => row.status === 'accepted')?.count || 0;
+  const hasNeedsReview = statuses.some((row) => row.status === 'needs_review');
+  const hasDraft = statuses.some((row) => String(row.status).startsWith('draft_'));
+  const status = accepted === total ? 'accepted' : hasNeedsReview || hasDraft ? 'needs_review' : 'ready_for_llm';
   statements.updateEntry.run({
     id: productEntryId,
     status,
@@ -360,10 +360,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

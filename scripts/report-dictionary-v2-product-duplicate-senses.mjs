@@ -1,14 +1,14 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_OUT = "logs/product-duplicate-sense-report.json";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_OUT = 'logs/product-duplicate-sense-report.json';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
-const sampleLimit = Number.parseInt(args.samples || "80", 10);
+const sampleLimit = Number.parseInt(args.samples || '80', 10);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
@@ -70,17 +70,17 @@ const sourceLinksBySense = db.prepare(
 );
 
 const groups = duplicateRows.map((row) => {
-  const senseIds = unique(row.sense_ids.split(",").map((id) => Number.parseInt(id, 10))).sort((a, b) => a - b);
+  const senseIds = unique(row.sense_ids.split(',').map((id) => Number.parseInt(id, 10))).sort((a, b) => a - b);
   const senses = senseIds.map((id) => describeSense(id));
   const localizationSignatures = unique(senses.map((sense) => sense.localization_signature));
   const sourceSignatures = unique(senses.map((sense) => sense.source_signature));
   const sourceOverlaps = countSourceOverlaps(senses);
   const classification =
     localizationSignatures.length === 1
-      ? "full_duplicate"
+      ? 'full_duplicate'
       : sourceOverlaps > 0
-        ? "partial_duplicate_with_source_overlap"
-        : "partial_duplicate";
+        ? 'partial_duplicate_with_source_overlap'
+        : 'partial_duplicate';
 
   return {
     classification,
@@ -99,7 +99,7 @@ const groups = duplicateRows.map((row) => {
   };
 });
 
-const classificationCounts = countBy(groups, "classification");
+const classificationCounts = countBy(groups, 'classification');
 const affectedSenseIds = new Set(groups.flatMap((group) => group.senses.map((sense) => sense.id)));
 const affectedEntries = new Set(groups.map((group) => group.entry_id));
 
@@ -114,15 +114,14 @@ const report = {
     classifications: classificationCounts,
     safe_auto_merge_groups: classificationCounts.full_duplicate || 0,
     needs_review_groups:
-      (classificationCounts.partial_duplicate || 0) +
-      (classificationCounts.partial_duplicate_with_source_overlap || 0)
+      (classificationCounts.partial_duplicate || 0) + (classificationCounts.partial_duplicate_with_source_overlap || 0)
   },
   samples: groups.slice(0, Number.isFinite(sampleLimit) ? sampleLimit : 80),
   groups
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
 
 db.close();
 
@@ -147,8 +146,8 @@ function describeSense(id) {
     ...sense,
     localizations,
     source_links: sourceLinks,
-    localization_signature: localizations.map(localizationSignature).join("||"),
-    source_signature: sourceLinks.map(sourceSignature).join("||")
+    localization_signature: localizations.map(localizationSignature).join('||'),
+    source_signature: sourceLinks.map(sourceSignature).join('||')
   };
 }
 
@@ -161,11 +160,11 @@ function localizationSignature(row) {
     normalize(row.pronunciation),
     normalize(row.pronunciation_system),
     normalize(row.definition)
-  ].join("\t");
+  ].join('\t');
 }
 
 function sourceSignature(row) {
-  return [normalize(row.source_lang), normalize(row.source_word), normalize(row.source_sense_id)].join("\t");
+  return [normalize(row.source_lang), normalize(row.source_word), normalize(row.source_sense_id)].join('\t');
 }
 
 function countSourceOverlaps(senses) {
@@ -183,7 +182,10 @@ function countSourceOverlaps(senses) {
 }
 
 function normalize(value) {
-  return String(value ?? "").trim().replace(/\s+/gu, " ").toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLowerCase();
 }
 
 function unique(values) {
@@ -201,14 +203,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[i + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       i++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

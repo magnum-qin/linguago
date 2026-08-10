@@ -1,106 +1,106 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = path.resolve(args.db || "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db");
+const dbPath = path.resolve(args.db || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db');
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const now = new Date().toISOString();
-const source = "manual-polyphone-supplement-20260619";
+const source = 'manual-polyphone-supplement-20260619';
 
 const supplements = [
   {
-    headword: "中",
-    normalized_key: "中",
-    primary_lang: "zh",
+    headword: '中',
+    normalized_key: '中',
+    primary_lang: 'zh',
     frequency_rank: 781,
-    group_key: "manual:zh:中:zhong4",
+    group_key: 'manual:zh:中:zhong4',
     senses: [
       {
-        part_of_speech: "verb",
-        gloss_key: "hit; strike a target",
+        part_of_speech: 'verb',
+        gloss_key: 'hit; strike a target',
         confidence: 0.98,
         localizations: {
           zh: {
-            term: "中",
-            reading: "zhòng",
-            reading_system: "pinyin",
-            definition: "击中；命中目标。"
+            term: '中',
+            reading: 'zhòng',
+            reading_system: 'pinyin',
+            definition: '击中；命中目标。'
           },
           en: {
-            term: "hit; strike",
-            pronunciation: "/hɪt/",
-            pronunciation_system: "IPA",
-            definition: "To reach or strike a target accurately."
+            term: 'hit; strike',
+            pronunciation: '/hɪt/',
+            pronunciation_system: 'IPA',
+            definition: 'To reach or strike a target accurately.'
           },
-          "pt-BR": {
-            term: "acertar",
-            pronunciation: "/a.seʁˈtaʁ/",
-            pronunciation_system: "IPA",
-            definition: "Atingir corretamente um alvo."
+          'pt-BR': {
+            term: 'acertar',
+            pronunciation: '/a.seʁˈtaʁ/',
+            pronunciation_system: 'IPA',
+            definition: 'Atingir corretamente um alvo.'
           },
           ja: {
-            term: "当たる; 命中する",
-            reading: "あたる; めいちゅうする",
-            reading_system: "kana",
-            definition: "目標に当たる。"
+            term: '当たる; 命中する',
+            reading: 'あたる; めいちゅうする',
+            reading_system: 'kana',
+            definition: '目標に当たる。'
           }
         },
         example: {
-          source_lang: "zh",
-          source_text: "他一箭中了靶心。",
+          source_lang: 'zh',
+          source_text: '他一箭中了靶心。',
           localizations: {
-            zh: { text: "他一箭中了靶心。", reading: "Tā yī jiàn zhòng le bǎxīn." },
-            en: { text: "He hit the bullseye with one arrow." },
-            "pt-BR": { text: "Ele acertou o centro do alvo com uma flecha." },
-            ja: { text: "彼は一本の矢で的の中心に当てた。", reading: "かれはいっぽんのやでまとのちゅうしんにあてた。" }
+            zh: { text: '他一箭中了靶心。', reading: 'Tā yī jiàn zhòng le bǎxīn.' },
+            en: { text: 'He hit the bullseye with one arrow.' },
+            'pt-BR': { text: 'Ele acertou o centro do alvo com uma flecha.' },
+            ja: { text: '彼は一本の矢で的の中心に当てた。', reading: 'かれはいっぽんのやでまとのちゅうしんにあてた。' }
           }
         }
       },
       {
-        part_of_speech: "verb",
-        gloss_key: "win; be selected",
+        part_of_speech: 'verb',
+        gloss_key: 'win; be selected',
         confidence: 0.98,
         localizations: {
           zh: {
-            term: "中",
-            reading: "zhòng",
-            reading_system: "pinyin",
-            definition: "被选中；中奖；考中。"
+            term: '中',
+            reading: 'zhòng',
+            reading_system: 'pinyin',
+            definition: '被选中；中奖；考中。'
           },
           en: {
-            term: "win; be selected",
-            pronunciation: "/wɪn/",
-            pronunciation_system: "IPA",
-            definition: "To be chosen, pass an exam, or win a prize."
+            term: 'win; be selected',
+            pronunciation: '/wɪn/',
+            pronunciation_system: 'IPA',
+            definition: 'To be chosen, pass an exam, or win a prize.'
           },
-          "pt-BR": {
-            term: "ganhar; ser selecionado",
-            pronunciation: "/ɡaˈɲaʁ/; /seʁ se.le.si.oˈna.du/",
-            pronunciation_system: "IPA",
-            definition: "Ser escolhido, aprovado ou ganhar um prêmio."
+          'pt-BR': {
+            term: 'ganhar; ser selecionado',
+            pronunciation: '/ɡaˈɲaʁ/; /seʁ se.le.si.oˈna.du/',
+            pronunciation_system: 'IPA',
+            definition: 'Ser escolhido, aprovado ou ganhar um prêmio.'
           },
           ja: {
-            term: "当選する; 合格する",
-            reading: "とうせんする; ごうかくする",
-            reading_system: "kana",
-            definition: "選ばれる、または試験に受かる。"
+            term: '当選する; 合格する',
+            reading: 'とうせんする; ごうかくする',
+            reading_system: 'kana',
+            definition: '選ばれる、または試験に受かる。'
           }
         },
         example: {
-          source_lang: "zh",
-          source_text: "她中了彩票。",
+          source_lang: 'zh',
+          source_text: '她中了彩票。',
           localizations: {
-            zh: { text: "她中了彩票。", reading: "Tā zhòng le cǎipiào." },
-            en: { text: "She won the lottery." },
-            "pt-BR": { text: "Ela ganhou na loteria." },
-            ja: { text: "彼女は宝くじに当たった。", reading: "かのじょはたからくじにあたった。" }
+            zh: { text: '她中了彩票。', reading: 'Tā zhòng le cǎipiào.' },
+            en: { text: 'She won the lottery.' },
+            'pt-BR': { text: 'Ela ganhou na loteria.' },
+            ja: { text: '彼女は宝くじに当たった。', reading: 'かのじょはたからくじにあたった。' }
           }
         }
       }
@@ -109,15 +109,17 @@ const supplements = [
 ];
 
 const statements = {
-  getEntry: db.prepare("SELECT id FROM product_entries WHERE group_key = ?"),
+  getEntry: db.prepare('SELECT id FROM product_entries WHERE group_key = ?'),
   insertEntry: db.prepare(`
     INSERT INTO product_entries
       (headword, normalized_key, primary_lang, frequency_rank, group_key, group_method, status, source_count, lang_count, created_at)
     VALUES
       (@headword, @normalized_key, @primary_lang, @frequency_rank, @group_key, 'manual_polyphone', 'accepted', 0, 4, @created_at)
   `),
-  getSense: db.prepare("SELECT id FROM product_senses WHERE product_entry_id = ? AND gloss_key = ?"),
-  nextSenseOrder: db.prepare("SELECT COALESCE(MAX(sense_order), 0) + 1 AS next_order FROM product_senses WHERE product_entry_id = ?"),
+  getSense: db.prepare('SELECT id FROM product_senses WHERE product_entry_id = ? AND gloss_key = ?'),
+  nextSenseOrder: db.prepare(
+    'SELECT COALESCE(MAX(sense_order), 0) + 1 AS next_order FROM product_senses WHERE product_entry_id = ?'
+  ),
   insertSense: db.prepare(`
     INSERT INTO product_senses
       (product_entry_id, sense_order, part_of_speech, gloss_key, status, confidence, created_at)
@@ -140,7 +142,7 @@ const statements = {
       confidence = excluded.confidence,
       needs_review = 0
   `),
-  getExample: db.prepare("SELECT id FROM product_examples WHERE product_sense_id = ? AND source = ?"),
+  getExample: db.prepare('SELECT id FROM product_examples WHERE product_sense_id = ? AND source = ?'),
   insertExample: db.prepare(`
     INSERT INTO product_examples
       (product_sense_id, source_example_id, example_order, source_lang, source_text, source, confidence, needs_review)
@@ -257,11 +259,11 @@ function parseArgs(argv) {
   const output = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[i + 1];
-    output[key] = next && !next.startsWith("--") ? next : "1";
-    if (next && !next.startsWith("--")) i++;
+    output[key] = next && !next.startsWith('--') ? next : '1';
+    if (next && !next.startsWith('--')) i++;
   }
   return output;
 }

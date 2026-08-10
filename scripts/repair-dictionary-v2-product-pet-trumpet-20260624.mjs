@@ -1,54 +1,54 @@
-import Database from "better-sqlite3";
+import Database from 'better-sqlite3';
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = args.db || "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const apply = args.apply === "true" || args.apply === true;
+const dbPath = args.db || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const apply = args.apply === 'true' || args.apply === true;
 
 const senseId = 12840;
-const source = "manual:pet-trumpet-repair-20260624";
+const source = 'manual:pet-trumpet-repair-20260624';
 
 const localizations = [
   {
-    lang: "en",
-    term: "trumpet",
+    lang: 'en',
+    term: 'trumpet',
     reading: null,
     reading_system: null,
-    pronunciation: "/ˈtrʌm.pɪt/",
-    pronunciation_system: "IPA",
-    definition: "A brass musical instrument played by blowing through a mouthpiece."
+    pronunciation: '/ˈtrʌm.pɪt/',
+    pronunciation_system: 'IPA',
+    definition: 'A brass musical instrument played by blowing through a mouthpiece.'
   },
   {
-    lang: "ja",
-    term: "トランペット",
-    reading: "トランペット",
-    reading_system: "katakana",
+    lang: 'ja',
+    term: 'トランペット',
+    reading: 'トランペット',
+    reading_system: 'katakana',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "金管楽器の一種。唇を振動させて音を出す楽器。"
+    definition: '金管楽器の一種。唇を振動させて音を出す楽器。'
   },
   {
-    lang: "zh",
-    term: "小号",
-    reading: "xiǎohào",
-    reading_system: "pinyin",
+    lang: 'zh',
+    term: '小号',
+    reading: 'xiǎohào',
+    reading_system: 'pinyin',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "一种铜管乐器，通过吹嘴吹奏发声。"
+    definition: '一种铜管乐器，通过吹嘴吹奏发声。'
   },
   {
-    lang: "pt-BR",
-    term: "trompete",
+    lang: 'pt-BR',
+    term: 'trompete',
     reading: null,
     reading_system: null,
-    pronunciation: "/tɾõˈpe.tʃi/",
-    pronunciation_system: "IPA",
-    definition: "Instrumento musical de sopro da família dos metais, tocado com um bocal."
+    pronunciation: '/tɾõˈpe.tʃi/',
+    pronunciation_system: 'IPA',
+    definition: 'Instrumento musical de sopro da família dos metais, tocado com um bocal.'
   }
 ];
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const before = readRows();
 const updateSense = db.prepare(`
@@ -106,14 +106,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

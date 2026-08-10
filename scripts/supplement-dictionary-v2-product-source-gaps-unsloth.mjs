@@ -114,10 +114,12 @@ const residualMode = args['residual-mode'] === 'true';
 const promptMode = args['prompt-mode'] || 'compact';
 const minimalRequest = args['minimal-request'] === 'true';
 const streamResponse = args['stream-response'] === 'true';
+const chatPath = normalizeChatPath(args['chat-path'] || '/v1/chat/completions');
 const disableThinking = args['disable-thinking'] !== 'false';
 const skipExistingDrafts = args['skip-existing-drafts'] !== 'false';
 const requireEvidenceVerdict = args['require-evidence-verdict'] === 'true';
 const replayReportPath = args['replay-report'] ? path.resolve(args['replay-report']) : null;
+const replayInvalidOutputs = args['replay-invalid-outputs'] === 'true';
 const controlledConsensusDraftWrite = args['controlled-consensus-draft-write'] === 'true';
 const replayReportStats = replayReportPath && fs.existsSync(replayReportPath)
   ? JSON.parse(fs.readFileSync(replayReportPath, 'utf8'))?.stats || null
@@ -231,7 +233,7 @@ const checkpoint = loadCheckpoint();
 const checkpointCompleted = new Set(
   Object.values(checkpoint?.items || {})
     .filter((item) => item?.status === 'accepted' || item?.status === 'rejected')
-    .map((item) => String(item.source_entry_id))
+    .map((item) => checkpointCandidateKey(item))
 );
 // --limit is the total run target. A resumed run only fills the unfinished remainder.
 // Replay is exact over its approved report, so the normal generation limit
@@ -282,9 +284,10 @@ for (const row of allRows) {
   if (replaySourceEntryIds && !replaySourceEntryIds.has(Number(row?.source_entry_id))) continue;
   if (onlySourceEntryIds && !onlySourceEntryIds.has(Number(row?.source_entry_id))) continue;
   if (sourceLangFilter && !sourceLangFilter.has(row?.source_lang)) continue;
-  if (checkpointCompleted.has(String(row?.source_entry_id))) {
+  if (checkpointCompleted.has(checkpointCandidateKey(row))) {
     rejectedBeforeGeneration.push({
       source_entry_id: row?.source_entry_id,
+      source_sense_id: row?.first_sense_id ?? row?.source_sense_id ?? null,
       word: row?.word,
       source_lang: row?.source_lang,
       frequency_rank: row?.frequency_rank,
@@ -296,6 +299,7 @@ for (const row of allRows) {
   if (!eligibility.ok) {
     rejectedBeforeGeneration.push({
       source_entry_id: row?.source_entry_id,
+      source_sense_id: row?.first_sense_id ?? row?.source_sense_id ?? null,
       word: row?.word,
       source_lang: row?.source_lang,
       frequency_rank: row?.frequency_rank,
@@ -354,6 +358,7 @@ if (selectOnly) {
         stats,
         selected_preview: selected.slice(0, 80).map((row) => ({
           source_entry_id: row.source_entry_id,
+          source_sense_id: row.first_sense_id ?? row.source_sense_id ?? null,
           word: row.word,
           source_lang: row.source_lang,
           frequency_rank: row.frequency_rank,
@@ -428,6 +433,7 @@ const stats = {
   prompt_mode: promptMode,
   minimal_request: minimalRequest,
   stream_response: streamResponse,
+  chat_path: chatPath,
   disable_thinking: disableThinking,
   publishable,
   skip_existing_drafts: skipExistingDrafts,
@@ -487,7 +493,16 @@ const stats = {
   endpoint_metrics: {}
 };
 
-const generated = [];
+const generated = Object.values(checkpoint?.items || {})
+  .map((item) => item?.generated_item)
+  .filter(Boolean);
+stats.generated = generated.length;
+stats.accepted = generated.filter((item) => item.valid).length;
+stats.rejected = generated.length - stats.accepted;
+stats.infrastructure_rejected = generated.filter((item) => item.infrastructure_failure).length;
+stats.validation_rejected = generated.filter(
+  (item) => !item.valid && !item.infrastructure_failure && !item.errors?.includes('source_evidence_mismatch')
+).length;
 const generationChunks = chunkRows(selected, chunkSize, false);
 for (let chunkIndex = 0; chunkIndex < generationChunks.length; chunkIndex++) {
   const chunk = generationChunks[chunkIndex];
@@ -554,7 +569,7 @@ function replayGeneratedReport() {
     : new Set();
   const replayed = [];
   for (const item of replay.generated) {
-    if (!item?.valid || !item?.output) continue;
+    if ((!item?.valid && !replayInvalidOutputs) || !item?.output) continue;
     const row = rowsById.get(String(item.source_entry_id));
     if (!row) continue;
     const output = normalizeGeneratedOutput(row, item.output);
@@ -591,6 +606,7 @@ function replayGeneratedReport() {
     publishable,
     source_items: replay.generated.length,
     source_accepted: replay.generated.filter((item) => item?.valid).length,
+    replay_invalid_outputs: replayInvalidOutputs,
     matched: replayed.length,
     accepted: accepted.length,
     rejected: replayed.length - accepted.length,
@@ -684,13 +700,17 @@ function loadReplaySourceEntryIds(file) {
   if (!Array.isArray(replay.generated)) throw new Error('Replay report must contain a generated array.');
   return new Set(
     replay.generated
-      .filter((item) => item?.valid && item?.output)
+      .filter((item) => (item?.valid || replayInvalidOutputs) && item?.output)
       .map((item) => Number(item.source_entry_id))
       .filter(Number.isInteger)
   );
 }
 
 async function generateBatch(rows, endpoint) {
+  if (promptMode === 'nano-per-language') {
+    if (rows.length !== 1) throw new Error('nano-per-language requires batch size 1');
+    return [await generatePerLanguage(rows[0], endpoint)];
+  }
   const prompt = rows.length === 1 ? buildPrompt(rows[0]) : buildBatchPrompt(rows);
   const requestBody = {
     model,
@@ -716,7 +736,7 @@ async function generateBatch(rows, endpoint) {
   if (!minimalRequest) {
     requestBody.reasoning_effort = 'none';
   }
-  const response = await fetch(`${endpoint}/v1/chat/completions`, {
+  const response = await fetch(`${endpoint}${chatPath}`, {
     method: 'POST',
     signal: AbortSignal.timeout(timeoutMs),
     headers: {
@@ -729,7 +749,7 @@ async function generateBatch(rows, endpoint) {
     const text = await response.text();
     throw new Error(`HTTP ${response.status}: ${text.slice(0, 500)}`);
   }
-  const content = streamResponse ? await readChatCompletionStream(response) : await readChatCompletion(response);
+  const content = streamResponse ? await readChatCompletionStream(response, timeoutMs) : await readChatCompletion(response);
   const output = parseJson(content);
   if (rows.length === 1) return [normalizeModelOutput(output, rows[0])];
   const items = Array.isArray(output) ? output : output?.items;
@@ -740,32 +760,126 @@ async function generateBatch(rows, endpoint) {
   });
 }
 
+async function generatePerLanguage(row, endpoint) {
+  const localizations = {};
+  for (const lang of LANGS) {
+    const term = lockedTargetTerm(row, lang);
+    if (!term) throw new Error(`missing_locked_term_${lang}`);
+    const prompt = buildPerLanguageGenerationPrompt(row, lang, term);
+    const requestBody = {
+      model,
+      stream: streamResponse,
+      temperature: 0,
+      max_tokens: Math.min(maxTokens || 360, 360),
+      enable_thinking: false,
+      messages: [{ role: 'user', content: prompt }]
+    };
+    const response = await fetch(`${endpoint}${chatPath}`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`HTTP ${response.status}: ${text.slice(0, 500)}`);
+    }
+    const content = streamResponse ? await readChatCompletionStream(response, timeoutMs) : await readChatCompletion(response);
+    const parsed = parseJson(content);
+    let pronunciation = String(parsed?.p || '').trim();
+    const definition = String(parsed?.d || '').trim();
+    if (!pronunciation || !definition) throw new Error(`invalid_localization_${lang}`);
+    if (lang === 'ja' && /^[\p{Script=Katakana}ー・]+$/u.test(term)) pronunciation = term;
+    localizations[lang] =
+      lang === 'zh' || lang === 'ja'
+        ? {
+            term,
+            reading: pronunciation,
+            reading_system: lang === 'zh' ? 'pinyin' : 'kana',
+            definition
+          }
+        : { term, pronunciation, pronunciation_system: 'IPA', definition };
+  }
+  return {
+    headword: row.word,
+    normalized_key: row.normalized_key || row.word,
+    primary_lang: row.source_lang,
+    frequency_rank: row.frequency_rank ?? null,
+    part_of_speech: row.useful_senses?.[0]?.part_of_speech || row.part_of_speech || null,
+    gloss_key: sourceMeaningAnchor(row),
+    source_evidence_valid: true,
+    source_evidence_reason: null,
+    localizations
+  };
+}
+
+function lockedTargetTerm(row, lang) {
+  if (lang === row.source_lang) return String(row.word || '').trim();
+  const preferred = row?.candidate_evidence_review?.preferred_terms?.[lang];
+  if (nonEmpty(preferred)) return String(preferred).trim();
+  const hinted = row?.generation_hints?.[lang]?.terms?.[0];
+  return nonEmpty(hinted) ? String(hinted).trim() : '';
+}
+
+function buildPerLanguageGenerationPrompt(row, lang, term) {
+  const readingLabel = lang === 'zh' ? 'pinyin' : lang === 'ja' ? 'kana' : 'IPA';
+  const definitionContract = reviewedDefinitionContract(row, lang);
+  const languageRule =
+    lang === 'zh'
+      ? 'Use Simplified Chinese. D must contain at least 8 Chinese characters, explain what T means, and must not equal T.'
+      : lang === 'ja'
+        ? 'D must contain at least 12 Japanese characters, explain what T means, and must not equal T. If T is all katakana, P must equal T exactly; otherwise P must be kana only, never romaji.'
+        : lang === 'pt-BR'
+          ? 'D must be natural Brazilian Portuguese, contain at least 6 words, and must not equal T.'
+          : 'D must be natural English, contain at least 6 words, and must not equal T.';
+  return [
+    'JSON only. Create one dictionary localization.',
+    `W=${JSON.stringify(row.word)};M=${JSON.stringify(sourceMeaningAnchor(row))};C=${JSON.stringify(definitionContract)};X=${lang};T=${JSON.stringify(term)}.`,
+    `Use exact T. Return {"p":"${readingLabel}","d":"definition"}. P is the real ${readingLabel} of T. ${languageRule}`,
+    'D must define only M, follow trustworthy contract C when C is informative, be complete, factual, and concise; never copy placeholders.'
+  ].join(' ');
+}
+
 async function readChatCompletion(response) {
   const envelope = JSON.parse(await response.text());
   return envelope?.choices?.[0]?.message?.content || '';
 }
 
-async function readChatCompletionStream(response) {
+async function readChatCompletionStream(response, bodyTimeoutMs) {
   if (!response.body) throw new Error('stream response missing body');
   const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let content = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-    const lines = buffer.split(/\r?\n/u);
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue;
-      const data = line.slice(5).trim();
-      if (!data || data === '[DONE]') continue;
-      const chunk = JSON.parse(data);
-      content += chunk?.choices?.[0]?.delta?.content || '';
+  let timer;
+  const consume = (async () => {
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let content = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split(/\r?\n/u);
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        const chunk = JSON.parse(data);
+        content += chunk?.choices?.[0]?.delta?.content || '';
+      }
+      if (done) break;
     }
-    if (done) break;
+    return content;
+  })();
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reader.cancel('stream_body_timeout').catch(() => {});
+      reject(new Error(`stream_body_timeout_${bodyTimeoutMs}ms`));
+    }, bodyTimeoutMs);
+  });
+  try {
+    return await Promise.race([consume, timeout]);
+  } finally {
+    clearTimeout(timer);
   }
-  return content;
 }
 
 async function runGenerationPool(rows) {
@@ -1235,7 +1349,7 @@ async function requestStructuredReview(endpoint, systemPrompt, userPrompt, maxRe
   let lastError = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const response = await fetchJson(`${endpoint}/v1/chat/completions`, {
+      const response = await fetchJson(`${endpoint}${chatPath}`, {
         method: 'POST',
         timeoutMs,
         body: {
@@ -1482,6 +1596,7 @@ async function fetchJson(url, { method = 'GET', timeoutMs = 30_000, body = null 
 }
 
 function buildPrompt(row) {
+  if (promptMode === 'nano') return buildNanoPrompt(row);
   if (promptMode === 'micro') return buildMicroPrompt(row);
   if (promptMode === 'ultra') return buildUltraCompactPrompt(row);
   if (promptMode === 'compact') return buildCompactPrompt(row);
@@ -1608,6 +1723,20 @@ function buildMicroPrompt(row) {
   return lines.filter(Boolean).join(' ');
 }
 
+function buildNanoPrompt(row) {
+  const terms = compactReviewedPreferredTerms(row) || compactGenerationHints(row);
+  return [
+    'JSON only.',
+    `W=${JSON.stringify(row.word)};L=${row.source_lang};M=${JSON.stringify(sourceMeaningAnchor(row))}.`,
+    terms ? `T=${JSON.stringify(terms)}.` : '',
+    'If M is not a real sense of W: {"v":false,"r":"reason"}.',
+    'Else: {"v":true,"r":null,"g":"sense","en":["term","IPA","definition"],"pt-BR":["term","IPA","definition"],"zh":["term","pinyin","definition"],"ja":["term","kana","definition"]}.',
+    'Use W exactly for L; use T terms when given; translate the same sense; natural definitions; simplified zh.'
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 function compactGenerationHints(row) {
   const hints = row?.generation_hints;
   if (!hints || typeof hints !== 'object') return '';
@@ -1682,7 +1811,7 @@ function evidenceReasonRepeatsSourceAsCorrection(reason, sourceWord) {
 }
 
 function normalizeModelOutput(output, row) {
-  if (promptMode !== 'micro' || !output || typeof output !== 'object') return output;
+  if (!['micro', 'nano'].includes(promptMode) || !output || typeof output !== 'object') return output;
   const localization = (lang, readingSystem, pronunciationSystem) => {
     const values = Array.isArray(output[lang]) ? output[lang] : [];
     const normalized = {
@@ -1775,6 +1904,8 @@ function buildCompactPrompt(row) {
   const gloss = row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || '';
   const preferredTerms = enforceReviewedPreferredTerms ? compactReviewedPreferredTerms(row) : '';
   const generationHints = enforceGenerationHintTerms ? compactGenerationHints(row) : '';
+  const definitionContract = compactDefinitionContract(row);
+  const suggestedTerms = compactReviewedSuggestedTerms(row);
   const lines = [
     'Return one JSON object for a multilingual dictionary entry.',
     `Headword: ${row.word}`,
@@ -1782,6 +1913,8 @@ function buildCompactPrompt(row) {
     `Meaning: ${gloss}`,
     generationHints ? `Verified exact terms: ${generationHints}` : '',
     preferredTerms ? `Reviewed preferred terms: ${preferredTerms}` : '',
+    suggestedTerms ? `Semantic term constraints: ${suggestedTerms}` : '',
+    definitionContract ? `Required definition contract: ${definitionContract}` : '',
     'Top-level keys: headword, normalized_key, primary_lang, frequency_rank, part_of_speech, gloss_key, source_evidence_valid, source_evidence_reason, localizations.',
     'Set source_evidence_valid=true only when Meaning is a real sense of the source-language headword; otherwise set false and explain source_evidence_reason.',
     'Localizations: en, pt-BR, zh, ja.',
@@ -1793,6 +1926,9 @@ function buildCompactPrompt(row) {
       : '',
     preferredTerms
       ? 'Use every Reviewed preferred term exactly in its matching localization term field.'
+      : '',
+    definitionContract
+      ? 'Every localization definition must preserve its matching Required definition contract exactly in meaning, scope, domain, and grammatical role.'
       : '',
     'If source language is zh or ja, en.term and pt-BR.term must be translated dictionary terms in English and Portuguese, not hanzi, kana, pinyin, or the original source spelling.',
     'If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.',
@@ -1815,6 +1951,16 @@ function buildCompactPrompt(row) {
       lines.push(`Regenerate and fix this QA finding: ${String(row.latest_quality_review_reason).slice(0, 700)}`);
     }
     lines.push('Do not repeat the rejected term, grammatical category, factual claim, or typo.');
+  }
+  if (Array.isArray(row.latest_errors) && row.latest_errors.includes('structured_consensus_correction_retry')) {
+    const details = Array.isArray(row.latest_quality_review_errors)
+      ? row.latest_quality_review_errors.join('; ')
+      : '';
+    lines.push(`Apply these exact independent-review corrections${details ? `: ${details}` : '.'}`);
+    if (row.latest_quality_review_reason) {
+      lines.push(`Correction reason: ${String(row.latest_quality_review_reason).slice(0, 700)}`);
+    }
+    lines.push('Do not restore the rejected current value.');
   }
   if (residualMode) lines.push(...residualPromptRules(row));
   return lines.filter(Boolean).join('\n');
@@ -1867,14 +2013,31 @@ function buildCompactBatchPrompt(rows) {
 }
 
 function compactDefinitionContract(row) {
-  const contract = row?.candidate_evidence_review?.definition_contract;
-  if (!contract || typeof contract !== 'object' || Array.isArray(contract)) return '';
   const normalized = Object.fromEntries(
     ['en', 'pt-BR', 'zh', 'ja']
-      .map((lang) => [lang, String(contract[lang] || '').trim()])
+      .map((lang) => [lang, reviewedDefinitionContract(row, lang)])
       .filter(([, value]) => value)
   );
   return Object.keys(normalized).length ? JSON.stringify(normalized) : '';
+}
+
+function reviewedDefinitionContract(row, lang) {
+  const explicitCorrection = row?.structured_correction_retry?.corrections?.find(
+    (item) => item?.language === lang && item?.field === 'definition' && nonEmpty(item?.replacement)
+  );
+  if (explicitCorrection) return String(explicitCorrection.replacement).trim();
+
+  const value = String(row?.candidate_evidence_review?.definition_contract?.[lang] || '').trim();
+  if (!value || /(?:^|\s)(?:en|pt(?:-BR)?|zh|ja)\s*:/iu.test(value)) return '';
+  if (!definitionLanguageLooksRight(value, lang) || definitionTooThin(value, lang, '')) return '';
+
+  const englishAnchor = String(row?.candidate_evidence_review?.english_anchor || '').trim();
+  if (lang !== 'en' && englishAnchor && normalize(value) === normalize(englishAnchor)) return '';
+
+  // Latin-script English placeholders cannot be distinguished reliably from
+  // Portuguese here. Let generation localize the reviewed English anchor.
+  if (lang === 'pt-BR') return '';
+  return value;
 }
 
 function residualPromptRules(row = null) {
@@ -2003,6 +2166,7 @@ function normalizeGeneratedOutput(row, output) {
   // Some source reports use a multilingual gloss summary as gloss_key, which is
   // unsuitable for English reverse-dictionary matching.
   normalized.source_meaning_anchor = sourceMeaningAnchor(row);
+  normalized.source_meaning_anchors = sourceMeaningAnchors(row);
   normalized.gloss_key = nonEmpty(normalized.gloss_key)
     ? normalized.gloss_key
     : row.first_gloss_key || row.first_gloss_preview || row.gloss_key || row.gloss_preview || '';
@@ -2081,6 +2245,7 @@ function applyReviewedEvidenceTerms(row, output) {
   }
   const evidenceLocalizations = Array.isArray(row.first_sense_localizations) ? row.first_sense_localizations : [];
   const jaEvidence = evidenceLocalizations.find((loc) => loc?.lang === 'ja' && kanaOnly(loc.term));
+  if (nonEmpty(preferredTerms.ja)) return;
   if (!jaEvidence || !output.localizations?.ja) return;
   output.localizations = { ...output.localizations };
   output.localizations.ja = {
@@ -2824,6 +2989,23 @@ function sourceMeaningAnchor(row) {
   );
 }
 
+function sourceMeaningAnchors(row) {
+  const values = new Set();
+  const add = (value) => {
+    for (const item of String(value || '').split(/[;,/]|\bor\b/iu)) {
+      const term = item.trim();
+      if (term) values.add(term);
+    }
+  };
+  add(sourceMeaningAnchor(row));
+  for (const term of row?.generation_hints?.en?.terms || []) add(term);
+  const enLoc = (Array.isArray(row?.first_sense_localizations) ? row.first_sense_localizations : []).find(
+    (loc) => loc?.lang === 'en'
+  );
+  add(enLoc?.term);
+  return [...values].slice(0, 8);
+}
+
 function termsShareContentToken(leftValues, rightValues) {
   const tokens = (values) =>
     values.flatMap((value) =>
@@ -2865,6 +3047,7 @@ function buildCheckpointConfig() {
     prompt_mode: promptMode,
     minimal_request: minimalRequest,
     stream_response: streamResponse,
+    chat_path: chatPath,
     disable_thinking: disableThinking,
     max_tokens: maxTokens,
     post_load_wait_ms: postLoadWaitMs,
@@ -2995,11 +3178,12 @@ function endpointChangeIsCompatible(previousConfig, nextConfig) {
 }
 
 function updateCheckpoint(state, generatedItems, writes, runStats, committedChunks, totalChunks) {
-  if (!checkpointPath || !state || !apply || dryRun) return;
-  const writesBySource = new Map(writes.map((item) => [String(item.source_entry_id), item]));
+  if (!checkpointPath || !state || dryRun) return;
+  const writesBySource = new Map(writes.map((item) => [checkpointCandidateKey(item), item]));
   for (const item of generatedItems) {
-    const write = writesBySource.get(String(item.source_entry_id));
-    state.items[String(item.source_entry_id)] = {
+    const itemKey = checkpointCandidateKey(item);
+    const write = writesBySource.get(itemKey);
+    state.items[itemKey] = {
       source_entry_id: item.source_entry_id,
       source_sense_id: Number(item?.source_sense_id ?? item?.output?.source_sense_id) || null,
       word: item.word,
@@ -3013,6 +3197,7 @@ function updateCheckpoint(state, generatedItems, writes, runStats, committedChun
       product_entry_id: write?.product_entry_id || null,
       product_sense_id: write?.product_sense_id || null,
       promote_allowed: !noPromoteSourceEntryIds.has(String(item.source_entry_id)),
+      generated_item: item,
       completed_at: new Date().toISOString()
     };
   }
@@ -3030,6 +3215,12 @@ function updateCheckpoint(state, generatedItems, writes, runStats, committedChun
     endpoint_metrics: runStats.endpoint_metrics
   };
   writeJsonAtomically(checkpointPath, state);
+}
+
+function checkpointCandidateKey(value) {
+  const sourceEntryId = Number(value?.source_entry_id);
+  const sourceSenseId = Number(value?.source_sense_id ?? value?.first_sense_id ?? value?.output?.source_sense_id);
+  return `${sourceEntryId}:${Number.isInteger(sourceSenseId) ? sourceSenseId : 'none'}`;
 }
 
 function writeJsonAtomically(filePath, value) {
@@ -3159,6 +3350,14 @@ function normalizeSpeculativeType(value) {
     throw new Error(`Invalid --speculative-type: ${value}`);
   }
   return canonical;
+}
+
+function normalizeChatPath(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized.startsWith('/') || normalized.includes('://') || normalized.includes('..')) {
+    throw new Error(`Invalid --chat-path: ${value}`);
+  }
+  return normalized;
 }
 
 function chunkRows(rows, size) {

@@ -1,57 +1,57 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = path.resolve(args.db || "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db");
+const dbPath = path.resolve(args.db || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db');
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
-const source = "known-localization-repair-20260619";
+const source = 'known-localization-repair-20260619';
 const fixes = [
   {
-    headword: "hello",
-    primary_lang: "en",
-    gloss_key: "n. an expression of greeting",
-    lang: "en",
-    term: "hello",
-    pronunciation: "/həˈloʊ/",
-    pronunciation_system: "IPA",
-    definition: "Used as a greeting or to begin a telephone conversation."
+    headword: 'hello',
+    primary_lang: 'en',
+    gloss_key: 'n. an expression of greeting',
+    lang: 'en',
+    term: 'hello',
+    pronunciation: '/həˈloʊ/',
+    pronunciation_system: 'IPA',
+    definition: 'Used as a greeting or to begin a telephone conversation.'
   },
   {
-    headword: "你好",
-    primary_lang: "zh",
-    gloss_key: "hello; hi",
-    lang: "zh",
-    term: "你好",
-    reading: "nǐ hǎo",
-    reading_system: "pinyin",
-    definition: "用于问候或开始电话对话的致意语。"
+    headword: '你好',
+    primary_lang: 'zh',
+    gloss_key: 'hello; hi',
+    lang: 'zh',
+    term: '你好',
+    reading: 'nǐ hǎo',
+    reading_system: 'pinyin',
+    definition: '用于问候或开始电话对话的致意语。'
   },
   {
-    headword: "shall",
-    primary_lang: "en",
+    headword: 'shall',
+    primary_lang: 'en',
     sense_order: 1,
-    lang: "ja",
-    term: "〜するものとする",
-    reading: "〜するものとする",
-    reading_system: "kana",
-    definition: "英語の助動詞で、未来、義務、命令、約束などを表す。"
+    lang: 'ja',
+    term: '〜するものとする',
+    reading: '〜するものとする',
+    reading_system: 'kana',
+    definition: '英語の助動詞で、未来、義務、命令、約束などを表す。'
   },
   {
-    headword: "should",
-    primary_lang: "en",
+    headword: 'should',
+    primary_lang: 'en',
     sense_order: 1,
-    lang: "ja",
-    term: "〜すべきだ",
-    reading: "〜すべきだ",
-    reading_system: "kana",
-    definition: "英語の助動詞で、義務、助言、推量、条件などを表す。"
+    lang: 'ja',
+    term: '〜すべきだ',
+    reading: '〜すべきだ',
+    reading_system: 'kana',
+    definition: '英語の助動詞で、義務、助言、推量、条件などを表す。'
   }
 ];
 
@@ -155,11 +155,11 @@ function parseArgs(argv) {
   const output = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[i + 1];
-    output[key] = next && !next.startsWith("--") ? next : "1";
-    if (next && !next.startsWith("--")) i++;
+    output[key] = next && !next.startsWith('--') ? next : '1';
+    if (next && !next.startsWith('--')) i++;
   }
   return output;
 }

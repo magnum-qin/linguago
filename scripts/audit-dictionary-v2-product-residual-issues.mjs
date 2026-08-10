@@ -1,8 +1,8 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const sampleLimit = Number(args.samples || 12);
@@ -10,7 +10,7 @@ const sampleLimit = Number(args.samples || 12);
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath, { readonly: true });
-db.pragma("busy_timeout = 30000");
+db.pragma('busy_timeout = 30000');
 const hasPublicationBlocks = Boolean(
   db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'product_sense_publication_blocks'").get()
 );
@@ -35,11 +35,11 @@ const jobs = db
       ps.part_of_speech,
       ps.gloss_key,
       ps.status AS sense_status,
-      ${hasPublicationBlocks ? "b.block_code" : "NULL AS block_code"}
+      ${hasPublicationBlocks ? 'b.block_code' : 'NULL AS block_code'}
     FROM product_llm_completion_jobs j
     JOIN product_senses ps ON ps.id = j.target_id
     JOIN product_entries pe ON pe.id = ps.product_entry_id
-    ${hasPublicationBlocks ? "LEFT JOIN product_sense_publication_blocks b ON b.product_sense_id = ps.id" : ""}
+    ${hasPublicationBlocks ? 'LEFT JOIN product_sense_publication_blocks b ON b.product_sense_id = ps.id' : ''}
     WHERE j.status IN ('failed', 'needs_review')
       AND j.target_type = 'product_sense_localization'
       AND ps.status IN ('needs_review', 'ready_for_llm')
@@ -67,7 +67,7 @@ const senseRows = db
       ps.part_of_speech,
       ps.gloss_key,
       ps.status,
-      ${hasPublicationBlocks ? "b.block_code" : "NULL AS block_code"},
+      ${hasPublicationBlocks ? 'b.block_code' : 'NULL AS block_code'},
       (
         SELECT COUNT(DISTINCT pl.lang)
         FROM product_localizations pl
@@ -76,7 +76,7 @@ const senseRows = db
       ) AS clean_langs
     FROM product_senses ps
     JOIN product_entries pe ON pe.id = ps.product_entry_id
-    ${hasPublicationBlocks ? "LEFT JOIN product_sense_publication_blocks b ON b.product_sense_id = ps.id" : ""}
+    ${hasPublicationBlocks ? 'LEFT JOIN product_sense_publication_blocks b ON b.product_sense_id = ps.id' : ''}
     WHERE ps.status IN ('needs_review', 'ready_for_llm')
     ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.headword, ps.sense_order
   `
@@ -88,7 +88,7 @@ const blockedJobBuckets = new Map();
 for (const row of jobs) {
   const parsed = parseJobOutput(row.output_json);
   if (row.block_code) {
-    pushBucket(blockedJobBuckets, "blocked_publication_job", buildJobSample(row, parsed));
+    pushBucket(blockedJobBuckets, 'blocked_publication_job', buildJobSample(row, parsed));
     continue;
   }
 
@@ -124,39 +124,39 @@ console.log(JSON.stringify(result, null, 2));
 db.close();
 
 function classifyJob(row, parsed) {
-  if (row.status === "failed") {
-    if (/content is not JSON|SyntaxError|Bad escaped character/i.test(row.error || "")) {
-      return "json_parse_failed";
+  if (row.status === 'failed') {
+    if (/content is not JSON|SyntaxError|Bad escaped character/i.test(row.error || '')) {
+      return 'json_parse_failed';
     }
-    return "failed_other";
+    return 'failed_other';
   }
 
-  const term = parsed.localization?.term || "";
-  const definition = parsed.localization?.definition || "";
-  const error = row.error || "";
+  const term = parsed.localization?.term || '';
+  const definition = parsed.localization?.definition || '';
+  const error = row.error || '';
 
   if (/alternative form|variant of|only used in|classifier|CL:/i.test(term)) {
-    return "source_leak_term_cross_reference";
+    return 'source_leak_term_cross_reference';
   }
-  if (containsCjk(term) && !["zh", "ja"].includes(row.lang)) {
-    return "source_leak_term_cjk";
+  if (containsCjk(term) && !['zh', 'ja'].includes(row.lang)) {
+    return 'source_leak_term_cjk';
   }
-  if (row.lang === "zh" && containsKana(term)) {
-    return "wrong_script_term_zh_has_kana";
+  if (row.lang === 'zh' && containsKana(term)) {
+    return 'wrong_script_term_zh_has_kana';
   }
-  if (row.lang === "ja" && /^[A-Za-z][A-Za-z -]*$/.test(term)) {
-    return "wrong_script_term_ja_has_latin";
+  if (row.lang === 'ja' && /^[A-Za-z][A-Za-z -]*$/.test(term)) {
+    return 'wrong_script_term_ja_has_latin';
   }
   if (/pronunciation looks unrelated/i.test(error)) {
-    return "pronunciation_validation";
+    return 'pronunciation_validation';
   }
   if (/definition language looks suspicious/i.test(error)) {
-    if (containsCjk(definition) && ["en", "pt-BR"].includes(row.lang)) return "wrong_script_definition_cjk";
-    return "definition_language_suspicious";
+    if (containsCjk(definition) && ['en', 'pt-BR'].includes(row.lang)) return 'wrong_script_definition_cjk';
+    return 'definition_language_suspicious';
   }
-  if (/term language looks suspicious/i.test(error)) return "term_language_suspicious";
-  if (/reading/i.test(error)) return "reading_validation";
-  return "needs_review_other";
+  if (/term language looks suspicious/i.test(error)) return 'term_language_suspicious';
+  if (/reading/i.test(error)) return 'reading_validation';
+  return 'needs_review_other';
 }
 
 function buildJobSample(row, parsed) {
@@ -179,17 +179,17 @@ function buildJobSample(row, parsed) {
 }
 
 function classifySense(row) {
-  if (row.block_code) return "blocked_publication";
-  const gloss = row.gloss_key || "";
-  if (/alternative form|variant of|only used in/i.test(gloss)) return "variant_or_cross_reference_only";
-  if (row.clean_langs >= 3) return "mostly_complete_needs_one_slot";
-  if (row.frequency_rank != null && row.frequency_rank <= 5000) return "high_frequency_incomplete";
-  return "incomplete_or_low_confidence";
+  if (row.block_code) return 'blocked_publication';
+  const gloss = row.gloss_key || '';
+  if (/alternative form|variant of|only used in/i.test(gloss)) return 'variant_or_cross_reference_only';
+  if (row.clean_langs >= 3) return 'mostly_complete_needs_one_slot';
+  if (row.frequency_rank != null && row.frequency_rank <= 5000) return 'high_frequency_incomplete';
+  return 'incomplete_or_low_confidence';
 }
 
 function parseJobOutput(value) {
   try {
-    const parsed = JSON.parse(value || "{}");
+    const parsed = JSON.parse(value || '{}');
     return { localization: parsed.sense_localization || null };
   } catch {
     return { localization: null };
@@ -219,34 +219,34 @@ function summarizeBuckets(map, sampleLimit) {
 
 function buildRecommendedNextSteps(jobBuckets, senseBuckets) {
   const hasActionableJobs = jobBuckets.size > 0;
-  const hasActionableSenses = [...senseBuckets.keys()].some((key) => key !== "blocked_publication");
+  const hasActionableSenses = [...senseBuckets.keys()].some((key) => key !== 'blocked_publication');
   if (!hasActionableJobs && !hasActionableSenses) {
     return [
-      "no actionable residual jobs remain under the current audit policy",
-      "keep blocked_publication senses excluded from D1 export unless better source data is added",
-      "run release preflight and deploy only if export inputs changed"
+      'no actionable residual jobs remain under the current audit policy',
+      'keep blocked_publication senses excluded from D1 export unless better source data is added',
+      'run release preflight and deploy only if export inputs changed'
     ];
   }
 
   return [
-    "rule-repair source_leak_term when a reliable target term can be extracted from existing clean localizations",
-    "create a stricter retry prompt for json_parse_failed jobs only",
-    "mark variant_or_cross_reference_only senses as non-publishable when they have no stable lexical equivalent",
-    "rerun regression and D1 export after residual issue count is stable"
+    'rule-repair source_leak_term when a reliable target term can be extracted from existing clean localizations',
+    'create a stricter retry prompt for json_parse_failed jobs only',
+    'mark variant_or_cross_reference_only senses as non-publishable when they have no stable lexical equivalent',
+    'rerun regression and D1 export after residual issue count is stable'
   ];
 }
 
 function containsCjk(value) {
-  return /[\u3400-\u9fff]/u.test(String(value || ""));
+  return /[\u3400-\u9fff]/u.test(String(value || ''));
 }
 
 function containsKana(value) {
-  return /[\u3040-\u30ff]/u.test(String(value || ""));
+  return /[\u3040-\u30ff]/u.test(String(value || ''));
 }
 
 function abbreviate(value, maxLength) {
   if (value == null) return null;
-  const text = String(value).replace(/\s+/g, " ").trim();
+  const text = String(value).replace(/\s+/g, ' ').trim();
   return text.length <= maxLength ? text : `${text.slice(0, maxLength - 1)}...`;
 }
 
@@ -254,10 +254,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

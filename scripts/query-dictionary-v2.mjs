@@ -1,14 +1,14 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_pilot.db";
-const LANGS = ["zh", "en", "pt-BR", "ja"];
+const DEFAULT_DB = 'data/processed/linguago_v2_pilot.db';
+const LANGS = ['zh', 'en', 'pt-BR', 'ja'];
 
 const term = process.argv[2];
 const dbPath = path.resolve(process.argv[3] || DEFAULT_DB);
 
 if (!term) {
-  console.error("Usage: node scripts/query-dictionary-v2.mjs <term> [db-file]");
+  console.error('Usage: node scripts/query-dictionary-v2.mjs <term> [db-file]');
   process.exit(1);
 }
 
@@ -149,7 +149,7 @@ function primaryTranslations(senses) {
 function byLang(rows) {
   const output = emptyLangObject();
   for (const row of rows) {
-    output[row.lang] = Object.fromEntries(Object.entries(row).filter(([key]) => key !== "lang"));
+    output[row.lang] = Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'lang'));
   }
   return output;
 }
@@ -159,5 +159,8 @@ function emptyLangObject() {
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }

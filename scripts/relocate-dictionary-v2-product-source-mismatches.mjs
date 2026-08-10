@@ -1,49 +1,49 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
-const DEFAULT_OUT = "data/processed/product-source-mismatch-relocations.json";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
+const DEFAULT_OUT = 'data/processed/product-source-mismatch-relocations.json';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const outPath = path.resolve(args.out || DEFAULT_OUT);
-const dryRun = args["dry-run"] === "true";
-const apply = args.apply === "true";
-const clearGeneratedContent = args["clear-generated-content"] !== "false";
-const langs = String(args.langs || "zh")
-  .split(",")
+const dryRun = args['dry-run'] === 'true';
+const apply = args.apply === 'true';
+const clearGeneratedContent = args['clear-generated-content'] !== 'false';
+const langs = String(args.langs || 'zh')
+  .split(',')
   .map((lang) => lang.trim())
   .filter(Boolean);
-const maxHeadwordLength = Number(args["max-headword-length"] || 1);
-const maxSourceWordLength = Number(args["max-source-word-length"] || maxHeadwordLength || 1);
-const singleSourceOnly = args["single-source-only"] === "true";
-const sourceStatuses = String(args["source-statuses"] || "")
-  .split(",")
+const maxHeadwordLength = Number(args['max-headword-length'] || 1);
+const maxSourceWordLength = Number(args['max-source-word-length'] || maxHeadwordLength || 1);
+const singleSourceOnly = args['single-source-only'] === 'true';
+const sourceStatuses = String(args['source-statuses'] || '')
+  .split(',')
   .map((status) => status.trim())
   .filter(Boolean);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!dryRun && !apply) {
-  throw new Error("Pass --dry-run true to inspect or --apply true to relocate mismatches.");
+  throw new Error('Pass --dry-run true to inspect or --apply true to relocate mismatches.');
 }
-if (!langs.length) throw new Error("--langs must include at least one language");
+if (!langs.length) throw new Error('--langs must include at least one language');
 if (!Number.isFinite(maxHeadwordLength) || maxHeadwordLength < 0) {
-  throw new Error("--max-headword-length must be a non-negative number");
+  throw new Error('--max-headword-length must be a non-negative number');
 }
 if (!Number.isFinite(maxSourceWordLength) || maxSourceWordLength < 0) {
-  throw new Error("--max-source-word-length must be a non-negative number");
+  throw new Error('--max-source-word-length must be a non-negative number');
 }
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 
-const langClause = langs.map(() => "?").join(", ");
-const statusClause = sourceStatuses.length ? `AND ps.status IN (${sourceStatuses.map(() => "?").join(", ")})` : "";
-const headwordLengthClause = maxHeadwordLength ? "AND length(pe.headword) <= ?" : "";
-const sourceWordLengthClause = maxSourceWordLength ? "AND length(l.source_word) <= ?" : "";
-const singleSourceOnlyHaving = singleSourceOnly ? "AND COUNT(l.id) = 1" : "";
+const langClause = langs.map(() => '?').join(', ');
+const statusClause = sourceStatuses.length ? `AND ps.status IN (${sourceStatuses.map(() => '?').join(', ')})` : '';
+const headwordLengthClause = maxHeadwordLength ? 'AND length(pe.headword) <= ?' : '';
+const sourceWordLengthClause = maxSourceWordLength ? 'AND length(l.source_word) <= ?' : '';
+const singleSourceOnlyHaving = singleSourceOnly ? 'AND COUNT(l.id) = 1' : '';
 
 const statements = {
   candidates: db.prepare(`
@@ -200,7 +200,7 @@ const skipped = [];
 
 for (const row of rawCandidates) {
   if (row.distinct_source_words !== 1) {
-    skipped.push({ ...row, reason: "multiple_distinct_source_words" });
+    skipped.push({ ...row, reason: 'multiple_distinct_source_words' });
     continue;
   }
   const target = getOrPlanTargetEntry(row);
@@ -324,10 +324,10 @@ function refreshEntry(productEntryId) {
   const aggregate = statements.aggregateEntry.get(productEntryId);
   const statuses = statements.statusCounts.all(productEntryId);
   const total = statuses.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = statuses.find((row) => row.status === "accepted")?.count || 0;
-  const hasNeedsReview = statuses.some((row) => row.status === "needs_review");
-  const hasDraft = statuses.some((row) => String(row.status).startsWith("draft_"));
-  const status = accepted === total ? "accepted" : hasNeedsReview || hasDraft ? "needs_review" : "ready_for_llm";
+  const accepted = statuses.find((row) => row.status === 'accepted')?.count || 0;
+  const hasNeedsReview = statuses.some((row) => row.status === 'needs_review');
+  const hasDraft = statuses.some((row) => String(row.status).startsWith('draft_'));
+  const status = accepted === total ? 'accepted' : hasNeedsReview || hasDraft ? 'needs_review' : 'ready_for_llm';
   statements.updateEntry.run({
     id: productEntryId,
     status,
@@ -341,10 +341,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

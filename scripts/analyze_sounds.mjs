@@ -15,14 +15,18 @@ const multiExamples = [];
 
 for (const row of rows) {
   let parsed;
-  try { parsed = JSON.parse(row.data); } catch { continue; }
-  
+  try {
+    parsed = JSON.parse(row.data);
+  } catch {
+    continue;
+  }
+
   const enTrans = parsed.translations?.en;
   if (!enTrans || !Array.isArray(enTrans) || enTrans.length === 0) continue;
-  
+
   hasEnBase++;
   const sounds = parsed.sounds || [];
-  
+
   if (sounds.length === 0) {
     noSounds++;
   } else if (sounds.length === 1) {
@@ -32,7 +36,7 @@ for (const row of rows) {
     if (multiExamples.length < 5) {
       multiExamples.push({
         word: row.word,
-        sounds: sounds.map(s => s.value),
+        sounds: sounds.map((s) => s.value),
         senseCount: enTrans.length
       });
     }
@@ -41,10 +45,10 @@ for (const row of rows) {
 }
 
 console.log(`Total valid entries (has en base): ${hasEnBase}`);
-console.log(`No sounds:          ${noSounds} (${(noSounds/hasEnBase*100).toFixed(1)}%)`);
-console.log(`Single pronunciation: ${onePron} (${(onePron/hasEnBase*100).toFixed(1)}%)`);
-console.log(`Multi pronunciation:  ${multiPron} (${(multiPron/hasEnBase*100).toFixed(1)}%)`);
+console.log(`No sounds:          ${noSounds} (${((noSounds / hasEnBase) * 100).toFixed(1)}%)`);
+console.log(`Single pronunciation: ${onePron} (${((onePron / hasEnBase) * 100).toFixed(1)}%)`);
+console.log(`Multi pronunciation:  ${multiPron} (${((multiPron / hasEnBase) * 100).toFixed(1)}%)`);
 console.log(`\nMulti-pronunciation examples:`);
-multiExamples.forEach(e => {
+multiExamples.forEach((e) => {
   console.log(`  ${e.word}: sounds=[${e.sounds.join(', ')}], senses=${e.senseCount}`);
 });

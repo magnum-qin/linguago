@@ -1,10 +1,10 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_OUT = "logs/product-mergeable-duplicate-senses-20260624.json";
-const LANGS = ["en", "pt-BR", "zh", "ja"];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_OUT = 'logs/product-mergeable-duplicate-senses-20260624.json';
+const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
@@ -49,11 +49,13 @@ for (const sense of senses) {
     ...sense,
     localizations,
     source_links: sourceLinksStmt.all(sense.id),
-    term_signature: LANGS.map((lang) => `${lang}:${norm(localizations.find((row) => row.lang === lang)?.term)}`).join("|"),
+    term_signature: LANGS.map((lang) => `${lang}:${norm(localizations.find((row) => row.lang === lang)?.term)}`).join(
+      '|'
+    ),
     semantic_signature: LANGS.map((lang) => {
       const loc = localizations.find((row) => row.lang === lang);
       return `${lang}:${norm(loc?.term)}=${norm(loc?.definition)}`;
-    }).join("|")
+    }).join('|')
   };
   if (!byEntry.has(sense.product_entry_id)) byEntry.set(sense.product_entry_id, []);
   byEntry.get(sense.product_entry_id).push(item);
@@ -95,22 +97,22 @@ const report = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
 db.close();
 
 console.log(JSON.stringify({ ok: true, out: path.relative(process.cwd(), outPath), summary: report.summary }, null, 2));
 
 function classifyPair(left, right) {
   if (left.semantic_signature === right.semantic_signature) {
-    return { mergeable: true, reason: "four_lang_term_definition_exact", confidence: 0.98 };
+    return { mergeable: true, reason: 'four_lang_term_definition_exact', confidence: 0.98 };
   }
   if (left.term_signature === right.term_signature && matchingDefinitions(left, right) >= 3) {
-    return { mergeable: true, reason: "four_lang_terms_and_three_definitions_match", confidence: 0.92 };
+    return { mergeable: true, reason: 'four_lang_terms_and_three_definitions_match', confidence: 0.92 };
   }
   if (left.term_signature === right.term_signature && sourceOverlap(left, right)) {
-    return { mergeable: true, reason: "four_lang_terms_and_source_overlap", confidence: 0.88 };
+    return { mergeable: true, reason: 'four_lang_terms_and_source_overlap', confidence: 0.88 };
   }
-  return { mergeable: false, reason: "", confidence: 0 };
+  return { mergeable: false, reason: '', confidence: 0 };
 }
 
 function matchingDefinitions(left, right) {
@@ -124,8 +126,12 @@ function matchingDefinitions(left, right) {
 }
 
 function sourceOverlap(left, right) {
-  const leftKeys = new Set(left.source_links.map((row) => `${row.source_lang}:${norm(row.source_word)}:${row.source_sense_id}`));
-  return right.source_links.some((row) => leftKeys.has(`${row.source_lang}:${norm(row.source_word)}:${row.source_sense_id}`));
+  const leftKeys = new Set(
+    left.source_links.map((row) => `${row.source_lang}:${norm(row.source_word)}:${row.source_sense_id}`)
+  );
+  return right.source_links.some((row) =>
+    leftKeys.has(`${row.source_lang}:${norm(row.source_word)}:${row.source_sense_id}`)
+  );
 }
 
 function chooseKeeper(left, right) {
@@ -139,12 +145,18 @@ function summarizeSense(sense) {
     sense_order: sense.sense_order,
     gloss_key: sense.gloss_key,
     source_links: sense.source_links,
-    localizations: Object.fromEntries(sense.localizations.map((row) => [row.lang, { term: row.term, definition: row.definition }]))
+    localizations: Object.fromEntries(
+      sense.localizations.map((row) => [row.lang, { term: row.term, definition: row.definition }])
+    )
   };
 }
 
 function norm(value) {
-  return String(value || "").normalize("NFKC").trim().replace(/\s+/gu, " ").toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLocaleLowerCase();
 }
 
 function countBy(values) {
@@ -157,14 +169,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;

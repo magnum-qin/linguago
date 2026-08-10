@@ -1,31 +1,31 @@
-import Database from "better-sqlite3";
-import csv from "csv-parser";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import csv from 'csv-parser';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_ECDICT = "data/raw/ecdict.csv";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_ECDICT = 'data/raw/ecdict.csv';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const ecdictPath = path.resolve(args.ecdict || DEFAULT_ECDICT);
-const dryRun = args["dry-run"] !== "false";
-const minSameTermCount = args["min-same-term-count"] ? Number(args["min-same-term-count"]) : 2;
-const allowUniqueSameTerm = args["allow-unique-same-term"] === "true";
-const sameTermSourceAllowRegex = args["same-term-source-allow-regex"]
-  ? new RegExp(args["same-term-source-allow-regex"], "i")
+const dryRun = args['dry-run'] !== 'false';
+const minSameTermCount = args['min-same-term-count'] ? Number(args['min-same-term-count']) : 2;
+const allowUniqueSameTerm = args['allow-unique-same-term'] === 'true';
+const sameTermSourceAllowRegex = args['same-term-source-allow-regex']
+  ? new RegExp(args['same-term-source-allow-regex'], 'i')
   : null;
-const useEcdict = args["use-ecdict"] !== "false";
+const useEcdict = args['use-ecdict'] !== 'false';
 const limit = args.limit ? Number(args.limit) : 0;
 
 if (!Number.isInteger(minSameTermCount) || minSameTermCount < 1) {
-  throw new Error(`Invalid --min-same-term-count: ${args["min-same-term-count"]}`);
+  throw new Error(`Invalid --min-same-term-count: ${args['min-same-term-count']}`);
 }
 if (limit && (!Number.isInteger(limit) || limit < 1)) throw new Error(`Invalid --limit: ${args.limit}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const ecdict = useEcdict ? await loadEcdict(ecdictPath) : new Map();
 
@@ -49,7 +49,7 @@ const missingRows = db
       AND NULLIF(TRIM(pl.term), '') IS NOT NULL
     ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.normalized_key, ps.sense_order, ps.id,
       CASE pl.lang WHEN 'en' THEN 1 ELSE 2 END
-    ${limit ? "LIMIT ?" : ""}
+    ${limit ? 'LIMIT ?' : ''}
   `
   )
   .all(...(limit ? [limit] : []));
@@ -69,19 +69,19 @@ for (const row of missingRows) {
     updates.push({
       ...row,
       pronunciation: sameTerm.pronunciation,
-      pronunciation_system: sameTerm.pronunciation_system || "inferred",
+      pronunciation_system: sameTerm.pronunciation_system || 'inferred',
       source: `deterministic:same-term:n${sameTerm.count}`
     });
     continue;
   }
 
-  if (row.lang === "en" && ecdict.has(normalizeTerm(row.term))) {
+  if (row.lang === 'en' && ecdict.has(normalizeTerm(row.term))) {
     const phonetic = ecdict.get(normalizeTerm(row.term));
     updates.push({
       ...row,
       pronunciation: phonetic,
-      pronunciation_system: "ecdict-phonetic",
-      source: "deterministic:ecdict"
+      pronunciation_system: 'ecdict-phonetic',
+      source: 'deterministic:ecdict'
     });
     continue;
   }
@@ -113,12 +113,12 @@ const summary = {
   dry_run: dryRun,
   min_same_term_count: minSameTermCount,
   allow_unique_same_term: allowUniqueSameTerm,
-  same_term_source_allow_regex: args["same-term-source-allow-regex"] || null,
+  same_term_source_allow_regex: args['same-term-source-allow-regex'] || null,
   use_ecdict: useEcdict,
   candidates: missingRows.length,
   updates_planned: updates.length,
-  updates_by_lang: countBy(updates, "lang"),
-  updates_by_source: countBy(updates, "source"),
+  updates_by_lang: countBy(updates, 'lang'),
+  updates_by_source: countBy(updates, 'source'),
   skipped: skipped.length,
   samples: updates.slice(0, 30).map((item) => ({
     sense_id: item.product_sense_id,
@@ -195,7 +195,7 @@ function buildSameTermPronunciations(database, minCount, allowUnique, sourceAllo
     .all(minCount, allowUnique ? 1 : 0);
   return new Map(
     rows
-      .filter((row) => !sourceAllowRegex || sourceAllowRegex.test(row.sources || ""))
+      .filter((row) => !sourceAllowRegex || sourceAllowRegex.test(row.sources || ''))
       .map((row) => [`${row.lang}\t${row.normalized_term}`, row])
   );
 }
@@ -205,26 +205,29 @@ function loadEcdict(file) {
     const map = new Map();
     fs.createReadStream(file)
       .pipe(csv())
-      .on("data", (row) => {
+      .on('data', (row) => {
         const word = normalizeTerm(row.word);
         const phonetic = cleanPhonetic(row.phonetic);
         if (!word || !phonetic) return;
         if (!map.has(word)) map.set(word, phonetic);
       })
-      .on("error", reject)
-      .on("end", () => resolve(map));
+      .on('error', reject)
+      .on('end', () => resolve(map));
   });
 }
 
 function cleanPhonetic(value) {
-  const text = String(value || "").trim();
-  if (!text) return "";
-  if (text.length > 80) return "";
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (text.length > 80) return '';
   return text;
 }
 
 function normalizeTerm(value) {
-  return String(value || "").normalize("NFKC").trim().toLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase();
 }
 
 function countBy(items, key) {
@@ -239,10 +242,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

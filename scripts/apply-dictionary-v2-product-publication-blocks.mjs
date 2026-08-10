@@ -1,23 +1,23 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_BLOCKS = "config/dictionary-overrides/product-publication-blocks.json";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_BLOCKS = 'config/dictionary-overrides/product-publication-blocks.json';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const blocksPath = path.resolve(args.blocks || DEFAULT_BLOCKS);
-const apply = args.apply === "true";
+const apply = args.apply === 'true';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!fs.existsSync(blocksPath)) throw new Error(`Blocks file not found: ${blocksPath}`);
 
-const rows = JSON.parse(fs.readFileSync(blocksPath, "utf8"));
-if (!Array.isArray(rows)) throw new Error("Publication blocks file must be a JSON array.");
+const rows = JSON.parse(fs.readFileSync(blocksPath, 'utf8'));
+if (!Array.isArray(rows)) throw new Error('Publication blocks file must be a JSON array.');
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 db.prepare(
   `
@@ -79,7 +79,7 @@ const statements = {
     WHERE product_entry_id = ?
     GROUP BY status
   `),
-  setEntryStatus: db.prepare("UPDATE product_entries SET status = ? WHERE id = ?"),
+  setEntryStatus: db.prepare('UPDATE product_entries SET status = ? WHERE id = ?'),
   blockSummary: db.prepare(`
     SELECT block_code, COUNT(*) AS count
     FROM product_sense_publication_blocks
@@ -115,20 +115,27 @@ function resolveTarget(row) {
 }
 
 function validateBlock(row) {
-  if (!["blocked_source_ambiguous", "blocked_source_unstable", "non_publishable"].includes(row.block_code)) {
+  if (!['blocked_source_ambiguous', 'blocked_source_unstable', 'non_publishable'].includes(row.block_code)) {
     return `invalid_block_code:${row.block_code}`;
   }
-  if (!row.rationale || typeof row.rationale !== "string") return "missing_rationale";
+  if (!row.rationale || typeof row.rationale !== 'string') return 'missing_rationale';
   return null;
 }
 
 function updateEntryStatus(entryId) {
   const counts = statements.entryStatusCounts.all(entryId);
   const total = counts.reduce((sum, row) => sum + Number(row.count), 0);
-  const accepted = counts.find((row) => row.status === "accepted")?.count || 0;
-  const needsReview = counts.find((row) => row.status === "needs_review")?.count || 0;
-  const ready = counts.find((row) => row.status === "ready_for_llm")?.count || 0;
-  const status = accepted === total ? "accepted" : needsReview > 0 ? "needs_review" : ready > 0 ? "ready_for_llm" : "draft_single_source";
+  const accepted = counts.find((row) => row.status === 'accepted')?.count || 0;
+  const needsReview = counts.find((row) => row.status === 'needs_review')?.count || 0;
+  const ready = counts.find((row) => row.status === 'ready_for_llm')?.count || 0;
+  const status =
+    accepted === total
+      ? 'accepted'
+      : needsReview > 0
+        ? 'needs_review'
+        : ready > 0
+          ? 'ready_for_llm'
+          : 'draft_single_source';
   statements.setEntryStatus.run(status, entryId);
 }
 
@@ -141,7 +148,7 @@ const tx = db.transaction(() => {
     }
     const sense = resolveTarget(row);
     if (!sense) {
-      stats.skipped.push({ target: row.target, reason: "sense_not_found" });
+      stats.skipped.push({ target: row.target, reason: 'sense_not_found' });
       continue;
     }
     stats.resolved++;
@@ -170,10 +177,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

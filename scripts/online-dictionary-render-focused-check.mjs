@@ -29,6 +29,9 @@ const terms = [
   { term: '\u4f55\u6642', expectedText: ['when', 'what time'] },
   { term: '\u56fd\u969b', expectedText: ['international'] },
   { term: '\u30d3\u30b8\u30bf\u30fc', expectedText: ['visitor', 'visiting team'] },
+  { term: 'maremoto', expectedText: ['seaquake', 'IPA'] },
+  { term: 'is\u00f4mero', expectedText: ['isomer', 'IPA'] },
+  { term: 'eucarionte', expectedText: ['eukaryote', 'membrane-bound nucleus', 'IPA'] },
   { term: 'supersimetria', expectedText: ['supersymmetry', 'IPA'] }
 ];
 
@@ -82,7 +85,8 @@ if (failures.length > 0) {
 async function checkRenderedTerm(page, item, viewportName, ordinal) {
   await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
   let rendered = false;
-  for (let attempt = 1; attempt <= 2 && !rendered; attempt += 1) {
+  const expectedStableText = item.expectedText.map(normalizeSearchText);
+  for (let attempt = 1; attempt <= 3 && !rendered; attempt += 1) {
     if (attempt > 1) {
       await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
     }
@@ -106,15 +110,31 @@ async function checkRenderedTerm(page, item, viewportName, ordinal) {
     await translateButton.click();
     rendered = await page
       .waitForFunction(
-        () => {
-          const text = document.body.innerText.toLowerCase();
-          return text.includes('dictionary') || text.includes('dicion');
+        (expected) => {
+          const text = document.body.innerText
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .toLowerCase();
+          return expected.some((value) => text.includes(value));
         },
-        undefined,
+        expectedStableText,
         { timeout: attempt === 1 ? 15000 : 45000 }
       )
       .then(() => true)
       .catch(() => false);
+    if (rendered) {
+      await page.waitForTimeout(750);
+      rendered = await page.evaluate(
+        (expected) => {
+          const text = document.body.innerText
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .toLowerCase();
+          return expected.some((value) => text.includes(value));
+        },
+        expectedStableText
+      );
+    }
   }
   if (!rendered) throw new Error(`No rendered result after retrying ${item.term}`);
   await page.waitForTimeout(900);
@@ -202,4 +222,11 @@ function safeName(value) {
       .replace(/^-+|-+$/g, '')
       .slice(0, 40) || 'term'
   );
+}
+
+function normalizeSearchText(value) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
 }

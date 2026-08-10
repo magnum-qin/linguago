@@ -1,14 +1,16 @@
-import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import initSqlJs from "sql.js";
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import initSqlJs from 'sql.js';
 
-const INPUT = path.resolve(process.argv[2] || "data/processed/generated_dictionary.accepted.jsonl");
-const DB_FILE = path.resolve(process.argv[3] || "data/dictionary.sqlite");
-const SCHEMA_FILE = path.resolve("data/schema/dictionary.sql");
-const SOURCE_CANDIDATES_FILE = path.resolve(process.env.DICTIONARY_CANDIDATES_FILE || "data/processed/frequency_candidates.jsonl");
-const SQL_WASM = path.resolve("node_modules/sql.js/dist/sql-wasm.wasm");
-const LANGS = ["zh", "en", "pt-BR", "ja"];
+const INPUT = path.resolve(process.argv[2] || 'data/processed/generated_dictionary.accepted.jsonl');
+const DB_FILE = path.resolve(process.argv[3] || 'data/dictionary.sqlite');
+const SCHEMA_FILE = path.resolve('data/schema/dictionary.sql');
+const SOURCE_CANDIDATES_FILE = path.resolve(
+  process.env.DICTIONARY_CANDIDATES_FILE || 'data/processed/frequency_candidates.jsonl'
+);
+const SQL_WASM = path.resolve('node_modules/sql.js/dist/sql-wasm.wasm');
+const LANGS = ['zh', 'en', 'pt-BR', 'ja'];
 const sourceLangHints = loadSourceLangHints(INPUT, SOURCE_CANDIDATES_FILE);
 
 if (!fs.existsSync(INPUT)) throw new Error(`Input file not found: ${INPUT}`);
@@ -17,15 +19,13 @@ if (!fs.existsSync(SCHEMA_FILE)) throw new Error(`Schema file not found: ${SCHEM
 fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
 
 const SQL = await initSqlJs({ wasmBinary: fs.readFileSync(SQL_WASM) });
-const db = fs.existsSync(DB_FILE)
-  ? new SQL.Database(fs.readFileSync(DB_FILE))
-  : new SQL.Database();
+const db = fs.existsSync(DB_FILE) ? new SQL.Database(fs.readFileSync(DB_FILE)) : new SQL.Database();
 
-db.run(fs.readFileSync(SCHEMA_FILE, "utf8"));
+db.run(fs.readFileSync(SCHEMA_FILE, 'utf8'));
 runMigrations(db);
 
 const rows = fs
-  .readFileSync(INPUT, "utf8")
+  .readFileSync(INPUT, 'utf8')
   .split(/\r?\n/)
   .filter(Boolean)
   .map((line) => JSON.parse(line));
@@ -118,12 +118,12 @@ const upsertPronunciation = db.prepare(`
     updated_at = CURRENT_TIMESTAMP
 `);
 
-db.run("BEGIN");
+db.run('BEGIN');
 let imported = 0;
 try {
   for (const row of rows) {
     const entry = row.entry;
-    if (!entry || entry.type !== "word") continue;
+    if (!entry || entry.type !== 'word') continue;
 
     const normalized = normalize(entry.normalized_text || entry.source_text);
     const sourceLang = sourceLangFromRow(row, entry.source_text);
@@ -136,7 +136,7 @@ try {
     };
 
     insertEntry.run([
-      "word",
+      'word',
       sourceLang,
       entry.source_text,
       normalized,
@@ -155,18 +155,18 @@ try {
       upsertTranslation.run([
         entryId,
         lang,
-        translation.text || detail.word || "",
-        normalize(translation.text || detail.word || ""),
+        translation.text || detail.word || '',
+        normalize(translation.text || detail.word || ''),
         0.9,
-        JSON.stringify({ source: "model" })
+        JSON.stringify({ source: 'model' })
       ]);
 
       upsertPronunciation.run([
         entryId,
         lang,
-        translation.phonetic || "",
-        translation.audio_text || translation.text || "",
-        JSON.stringify({ source: "model" })
+        translation.phonetic || '',
+        translation.audio_text || translation.text || '',
+        JSON.stringify({ source: 'model' })
       ]);
     }
 
@@ -178,20 +178,20 @@ try {
         entryId,
         Number.isFinite(senseOrder) ? senseOrder : 1,
         index + 1,
-        example.sentence || "",
-        example.translations?.zh || "",
-        example.translations?.en || "",
-        example.translations?.["pt-BR"] || "",
-        example.translations?.ja || "",
-        JSON.stringify({ source: "model" })
+        example.sentence || '',
+        example.translations?.zh || '',
+        example.translations?.en || '',
+        example.translations?.['pt-BR'] || '',
+        example.translations?.ja || '',
+        JSON.stringify({ source: 'model' })
       ]);
     }
 
     imported += 1;
   }
-  db.run("COMMIT");
+  db.run('COMMIT');
 } catch (error) {
-  db.run("ROLLBACK");
+  db.run('ROLLBACK');
   throw error;
 } finally {
   insertEntry.free();
@@ -204,9 +204,7 @@ try {
 }
 
 function upsertSensesAndDefinitions(entryId, entry, metadata) {
-  const senses = Array.isArray(entry.senses) && entry.senses.length
-    ? entry.senses
-    : [senseFromLegacyEntry(entry)];
+  const senses = Array.isArray(entry.senses) && entry.senses.length ? entry.senses : [senseFromLegacyEntry(entry)];
 
   const normalizedSenses = [];
   for (const [index, sense] of senses.entries()) {
@@ -221,7 +219,7 @@ function upsertSensesAndDefinitions(entryId, entry, metadata) {
       stringOrNull(sense.domain_label || sense.domain),
       Number.isFinite(Number(sense.frequency_rank)) ? Number(sense.frequency_rank) : null,
       Number.isFinite(Number(sense.confidence)) ? Number(sense.confidence) : 0.85,
-      JSON.stringify({ source: "model", imported_from: metadata.imported_from })
+      JSON.stringify({ source: 'model', imported_from: metadata.imported_from })
     ]);
 
     for (const lang of LANGS) {
@@ -229,14 +227,14 @@ function upsertSensesAndDefinitions(entryId, entry, metadata) {
         stringOrNull(sense.definitions?.[lang]) ||
         stringOrNull(sense.word_details?.[lang]?.definition) ||
         (normalizedSenseOrder === 1 ? stringOrNull(entry.word_details?.[lang]?.definition) : null) ||
-        "";
+        '';
 
       upsertDefinition.run([
         entryId,
         lang,
         normalizedSenseOrder,
         definition,
-        JSON.stringify({ source: "model", imported_from: metadata.imported_from })
+        JSON.stringify({ source: 'model', imported_from: metadata.imported_from })
       ]);
     }
 
@@ -264,21 +262,21 @@ function summarizeSense(sense) {
     const definition = sense.definitions?.[lang] || sense.word_details?.[lang]?.definition;
     if (definition) return definition;
   }
-  return "";
+  return '';
 }
 
 function stringOrNull(value) {
-  const text = String(value || "").trim();
+  const text = String(value || '').trim();
   return text || null;
 }
 
 function runMigrations(db) {
-  ensureColumn(db, "dictionary_examples", "sense_order", "INTEGER NOT NULL DEFAULT 1");
+  ensureColumn(db, 'dictionary_examples', 'sense_order', 'INTEGER NOT NULL DEFAULT 1');
   ensureUniqueIndex(
     db,
-    "idx_dictionary_examples_entry_sense_example",
-    "dictionary_examples",
-    "entry_id, sense_order, example_order"
+    'idx_dictionary_examples_entry_sense_example',
+    'dictionary_examples',
+    'entry_id, sense_order, example_order'
   );
 }
 
@@ -336,7 +334,7 @@ function loadSourceLangHints(inputFile, candidatesFile) {
   if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) return new Map();
 
   const hints = new Map();
-  const lines = fs.readFileSync(candidatesFile, "utf8").split(/\r?\n/).filter(Boolean);
+  const lines = fs.readFileSync(candidatesFile, 'utf8').split(/\r?\n/).filter(Boolean);
   for (const line of lines.slice(start - 1, end)) {
     const candidate = JSON.parse(line);
     if (!LANGS.includes(candidate.source_lang)) continue;
@@ -347,17 +345,20 @@ function loadSourceLangHints(inputFile, candidatesFile) {
 }
 
 function detectSourceLang(text) {
-  if (/[\u3040-\u30ff]/u.test(text)) return "ja";
-  if (/[\u3400-\u9fff]/u.test(text)) return "zh";
-  if (/[ãõáéíóúâêôç]/iu.test(text)) return "pt-BR";
-  if (/^[a-z' -]+$/i.test(text)) return "en";
-  return "unknown";
+  if (/[\u3040-\u30ff]/u.test(text)) return 'ja';
+  if (/[\u3400-\u9fff]/u.test(text)) return 'zh';
+  if (/[ãõáéíóúâêôç]/iu.test(text)) return 'pt-BR';
+  if (/^[a-z' -]+$/i.test(text)) return 'en';
+  return 'unknown';
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function hash(value) {
-  return crypto.createHash("sha256").update(value).digest("hex");
+  return crypto.createHash('sha256').update(value).digest('hex');
 }

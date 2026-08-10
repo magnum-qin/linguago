@@ -1,40 +1,40 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const dryRun = args["dry-run"] !== "false";
+const dryRun = args['dry-run'] !== 'false';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
-const source = "known-needs-review-finalize-20260620";
+const source = 'known-needs-review-finalize-20260620';
 
 const localizationFixes = [
   {
     sense_id: 1487,
-    lang: "ja",
-    term: "〜士",
-    reading: "〜し",
-    reading_system: "kana",
+    lang: 'ja',
+    term: '〜士',
+    reading: '〜し',
+    reading_system: 'kana',
     pronunciation: null,
     pronunciation_system: null,
-    definition: "職業・専門・信奉者などを表す接尾辞。"
+    definition: '職業・専門・信奉者などを表す接尾辞。'
   },
   {
     sense_id: 2572,
-    lang: "pt-BR",
-    term: "cão",
+    lang: 'pt-BR',
+    term: 'cão',
     reading: null,
     reading_system: null,
-    pronunciation: "/kɐ̃w/",
-    pronunciation_system: "IPA",
-    definition: "Mamífero carnívoro domesticado, geralmente criado como animal de companhia, guarda ou trabalho."
+    pronunciation: '/kɐ̃w/',
+    pronunciation_system: 'IPA',
+    definition: 'Mamífero carnívoro domesticado, geralmente criado como animal de companhia, guarda ou trabalho.'
   }
 ];
 
@@ -45,7 +45,7 @@ const notPublishableSenseIds = [
 ];
 
 const statements = {
-  findLocalization: db.prepare("SELECT id FROM product_localizations WHERE product_sense_id = ? AND lang = ?"),
+  findLocalization: db.prepare('SELECT id FROM product_localizations WHERE product_sense_id = ? AND lang = ?'),
   updateLocalization: db.prepare(`
     UPDATE product_localizations
     SET term = @term,
@@ -148,7 +148,7 @@ function leaveNonPublishableForReview() {
     statements.markSenseNeedsReview.run(senseId);
     statements.markBadLocalizationsNeedsReview.run({
       sense_id: senseId,
-      lang: "zh",
+      lang: 'zh',
       source
     });
     stats.senses_left_for_review++;
@@ -159,10 +159,10 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) parsed[key] = "true";
+    if (!next || next.startsWith('--')) parsed[key] = 'true';
     else {
       parsed[key] = next;
       index++;

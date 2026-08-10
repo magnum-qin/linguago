@@ -1,35 +1,35 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
-const LANGS = ["zh", "en", "pt-BR", "ja"];
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
-const DEFAULT_PROVIDER = "ollama";
-const DEFAULT_MODEL = "qwen3.6:latest";
-const DEFAULT_PROMPT_VERSION = "dictionary-v2-product-localization-v1";
+const LANGS = ['zh', 'en', 'pt-BR', 'ja'];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
+const DEFAULT_PROVIDER = 'ollama';
+const DEFAULT_MODEL = 'qwen3.6:latest';
+const DEFAULT_PROMPT_VERSION = 'dictionary-v2-product-localization-v1';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const provider = args.provider || DEFAULT_PROVIDER;
 const model = args.model || DEFAULT_MODEL;
-const promptVersion = args["prompt-version"] || DEFAULT_PROMPT_VERSION;
+const promptVersion = args['prompt-version'] || DEFAULT_PROMPT_VERSION;
 const limit = args.limit ? Number(args.limit) : 0;
-const dryRun = args["dry-run"] === "true";
-const includeExamples = args["include-examples"] !== "false";
-const repairNeedsReview = args["repair-needs-review"] === "true";
-const completeOnly = args["complete-only"] === "true";
-const excludeReviewLocalizations = args["exclude-review-localizations"] === "true";
+const dryRun = args['dry-run'] === 'true';
+const includeExamples = args['include-examples'] !== 'false';
+const repairNeedsReview = args['repair-needs-review'] === 'true';
+const completeOnly = args['complete-only'] === 'true';
+const excludeReviewLocalizations = args['exclude-review-localizations'] === 'true';
 const sourceStatuses = String(
-  args["source-statuses"] || (repairNeedsReview ? "ready_for_llm,needs_review" : "ready_for_llm")
+  args['source-statuses'] || (repairNeedsReview ? 'ready_for_llm,needs_review' : 'ready_for_llm')
 )
-  .split(",")
+  .split(',')
   .map((status) => status.trim())
   .filter(Boolean);
-const targetLangs = String(args["target-langs"] || LANGS.join(","))
-  .split(",")
+const targetLangs = String(args['target-langs'] || LANGS.join(','))
+  .split(',')
   .map((lang) => lang.trim())
   .filter(Boolean);
-const senseIds = String(args["sense-ids"] || "")
-  .split(",")
+const senseIds = String(args['sense-ids'] || '')
+  .split(',')
   .map((id) => id.trim())
   .filter(Boolean)
   .map((id) => Number(id));
@@ -39,20 +39,22 @@ for (const lang of targetLangs) {
 }
 if (limit && (!Number.isInteger(limit) || limit < 1)) throw new Error(`Invalid --limit: ${args.limit}`);
 for (const status of sourceStatuses) {
-  if (!["ready_for_llm", "needs_review", "draft_fused", "draft_single_source", "accepted"].includes(status)) {
+  if (!['ready_for_llm', 'needs_review', 'draft_fused', 'draft_single_source', 'accepted'].includes(status)) {
     throw new Error(`Unknown source status: ${status}`);
   }
 }
 for (const senseId of senseIds) {
   if (!Number.isInteger(senseId) || senseId < 1) throw new Error(`Invalid --sense-ids value: ${senseId}`);
 }
-const targetLangCte = targetLangs.map((_, index) => (index === 0 ? "SELECT ? AS lang" : "UNION ALL SELECT ?")).join(" ");
-const sourceStatusClause = sourceStatuses.map(() => "?").join(", ");
-const senseIdClause = senseIds.length ? `AND ps.id IN (${senseIds.map(() => "?").join(", ")})` : "";
+const targetLangCte = targetLangs
+  .map((_, index) => (index === 0 ? 'SELECT ? AS lang' : 'UNION ALL SELECT ?'))
+  .join(' ');
+const sourceStatusClause = sourceStatuses.map(() => '?').join(', ');
+const senseIdClause = senseIds.length ? `AND ps.id IN (${senseIds.map(() => '?').join(', ')})` : '';
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 ensureSchema(db);
 
 const statements = {
@@ -65,7 +67,7 @@ const statements = {
     LEFT JOIN product_localizations pl ON pl.product_sense_id = ps.id AND pl.lang = tl.lang
     WHERE ps.status IN (${sourceStatusClause})
       ${senseIdClause}
-      AND ${repairNeedsReview ? "pl.id IS NOT NULL AND pl.needs_review = 1" : "pl.id IS NULL"}
+      AND ${repairNeedsReview ? 'pl.id IS NOT NULL AND pl.needs_review = 1' : 'pl.id IS NULL'}
       AND (
         ? = 0
         OR (
@@ -89,7 +91,7 @@ const statements = {
       pe.normalized_key,
       ps.sense_order,
       CASE tl.lang WHEN 'en' THEN 1 WHEN 'zh' THEN 2 WHEN 'ja' THEN 3 ELSE 4 END
-    ${limit ? "LIMIT ?" : ""}
+    ${limit ? 'LIMIT ?' : ''}
   `),
   sense: db.prepare(`
     SELECT
@@ -154,7 +156,7 @@ const statements = {
 };
 
 const stats = {
-  mode: repairNeedsReview ? "repair_needs_review" : "missing_localizations",
+  mode: repairNeedsReview ? 'repair_needs_review' : 'missing_localizations',
   scanned_candidates: 0,
   skipped_existing_job: 0,
   jobs_created: 0,
@@ -182,15 +184,7 @@ const jobs = [];
 
 for (const candidate of candidates) {
   stats.scanned_candidates++;
-  if (
-    statements.existingJob.get(
-      candidate.product_sense_id,
-      candidate.lang,
-      provider,
-      model,
-      promptVersion
-    )
-  ) {
+  if (statements.existingJob.get(candidate.product_sense_id, candidate.lang, provider, model, promptVersion)) {
     stats.skipped_existing_job++;
     continue;
   }
@@ -213,7 +207,8 @@ if (!dryRun) {
 stats.jobs_created = jobs.length;
 
 const queuedByLang = db
-  .prepare(`
+  .prepare(
+    `
     SELECT lang, COUNT(*) AS count
     FROM product_llm_completion_jobs
     WHERE target_type = 'product_sense_localization'
@@ -223,7 +218,8 @@ const queuedByLang = db
       AND status = 'queued'
     GROUP BY lang
     ORDER BY lang
-  `)
+  `
+  )
   .all(provider, model, promptVersion);
 
 console.log(
@@ -253,23 +249,21 @@ function buildInput({ sense, lang }) {
   const examples = includeExamples
     ? statements.examples.all(sense.product_sense_id).map((example) => ({
         ...example,
-        localizations: Object.fromEntries(
-          statements.exampleLocalizations.all(example.id).map((row) => [row.lang, row])
-        )
+        localizations: Object.fromEntries(statements.exampleLocalizations.all(example.id).map((row) => [row.lang, row]))
       }))
     : [];
 
   return {
-    task: "complete_product_sense_localization",
+    task: 'complete_product_sense_localization',
     target_lang: lang,
     requirements: {
       output_json_only: true,
       complete_only_target_lang: true,
       preserve_existing_languages: true,
       keep_same_sense: true,
-      use_brazilian_portuguese_for_pt_BR: lang === "pt-BR",
-      include_reading: lang === "zh" || lang === "ja",
-      include_pronunciation: lang === "en" || lang === "pt-BR",
+      use_brazilian_portuguese_for_pt_BR: lang === 'pt-BR',
+      include_reading: lang === 'zh' || lang === 'ja',
+      include_pronunciation: lang === 'en' || lang === 'pt-BR',
       include_example_localizations: includeExamples
     },
     product_entry: {
@@ -295,55 +289,55 @@ function buildInput({ sense, lang }) {
 }
 
 function outputSchema(lang) {
-  const required = ["lang", "term", "definition"];
-  const readingSchema = { type: ["string", "null"] };
-  const readingSystemSchema = { type: ["string", "null"] };
-  const pronunciationSchema = { type: ["string", "null"] };
-  const pronunciationSystemSchema = { type: ["string", "null"] };
+  const required = ['lang', 'term', 'definition'];
+  const readingSchema = { type: ['string', 'null'] };
+  const readingSystemSchema = { type: ['string', 'null'] };
+  const pronunciationSchema = { type: ['string', 'null'] };
+  const pronunciationSystemSchema = { type: ['string', 'null'] };
 
-  if (lang === "zh" || lang === "ja") {
-    required.push("reading", "reading_system");
-    readingSchema.type = "string";
+  if (lang === 'zh' || lang === 'ja') {
+    required.push('reading', 'reading_system');
+    readingSchema.type = 'string';
     readingSchema.minLength = 1;
-    readingSystemSchema.type = "string";
+    readingSystemSchema.type = 'string';
     readingSystemSchema.minLength = 1;
   }
-  if (lang === "en" || lang === "pt-BR") {
-    required.push("pronunciation", "pronunciation_system");
-    pronunciationSchema.type = "string";
+  if (lang === 'en' || lang === 'pt-BR') {
+    required.push('pronunciation', 'pronunciation_system');
+    pronunciationSchema.type = 'string';
     pronunciationSchema.minLength = 1;
-    pronunciationSystemSchema.type = "string";
+    pronunciationSystemSchema.type = 'string';
     pronunciationSystemSchema.minLength = 1;
   }
 
   return {
-    type: "object",
-    required: ["sense_localization", "example_localizations"],
+    type: 'object',
+    required: ['sense_localization', 'example_localizations'],
     properties: {
       sense_localization: {
-        type: "object",
+        type: 'object',
         required,
         properties: {
           lang: { const: lang },
-          term: { type: "string", minLength: 1 },
+          term: { type: 'string', minLength: 1 },
           reading: readingSchema,
           reading_system: readingSystemSchema,
           pronunciation: pronunciationSchema,
           pronunciation_system: pronunciationSystemSchema,
-          definition: { type: "string", minLength: 1 },
-          usage_note: { type: ["string", "null"] }
+          definition: { type: 'string', minLength: 1 },
+          usage_note: { type: ['string', 'null'] }
         }
       },
       example_localizations: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
-          required: ["example_id", "lang", "text"],
+          type: 'object',
+          required: ['example_id', 'lang', 'text'],
           properties: {
-            example_id: { type: "number" },
+            example_id: { type: 'number' },
             lang: { const: lang },
-            text: { type: "string", minLength: 1 },
-            reading: { type: ["string", "null"] }
+            text: { type: 'string', minLength: 1 },
+            reading: { type: ['string', 'null'] }
           }
         }
       }
@@ -382,10 +376,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

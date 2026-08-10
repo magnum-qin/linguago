@@ -1,21 +1,24 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
-const DEFAULT_PRODUCT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const LANGS = ["en", "pt-BR", "zh", "ja"];
+const DEFAULT_SOURCE_DB = 'data/processed/linguago_v2_full.db';
+const DEFAULT_PRODUCT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 
 const args = parseArgs(process.argv.slice(2));
-const sourceDbPath = path.resolve(args["source-db"] || DEFAULT_SOURCE_DB);
-const productDbPath = path.resolve(args["product-db"] || DEFAULT_PRODUCT_DB);
-const outPath = path.resolve(args.out || "logs/product-coverage-gaps-20260622.json");
-const maxRank = Number(args["max-rank"] || 50_000);
+const sourceDbPath = path.resolve(args['source-db'] || DEFAULT_SOURCE_DB);
+const productDbPath = path.resolve(args['product-db'] || DEFAULT_PRODUCT_DB);
+const outPath = path.resolve(args.out || 'logs/product-coverage-gaps-20260622.json');
+const maxRank = Number(args['max-rank'] || 50_000);
 const limit = Number(args.limit || 200);
-const minGlossLength = Number(args["min-gloss-length"] || 4);
-const requireSourceScript = args["require-source-script"] !== "false";
-const includeDetails = args["include-details"] === true || args["include-details"] === "true";
-const requireFirstSenseComplete = args["require-first-sense-complete"] === true || args["require-first-sense-complete"] === "true";
+const minGlossLength = Number(args['min-gloss-length'] || 4);
+const requireSourceScript = args['require-source-script'] !== 'false';
+const includeDetails = args['include-details'] === true || args['include-details'] === 'true';
+const includeKaikkiRawEvidence =
+  args['include-kaikki-raw-evidence'] === true || args['include-kaikki-raw-evidence'] === 'true';
+const requireFirstSenseComplete =
+  args['require-first-sense-complete'] === true || args['require-first-sense-complete'] === 'true';
 
 if (!fs.existsSync(sourceDbPath)) throw new Error(`Source DB not found: ${sourceDbPath}`);
 if (!fs.existsSync(productDbPath)) throw new Error(`Product DB not found: ${productDbPath}`);
@@ -25,7 +28,7 @@ const productCoverage = loadProductCoverage(productDb);
 productDb.close();
 
 const sourceDb = new Database(sourceDbPath, { readonly: true });
-sourceDb.pragma("busy_timeout = 30000");
+sourceDb.pragma('busy_timeout = 30000');
 
 const sourceEntries = sourceDb
   .prepare(
@@ -34,7 +37,7 @@ const sourceEntries = sourceDb
     FROM entries
     WHERE frequency_rank IS NOT NULL
       AND frequency_rank <= ?
-      AND source_lang IN (${LANGS.map(() => "?").join(", ")})
+      AND source_lang IN (${LANGS.map(() => '?').join(', ')})
       AND status <> 'deprecated'
     ORDER BY frequency_rank, source_lang, id
   `
@@ -103,6 +106,28 @@ const exampleLocalizations = sourceDb.prepare(`
   ORDER BY needs_review, lang
 `);
 
+const supplementalKaikkiEvidence = includeKaikkiRawEvidence
+  ? sourceDb.prepare(`
+      SELECT
+        ds.source_key,
+        se.lang AS source_lang,
+        se.word,
+        ss.id AS source_sense_id,
+        ss.sense_order,
+        ss.part_of_speech,
+        ss.gloss
+      FROM source_entries se
+      JOIN dictionary_sources ds ON ds.id = se.source_id
+      JOIN source_senses ss ON ss.source_entry_id = se.id
+      WHERE se.normalized_key = ?
+        AND se.lang = ?
+        AND ds.source_key = ?
+        AND NULLIF(TRIM(ss.gloss), '') IS NOT NULL
+      ORDER BY ss.sense_order, ss.id
+      LIMIT 3
+    `)
+  : null;
+
 const stats = {
   source_db: path.relative(process.cwd(), sourceDbPath),
   product_db: path.relative(process.cwd(), productDbPath),
@@ -156,6 +181,7 @@ for (const entry of sourceEntries) {
 
   const locRows = localizationSummary.all(entry.id);
   const cleanLangs = locRows.map((row) => row.lang);
+  const supplementalEvidence = loadSupplementalKaikkiEvidence(entry, normalized, gloss);
   const gap = {
     source_entry_id: entry.id,
     word: entry.word,
@@ -176,6 +202,9 @@ for (const entry of sourceEntries) {
     first_sense_clean_localization_langs: firstSenseCleanLangs,
     first_sense_clean_localization_lang_count: firstSenseCleanLangs.length,
     clean_example_count: Number(exampleCount.get(entry.id)?.n || 0),
+    supplemental_evidence: supplementalEvidence,
+    supplemental_evidence_langs: supplementalEvidence.length ? [entry.source_lang, 'en'] : [],
+    supplemental_evidence_lang_count: supplementalEvidence.length ? 2 : 0,
     priority_score: scoreGap(entry, summary, cleanLangs)
   };
   if (includeDetails) {
@@ -202,14 +231,17 @@ const report = {
   selected_count: selected.length,
   selected,
   notes: [
-    "This is a read-only gap report; it does not modify either database.",
-    "A term is considered covered if product_entries or product_localizations already contain the same normalized form in the same language.",
-    "Review selected rows before promoting them into product coverage supplements."
+    'This is a read-only gap report; it does not modify either database.',
+    'A term is considered covered if product_entries or product_localizations already contain the same normalized form in the same language.',
+    includeKaikkiRawEvidence
+      ? 'Kaikki raw evidence is reported separately and is not counted as canonical clean localization coverage.'
+      : 'Kaikki raw evidence was not requested.',
+    'Review selected rows before promoting them into product coverage supplements.'
   ]
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
+fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
 
 console.log(
   JSON.stringify(
@@ -224,7 +256,7 @@ console.log(
         word: row.word,
         status: row.source_status,
         gloss: row.gloss_preview,
-        clean_langs: row.clean_localization_langs.join(",")
+        clean_langs: row.clean_localization_langs.join(',')
       }))
     },
     null,
@@ -234,11 +266,13 @@ console.log(
 
 function loadProductCoverage(db) {
   const coverage = new Set();
-  for (const row of db.prepare("SELECT primary_lang AS lang, normalized_key AS form FROM product_entries").iterate()) {
+  for (const row of db.prepare('SELECT primary_lang AS lang, normalized_key AS form FROM product_entries').iterate()) {
     const normalized = normalize(row.form);
     if (normalized) coverage.add(key(row.lang, normalized));
   }
-  for (const row of db.prepare("SELECT lang, term AS form FROM product_localizations WHERE needs_review = 0").iterate()) {
+  for (const row of db
+    .prepare('SELECT lang, term AS form FROM product_localizations WHERE needs_review = 0')
+    .iterate()) {
     const normalized = normalize(row.form);
     if (normalized) coverage.add(key(row.lang, normalized));
   }
@@ -249,21 +283,73 @@ function scoreGap(entry, summary, cleanLangs) {
   const rankScore = Math.max(0, maxRank + 1 - Number(entry.frequency_rank || maxRank + 1));
   const langScore = cleanLangs.length * 500;
   const cleanSenseScore = Number(summary.clean_sense_count || 0) * 100;
-  const statusScore = entry.status === "accepted" ? 1000 : entry.status === "needs_review" ? 250 : 0;
+  const statusScore = entry.status === 'accepted' ? 1000 : entry.status === 'needs_review' ? 250 : 0;
   return rankScore + langScore + cleanSenseScore + statusScore;
 }
 
+function loadSupplementalKaikkiEvidence(entry, normalized, candidateGloss) {
+  if (!supplementalKaikkiEvidence) return [];
+  const sourceKey = entry.source_lang === 'ja' ? 'kaikki-ja' : entry.source_lang === 'pt-BR' ? 'kaikki-pt' : null;
+  if (!sourceKey) return [];
+  return supplementalKaikkiEvidence
+    .all(normalized, entry.source_lang, sourceKey)
+    .filter(
+      (row) =>
+        normalize(row.word) === normalized &&
+        usableEnglishGloss(row.gloss) &&
+        glossesShareMeaningToken(candidateGloss, row.gloss)
+    )
+    .map((row) => ({
+      source_key: row.source_key,
+      source_lang: row.source_lang,
+      word: row.word,
+      source_sense_id: row.source_sense_id,
+      sense_order: row.sense_order,
+      part_of_speech: cleanText(row.part_of_speech) || null,
+      gloss: preview(row.gloss, 240)
+    }));
+}
+
+function glossesShareMeaningToken(left, right) {
+  const leftTokens = meaningTokens(left);
+  const rightTokens = meaningTokens(right);
+  return [...leftTokens].some((token) => rightTokens.has(token));
+}
+
+function meaningTokens(value) {
+  const ignored = new Set([
+    'and', 'are', 'from', 'into', 'one', 'ones', 'that', 'the', 'this', 'with',
+    'first', 'person', 'second', 'singular', 'third', 'plural', 'form', 'inflection'
+  ]);
+  return new Set(
+    String(value || '')
+      .normalize('NFKC')
+      .toLocaleLowerCase('en')
+      .match(/\p{Script=Latin}+/gu)
+      ?.map((token) => token.replace(/(?:ing|ed|es|s)$/u, ''))
+      .filter((token) => token.length >= 3 && !ignored.has(token)) || []
+  );
+}
+
+function usableEnglishGloss(value) {
+  const text = cleanText(value).normalize('NFKC');
+  if (text.length < 8 || /<[^>]+>|\uFFFD/u.test(text)) return false;
+  if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text)) return false;
+  const letters = text.match(/\p{Script=Latin}/gu)?.length || 0;
+  return letters >= 4 && letters / Math.max(1, [...text].length) >= 0.35;
+}
+
 function sourceScriptOk(word, lang) {
-  const text = String(word || "").trim();
+  const text = String(word || '').trim();
   if (!text) return false;
   const hasLatin = /\p{Script=Latin}/u.test(text);
   const hasHan = /\p{Script=Han}/u.test(text);
   const hasHiragana = /\p{Script=Hiragana}/u.test(text);
   const hasKatakana = /\p{Script=Katakana}/u.test(text);
   const hasKana = hasHiragana || hasKatakana || /[\u30fc\uff70]/u.test(text);
-  if (lang === "zh") return hasHan && !hasKana;
-  if (lang === "ja") return hasHan || hasKana;
-  if (lang === "en" || lang === "pt-BR") return !hasHan && !hasKana && hasLatin;
+  if (lang === 'zh') return hasHan && !hasKana;
+  if (lang === 'ja') return hasHan || hasKana;
+  if (lang === 'en' || lang === 'pt-BR') return !hasHan && !hasKana && hasLatin;
   return true;
 }
 
@@ -278,15 +364,18 @@ function key(lang, normalized) {
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function cleanText(value) {
-  return String(value || "").trim();
+  return String(value || '').trim();
 }
 
 function preview(value, length) {
-  const text = cleanText(value).replace(/\s+/g, " ");
+  const text = cleanText(value).replace(/\s+/g, ' ');
   return text.length > length ? `${text.slice(0, length - 1)}...` : text;
 }
 
@@ -320,10 +409,10 @@ function parseArgs(argv) {
   const result = {};
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[index + 1];
-    if (!next || next.startsWith("--")) result[key] = true;
+    if (!next || next.startsWith('--')) result[key] = true;
     else {
       result[key] = next;
       index++;

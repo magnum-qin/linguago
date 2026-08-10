@@ -1,7 +1,7 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
-const dbPath = path.resolve(process.argv[2] || "data/processed/linguago_v2_full.db");
+const dbPath = path.resolve(process.argv[2] || 'data/processed/linguago_v2_full.db');
 const db = new Database(dbPath, { readonly: true });
 
 const tables = all("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name").map((row) => row.name);
@@ -100,10 +100,10 @@ const output = {
   `)
 };
 
-const jobTable = tables.includes("llm_completion_jobs")
-  ? "llm_completion_jobs"
-  : tables.includes("llm_jobs")
-    ? "llm_jobs"
+const jobTable = tables.includes('llm_completion_jobs')
+  ? 'llm_completion_jobs'
+  : tables.includes('llm_jobs')
+    ? 'llm_jobs'
     : null;
 
 if (jobTable) {
@@ -115,14 +115,14 @@ if (jobTable) {
     GROUP BY status
     ORDER BY status
   `);
-  if (output.job_columns.includes("target_lang")) {
+  if (output.job_columns.includes('target_lang')) {
     output.llm_jobs_by_lang_status = all(`
       SELECT target_lang, status, COUNT(*) AS count
       FROM ${jobTable}
       GROUP BY target_lang, status
       ORDER BY target_lang, status
     `);
-  } else if (output.job_columns.includes("lang")) {
+  } else if (output.job_columns.includes('lang')) {
     output.llm_jobs_by_lang_status = all(`
       SELECT lang, status, COUNT(*) AS count
       FROM ${jobTable}

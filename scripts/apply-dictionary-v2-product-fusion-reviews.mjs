@@ -1,28 +1,28 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_fused_only_pilot.db";
-const DEFAULT_MODEL = "qwen3.6:latest";
-const DEFAULT_PROMPT_VERSION = "dictionary-v2-product-fusion-review-v1";
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_fused_only_pilot.db';
+const DEFAULT_MODEL = 'qwen3.6:latest';
+const DEFAULT_PROMPT_VERSION = 'dictionary-v2-product-fusion-review-v1';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const model = args.model || DEFAULT_MODEL;
-const promptVersion = args["prompt-version"] || DEFAULT_PROMPT_VERSION;
-const keepThreshold = Number(args["keep-threshold"] || 0.8);
-const splitThreshold = Number(args["split-threshold"] || 0.8);
-const dryRun = args["dry-run"] === "true";
-const keepAction = args["keep-action"] || "ready_for_llm";
+const promptVersion = args['prompt-version'] || DEFAULT_PROMPT_VERSION;
+const keepThreshold = Number(args['keep-threshold'] || 0.8);
+const splitThreshold = Number(args['split-threshold'] || 0.8);
+const dryRun = args['dry-run'] === 'true';
+const keepAction = args['keep-action'] || 'ready_for_llm';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
-if (!["ready_for_llm", "noop"].includes(keepAction)) {
-  throw new Error("--keep-action must be one of: ready_for_llm, noop");
+if (!['ready_for_llm', 'noop'].includes(keepAction)) {
+  throw new Error('--keep-action must be one of: ready_for_llm, noop');
 }
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 10000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000');
 ensureApplySchema(db);
 
 const latestReviews = db
@@ -173,7 +173,7 @@ const summary = {
     .all()
 };
 
-fs.writeFileSync(dbPath.replace(/\.db$/u, ".fusion-apply.summary.json"), JSON.stringify(summary, null, 2));
+fs.writeFileSync(dbPath.replace(/\.db$/u, '.fusion-apply.summary.json'), JSON.stringify(summary, null, 2));
 db.close();
 console.log(JSON.stringify(summary, null, 2));
 
@@ -205,36 +205,36 @@ function applyReview(review, write) {
   const entry = statements.entryForSense.get(review.product_sense_id);
   if (!entry) return;
 
-  if (review.decision === "keep") {
+  if (review.decision === 'keep') {
     if (Number(review.confidence) < keepThreshold) {
       stats.skipped_low_confidence_keep++;
       return;
     }
-    if (keepAction === "noop") {
+    if (keepAction === 'noop') {
       stats.kept_unchanged++;
       return;
     }
     if (write) {
-      statements.setSenseStatus.run("ready_for_llm", review.product_sense_id);
-      statements.setEntryStatus.run("ready_for_llm", review.product_entry_id);
+      statements.setSenseStatus.run('ready_for_llm', review.product_sense_id);
+      statements.setEntryStatus.run('ready_for_llm', review.product_entry_id);
     }
     stats.marked_ready_for_llm++;
     return;
   }
 
-  if (review.decision === "split") {
+  if (review.decision === 'split') {
     if (Number(review.confidence) < splitThreshold) {
       stats.skipped_low_confidence_split++;
       if (write) {
-        statements.setSenseStatus.run("needs_review", review.product_sense_id);
-        statements.setEntryStatus.run("needs_review", review.product_entry_id);
+        statements.setSenseStatus.run('needs_review', review.product_sense_id);
+        statements.setEntryStatus.run('needs_review', review.product_entry_id);
       }
       stats.marked_needs_review++;
       return;
     }
     if (write) {
-      statements.setSenseStatus.run("needs_review", review.product_sense_id);
-      statements.setEntryStatus.run("needs_review", review.product_entry_id);
+      statements.setSenseStatus.run('needs_review', review.product_sense_id);
+      statements.setEntryStatus.run('needs_review', review.product_entry_id);
       statements.upsertSplitPlan.run({
         review_id: review.id,
         product_entry_id: review.product_entry_id,
@@ -252,8 +252,8 @@ function applyReview(review, write) {
   }
 
   if (write) {
-    statements.setSenseStatus.run("needs_review", review.product_sense_id);
-    statements.setEntryStatus.run("needs_review", review.product_entry_id);
+    statements.setSenseStatus.run('needs_review', review.product_sense_id);
+    statements.setEntryStatus.run('needs_review', review.product_entry_id);
   }
   stats.marked_needs_review++;
 }
@@ -261,7 +261,7 @@ function applyReview(review, write) {
 function normalizeSuggestedGroups(value, productSenseId) {
   let groups = [];
   try {
-    groups = JSON.parse(value || "[]");
+    groups = JSON.parse(value || '[]');
   } catch {
     groups = [];
   }
@@ -288,11 +288,11 @@ function normalizeSuggestedGroups(value, productSenseId) {
       const sourceLinkIds = Array.isArray(group.source_link_ids) ? group.source_link_ids.map(Number) : [];
       const resolvedLinks = sourceLinkIds.map((id) => byLinkId.get(id)).filter(Boolean);
       return {
-        label: String(group.label || "").trim() || "group",
+        label: String(group.label || '').trim() || 'group',
         source_link_ids: sourceLinkIds,
         source_sense_ids: resolvedLinks.map((link) => link.source_sense_id),
         source_words: resolvedLinks.map((link) => `${link.source_lang}:${link.source_word}`),
-        reason: String(group.reason || "").trim()
+        reason: String(group.reason || '').trim()
       };
     }),
     null,
@@ -304,10 +304,10 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

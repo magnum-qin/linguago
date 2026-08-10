@@ -1,18 +1,18 @@
-import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const INPUT = path.resolve(process.argv[2] || "output/ollama-dictionary-test.jsonl");
-const OUT_DIR = path.resolve("data/processed");
-const prefix = process.argv[3] || "generated_dictionary";
+const INPUT = path.resolve(process.argv[2] || 'output/ollama-dictionary-test.jsonl');
+const OUT_DIR = path.resolve('data/processed');
+const prefix = process.argv[3] || 'generated_dictionary';
 const ACCEPTED_OUT = path.join(OUT_DIR, `${prefix}.accepted.jsonl`);
 const REVIEW_OUT = path.join(OUT_DIR, `${prefix}.needs_review.jsonl`);
 const REPORT_OUT = path.join(OUT_DIR, `${prefix}.validation-report.json`);
-const LANGS = ["zh", "en", "pt-BR", "ja"];
+const LANGS = ['zh', 'en', 'pt-BR', 'ja'];
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-const lines = fs.existsSync(INPUT) ? fs.readFileSync(INPUT, "utf8").split(/\r?\n/).filter(Boolean) : [];
+const lines = fs.existsSync(INPUT) ? fs.readFileSync(INPUT, 'utf8').split(/\r?\n/).filter(Boolean) : [];
 const accepted = [];
 const needsReview = [];
 
@@ -29,8 +29,8 @@ for (const [index, line] of lines.entries()) {
   const { errors, warnings } = validateEntry(entry, parsed);
   const row = {
     source_line: index + 1,
-    term: parsed.term || entry?.source_text || "",
-    normalized_term: normalize(parsed.term || entry?.normalized_text || entry?.source_text || ""),
+    term: parsed.term || entry?.source_text || '',
+    normalized_term: normalize(parsed.term || entry?.normalized_text || entry?.source_text || ''),
     source_lang: parsed.source_lang || null,
     source_id: parsed.source_id || null,
     frequency_rank: parsed.frequency_rank ?? null,
@@ -48,8 +48,11 @@ for (const [index, line] of lines.entries()) {
   }
 }
 
-fs.writeFileSync(ACCEPTED_OUT, accepted.map((row) => JSON.stringify(row)).join("\n") + (accepted.length ? "\n" : ""));
-fs.writeFileSync(REVIEW_OUT, needsReview.map((row) => JSON.stringify(row)).join("\n") + (needsReview.length ? "\n" : ""));
+fs.writeFileSync(ACCEPTED_OUT, accepted.map((row) => JSON.stringify(row)).join('\n') + (accepted.length ? '\n' : ''));
+fs.writeFileSync(
+  REVIEW_OUT,
+  needsReview.map((row) => JSON.stringify(row)).join('\n') + (needsReview.length ? '\n' : '')
+);
 
 const report = {
   generated_at: new Date().toISOString(),
@@ -74,13 +77,13 @@ function validateEntry(entry, parsed = {}) {
   const errors = [];
   const warnings = [];
 
-  if (!entry || typeof entry !== "object") {
-    return { errors: ["entry is missing or not an object"], warnings };
+  if (!entry || typeof entry !== 'object') {
+    return { errors: ['entry is missing or not an object'], warnings };
   }
 
-  if (entry.type !== "word") errors.push("entry.type must be word for dictionary prefill");
-  requireText(errors, entry.source_text, "source_text");
-  requireText(errors, entry.normalized_text, "normalized_text");
+  if (entry.type !== 'word') errors.push('entry.type must be word for dictionary prefill');
+  requireText(errors, entry.source_text, 'source_text');
+  requireText(errors, entry.normalized_text, 'normalized_text');
   validateSourceText(errors, warnings, entry, parsed);
   validateSourceLanguageFields(errors, entry, parsed);
 
@@ -93,10 +96,10 @@ function validateEntry(entry, parsed = {}) {
     requireText(errors, detail?.definition, `word_details.${lang}.definition`);
 
     const langWarnings = validateLocalizedLanguage(lang, {
-      translation: translation?.text || "",
-      definition: detail?.definition || "",
-      example: entry.examples?.[0]?.translations?.[lang] || "",
-      explanation: entry.explanations?.[lang] || ""
+      translation: translation?.text || '',
+      definition: detail?.definition || '',
+      example: entry.examples?.[0]?.translations?.[lang] || '',
+      explanation: entry.explanations?.[lang] || ''
     });
     warnings.push(...langWarnings);
 
@@ -106,10 +109,10 @@ function validateEntry(entry, parsed = {}) {
   }
 
   if (!Array.isArray(entry.examples) || !entry.examples.length) {
-    errors.push("examples must contain at least one example");
+    errors.push('examples must contain at least one example');
   } else {
     const example = entry.examples[0];
-    requireText(errors, example?.sentence, "examples.0.sentence");
+    requireText(errors, example?.sentence, 'examples.0.sentence');
     for (const lang of LANGS) {
       requireText(errors, example?.translations?.[lang], `examples.0.translations.${lang}`);
     }
@@ -126,7 +129,7 @@ function validateEntry(entry, parsed = {}) {
 
 function validateSenses(entry, errors, warnings) {
   if (!Array.isArray(entry.senses) || !entry.senses.length) {
-    warnings.push("missing senses array; legacy single-sense import will be used");
+    warnings.push('missing senses array; legacy single-sense import will be used');
     return;
   }
 
@@ -147,7 +150,7 @@ function validateSenses(entry, errors, warnings) {
     seenOrders.add(order);
 
     const gloss = normalize(sense?.gloss_key || sense?.key);
-    const partOfSpeech = normalize(sense?.part_of_speech || "");
+    const partOfSpeech = normalize(sense?.part_of_speech || '');
     senseMeta.set(order, { gloss, partOfSpeech });
     requireText(warnings, sense?.gloss_key || sense?.key, `senses.${index}.gloss_key`);
     if (gloss) {
@@ -166,13 +169,13 @@ function validateSenses(entry, errors, warnings) {
       const definition =
         sense?.definitions?.[lang] ||
         sense?.word_details?.[lang]?.definition ||
-        (order === 1 ? entry.word_details?.[lang]?.definition : "");
+        (order === 1 ? entry.word_details?.[lang]?.definition : '');
       requireText(errors, definition, `senses.${index}.definitions.${lang}`);
       const normalizedDefinition = normalizeDefinition(definition);
       if (normalizedDefinition) {
         if (seenDefinitions[lang].has(normalizedDefinition)) {
           const firstOrder = seenDefinitions[lang].get(normalizedDefinition);
-          const key = [Number(firstOrder), order].sort((a, b) => a - b).join(":");
+          const key = [Number(firstOrder), order].sort((a, b) => a - b).join(':');
           const pair = duplicateDefinitionPairs.get(key) || {
             firstOrder: Number(firstOrder),
             secondOrder: order,
@@ -192,18 +195,18 @@ function validateSenses(entry, errors, warnings) {
     const samePartOfSpeech = firstMeta?.partOfSpeech && firstMeta.partOfSpeech === secondMeta?.partOfSpeech;
     if (samePartOfSpeech || pair.languages.length > 1) {
       errors.push(
-        `duplicate sense definition at senses ${pair.firstOrder} and ${pair.secondOrder} for ${pair.languages.join(", ")}`
+        `duplicate sense definition at senses ${pair.firstOrder} and ${pair.secondOrder} for ${pair.languages.join(', ')}`
       );
     } else {
       warnings.push(
-        `shared sense definition across parts of speech at senses ${pair.firstOrder} and ${pair.secondOrder} for ${pair.languages.join(", ")}`
+        `shared sense definition across parts of speech at senses ${pair.firstOrder} and ${pair.secondOrder} for ${pair.languages.join(', ')}`
       );
     }
   }
 }
 
 function validateSourceText(errors, warnings, entry, parsed) {
-  const expected = normalize(parsed.term || "");
+  const expected = normalize(parsed.term || '');
   if (!expected) return;
 
   const sourceText = normalize(entry.source_text);
@@ -218,7 +221,7 @@ function validateSourceText(errors, warnings, entry, parsed) {
 
 function validateSourceLanguageFields(errors, entry, parsed) {
   const sourceLang = parsed.source_lang;
-  const expected = normalize(parsed.term || entry.source_text || "");
+  const expected = normalize(parsed.term || entry.source_text || '');
   if (!LANGS.includes(sourceLang) || !expected) return;
 
   const sourceTranslation = normalize(entry.translations?.[sourceLang]?.text);
@@ -236,37 +239,37 @@ function validateSourceLanguageFields(errors, entry, parsed) {
 }
 
 function requireText(messages, value, name) {
-  if (typeof value !== "string" || !value.trim()) messages.push(`missing text: ${name}`);
+  if (typeof value !== 'string' || !value.trim()) messages.push(`missing text: ${name}`);
 }
 
 function looksLikeWrongAudioText(audioText, translatedText, lang) {
   const audio = normalize(audioText);
   const text = normalize(translatedText);
   if (!audio || !text) return false;
-  if (lang === "zh") return /^[a-z\s'-]+$/i.test(audio) && /[\u3400-\u9fff]/u.test(text) && !hasPinyinTone(audioText);
-  if (lang === "ja") return /^[a-z\s'-]+$/i.test(audio) && /[\u3040-\u30ff\u3400-\u9fff]/u.test(text);
-  if (lang === "pt-BR") return audio === "the" || audio === "to" || audio === "and";
+  if (lang === 'zh') return /^[a-z\s'-]+$/i.test(audio) && /[\u3400-\u9fff]/u.test(text) && !hasPinyinTone(audioText);
+  if (lang === 'ja') return /^[a-z\s'-]+$/i.test(audio) && /[\u3040-\u30ff\u3400-\u9fff]/u.test(text);
+  if (lang === 'pt-BR') return audio === 'the' || audio === 'to' || audio === 'and';
   return false;
 }
 
 function validateLocalizedLanguage(lang, fields) {
   const warnings = [];
-  const joined = Object.values(fields).join(" ");
+  const joined = Object.values(fields).join(' ');
 
   if (looksLikeMojibake(joined)) {
     warnings.push(`suspected mojibake for ${lang}`);
   }
 
-  if (lang === "zh" && fields.definition && !/[\u3400-\u9fff]/u.test(fields.definition)) {
-    warnings.push("zh definition appears non-Chinese");
+  if (lang === 'zh' && fields.definition && !/[\u3400-\u9fff]/u.test(fields.definition)) {
+    warnings.push('zh definition appears non-Chinese');
   }
 
-  if (lang === "ja" && fields.definition && !/[\u3040-\u30ff]/u.test(fields.definition)) {
-    warnings.push("ja definition appears non-Japanese");
+  if (lang === 'ja' && fields.definition && !/[\u3040-\u30ff]/u.test(fields.definition)) {
+    warnings.push('ja definition appears non-Japanese');
   }
 
-  if (lang === "pt-BR" && fields.definition && !looksPortugueseLike(fields.definition)) {
-    warnings.push("pt-BR definition appears non-Portuguese");
+  if (lang === 'pt-BR' && fields.definition && !looksPortugueseLike(fields.definition)) {
+    warnings.push('pt-BR definition appears non-Portuguese');
   }
 
   return warnings;
@@ -294,25 +297,28 @@ function score(errors, warnings) {
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function normalizeDefinition(value) {
   return normalize(value)
-    .replace(/[.,;:!?，。；：！？、\s]+/gu, " ")
+    .replace(/[.,;:!?，。；：！？、\s]+/gu, ' ')
     .trim();
 }
 
 function hash(value) {
-  return crypto.createHash("sha256").update(value).digest("hex");
+  return crypto.createHash('sha256').update(value).digest('hex');
 }
 
 function reviewRow(row) {
   return {
     ...row,
-    term: "",
-    normalized_term: "",
-    raw_hash: hash(String(row.raw || "")),
+    term: '',
+    normalized_term: '',
+    raw_hash: hash(String(row.raw || '')),
     quality_score: 0,
     validation_warnings: row.warnings || [],
     validation_errors: row.errors || []

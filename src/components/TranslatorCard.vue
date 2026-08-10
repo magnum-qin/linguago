@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue';
-import { Sun, Moon, Settings, X, Languages, Bookmark, Clipboard, History } from 'lucide-vue-next';
+import { Sun, Moon, Settings, X, Languages, Bookmark, Clipboard, History, Square } from 'lucide-vue-next';
 import { useTheme } from '../composables/useTheme';
 import { useTranslation } from '../composables/useTranslation';
 import { useBookmarks } from '../composables/useBookmarks';
 import { useHistory } from '../composables/useHistory';
 
 const { currentTheme, toggleTheme } = useTheme();
-const { inputText, sourceLangPreference, translate, clear, resultData, isTranslating } = useTranslation();
+const { inputText, sourceLangPreference, translate, stopTranslation, clear, resultData, isTranslating } =
+  useTranslation();
 const { isBookmarksOpen } = useBookmarks();
 const { isHistoryOpen } = useHistory();
 
@@ -28,12 +29,12 @@ const detectCjkMode = (text: string): 'zh' | 'ja' | 'hidden' => {
 };
 
 const sourceToggleVisible = computed(() => detectCjkMode(inputText.value) !== 'hidden');
-const sourceToggleLabel = computed(() => sourceLangPreference.value === 'ja' ? '日' : '中');
+const sourceToggleLabel = computed(() => (sourceLangPreference.value === 'ja' ? '日' : '中'));
 
 const autoResize = () => {
   if (!textareaRef.value) return;
   const el = textareaRef.value;
-  
+
   // Use a hidden clone to calculate true scrollHeight without causing page reflow/jumping
   const clone = el.cloneNode() as HTMLTextAreaElement;
   clone.value = el.value;
@@ -44,13 +45,13 @@ const autoResize = () => {
   clone.style.visibility = 'hidden';
   clone.style.overflow = 'hidden';
   document.body.appendChild(clone);
-  
+
   const targetHeight = clone.scrollHeight;
   document.body.removeChild(clone);
-  
+
   const currentHeight = el.style.height || '56px';
   if (currentHeight === `${targetHeight}px`) return;
-  
+
   el.style.transition = 'height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)';
   el.style.height = `${targetHeight}px`;
   el.style.overflowY = 'hidden';
@@ -69,8 +70,13 @@ watch(inputText, async (value) => {
 
 const handleGlobalKeydown = (e: KeyboardEvent) => {
   // Ignore if user is already typing in an input/textarea
-  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement).isContentEditable) return;
-  
+  if (
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement ||
+    (e.target as HTMLElement).isContentEditable
+  )
+    return;
+
   if (e.key === '/' || e.code === 'Slash' || e.key === '、') {
     e.preventDefault();
     textareaRef.value?.focus();
@@ -117,10 +123,26 @@ const handleClear = () => {
   textareaRef.value?.focus();
 };
 
-const handleTranslate = () => {
-  if (inputText.value.trim()) {
-    translate();
+const usesMobileKeyboard = () => {
+  return window.matchMedia('(pointer: coarse)').matches && navigator.maxTouchPoints > 0;
+};
+
+const handleTranslate = async () => {
+  if (!inputText.value.trim() || isTranslating.value) return;
+
+  const translation = translate();
+  if (usesMobileKeyboard()) {
+    textareaRef.value?.blur();
   }
+  await translation;
+};
+
+const handlePrimaryAction = () => {
+  if (isTranslating.value) {
+    stopTranslation();
+    return;
+  }
+  handleTranslate();
 };
 
 const handleTextareaKeydown = (e: KeyboardEvent) => {
@@ -136,7 +158,6 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
   e.preventDefault();
   handleTranslate();
 };
-
 </script>
 
 <template>
@@ -208,12 +229,16 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
       </div>
     </div>
 
-    <v-card elevation="0" class="!bg-m3-surface-container !rounded-[28px] !p-4 sm:!p-5 flex flex-col gap-4 !shadow-sm transition-all focus-within:!shadow-md focus-within:!bg-m3-surface-container-high !border !border-m3-outline-variant/20 relative z-10">
+    <v-card
+      elevation="0"
+      class="!bg-m3-surface-container !rounded-[28px] !p-4 sm:!p-5 flex flex-col gap-4 !shadow-sm transition-all focus-within:!shadow-md focus-within:!bg-m3-surface-container-high !border !border-m3-outline-variant/20 relative z-10"
+    >
       <textarea
         ref="textareaRef"
         v-model="inputText"
         rows="1"
         autocomplete="off"
+        enterkeyhint="go"
         :placeholder="'单词或句子...\nPalavra ou frase...'"
         class="w-full resize-none border-0 outline-none min-h-[56px] bg-transparent text-m3-on-surface !text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] placeholder:text-m3-on-surface-variant/50 overflow-hidden font-display font-medium"
         @keydown="handleTextareaKeydown"
@@ -224,23 +249,31 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
 
       <div class="flex items-center relative min-h-[44px] mt-3 w-full">
         <Transition name="fade-up">
-          <v-btn 
+          <v-btn
             v-if="inputText.length > 0"
             variant="flat"
-            class="!h-11 !flex !items-center !justify-center !rounded-full !px-4 sm:!px-5 !text-[0.85rem] !font-bold !text-m3-on-surface !bg-m3-surface !shadow-sm !border !border-m3-outline-variant/30 hover:!bg-m3-surface-container-high transition-all outline-none focus-visible:ring-2 focus-visible:ring-m3-primary absolute left-0 z-10 whitespace-nowrap !tracking-normal !normal-case" 
+            class="!h-11 !flex !items-center !justify-center !rounded-full !px-4 sm:!px-5 !text-[0.85rem] !font-bold !text-m3-on-surface !bg-m3-surface !shadow-sm !border !border-m3-outline-variant/30 hover:!bg-m3-surface-container-high transition-all outline-none focus-visible:ring-2 focus-visible:ring-m3-primary absolute left-0 z-10 whitespace-nowrap !tracking-normal !normal-case"
             @click="handleClear"
           >
             <X class="w-3.5 h-3.5 mr-1.5" />清空 / Limpar
           </v-btn>
         </Transition>
-        
-        <v-btn 
+
+        <v-btn
+          data-testid="translation-action"
           variant="flat"
-          class="!h-11 !flex !items-center !justify-center !rounded-[28px] !rounded-br-sm !px-5 sm:!px-6 !text-[0.85rem] !font-bold !text-m3-on-primary !bg-m3-primary hover:!opacity-90 transition-opacity disabled:!opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-m3-surface-container focus-visible:ring-m3-primary ml-auto z-10 relative shrink-0 whitespace-nowrap !tracking-normal !normal-case"
-          @click="handleTranslate"
-          :disabled="!inputText.trim()"
+          class="!h-11 !flex !items-center !justify-center !rounded-[28px] !rounded-br-sm !px-5 sm:!px-6 !text-[0.85rem] !font-bold !text-m3-on-primary hover:!opacity-90 transition-colors disabled:!opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-m3-surface-container focus-visible:ring-m3-primary ml-auto z-10 relative shrink-0 whitespace-nowrap !tracking-normal !normal-case"
+          :class="isTranslating ? '!bg-[#BA1A1A]' : '!bg-m3-primary'"
+          :aria-label="isTranslating ? '中止翻译 / Parar tradução' : '翻译 / Traduzir'"
+          @click="handlePrimaryAction"
+          :disabled="!isTranslating && !inputText.trim()"
         >
-          <Languages class="w-3.5 h-3.5 mr-2" />翻译 / Traduzir
+          <template v-if="isTranslating">
+            <Square class="w-3.5 h-3.5 mr-2 fill-current" />中止 / Parar
+          </template>
+          <template v-else>
+            <Languages class="w-3.5 h-3.5 mr-2" />翻译 / Traduzir
+          </template>
         </v-btn>
       </div>
     </v-card>

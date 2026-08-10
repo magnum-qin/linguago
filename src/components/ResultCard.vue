@@ -36,7 +36,10 @@ const langs = [
 ];
 
 const activeTabIndex = computed(() => {
-  return Math.max(0, langs.findIndex(l => l.code === activeLang.value));
+  return Math.max(
+    0,
+    langs.findIndex((l) => l.code === activeLang.value)
+  );
 });
 
 const transitionName = ref('slide-left');
@@ -55,7 +58,7 @@ const updateIndicator = () => {
   if (!tabContainerRef.value) return;
   const content = tabContainerRef.value.querySelector('.custom-tabs-content');
   if (!content) return;
-  
+
   const tabs = content.querySelectorAll('.custom-tab-btn');
   const activeBtn = tabs[activeTabIndex.value] as HTMLElement;
   if (activeBtn) {
@@ -90,8 +93,6 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateIndicator);
 });
 
-
-
 const currentTranslation = computed(() => {
   if (!resultData.value || !resultData.value.translations) return null;
   return resultData.value.translations[activeLang.value] || null;
@@ -105,10 +106,12 @@ const currentWordDetail = computed(() => {
 const currentSenses = computed(() => {
   if (!resultData.value) return [];
   const groupedSenses = Array.isArray(resultData.value.pronunciation_groups)
-    ? resultData.value.pronunciation_groups.flatMap((group: any) => Array.isArray(group.senses) ? group.senses : [])
+    ? resultData.value.pronunciation_groups.flatMap((group: any) => (Array.isArray(group.senses) ? group.senses : []))
     : [];
-  const source = groupedSenses.length > 0 ? groupedSenses : (resultData.value.senses || []);
-  return source.filter((s: any) => s?.localizations?.[activeLang.value]?.definition || s?.definitions?.[activeLang.value]);
+  const source = groupedSenses.length > 0 ? groupedSenses : resultData.value.senses || [];
+  return source.filter(
+    (s: any) => s?.localizations?.[activeLang.value]?.definition || s?.definitions?.[activeLang.value]
+  );
 });
 
 const hasDictionarySenses = computed(() => {
@@ -157,16 +160,46 @@ onUnmounted(() => {
   <section class="flex flex-col w-full relative z-0">
     <Transition mode="out-in" name="fade" @enter="updateIndicator">
       <!-- Result State -->
-      <div v-if="resultData" class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative">
+      <div
+        v-if="resultData"
+        class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative"
+      >
         <div class="flex items-center justify-between w-full mb-6">
-          <span class="text-[0.7rem] font-bold uppercase tracking-widest text-m3-on-surface-variant flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full" :class="resultData.provider === 'dictionary' ? 'bg-[#ff9800]' : ((resultData.cache_hit ?? resultData.cached) ? 'bg-m3-primary' : 'bg-[#008053]')"></span>
+          <span
+            class="text-[0.7rem] font-bold uppercase tracking-widest text-m3-on-surface-variant flex items-center gap-1.5"
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full"
+              :class="
+                resultData.provider === 'dictionary'
+                  ? 'bg-[#ff9800]'
+                  : (resultData.cache_hit ?? resultData.cached)
+                    ? 'bg-m3-primary'
+                    : 'bg-[#008053]'
+              "
+            ></span>
             <div class="flex flex-col">
               <span class="flex items-center gap-1.5">
-                {{ resultData.provider === 'dictionary' ? '核心词典' : ((resultData.cache_hit ?? resultData.cached) ? '已缓存' : 'AI') }}
-                <Loader2 v-if="isTranslating && resultData.provider !== 'dictionary' && !(resultData.cache_hit ?? resultData.cached)" class="w-3 h-3.5 animate-spin text-m3-primary" />
+                {{
+                  resultData.provider === 'dictionary'
+                    ? '核心词典'
+                    : (resultData.cache_hit ?? resultData.cached)
+                      ? '已缓存'
+                      : 'AI'
+                }}
+                <Loader2
+                  v-if="
+                    isTranslating &&
+                    resultData.provider !== 'dictionary' &&
+                    !(resultData.cache_hit ?? resultData.cached)
+                  "
+                  class="w-3 h-3.5 animate-spin text-m3-primary"
+                />
               </span>
-              <span class="text-[0.55rem] opacity-70 tracking-normal mt-0.5" v-if="resultData.provider === 'dictionary' || (resultData.cache_hit ?? resultData.cached)">
+              <span
+                class="text-[0.55rem] opacity-70 tracking-normal mt-0.5"
+                v-if="resultData.provider === 'dictionary' || (resultData.cache_hit ?? resultData.cached)"
+              >
                 {{ resultData.provider === 'dictionary' ? 'Dicionário Principal' : 'Em cache' }}
               </span>
               <span class="text-[0.55rem] opacity-70 tracking-normal mt-0.5 uppercase" v-else>
@@ -174,21 +207,25 @@ onUnmounted(() => {
               </span>
             </div>
           </span>
-          
+
           <div class="flex gap-2 items-center shrink-0">
-            <v-btn 
-              v-if="currentWord && resultData?.type !== 'sentence'" 
+            <v-btn
+              v-if="currentWord && resultData?.type !== 'sentence'"
               icon
               variant="flat"
               density="comfortable"
               class="rounded-full !text-m3-on-surface-variant"
-              :class="isBookmarked(currentWord) ? '!text-m3-primary bg-m3-primary/10' : 'bg-transparent hover:bg-m3-surface-variant/50'"
+              :class="
+                isBookmarked(currentWord)
+                  ? '!text-m3-primary bg-m3-primary/10'
+                  : 'bg-transparent hover:bg-m3-surface-variant/50'
+              "
               @click="toggleBookmark(currentWord)"
               aria-label="收藏 / Favorito"
             >
               <Star class="w-5 h-5" :class="isBookmarked(currentWord) ? 'fill-current' : ''" />
             </v-btn>
-            <v-btn 
+            <v-btn
               v-if="currentWord"
               icon
               variant="flat"
@@ -203,24 +240,28 @@ onUnmounted(() => {
         </div>
 
         <!-- Language Selection Slider Tabs -->
-        <div 
-          v-if="typeof resultData !== 'string' && resultData.translations" 
-          ref="tabContainerRef" 
+        <div
+          v-if="typeof resultData !== 'string' && resultData.translations"
+          ref="tabContainerRef"
           class="custom-tabs-container relative bg-m3-surface border border-m3-outline-variant/30 rounded-[20px] p-[6px] w-full min-h-[48px] overflow-hidden flex"
         >
           <!-- Sliding Indicator -->
-          <div 
-            class="absolute top-[6px] bottom-[6px] bg-m3-primary rounded-[14px] shadow-sm transition-all duration-500 ease-spring pointer-events-none z-0" 
+          <div
+            class="absolute top-[6px] bottom-[6px] bg-m3-primary rounded-[14px] shadow-sm transition-all duration-500 ease-spring pointer-events-none z-0"
             :style="indicatorStyle"
           ></div>
-          
+
           <div class="custom-tabs-content z-10 w-full grid grid-cols-4 gap-0">
-            <button 
-              v-for="(lang, i) in langs" 
-              :key="lang.code" 
-              @click="selectLang(i, lang.code)" 
+            <button
+              v-for="(lang, i) in langs"
+              :key="lang.code"
+              @click="selectLang(i, lang.code)"
               class="custom-tab-btn w-full px-4 py-2.5 rounded-[14px] text-sm font-bold tracking-wide uppercase transition-all duration-300 select-none outline-none text-center cursor-pointer flex items-center justify-center"
-              :class="activeLang === lang.code ? '!text-m3-on-primary' : '!text-m3-on-surface-variant/75 hover:!text-m3-on-surface'"
+              :class="
+                activeLang === lang.code
+                  ? '!text-m3-on-primary'
+                  : '!text-m3-on-surface-variant/75 hover:!text-m3-on-surface'
+              "
             >
               {{ lang.label }}
             </button>
@@ -231,14 +272,16 @@ onUnmounted(() => {
         <div class="mt-6 flex flex-col">
           <!-- Header Text / Query Word -->
           <div class="flex items-center justify-between gap-4 mb-4" v-if="currentWord">
-            <h1 class="text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] font-display font-black text-m3-on-surface tracking-tight break-words">
+            <h1
+              class="text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] font-display font-black text-m3-on-surface tracking-tight break-words"
+            >
               <FuriganaText :text="currentWord" />
             </h1>
           </div>
-          
+
           <!-- Phonetics -->
           <div v-if="!hasDictionarySenses && currentTranslation?.phonetic" class="flex flex-wrap gap-2 mb-6">
-            <button 
+            <button
               @click="speak(currentTranslation.audio_text || currentTranslation.text, activeLang)"
               class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-m3-outline-variant/30 bg-m3-surface text-m3-on-surface-variant text-[0.95rem] font-medium tracking-wide shadow-sm cursor-pointer hover:bg-m3-primary hover:text-m3-on-primary hover:border-transparent hover:shadow-md transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary active:scale-95"
               aria-label="朗读音标发音 / Pronunciar"
@@ -262,11 +305,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Waiting / Loading State -->
-      <ResultLoader
-        v-else
-        :is-translating="isTranslating"
-        :color-scheme="colorScheme"
-      />
+      <ResultLoader v-else :is-translating="isTranslating" :color-scheme="colorScheme" />
     </Transition>
 
     <!-- Feedback / Error Report Dialog -->
@@ -292,11 +331,15 @@ onUnmounted(() => {
 /* Tab Slide Transitions */
 .slide-left-enter-active,
 .slide-right-enter-active {
-  transition: opacity 0.2s cubic-bezier(0.1, 0.9, 0.2, 1), transform 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+  transition:
+    opacity 0.2s cubic-bezier(0.1, 0.9, 0.2, 1),
+    transform 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
 }
 .slide-left-leave-active,
 .slide-right-leave-active {
-  transition: opacity 0.1s ease-in, transform 0.1s ease-in;
+  transition:
+    opacity 0.1s ease-in,
+    transform 0.1s ease-in;
 }
 
 .slide-left-enter-from {
@@ -316,5 +359,4 @@ onUnmounted(() => {
   opacity: 0;
   transform: translateX(10px);
 }
-
 </style>

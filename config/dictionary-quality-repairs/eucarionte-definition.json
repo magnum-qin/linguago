@@ -1,0 +1,12 @@
+{
+  "kind": "human_reviewed_definition_contract",
+  "source_entry_id": 2059756,
+  "reviewed_at": "2026-08-10",
+  "reason": "The first generated English and Portuguese definitions omitted the defining membrane-bound nucleus.",
+  "definition_contract": {
+    "en": "An organism whose cells contain a membrane-bound nucleus and other membrane-bound organelles.",
+    "pt-BR": "Um organismo cujas células contêm um núcleo delimitado por membrana e outras organelas membranosas.",
+    "zh": "细胞具有由核膜包围的细胞核及其他膜结合细胞器的生物。",
+    "ja": "細胞内に核膜で囲まれた細胞核とその他の膜小器官を持つ生物。"
+  }
+}

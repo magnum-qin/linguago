@@ -1,34 +1,54 @@
-import Database from "better-sqlite3";
-import csvParser from "csv-parser";
-import { XMLParser } from "fast-xml-parser";
-import fs from "node:fs";
-import path from "node:path";
-import readline from "node:readline";
-import zlib from "node:zlib";
+import Database from 'better-sqlite3';
+import csvParser from 'csv-parser';
+import { XMLParser } from 'fast-xml-parser';
+import fs from 'node:fs';
+import path from 'node:path';
+import readline from 'node:readline';
+import zlib from 'node:zlib';
 
-const LANGUAGE_CODES = new Set(["en", "zh", "ja", "pt-BR"]);
-const DEFAULT_DB = "data/processed/linguago_v2_staging.db";
+const LANGUAGE_CODES = new Set(['en', 'zh', 'ja', 'pt-BR']);
+const DEFAULT_DB = 'data/processed/linguago_v2_staging.db';
 const WIKDICT_PAIRS = [
-  ["en", "zh"],
-  ["zh", "en"],
-  ["en", "ja"],
-  ["ja", "en"],
-  ["en", "pt"],
-  ["pt", "en"],
-  ["zh", "ja"],
-  ["ja", "zh"],
-  ["zh", "pt"],
-  ["pt", "zh"],
-  ["ja", "pt"],
-  ["pt", "ja"]
+  ['en', 'zh'],
+  ['zh', 'en'],
+  ['en', 'ja'],
+  ['ja', 'en'],
+  ['en', 'pt'],
+  ['pt', 'en'],
+  ['zh', 'ja'],
+  ['ja', 'zh'],
+  ['zh', 'pt'],
+  ['pt', 'zh'],
+  ['ja', 'pt'],
+  ['pt', 'ja']
 ];
 const WIKDICT_SOURCE_KEYS = WIKDICT_PAIRS.map(([from, to]) => `wikdict-${from}-${to}`);
-const DEFAULT_SOURCES = ["ecdict", "kaikki-zh", "cedict", "jmdict", "freedict-eng-por", "freedict-por-eng"];
+const DEFAULT_SOURCES = ['ecdict', 'kaikki-zh', 'cedict', 'jmdict', 'freedict-eng-por', 'freedict-por-eng'];
+const KAIKKI_SOURCES = {
+  'kaikki-zh': {
+    sourceName: 'Kaikki English Wiktionary Chinese entries',
+    sourceUrl: 'https://kaikki.org/dictionary/Chinese/',
+    file: 'data/raw/kaikki_Chinese.jsonl',
+    lang: 'zh'
+  },
+  'kaikki-ja': {
+    sourceName: 'Kaikki English Wiktionary Japanese entries',
+    sourceUrl: 'https://kaikki.org/dictionary/Japanese/',
+    file: 'data/raw/kaikki_Japanese.jsonl',
+    lang: 'ja'
+  },
+  'kaikki-pt': {
+    sourceName: 'Kaikki English Wiktionary Portuguese entries',
+    sourceUrl: 'https://kaikki.org/dictionary/Portuguese/',
+    file: 'data/raw/kaikki_Portuguese.jsonl',
+    lang: 'pt-BR'
+  }
+};
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const sourceNames = (args.sources || DEFAULT_SOURCES.join(","))
-  .split(",")
+const sourceNames = (args.sources || DEFAULT_SOURCES.join(','))
+  .split(',')
   .map((source) => source.trim())
   .filter(Boolean);
 const limit = args.limit ? Number(args.limit) : 0;
@@ -38,7 +58,7 @@ if (!fs.existsSync(dbPath)) {
 }
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
+db.pragma('foreign_keys = ON');
 
 const statements = {
   upsertSource: db.prepare(`
@@ -50,7 +70,7 @@ const statements = {
       license = excluded.license,
       metadata_json = excluded.metadata_json
   `),
-  getSource: db.prepare("SELECT id FROM dictionary_sources WHERE source_key = ?"),
+  getSource: db.prepare('SELECT id FROM dictionary_sources WHERE source_key = ?'),
   insertEntry: db.prepare(`
     INSERT OR IGNORE INTO source_entries
       (source_id, source_entry_key, word, normalized_key, lang, raw_json)
@@ -71,31 +91,34 @@ const statements = {
 
 const importers = {
   ecdict: importEcDict,
-  "kaikki-zh": importKaikkiChinese,
   cedict: importCcCedict,
   jmdict: importJmDict,
-  "omw-30": importOpenMultilingualWordnet,
-  "freedict-eng-por": (options) =>
+  'omw-30': importOpenMultilingualWordnet,
+  'freedict-eng-por': (options) =>
     importFreeDict({
       ...options,
-      sourceKey: "freedict-eng-por",
-      sourceName: "FreeDict English-Portuguese",
-      sourceUrl: "https://github.com/freedict/fd-dictionaries/tree/master/eng-por",
-      file: "data/raw/freedict-eng-por.tei",
-      sourceLang: "en",
-      targetLang: "pt-BR"
+      sourceKey: 'freedict-eng-por',
+      sourceName: 'FreeDict English-Portuguese',
+      sourceUrl: 'https://github.com/freedict/fd-dictionaries/tree/master/eng-por',
+      file: 'data/raw/freedict-eng-por.tei',
+      sourceLang: 'en',
+      targetLang: 'pt-BR'
     }),
-  "freedict-por-eng": (options) =>
+  'freedict-por-eng': (options) =>
     importFreeDict({
       ...options,
-      sourceKey: "freedict-por-eng",
-      sourceName: "FreeDict Portuguese-English",
-      sourceUrl: "https://github.com/freedict/fd-dictionaries/tree/master/por-eng",
-      file: "data/raw/freedict-por-eng.tei",
-      sourceLang: "pt-BR",
-      targetLang: "en"
+      sourceKey: 'freedict-por-eng',
+      sourceName: 'FreeDict Portuguese-English',
+      sourceUrl: 'https://github.com/freedict/fd-dictionaries/tree/master/por-eng',
+      file: 'data/raw/freedict-por-eng.tei',
+      sourceLang: 'pt-BR',
+      targetLang: 'en'
     })
 };
+
+for (const [sourceKey, config] of Object.entries(KAIKKI_SOURCES)) {
+  importers[sourceKey] = (options) => importKaikkiLanguage({ ...options, sourceKey, ...config });
+}
 
 for (const [from, to] of WIKDICT_PAIRS) {
   const sourceKey = `wikdict-${from}-${to}`;
@@ -115,7 +138,7 @@ const summary = [];
 for (const sourceName of sourceNames) {
   const importer = importers[sourceName];
   if (!importer) {
-    throw new Error(`Unknown source "${sourceName}". Valid sources: ${Object.keys(importers).join(", ")}`);
+    throw new Error(`Unknown source "${sourceName}". Valid sources: ${Object.keys(importers).join(', ')}`);
   }
   const started = performance.now();
   const result = await importer({ limit });
@@ -131,14 +154,14 @@ console.log(JSON.stringify({ ok: true, db: path.relative(process.cwd(), dbPath),
 
 async function importEcDict({ limit }) {
   const sourceId = ensureSource({
-    source_key: "ecdict",
-    source_name: "ECDICT",
-    source_url: "https://github.com/skywind3000/ECDICT",
-    license: "Verify upstream license before redistribution",
-    metadata_json: JSON.stringify({ file: "data/raw/ecdict.csv" })
+    source_key: 'ecdict',
+    source_name: 'ECDICT',
+    source_url: 'https://github.com/skywind3000/ECDICT',
+    license: 'Verify upstream license before redistribution',
+    metadata_json: JSON.stringify({ file: 'data/raw/ecdict.csv' })
   });
-  const file = path.resolve("data/raw/ecdict.csv");
-  if (!fs.existsSync(file)) return { skipped: true, reason: "missing data/raw/ecdict.csv" };
+  const file = path.resolve('data/raw/ecdict.csv');
+  if (!fs.existsSync(file)) return { skipped: true, reason: 'missing data/raw/ecdict.csv' };
 
   let entries = 0;
   let senses = 0;
@@ -153,7 +176,7 @@ async function importEcDict({ limit }) {
         source_entry_key: sourceEntryKey,
         word,
         normalized_key: normalizeKey(word),
-        lang: "en",
+        lang: 'en',
         raw_json: raw
       });
       const entryId = getSourceEntryId(sourceId, sourceEntryKey);
@@ -166,10 +189,10 @@ async function importEcDict({ limit }) {
           part_of_speech: cleanText(row.pos),
           gloss,
           raw_json: compactJson({
-            definition: row.definition || "",
-            translation: row.translation || "",
-            phonetic: row.phonetic || "",
-            pos: row.pos || ""
+            definition: row.definition || '',
+            translation: row.translation || '',
+            phonetic: row.phonetic || '',
+            pos: row.pos || ''
           })
         });
         senses++;
@@ -182,7 +205,7 @@ async function importEcDict({ limit }) {
   await new Promise((resolve, reject) => {
     fs.createReadStream(file)
       .pipe(csvParser())
-      .on("data", (row) => {
+      .on('data', (row) => {
         if (limit && entries + batch.length >= limit) return;
         batch.push(row);
         if (batch.length >= 500) {
@@ -190,8 +213,8 @@ async function importEcDict({ limit }) {
           batch = [];
         }
       })
-      .on("error", reject)
-      .on("end", () => {
+      .on('error', reject)
+      .on('end', () => {
         if (batch.length) insertBatch(batch);
         resolve();
       });
@@ -200,60 +223,73 @@ async function importEcDict({ limit }) {
   return { entries, senses };
 }
 
-async function importKaikkiChinese({ limit }) {
+async function importKaikkiLanguage({ limit, sourceKey, sourceName, sourceUrl, file: relativeFile, lang }) {
   const sourceId = ensureSource({
-    source_key: "kaikki-zh",
-    source_name: "Kaikki Chinese Wiktionary extraction",
-    source_url: "https://kaikki.org/dictionary/Chinese/",
-    license: "CC BY-SA; verify upstream metadata before redistribution",
-    metadata_json: JSON.stringify({ file: "data/raw/kaikki_Chinese.jsonl" })
+    source_key: sourceKey,
+    source_name: sourceName,
+    source_url: sourceUrl,
+    license: 'CC BY-SA 4.0 and GFDL',
+    metadata_json: JSON.stringify({ file: relativeFile, edition: 'enwiktionary', format: 'kaikki-postprocessed-jsonl' })
   });
-  const file = path.resolve("data/raw/kaikki_Chinese.jsonl");
-  if (!fs.existsSync(file)) return { skipped: true, reason: "missing data/raw/kaikki_Chinese.jsonl" };
+  const file = path.resolve(relativeFile);
+  if (!fs.existsSync(file)) return { skipped: true, reason: `missing ${relativeFile}` };
 
   let entries = 0;
   let senses = 0;
-  const stream = fs.createReadStream(file, { encoding: "utf8" });
+  const stream = fs.createReadStream(file, { encoding: 'utf8' });
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-  const insertOne = db.transaction((item) => {
+  const insertOne = (item) => {
     const word = cleanText(item.word);
     if (!word) return;
-    const sourceEntryKey = item.id || `${word}:${item.pos || "unknown"}:${entries + 1}`;
+    const validSenses = (Array.isArray(item.senses) ? item.senses : [])
+      .map((sense, index) => ({ sense, index, gloss: firstNonEmpty(sense.glosses || sense.raw_glosses || []) }))
+      .filter((row) => row.gloss);
+    if (validSenses.length === 0) return;
+    const sourceEntryKey = item.id || `${word}:${item.pos || 'unknown'}:${entries + 1}`;
     insertSourceEntry({
       source_id: sourceId,
       source_entry_key: sourceEntryKey,
       word,
       normalized_key: normalizeKey(word),
-      lang: "zh",
+      lang,
       raw_json: compactJson(item)
     });
     const entryId = getSourceEntryId(sourceId, sourceEntryKey);
-    const itemSenses = Array.isArray(item.senses) ? item.senses : [];
-    itemSenses.forEach((sense, index) => {
+    validSenses.forEach(({ sense, index, gloss }, senseOrder) => {
       insertSourceSense({
         source_entry_id: entryId,
         source_sense_key: sense.id || `${sourceEntryKey}:${index + 1}`,
-        sense_order: index + 1,
+        sense_order: senseOrder + 1,
         part_of_speech: cleanText(sense.pos || item.pos),
         domain: firstNonEmpty([...(sense.topics || []), ...(sense.categories || []).map((c) => c.name)]),
         register_label: firstNonEmpty([...(sense.tags || []), ...(sense.raw_tags || [])]),
-        gloss: firstNonEmpty(sense.glosses || sense.raw_glosses || []),
+        gloss,
         raw_json: compactJson(sense)
       });
       senses++;
     });
     entries++;
+  };
+  const insertBatch = db.transaction((items) => {
+    for (const item of items) insertOne(item);
   });
 
+  let batch = [];
   for await (const line of rl) {
     if (limit && entries >= limit) break;
     if (!line.trim()) continue;
     try {
-      insertOne(JSON.parse(line));
+      batch.push(JSON.parse(line));
+      const batchTarget = limit ? Math.min(500, Math.max(1, limit - entries)) : 500;
+      if (batch.length >= batchTarget) {
+        insertBatch(batch);
+        batch = [];
+      }
     } catch {
       // Keep malformed source rows out of staging; raw source is still available on disk.
     }
   }
+  if (batch.length && (!limit || entries < limit)) insertBatch(batch);
 
   rl.close();
   stream.destroy();
@@ -262,14 +298,14 @@ async function importKaikkiChinese({ limit }) {
 
 async function importCcCedict({ limit }) {
   const sourceId = ensureSource({
-    source_key: "cc-cedict",
-    source_name: "CC-CEDICT",
-    source_url: "https://cc-cedict.org/wiki/",
-    license: "CC BY-SA 4.0",
-    metadata_json: JSON.stringify({ file: "data/raw/CC-CEDICT.txt.gz" })
+    source_key: 'cc-cedict',
+    source_name: 'CC-CEDICT',
+    source_url: 'https://cc-cedict.org/wiki/',
+    license: 'CC BY-SA 4.0',
+    metadata_json: JSON.stringify({ file: 'data/raw/CC-CEDICT.txt.gz' })
   });
-  const file = path.resolve("data/raw/CC-CEDICT.txt.gz");
-  if (!fs.existsSync(file)) return { skipped: true, reason: "missing data/raw/CC-CEDICT.txt.gz" };
+  const file = path.resolve('data/raw/CC-CEDICT.txt.gz');
+  if (!fs.existsSync(file)) return { skipped: true, reason: 'missing data/raw/CC-CEDICT.txt.gz' };
 
   let entries = 0;
   let senses = 0;
@@ -284,7 +320,7 @@ async function importCcCedict({ limit }) {
       source_entry_key: sourceEntryKey,
       word: parsed.simplified,
       normalized_key: normalizeKey(parsed.simplified),
-      lang: "zh",
+      lang: 'zh',
       raw_json: compactJson(parsed)
     });
     const entryId = getSourceEntryId(sourceId, sourceEntryKey);
@@ -313,16 +349,16 @@ async function importCcCedict({ limit }) {
 
 async function importJmDict({ limit }) {
   const sourceId = ensureSource({
-    source_key: "jmdict",
-    source_name: "JMdict English",
-    source_url: "https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project",
-    license: "CC BY-SA 4.0",
-    metadata_json: JSON.stringify({ file: "data/raw/JMdict_e.gz" })
+    source_key: 'jmdict',
+    source_name: 'JMdict English',
+    source_url: 'https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project',
+    license: 'CC BY-SA 4.0',
+    metadata_json: JSON.stringify({ file: 'data/raw/JMdict_e.gz' })
   });
-  const file = path.resolve("data/raw/JMdict_e.gz");
-  if (!fs.existsSync(file)) return { skipped: true, reason: "missing data/raw/JMdict_e.gz" };
+  const file = path.resolve('data/raw/JMdict_e.gz');
+  if (!fs.existsSync(file)) return { skipped: true, reason: 'missing data/raw/JMdict_e.gz' };
 
-  const xml = zlib.gunzipSync(fs.readFileSync(file)).toString("utf8");
+  const xml = zlib.gunzipSync(fs.readFileSync(file)).toString('utf8');
   const parser = new XMLParser({
     ignoreAttributes: false,
     parseTagValue: false,
@@ -336,7 +372,9 @@ async function importJmDict({ limit }) {
   const insertMany = db.transaction((items) => {
     for (const item of items) {
       if (limit && entries >= limit) break;
-      const word = cleanText(firstText(asArray(item.k_ele).map((k) => k.keb)) || firstText(asArray(item.r_ele).map((r) => r.reb)));
+      const word = cleanText(
+        firstText(asArray(item.k_ele).map((k) => k.keb)) || firstText(asArray(item.r_ele).map((r) => r.reb))
+      );
       if (!word) continue;
       const sourceEntryKey = String(item.ent_seq || word);
       insertSourceEntry({
@@ -344,7 +382,7 @@ async function importJmDict({ limit }) {
         source_entry_key: sourceEntryKey,
         word,
         normalized_key: normalizeKey(word),
-        lang: "ja",
+        lang: 'ja',
         raw_json: compactJson(item)
       });
       const entryId = getSourceEntryId(sourceId, sourceEntryKey);
@@ -354,7 +392,7 @@ async function importJmDict({ limit }) {
           source_sense_key: `${sourceEntryKey}:${index + 1}`,
           sense_order: index + 1,
           part_of_speech: firstText(asArray(sense.pos)),
-          gloss: firstText(asArray(sense.gloss).map((gloss) => (typeof gloss === "string" ? gloss : gloss?.["#text"]))),
+          gloss: firstText(asArray(sense.gloss).map((gloss) => (typeof gloss === 'string' ? gloss : gloss?.['#text']))),
           raw_json: compactJson(sense)
         });
         senses++;
@@ -371,13 +409,13 @@ async function importFreeDict({ limit, sourceKey, sourceName, sourceUrl, file, s
     source_key: sourceKey,
     source_name: sourceName,
     source_url: sourceUrl,
-    license: "FreeDict project license; verify dictionary metadata before redistribution",
+    license: 'FreeDict project license; verify dictionary metadata before redistribution',
     metadata_json: JSON.stringify({ file, target_lang: targetLang })
   });
   const filePath = path.resolve(file);
   if (!fs.existsSync(filePath)) return { skipped: true, reason: `missing ${file}` };
 
-  const xml = fs.readFileSync(filePath, "utf8");
+  const xml = fs.readFileSync(filePath, 'utf8');
   const parser = new XMLParser({
     ignoreAttributes: false,
     parseTagValue: false,
@@ -385,14 +423,14 @@ async function importFreeDict({ limit, sourceKey, sourceName, sourceUrl, file, s
     trimValues: true
   });
   const parsed = parser.parse(xml);
-  const entriesRaw = collectTeiNodes(parsed, "entry").filter((entry) => firstText(collectTeiText(entry, "orth")));
+  const entriesRaw = collectTeiNodes(parsed, 'entry').filter((entry) => firstText(collectTeiText(entry, 'orth')));
 
   let entries = 0;
   let senses = 0;
   const insertMany = db.transaction((items) => {
     for (const item of items) {
       if (limit && entries >= limit) break;
-      const word = firstText(collectTeiText(item, "orth"));
+      const word = firstText(collectTeiText(item, 'orth'));
       if (!word) continue;
 
       const sourceEntryKey = getXmlId(item) || `${sourceKey}:${entries + 1}:${word}`;
@@ -431,13 +469,13 @@ async function importWikDict({ limit, sourceKey, sourceName, sourceUrl, file, so
     source_key: sourceKey,
     source_name: sourceName,
     source_url: sourceUrl,
-    license: "Wiktionary-derived; see WikDict upstream metadata",
+    license: 'Wiktionary-derived; see WikDict upstream metadata',
     metadata_json: compactJson({
-      type: "wikdict-sqlite",
+      type: 'wikdict-sqlite',
       file,
       source_lang: sourceLang,
       target_lang: targetLang,
-      role: "translation-evidence"
+      role: 'translation-evidence'
     })
   });
 
@@ -464,7 +502,7 @@ async function importWikDict({ limit, sourceKey, sourceName, sourceUrl, file, so
         WHERE COALESCE(written_rep, '') <> ''
           AND COALESCE(trans_list, '') <> ''
         ORDER BY written_rep, rowid
-        ${limit ? "LIMIT @limit" : ""}
+        ${limit ? 'LIMIT @limit' : ''}
       `
     )
     .all(limit ? { limit } : {});
@@ -502,7 +540,7 @@ async function importWikDict({ limit, sourceKey, sourceName, sourceUrl, file, so
     const sourceEntryKey = normalizeKey(word);
     const senseOrder = (senseOrderByEntry.get(sourceEntryKey) || 0) + 1;
     senseOrderByEntry.set(sourceEntryKey, senseOrder);
-    const translationGloss = translations.join("; ");
+    const translationGloss = translations.join('; ');
     const raw = {
       target_lang: targetLang,
       translations,
@@ -551,29 +589,29 @@ async function importWikDict({ limit, sourceKey, sourceName, sourceUrl, file, so
 }
 
 async function importOpenMultilingualWordnet({ limit }) {
-  const sourceKey = "omw-30";
+  const sourceKey = 'omw-30';
   const sourceId = ensureSource({
     source_key: sourceKey,
-    source_name: "Open Multilingual Wordnet 1.x / PWN 3.0 aligned",
-    source_url: "https://github.com/omwn/omw-data",
-    license: "mixed open WordNet licenses; see OMW source metadata",
+    source_name: 'Open Multilingual Wordnet 1.x / PWN 3.0 aligned',
+    source_url: 'https://github.com/omwn/omw-data',
+    license: 'mixed open WordNet licenses; see OMW source metadata',
     metadata_json: compactJson({
-      type: "omw-tab",
-      role: "concept-aligned-multilingual-evidence",
+      type: 'omw-tab',
+      role: 'concept-aligned-multilingual-evidence',
       files: {
-        en: "data/raw/omw/wn-data-eng.tab",
-        zh: "data/raw/omw/wn-data-cmn.tab",
-        ja: "data/raw/omw/wn-data-jpn.tab",
-        "pt-BR": "data/raw/omw/wn-data-por.tab"
+        en: 'data/raw/omw/wn-data-eng.tab',
+        zh: 'data/raw/omw/wn-data-cmn.tab',
+        ja: 'data/raw/omw/wn-data-jpn.tab',
+        'pt-BR': 'data/raw/omw/wn-data-por.tab'
       }
     })
   });
 
   const files = [
-    { lang: "en", file: "data/raw/omw/wn-data-eng.tab" },
-    { lang: "zh", file: "data/raw/omw/wn-data-cmn.tab" },
-    { lang: "ja", file: "data/raw/omw/wn-data-jpn.tab" },
-    { lang: "pt-BR", file: "data/raw/omw/wn-data-por.tab" }
+    { lang: 'en', file: 'data/raw/omw/wn-data-eng.tab' },
+    { lang: 'zh', file: 'data/raw/omw/wn-data-cmn.tab' },
+    { lang: 'ja', file: 'data/raw/omw/wn-data-jpn.tab' },
+    { lang: 'pt-BR', file: 'data/raw/omw/wn-data-por.tab' }
   ];
   const synsets = new Map();
   let skipped = 0;
@@ -581,22 +619,22 @@ async function importOpenMultilingualWordnet({ limit }) {
   for (const { lang, file } of files) {
     const filePath = path.resolve(file);
     if (!fs.existsSync(filePath)) throw new Error(`Missing OMW tab file: ${filePath}`);
-    const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/u);
+    const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/u);
     for (const line of lines) {
-      if (!line || line.startsWith("#")) continue;
-      const parts = line.split("\t");
+      if (!line || line.startsWith('#')) continue;
+      const parts = line.split('\t');
       if (parts.length < 3) {
         skipped++;
         continue;
       }
       const synset = cleanText(parts[0]);
       const valueType = cleanText(parts[1]);
-      const lemma = cleanOwmLemma(parts.slice(2).join("\t"), lang);
-      if (!synset || !valueType.endsWith("lemma") || !isUsefulWikDictText(lemma, lang)) {
+      const lemma = cleanOwmLemma(parts.slice(2).join('\t'), lang);
+      if (!synset || !valueType.endsWith('lemma') || !isUsefulWikDictText(lemma, lang)) {
         skipped++;
         continue;
       }
-      const bucket = synsets.get(synset) || { synset, pos: synset.split("-").pop(), localizations: new Map() };
+      const bucket = synsets.get(synset) || { synset, pos: synset.split('-').pop(), localizations: new Map() };
       const terms = bucket.localizations.get(lang) || [];
       if (!terms.includes(lemma) && terms.length < 8) terms.push(lemma);
       bucket.localizations.set(lang, terms);
@@ -609,7 +647,9 @@ async function importOpenMultilingualWordnet({ limit }) {
   for (const concept of synsets.values()) {
     const langs = [...concept.localizations.keys()];
     if (langs.length < 2) continue;
-    const localizations = Object.fromEntries([...concept.localizations.entries()].map(([lang, terms]) => [lang, terms]));
+    const localizations = Object.fromEntries(
+      [...concept.localizations.entries()].map(([lang, terms]) => [lang, terms])
+    );
     for (const [lang, terms] of concept.localizations.entries()) {
       for (const term of terms.slice(0, 4)) {
         const entryKey = `${lang}:${normalizeKey(term)}`;
@@ -626,7 +666,7 @@ async function importOpenMultilingualWordnet({ limit }) {
             raw_json: compactJson({
               term,
               lang,
-              synset_counted_source: "omw"
+              synset_counted_source: 'omw'
             })
           },
           sense: {
@@ -692,26 +732,22 @@ function insertSourceSense(sense) {
     domain: null,
     register_label: null,
     ...sense,
-    gloss: cleanText(sense.gloss) || "",
-    raw_json: sense.raw_json || "{}"
+    gloss: cleanText(sense.gloss) || '',
+    raw_json: sense.raw_json || '{}'
   });
 }
 
 function splitEcDictDefinitions(definition, translation) {
-  const source = cleanText(definition) || cleanText(translation) || "";
-  if (!source) return ["missing definition"];
-  return source
-    .split(/\n+/u)
-    .map(cleanText)
-    .filter(Boolean)
-    .slice(0, 12);
+  const source = cleanText(definition) || cleanText(translation) || '';
+  if (!source) return ['missing definition'];
+  return source.split(/\n+/u).map(cleanText).filter(Boolean).slice(0, 12);
 }
 
 function parseCedictLine(line) {
-  if (!line || line.startsWith("#")) return null;
+  if (!line || line.startsWith('#')) return null;
   const match = line.match(/^(\S+)\s+(\S+)\s+\[([^\]]+)\]\s+\/(.+)\/$/u);
   if (!match) return null;
-  const definitions = match[4].split("/").map(cleanText).filter(Boolean);
+  const definitions = match[4].split('/').map(cleanText).filter(Boolean);
   if (!definitions.length) return null;
   return {
     traditional: match[1],
@@ -722,23 +758,25 @@ function parseCedictLine(line) {
 }
 
 function normalizeKey(value) {
-  return cleanText(value).normalize("NFKC").toLocaleLowerCase();
+  return cleanText(value).normalize('NFKC').toLocaleLowerCase();
 }
 
 function normalizeSourceLang(lang) {
-  if (lang === "pt") return "pt-BR";
+  if (lang === 'pt') return 'pt-BR';
   if (!LANGUAGE_CODES.has(lang)) throw new Error(`Unsupported source lang: ${lang}`);
   return lang;
 }
 
 function cleanText(value) {
-  return String(value || "").replace(/\s+/gu, " ").trim();
+  return String(value || '')
+    .replace(/\s+/gu, ' ')
+    .trim();
 }
 
 function cleanWikDictText(value) {
   return cleanText(value)
-    .replace(/^['"]+|['"]+$/gu, "")
-    .replace(/^\(([^)]+)\)$/u, "$1")
+    .replace(/^['"]+|['"]+$/gu, '')
+    .replace(/^\(([^)]+)\)$/u, '$1')
     .trim();
 }
 
@@ -756,15 +794,15 @@ function isUsefulWikDictText(value, lang) {
   if (/&[#A-Za-z0-9]+;/u.test(text)) return false;
   if (/[<>]/u.test(text)) return false;
   if (/^[\p{P}\p{S}\s]+$/u.test(text)) return false;
-  if ((lang === "en" || lang === "pt-BR") && !/[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(text)) return false;
-  if (lang === "zh" && !/[\u3400-\u9fff]/u.test(text)) return false;
-  if (lang === "ja" && !/[\u3040-\u30ff\u3400-\u9fff]/u.test(text)) return false;
+  if ((lang === 'en' || lang === 'pt-BR') && !/[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(text)) return false;
+  if (lang === 'zh' && !/[\u3400-\u9fff]/u.test(text)) return false;
+  if (lang === 'ja' && !/[\u3040-\u30ff\u3400-\u9fff]/u.test(text)) return false;
   return true;
 }
 
 function hashText(value) {
   let hash = 2166136261;
-  for (const char of String(value || "")) {
+  for (const char of String(value || '')) {
     hash ^= char.codePointAt(0);
     hash = Math.imul(hash, 16777619);
   }
@@ -774,21 +812,21 @@ function hashText(value) {
 function buildOwmGloss(localizations, sourceLang) {
   return Object.entries(localizations)
     .filter(([lang]) => lang !== sourceLang)
-    .map(([lang, terms]) => `${lang}: ${asArray(terms).slice(0, 4).join("; ")}`)
-    .join(" | ");
+    .map(([lang, terms]) => `${lang}: ${asArray(terms).slice(0, 4).join('; ')}`)
+    .join(' | ');
 }
 
 function cleanOwmLemma(value, lang) {
-  const text = cleanText(value).replace(/_/gu, " ");
-  if (lang === "zh" || lang === "ja") return text.replace(/\+/gu, "");
-  return text.replace(/\+/gu, " ");
+  const text = cleanText(value).replace(/_/gu, ' ');
+  if (lang === 'zh' || lang === 'ja') return text.replace(/\+/gu, '');
+  return text.replace(/\+/gu, ' ');
 }
 
 function omwPartOfSpeech(pos) {
-  if (pos === "n") return "noun";
-  if (pos === "v") return "verb";
-  if (pos === "a" || pos === "s") return "adjective";
-  if (pos === "r") return "adverb";
+  if (pos === 'n') return 'noun';
+  if (pos === 'v') return 'verb';
+  if (pos === 'a' || pos === 's') return 'adjective';
+  if (pos === 'r') return 'adverb';
   return null;
 }
 
@@ -809,15 +847,15 @@ function firstText(values) {
 }
 
 function extractFreeDictSenses(entry, targetLang) {
-  const senseNodes = collectDirectTeiNodes(entry, "sense");
+  const senseNodes = collectDirectTeiNodes(entry, 'sense');
   const sourceNodes = senseNodes.length ? senseNodes : [entry];
   const senses = sourceNodes
     .map((sense) => {
-      const definitions = collectTeiText(sense, "def");
+      const definitions = collectTeiText(sense, 'def');
       const translations = extractFreeDictTranslations(sense);
       const gloss = firstText([...translations, ...definitions]);
       return {
-        part_of_speech: firstText(collectTeiText(sense, "pos")) || firstText(collectTeiText(entry, "pos")),
+        part_of_speech: firstText(collectTeiText(sense, 'pos')) || firstText(collectTeiText(entry, 'pos')),
         gloss,
         raw: {
           target_lang: targetLang,
@@ -833,12 +871,12 @@ function extractFreeDictSenses(entry, targetLang) {
     ? senses
     : [
         {
-          part_of_speech: firstText(collectTeiText(entry, "pos")),
-          gloss: firstText(extractFreeDictTranslations(entry)) || "missing definition",
+          part_of_speech: firstText(collectTeiText(entry, 'pos')),
+          gloss: firstText(extractFreeDictTranslations(entry)) || 'missing definition',
           raw: {
             target_lang: targetLang,
             translations: extractFreeDictTranslations(entry),
-            definitions: collectTeiText(entry, "def"),
+            definitions: collectTeiText(entry, 'def'),
             xml_id: getXmlId(entry)
           }
         }
@@ -847,13 +885,13 @@ function extractFreeDictSenses(entry, targetLang) {
 
 function extractFreeDictTranslations(node) {
   const translations = [];
-  for (const cit of collectTeiNodes(node, "cit")) {
-    const type = String(cit?.["@_type"] || cit?.type || "").toLocaleLowerCase();
-    if (type && !["trans", "translation"].includes(type)) continue;
-    translations.push(...collectTeiText(cit, "quote"));
-    translations.push(...collectTeiText(cit, "q"));
+  for (const cit of collectTeiNodes(node, 'cit')) {
+    const type = String(cit?.['@_type'] || cit?.type || '').toLocaleLowerCase();
+    if (type && !['trans', 'translation'].includes(type)) continue;
+    translations.push(...collectTeiText(cit, 'quote'));
+    translations.push(...collectTeiText(cit, 'q'));
   }
-  translations.push(...collectTeiText(node, "trans"));
+  translations.push(...collectTeiText(node, 'trans'));
   return uniqueStrings(translations);
 }
 
@@ -862,7 +900,7 @@ function collectTeiNodes(node, tagName) {
   visitTei(node, (key, value) => {
     if (localName(key) === tagName) {
       for (const item of asArray(value)) {
-        if (item && typeof item === "object") results.push(item);
+        if (item && typeof item === 'object') results.push(item);
       }
     }
   });
@@ -871,11 +909,11 @@ function collectTeiNodes(node, tagName) {
 
 function collectDirectTeiNodes(node, tagName) {
   const results = [];
-  if (!node || typeof node !== "object") return results;
+  if (!node || typeof node !== 'object') return results;
   for (const [key, value] of Object.entries(node)) {
     if (localName(key) !== tagName) continue;
     for (const item of asArray(value)) {
-      if (item && typeof item === "object") results.push(item);
+      if (item && typeof item === 'object') results.push(item);
     }
   }
   return results;
@@ -894,36 +932,36 @@ function collectTeiText(node, tagName) {
 }
 
 function visitTei(node, visitor) {
-  if (!node || typeof node !== "object") return;
+  if (!node || typeof node !== 'object') return;
   for (const [key, value] of Object.entries(node)) {
     visitor(key, value);
     for (const item of asArray(value)) {
-      if (item && typeof item === "object") visitTei(item, visitor);
+      if (item && typeof item === 'object') visitTei(item, visitor);
     }
   }
 }
 
 function textContent(value) {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "string" || typeof value === "number") return cleanText(value);
-  if (Array.isArray(value)) return cleanText(value.map(textContent).filter(Boolean).join("; "));
-  if (typeof value !== "object") return "";
-  if (value["#text"]) return cleanText(value["#text"]);
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string' || typeof value === 'number') return cleanText(value);
+  if (Array.isArray(value)) return cleanText(value.map(textContent).filter(Boolean).join('; '));
+  if (typeof value !== 'object') return '';
+  if (value['#text']) return cleanText(value['#text']);
   return cleanText(
     Object.entries(value)
-      .filter(([key]) => !key.startsWith("@_"))
+      .filter(([key]) => !key.startsWith('@_'))
       .map(([, child]) => textContent(child))
       .filter(Boolean)
-      .join("; ")
+      .join('; ')
   );
 }
 
 function getXmlId(node) {
-  return cleanText(node?.["@_xml:id"] || node?.["@_id"] || node?.["@_n"]);
+  return cleanText(node?.['@_xml:id'] || node?.['@_id'] || node?.['@_n']);
 }
 
 function localName(key) {
-  return String(key || "").replace(/^.*:/u, "");
+  return String(key || '').replace(/^.*:/u, '');
 }
 
 function uniqueStrings(values) {
@@ -933,8 +971,8 @@ function uniqueStrings(values) {
 function pruneFreeDictEntry(entry) {
   return {
     xml_id: getXmlId(entry),
-    orth: collectTeiText(entry, "orth").slice(0, 6),
-    pos: firstText(collectTeiText(entry, "pos")),
+    orth: collectTeiText(entry, 'orth').slice(0, 6),
+    pos: firstText(collectTeiText(entry, 'pos')),
     translations: extractFreeDictTranslations(entry).slice(0, 12)
   };
 }
@@ -948,7 +986,7 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg.startsWith("--")) {
+    if (arg.startsWith('--')) {
       result[arg.slice(2)] = argv[++i];
     }
   }

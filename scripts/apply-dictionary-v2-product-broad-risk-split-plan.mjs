@@ -1,34 +1,34 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
-const DEFAULT_PLAN = "logs/product-broad-risk-split-plan-20260625.json";
-const SOURCE = "manual:broad-risk-split-20260625";
-const LANGS = ["en", "zh", "ja", "pt-BR"];
+const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_PLAN = 'logs/product-broad-risk-split-plan-20260625.json';
+const SOURCE = 'manual:broad-risk-split-20260625';
+const LANGS = ['en', 'zh', 'ja', 'pt-BR'];
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const planPath = path.resolve(args.plan || DEFAULT_PLAN);
-const apply = args.apply === "true";
+const apply = args.apply === 'true';
 const limit = args.limit ? Number(args.limit) : 0;
-const dropUnmappedExamples = args["drop-unmapped-examples"] === "true";
-const clearJobs = args["clear-jobs"] !== "false";
-const senseIds = parseIdSet(args["sense-ids"]);
+const dropUnmappedExamples = args['drop-unmapped-examples'] === 'true';
+const clearJobs = args['clear-jobs'] !== 'false';
+const senseIds = parseIdSet(args['sense-ids']);
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!fs.existsSync(planPath)) throw new Error(`Split plan not found: ${planPath}`);
 if (limit && (!Number.isInteger(limit) || limit < 1)) throw new Error(`Invalid --limit: ${args.limit}`);
 
-const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
+const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
 const candidates = (plan.approved_candidates || [])
   .filter((candidate) => !senseIds.size || senseIds.has(Number(candidate.sense_id)))
   .slice(0, limit || undefined);
-if (!candidates.length) throw new Error("No approved_candidates found in split plan");
+if (!candidates.length) throw new Error('No approved_candidates found in split plan');
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 
 const statements = {
   senseById: db.prepare(`
@@ -294,7 +294,7 @@ function applyCandidate(candidate, write) {
             source_lang: link.source_lang,
             source_word: link.source_word,
             source_frequency_rank: link.source_frequency_rank,
-            match_method: "manual_broad_split",
+            match_method: 'manual_broad_split',
             confidence: Math.min(Number(link.confidence) || 1, Number(candidate.confidence) || 1)
           }).changes;
         }
@@ -312,7 +312,7 @@ function applyCandidate(candidate, write) {
     }
 
     planned.proposed.push({
-      target_sense_id: write ? targetSenseId : isFirst ? targetSenseId : "(new)",
+      target_sense_id: write ? targetSenseId : isFirst ? targetSenseId : '(new)',
       target_sense_order: targetOrder,
       label: proposed.label,
       part_of_speech: proposed.part_of_speech,
@@ -336,13 +336,13 @@ function applyCandidate(candidate, write) {
       const action =
         targetIndex == null
           ? dropUnmappedExamples
-            ? "delete"
-            : "keep_original"
+            ? 'delete'
+            : 'keep_original'
           : targetIndex === 0
-            ? "keep_original"
-            : "move";
-      if (action === "move") stats.examples_moved++;
-      if (action === "delete") {
+            ? 'keep_original'
+            : 'move';
+      if (action === 'move') stats.examples_moved++;
+      if (action === 'delete') {
         stats.examples_deleted++;
         stats.example_localizations_deleted += 4;
       }
@@ -369,14 +369,14 @@ function handleExamples(currentSense, examples, plannedSenseIds, candidate, plan
         planned.example_actions.push({
           example_id: example.id,
           source_text: example.source_text,
-          action: "delete",
+          action: 'delete',
           target_proposed_order: null
         });
       } else {
         planned.example_actions.push({
           example_id: example.id,
           source_text: example.source_text,
-          action: "keep_original",
+          action: 'keep_original',
           target_proposed_order: 1
         });
       }
@@ -391,7 +391,7 @@ function handleExamples(currentSense, examples, plannedSenseIds, candidate, plan
       planned.example_actions.push({
         example_id: example.id,
         source_text: example.source_text,
-        action: "move",
+        action: 'move',
         target_sense_id: targetSenseId,
         target_proposed_order: targetIndex + 1
       });
@@ -399,7 +399,7 @@ function handleExamples(currentSense, examples, plannedSenseIds, candidate, plan
       planned.example_actions.push({
         example_id: example.id,
         source_text: example.source_text,
-        action: "keep_original",
+        action: 'keep_original',
         target_sense_id: targetSenseId,
         target_proposed_order: 1
       });
@@ -409,18 +409,18 @@ function handleExamples(currentSense, examples, plannedSenseIds, candidate, plan
 
 function validateCandidate(candidate) {
   const errors = [];
-  if (candidate.status !== "approved_candidate") errors.push("not_approved_candidate");
+  if (candidate.status !== 'approved_candidate') errors.push('not_approved_candidate');
   if (!Number.isFinite(Number(candidate.confidence)) || Number(candidate.confidence) < 0.85) {
-    errors.push("confidence_below_threshold");
+    errors.push('confidence_below_threshold');
   }
   const currentSense = statements.senseById.get(Number(candidate.sense_id));
-  if (!currentSense) errors.push("sense_not_found");
+  if (!currentSense) errors.push('sense_not_found');
   else {
-    if (currentSense.product_entry_id !== Number(candidate.entry_id)) errors.push("entry_id_mismatch");
-    if (currentSense.status !== "accepted") errors.push("sense_not_accepted");
+    if (currentSense.product_entry_id !== Number(candidate.entry_id)) errors.push('entry_id_mismatch');
+    if (currentSense.status !== 'accepted') errors.push('sense_not_accepted');
   }
   const proposedSenses = normalizeProposedSenses(candidate.proposed_senses || [], errors);
-  if (proposedSenses.length < 2) errors.push("not_enough_proposed_senses");
+  if (proposedSenses.length < 2) errors.push('not_enough_proposed_senses');
   return { ok: errors.length === 0, errors, currentSense, proposedSenses };
 }
 
@@ -461,9 +461,9 @@ function buildLocalizations(productSenseId, proposed, confidence) {
       product_sense_id: productSenseId,
       lang,
       term: loc.term,
-      reading: lang === "zh" || lang === "ja" ? loc.reading : null,
+      reading: lang === 'zh' || lang === 'ja' ? loc.reading : null,
       reading_system: readingSystem(lang, loc.reading),
-      pronunciation: lang === "en" || lang === "pt-BR" ? loc.pronunciation : null,
+      pronunciation: lang === 'en' || lang === 'pt-BR' ? loc.pronunciation : null,
       pronunciation_system: pronunciationSystem(lang, loc.pronunciation),
       definition: loc.definition,
       source: SOURCE,
@@ -474,7 +474,7 @@ function buildLocalizations(productSenseId, proposed, confidence) {
 
 function inferExampleTargetIndex(candidate, example) {
   const senseId = Number(candidate.sense_id);
-  const text = String(example.source_text || "");
+  const text = String(example.source_text || '');
   if (senseId === 8335 && /问题|question|pergunta/iu.test(text)) return 1;
   if (senseId === 6381 && /放心|worry|tranquilo|安心/iu.test(text)) return 0;
   return 0;
@@ -493,7 +493,7 @@ function renumberEntrySenses(productEntryId, previousSenses, createdSenseIds, fi
 }
 
 function cleanText(value) {
-  return typeof value === "string" ? value.replace(/\s+/gu, " ").trim() : "";
+  return typeof value === 'string' ? value.replace(/\s+/gu, ' ').trim() : '';
 }
 
 function cleanNullable(value) {
@@ -503,14 +503,14 @@ function cleanNullable(value) {
 
 function readingSystem(lang, reading) {
   if (!reading) return null;
-  if (lang === "zh") return "pinyin";
-  if (lang === "ja") return "kana";
+  if (lang === 'zh') return 'pinyin';
+  if (lang === 'ja') return 'kana';
   return null;
 }
 
 function pronunciationSystem(lang, pronunciation) {
   if (!pronunciation) return null;
-  if (lang === "en" || lang === "pt-BR") return "ipa";
+  if (lang === 'en' || lang === 'pt-BR') return 'ipa';
   return null;
 }
 
@@ -518,14 +518,14 @@ function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[index + 1];
-    if (next && !next.startsWith("--")) {
+    if (next && !next.startsWith('--')) {
       parsed[key] = next;
       index++;
     } else {
-      parsed[key] = "true";
+      parsed[key] = 'true';
     }
   }
   return parsed;
@@ -533,7 +533,7 @@ function parseArgs(argv) {
 
 function parseIdSet(value) {
   const ids = new Set();
-  for (const part of String(value || "").split(",")) {
+  for (const part of String(value || '').split(',')) {
     const id = Number(part.trim());
     if (Number.isInteger(id) && id > 0) ids.add(id);
   }

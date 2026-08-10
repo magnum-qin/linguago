@@ -14,26 +14,26 @@ const ENDPOINTS = [
 let endpointIndex = 0;
 
 const JSON_SCHEMA = {
-  type: "array",
+  type: 'array',
   items: {
-    type: "object",
+    type: 'object',
     properties: {
-      word: { type: "string" },
-      pos: { type: "string" },
-      gloss: { type: "string" },
-      examples: { 
-        type: "array",
+      word: { type: 'string' },
+      pos: { type: 'string' },
+      gloss: { type: 'string' },
+      examples: {
+        type: 'array',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
-            text: { type: "string" },
-            translation: { type: "string" }
+            text: { type: 'string' },
+            translation: { type: 'string' }
           },
-          required: ["text", "translation"]
+          required: ['text', 'translation']
         }
       }
     },
-    required: ["word", "pos", "gloss", "examples"]
+    required: ['word', 'pos', 'gloss', 'examples']
   }
 };
 
@@ -56,14 +56,17 @@ Return a JSON array of senses. For each sense, provide the translated word, part
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'qwen3.6:latest',
-        messages: [{ role: 'system', content: 'You are a JSON assistant. Output valid JSON array.'}, { role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: 'You are a JSON assistant. Output valid JSON array.' },
+          { role: 'user', content: prompt }
+        ],
         format: JSON_SCHEMA,
         stream: false,
         options: { temperature: 0.1 }
       }),
       signal: AbortSignal.timeout(30000)
     });
-    
+
     if (res.ok) {
       const data = await res.json();
       return JSON.parse(data.message.content);
@@ -71,7 +74,7 @@ Return a JSON array of senses. For each sense, provide the translated word, part
       console.error(`Error from ${endpoint}: ${res.status}`);
       return null;
     }
-  } catch(e) {
+  } catch (e) {
     console.error(`Failed to reach ${endpoint}:`, e.message);
     return null;
   }
@@ -79,20 +82,20 @@ Return a JSON array of senses. For each sense, provide the translated word, part
 
 async function main() {
   if (!fs.existsSync(DB_PATH)) {
-    console.error("DB not found!");
+    console.error('DB not found!');
     return;
   }
   const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-  
+
   const entries = Object.values(db);
   console.log(`Starting augmentation for ${entries.length} entries...`);
-  
+
   // We process in batches of 3 to utilize all 3 servers concurrently
   for (let i = 0; i < entries.length; i += 3) {
     const batch = entries.slice(i, i + 3);
     const promises = batch.map(async (entry) => {
       let updated = false;
-      
+
       // Need Japanese?
       if (!entry.translations.ja || entry.translations.ja.length === 0) {
         console.log(`[JA] Augmenting: ${entry.word}`);
@@ -102,7 +105,7 @@ async function main() {
           updated = true;
         }
       }
-      
+
       // Need Portuguese?
       if (!entry.translations.pt || entry.translations.pt.length === 0) {
         console.log(`[PT] Augmenting: ${entry.word}`);
@@ -114,16 +117,16 @@ async function main() {
       }
       return updated;
     });
-    
+
     const results = await Promise.all(promises);
-    if (results.some(r => r)) {
+    if (results.some((r) => r)) {
       // Save progressively
       fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
       console.log(`Progress saved at index ${Math.min(i + 3, entries.length)}`);
     }
   }
-  
-  console.log("Augmentation Complete!");
+
+  console.log('Augmentation Complete!');
 }
 
 main().catch(console.error);

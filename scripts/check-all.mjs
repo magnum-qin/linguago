@@ -1,32 +1,32 @@
-import { spawn } from "node:child_process";
-import fs from "node:fs";
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 
 const node = process.execPath;
 const checks = [
   {
-    name: "TypeScript",
+    name: 'TypeScript',
     command: node,
-    args: ["node_modules/typescript/bin/tsc", "--noEmit"]
+    args: ['node_modules/typescript/bin/tsc', '--noEmit']
   },
   {
-    name: "Service Worker cache",
+    name: 'Service Worker cache',
     command: node,
-    args: ["scripts/sw-cache-check.mjs"]
+    args: ['scripts/sw-cache-check.mjs']
   },
   ...[
-    "src/utils/api.js",
-    "src/utils/text-utils.js",
-    "src/utils/pronunciation.js",
-    "public/sw.js",
-    "scripts/api-smoke.mjs",
-    "scripts/stream-benchmark.mjs",
-    "scripts/sw-cache-check.mjs"
+    'src/utils/api.js',
+    'src/utils/text-utils.js',
+    'src/utils/pronunciation.js',
+    'public/sw.js',
+    'scripts/api-smoke.mjs',
+    'scripts/stream-benchmark.mjs',
+    'scripts/sw-cache-check.mjs'
   ]
     .filter((file) => fs.existsSync(file))
     .map((file) => ({
       name: `Syntax ${file}`,
       command: node,
-      args: ["--check", file]
+      args: ['--check', file]
     }))
 ];
 
@@ -43,7 +43,7 @@ for (const check of checks) {
 }
 
 for (const result of results) {
-  const status = result.ok ? "PASS" : "FAIL";
+  const status = result.ok ? 'PASS' : 'FAIL';
   console.log(`${status} ${result.name} (${result.ms}ms)`);
   if (!result.ok && result.output) {
     console.log(result.output);
@@ -61,17 +61,17 @@ function run(command, args) {
       shell: false,
       windowsHide: true
     });
-    let output = "";
-    child.stdout.on("data", (chunk) => {
+    let output = '';
+    child.stdout.on('data', (chunk) => {
       output += chunk;
     });
-    child.stderr.on("data", (chunk) => {
+    child.stderr.on('data', (chunk) => {
       output += chunk;
     });
-    child.on("error", (error) => {
+    child.on('error', (error) => {
       resolve({ code: 1, output: error.message });
     });
-    child.on("close", (code) => {
+    child.on('close', (code) => {
       resolve({ code: code ?? 1, output });
     });
   });

@@ -1,21 +1,37 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_DB = "data/processed/linguago_v2_fixed_pilot.db";
-const DEFAULT_FREQ_DIR = "data/raw/frequency";
+const DEFAULT_DB = 'data/processed/linguago_v2_fixed_pilot.db';
+const DEFAULT_FREQ_DIR = 'data/raw/frequency';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
-const freqDir = path.resolve(args["freq-dir"] || DEFAULT_FREQ_DIR);
-const maxRank = Number(args["max-rank"] || 50_000);
+const freqDir = path.resolve(args['freq-dir'] || DEFAULT_FREQ_DIR);
+const maxRank = Number(args['max-rank'] || 50_000);
+const frequencySource = String(args['frequency-source'] || 'frequencywords');
+const onlyUnranked = args['only-unranked'] === 'true';
+const backupOutPath = args['backup-out'] ? path.resolve(args['backup-out']) : null;
+const dryRun = args['dry-run'] === 'true';
 
-const frequencyFiles = {
-  en: "frequencywords-en_50k.txt",
-  zh: "frequencywords-zh_50k.txt",
-  ja: "frequencywords-ja_50k.txt",
-  "pt-BR": "frequencywords-pt_br_50k.txt"
+const frequencyFileSets = {
+  frequencywords: {
+    en: 'frequencywords-en_50k.txt',
+    zh: 'frequencywords-zh_50k.txt',
+    ja: 'frequencywords-ja_50k.txt',
+    'pt-BR': 'frequencywords-pt_br_50k.txt'
+  },
+  wordfreq: {
+    en: 'wordfreq-en-200000.txt',
+    zh: 'wordfreq-zh-200000.txt',
+    ja: 'wordfreq-ja-200000.txt',
+    'pt-BR': 'wordfreq-pt-200000.txt'
+  }
 };
+const frequencyFiles = frequencyFileSets[frequencySource];
+if (!frequencyFiles) {
+  throw new Error(`Invalid --frequency-source: ${frequencySource}`);
+}
 
 const missingFiles = Object.values(frequencyFiles)
   .map((file) => path.join(freqDir, file))
@@ -26,10 +42,10 @@ if (missingFiles.length) {
     JSON.stringify(
       {
         ok: false,
-        error: "missing_frequency_files",
+        error: 'missing_frequency_files',
         freq_dir: path.relative(process.cwd(), freqDir),
         missing_files: missingFiles.map((file) => path.relative(process.cwd(), file)),
-        next_step: "Run: npm run dict:download"
+        next_step: 'Run: npm run dict:download'
       },
       null,
       2
@@ -39,10 +55,10 @@ if (missingFiles.length) {
 }
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
+db.pragma('foreign_keys = ON');
 
 const statements = {
-  reset: db.prepare("UPDATE entries SET frequency_rank = NULL"),
+  reset: db.prepare('UPDATE entries SET frequency_rank = NULL'),
   byEntryKey: db.prepare(`
     SELECT id, frequency_rank
     FROM entries
@@ -68,7 +84,19 @@ const statements = {
   `)
 };
 
-if (args.reset !== "false") statements.reset.run();
+if (backupOutPath) {
+  const ranks = db
+    .prepare('SELECT id, frequency_rank FROM entries WHERE frequency_rank IS NOT NULL ORDER BY id')
+    .all();
+  fs.mkdirSync(path.dirname(backupOutPath), { recursive: true });
+  fs.writeFileSync(
+    backupOutPath,
+    `${JSON.stringify({ generated_at: new Date().toISOString(), db: path.relative(process.cwd(), dbPath), ranks })}\n`,
+    'utf8'
+  );
+}
+
+if (!dryRun && args.reset !== 'false' && !onlyUnranked) statements.reset.run();
 
 const updateRanks = db.transaction((updates) => {
   for (const update of updates) statements.updateRank.run(update);
@@ -89,12 +117,13 @@ for (const [lang, fileName] of Object.entries(frequencyFiles)) {
     if (!candidates.length) continue;
     matchedTerms++;
     for (const candidate of candidates) {
+      if (onlyUnranked && candidate.frequency_rank !== null) continue;
       matchedEntries.add(candidate.id);
       updates.push({ id: candidate.id, rank: row.rank });
     }
   }
 
-  updateRanks(updates);
+  if (!dryRun) updateRanks(updates);
   summary[lang] = {
     frequency_terms: rows.length,
     matched_terms: matchedTerms,
@@ -135,6 +164,10 @@ console.log(
       db: path.relative(process.cwd(), dbPath),
       freq_dir: path.relative(process.cwd(), freqDir),
       max_rank: maxRank,
+      frequency_source: frequencySource,
+      only_unranked: onlyUnranked,
+      dry_run: dryRun,
+      backup_out: backupOutPath ? path.relative(process.cwd(), backupOutPath) : null,
       summary,
       ranked_by_lang: rankedByLang,
       top_ranked: topRanked
@@ -146,7 +179,7 @@ console.log(
 
 function readFrequencyTerms(file, lang, limit) {
   return fs
-    .readFileSync(file, "utf8")
+    .readFileSync(file, 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
@@ -161,22 +194,25 @@ function readFrequencyTerms(file, lang, limit) {
 }
 
 function isHeader(term, lang) {
-  const lower = String(term || "").toLowerCase();
-  return lower === lang.toLowerCase() || (lang === "zh" && lower === "zh-cn") || (lang === "pt-BR" && lower === "pt");
+  const lower = String(term || '').toLowerCase();
+  return lower === lang.toLowerCase() || (lang === 'zh' && lower === 'zh-cn') || (lang === 'pt-BR' && lower === 'pt');
 }
 
 function normalize(value) {
-  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase();
+  return String(value || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const next = argv[i + 1];
-    result[arg.slice(2)] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[arg.slice(2)] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

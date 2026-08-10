@@ -1,0 +1,21 @@
+{
+  "source_key": "openhownet-official-2021",
+  "source_family": "openhownet",
+  "license": "MIT",
+  "production_publishable": true,
+  "research_only": false,
+  "citation_required": true,
+  "verified_at": "2026-08-10",
+  "official_license_page": "https://openhownet.thunlp.org/download",
+  "official_repository": "https://github.com/thunlp/OpenHowNet",
+  "repository_license_url": "https://github.com/thunlp/OpenHowNet/blob/master/LICENSE",
+  "scope_evidence": [
+    "The official download page places HowNet core data and the API under the OpenHowNet download section and states that OpenHowNet uses the MIT license.",
+    "The official repository identifies itself as Core Data of HowNet and OpenHowNet Python API and asks users of OpenHowNet data or API to cite the project paper."
+  ],
+  "required_citations": [
+    "Fanchao Qi, Chenghao Yang, Zhiyuan Liu, Qiang Dong, Maosong Sun, Zhendong Dong. OpenHowNet: An Open Sememe-based Lexical Knowledge Base. 2019.",
+    "Zhendong Dong and Qiang Dong. HowNet-a hybrid language and knowledge resource. 2003."
+  ],
+  "reason": "Official OpenHowNet download and repository pages apply MIT licensing to the project containing both core data and API; preserve attribution and citations."
+}

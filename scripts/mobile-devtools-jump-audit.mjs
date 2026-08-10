@@ -1,6 +1,6 @@
-import { chromium } from "playwright";
+import { chromium } from 'playwright';
 
-const url = "https://translation-pwa.qhzggzh-linguago.workers.dev";
+const url = 'https://translation-pwa.qhzggzh-linguago.workers.dev';
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({
@@ -8,17 +8,17 @@ const page = await browser.newPage({
   isMobile: true,
   hasTouch: true,
   userAgent:
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
 });
 
-await page.goto(url, { waitUntil: "networkidle" });
-await page.waitForSelector("#textInput");
+await page.goto(url, { waitUntil: 'networkidle' });
+await page.waitForSelector('#textInput');
 
 await page.evaluate(() => {
   window.__layoutShifts = [];
   window.__jumpFrames = [];
 
-  if ("PerformanceObserver" in window) {
+  if ('PerformanceObserver' in window) {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         window.__layoutShifts.push({
@@ -27,11 +27,7 @@ await page.evaluate(() => {
           sources: entry.sources?.map((source) => {
             const node = source.node;
             return {
-              node:
-                node?.id ||
-                node?.className ||
-                node?.tagName ||
-                "unknown",
+              node: node?.id || node?.className || node?.tagName || 'unknown',
               previous: source.previousRect
                 ? {
                     top: Math.round(source.previousRect.top),
@@ -50,15 +46,13 @@ await page.evaluate(() => {
       }
     });
 
-    observer.observe({ type: "layout-shift", buffered: true });
+    observer.observe({ type: 'layout-shift', buffered: true });
     window.__layoutShiftObserver = observer;
   }
 });
 
 function summarizeFrames(frames, selector) {
-  const values = frames
-    .map((frame) => frame[selector])
-    .filter((rect) => rect && rect.width > 0 && rect.height > 0);
+  const values = frames.map((frame) => frame[selector]).filter((rect) => rect && rect.width > 0 && rect.height > 0);
 
   if (!values.length) {
     return null;
@@ -77,7 +71,7 @@ function summarizeFrames(frames, selector) {
   };
 }
 
-await page.locator("#textInput").fill("hello");
+await page.locator('#textInput').fill('hello');
 
 const audit = await page.evaluate(async () => {
   const rectFor = (selector) => {
@@ -99,27 +93,27 @@ const audit = await page.evaluate(async () => {
     label,
     time: Math.round(performance.now()),
     bodyClasses: document.body.className,
-    busy: document.querySelector("#resultCard")?.getAttribute("aria-busy"),
-    translator: rectFor(".translator-card"),
-    result: rectFor("#resultCard"),
-    head: rectFor(".result-head"),
-    tabs: rectFor("#resultLanguageTabs"),
-    translation: rectFor("#translationCard"),
-    clearButton: rectFor("#clearButton"),
-    translateButton: rectFor("#translateButton")
+    busy: document.querySelector('#resultCard')?.getAttribute('aria-busy'),
+    translator: rectFor('.translator-card'),
+    result: rectFor('#resultCard'),
+    head: rectFor('.result-head'),
+    tabs: rectFor('#resultLanguageTabs'),
+    translation: rectFor('#translationCard'),
+    clearButton: rectFor('#clearButton'),
+    translateButton: rectFor('#translateButton')
   });
 
   const frames = [];
-  frames.push(capture("before-click"));
-  document.querySelector("#translateButton").click();
+  frames.push(capture('before-click'));
+  document.querySelector('#translateButton').click();
 
   const start = performance.now();
   while (performance.now() - start < 2400) {
-    frames.push(capture("frame"));
+    frames.push(capture('frame'));
     await new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
-  frames.push(capture("after-2400ms"));
+  frames.push(capture('after-2400ms'));
   return {
     frames,
     shifts: window.__layoutShifts || []
@@ -127,39 +121,37 @@ const audit = await page.evaluate(async () => {
 });
 
 const visibleFrames = audit.frames.filter((frame) => frame.result?.height > 0);
-const busyFrames = visibleFrames.filter((frame) => frame.busy === "true");
-const doneFrames = visibleFrames.filter((frame) => frame.busy === "false");
+const busyFrames = visibleFrames.filter((frame) => frame.busy === 'true');
+const doneFrames = visibleFrames.filter((frame) => frame.busy === 'false');
 
 const report = {
   url,
   frameCount: audit.frames.length,
   visibleFrameCount: visibleFrames.length,
   layoutShiftCount: audit.shifts.length,
-  layoutShiftScore: Number(
-    audit.shifts.reduce((sum, shift) => sum + shift.value, 0).toFixed(6)
-  ),
+  layoutShiftScore: Number(audit.shifts.reduce((sum, shift) => sum + shift.value, 0).toFixed(6)),
   firstVisible: visibleFrames[0],
   lastVisible: visibleFrames.at(-1),
   wholeVisibleRanges: {
-    translator: summarizeFrames(visibleFrames, "translator"),
-    result: summarizeFrames(visibleFrames, "result"),
-    head: summarizeFrames(visibleFrames, "head"),
-    tabs: summarizeFrames(visibleFrames, "tabs"),
-    translation: summarizeFrames(visibleFrames, "translation"),
-    clearButton: summarizeFrames(visibleFrames, "clearButton"),
-    translateButton: summarizeFrames(visibleFrames, "translateButton")
+    translator: summarizeFrames(visibleFrames, 'translator'),
+    result: summarizeFrames(visibleFrames, 'result'),
+    head: summarizeFrames(visibleFrames, 'head'),
+    tabs: summarizeFrames(visibleFrames, 'tabs'),
+    translation: summarizeFrames(visibleFrames, 'translation'),
+    clearButton: summarizeFrames(visibleFrames, 'clearButton'),
+    translateButton: summarizeFrames(visibleFrames, 'translateButton')
   },
   loadingRanges: {
-    result: summarizeFrames(busyFrames, "result"),
-    head: summarizeFrames(busyFrames, "head"),
-    tabs: summarizeFrames(busyFrames, "tabs"),
-    translation: summarizeFrames(busyFrames, "translation")
+    result: summarizeFrames(busyFrames, 'result'),
+    head: summarizeFrames(busyFrames, 'head'),
+    tabs: summarizeFrames(busyFrames, 'tabs'),
+    translation: summarizeFrames(busyFrames, 'translation')
   },
   doneRanges: {
-    result: summarizeFrames(doneFrames, "result"),
-    head: summarizeFrames(doneFrames, "head"),
-    tabs: summarizeFrames(doneFrames, "tabs"),
-    translation: summarizeFrames(doneFrames, "translation")
+    result: summarizeFrames(doneFrames, 'result'),
+    head: summarizeFrames(doneFrames, 'head'),
+    tabs: summarizeFrames(doneFrames, 'tabs'),
+    translation: summarizeFrames(doneFrames, 'translation')
   },
   layoutShifts: audit.shifts
 };

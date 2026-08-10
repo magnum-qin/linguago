@@ -3542,3 +3542,35 @@ deterministic support but failed independent Gemma no-correction consensus
 (66/80 and 64/90). The 500-row write gate remains blocked. All selection,
 resume, reverse-evidence, and consensus joins must use
 `source_entry_id:source_sense_id`; candidate batches must be entry-unique.
+## v86 Controlled-Consensus Release (2026-08-06)
+
+The next strict controlled lane selected 70 preferred-term-complete candidates;
+52 were already complete in the product DB. Qwen generated 17/18 valid new
+rows, strict four-language reverse evidence retained 17/17, and independent
+Gemma no-correction review accepted 13. A locale audit corrected pt-BR common
+noun `Catamarã` to `catamarã` through
+`config/dictionary-overrides/v86-pt-br-term-case.json` before replay.
+
+The 13 rows passed isolated and main-DB draft/promote runs, fast audit,
+published-risk audit, native export, and full in-memory import. Production v86
+contains 29,669 entries, 35,193 senses, 140,772 sense localizations, 3,030
+examples, and 11,898 example localizations. Worker version is
+`35880184-2258-44af-97e6-b00c08c7e2bf`, cache is
+`v86d-sequential-form-lookup-29669`, and D1 `published_at` is
+`2026-08-06T08:33:52.889Z`. Complete API, focused API, and separate
+mobile/desktop render checks pass.
+
+Operational failure lesson: D1 native release resets schema before importing
+data chunks. An interrupted process left a partial database with 19,909
+entries and zero senses until the audited 18 chunks were replayed. The native
+push script now retries each SQL file and verifies all seven remote table
+counts against `manifest.json` before printing completion. Treat a missing
+post-import count verification as a failed release, even if some Wrangler
+imports succeeded.
+
+Unicode smoke-test lesson: Windows PowerShell 5 encoded a raw Chinese JSON
+request body as question marks, making a valid `分度器` D1 row appear to miss.
+Use Node `fetch`, UTF-8 bytes, or Unicode escapes for non-ASCII API checks.
+The Worker resolves canonical keys, entry forms, and localized terms with
+three small sequential indexed queries before aggregating an entry. The
+focused API suite locks this behavior with `ja-protractor-form-lookup`.

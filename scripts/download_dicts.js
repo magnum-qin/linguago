@@ -10,19 +10,19 @@ const RAW_DIR = path.join(__dirname, '../data/raw');
 const FILES = [
   {
     name: 'CC-CEDICT.txt.gz',
-    url: 'https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz',
+    url: 'https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz'
   },
   {
     name: 'JMdict_e.gz',
-    url: 'http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz',
+    url: 'http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz'
   },
   {
     name: 'kaikki_Chinese.jsonl',
-    url: 'https://kaikki.org/dictionary/Chinese/kaikki.org-dictionary-Chinese.jsonl',
+    url: 'https://kaikki.org/dictionary/Chinese/kaikki.org-dictionary-Chinese.jsonl'
   },
   {
     name: 'ecdict.csv',
-    url: 'https://raw.githubusercontent.com/skywind3000/ECDICT/master/ecdict.csv',
+    url: 'https://raw.githubusercontent.com/skywind3000/ECDICT/master/ecdict.csv'
   }
 ];
 
@@ -55,7 +55,7 @@ async function main() {
   for (const file of FILES) {
     await downloadFile(file);
   }
-  console.log("All downloads finished!");
+  console.log('All downloads finished!');
 }
 
 main();

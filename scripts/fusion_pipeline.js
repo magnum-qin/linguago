@@ -14,35 +14,33 @@ const goldenDatabase = {};
 async function parseCCCedict() {
   const filePath = path.join(RAW_DIR, 'CC-CEDICT.txt.gz');
   if (!fs.existsSync(filePath)) return;
-  
+
   const fileStream = fs.createReadStream(filePath);
   const gunzip = zlib.createGunzip();
   const rl = readline.createInterface({ input: fileStream.pipe(gunzip), crlfDelay: Infinity });
-  
-  console.log("Parsing CC-CEDICT...");
+
+  console.log('Parsing CC-CEDICT...');
   let count = 0;
   for await (const line of rl) {
     if (line.startsWith('#')) continue;
-    
+
     // Format: Traditional Simplified [pin1 yin1] /def 1/def 2/
     const match = line.match(/^(\S+)\s+(\S+)\s+\[([^\]]+)\]\s+\/(.+)\//);
     if (match) {
       const simplified = match[2];
       const pinyin = match[3];
       const glosses = match[4].split('/');
-      
+
       goldenDatabase[simplified] = {
         word: simplified,
         translations: {
           zh: {
-            sounds: [{ type: "pinyin", value: pinyin }],
-            senses: [
-              { pos: "unknown", glosses: glosses, examples: [] }
-            ]
+            sounds: [{ type: 'pinyin', value: pinyin }],
+            senses: [{ pos: 'unknown', glosses: glosses, examples: [] }]
           },
           en: { senses: [] },
           ja: null,
-          "pt-BR": null
+          'pt-BR': null
         }
       };
       count++;
@@ -54,45 +52,45 @@ async function parseCCCedict() {
 async function parseKaikkiChinese() {
   const filePath = path.join(RAW_DIR, 'kaikki_Chinese.jsonl');
   if (!fs.existsSync(filePath)) return;
-  
+
   const fileStream = fs.createReadStream(filePath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
-  
-  console.log("Parsing Kaikki Chinese & Merging...");
+
+  console.log('Parsing Kaikki Chinese & Merging...');
   let count = 0;
   for await (const line of rl) {
     try {
       const entry = JSON.parse(line);
       const word = entry.word;
       if (!word) continue;
-      
-      const pos = entry.pos || "unknown";
+
+      const pos = entry.pos || 'unknown';
       const senses = entry.senses || [];
       const sounds = entry.sounds || [];
-      
+
       let pinyin = null;
       for (const s of sounds) {
-        if (s.tags && s.tags.includes("Pinyin") && s.zh_pron) {
+        if (s.tags && s.tags.includes('Pinyin') && s.zh_pron) {
           pinyin = s.zh_pron;
           break;
         }
       }
-      
-      const parsedSenses = senses.map(s => {
+
+      const parsedSenses = senses.map((s) => {
         return {
           pos: pos,
           glosses: s.glosses || [],
-          examples: (s.examples || []).map(e => ({
+          examples: (s.examples || []).map((e) => ({
             text: e.text,
             translation: e.english
           }))
         };
       });
-      
+
       if (goldenDatabase[word]) {
         // Merge into existing CC-CEDICT entry
         // Override with Kaikki's superior senses and sounds
-        if (pinyin) goldenDatabase[word].translations.zh.sounds = [{ type: "pinyin", value: pinyin }];
+        if (pinyin) goldenDatabase[word].translations.zh.sounds = [{ type: 'pinyin', value: pinyin }];
         // Append senses rather than overriding to keep CC-CEDICT fallback if needed, or just override
         goldenDatabase[word].translations.zh.senses = parsedSenses;
       } else if (count < 1000) {
@@ -101,12 +99,12 @@ async function parseKaikkiChinese() {
           word: word,
           translations: {
             zh: {
-              sounds: pinyin ? [{ type: "pinyin", value: pinyin }] : [],
+              sounds: pinyin ? [{ type: 'pinyin', value: pinyin }] : [],
               senses: parsedSenses
             },
             en: { senses: [] },
             ja: null,
-            "pt-BR": null
+            'pt-BR': null
           }
         };
         count++;
@@ -124,10 +122,10 @@ async function main() {
 
   await parseCCCedict();
   await parseKaikkiChinese();
-  
+
   const outputPath = path.join(PROCESSED_DIR, 'fusion_sample.json');
   fs.writeFileSync(outputPath, JSON.stringify(goldenDatabase, null, 2));
-  
+
   console.log(`Fusion complete! Extracted ${Object.keys(goldenDatabase).length} words.`);
   console.log(`Saved to: ${outputPath}`);
 }

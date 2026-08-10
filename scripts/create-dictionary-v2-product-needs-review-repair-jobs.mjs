@@ -1,18 +1,18 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import path from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = path.resolve(args.db || "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db");
-const provider = args.provider || "ollama";
-const model = args.model || "qwen3.6:latest";
-const promptVersion = args["prompt-version"] || "dictionary-v2-product-needs-review-repair-v2";
+const dbPath = path.resolve(args.db || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db');
+const provider = args.provider || 'ollama';
+const model = args.model || 'qwen3.6:latest';
+const promptVersion = args['prompt-version'] || 'dictionary-v2-product-needs-review-repair-v2';
 const limit = args.limit ? Number(args.limit) : 0;
-const dryRun = args["dry-run"] === "true";
-const errorLike = args["error-like"] || "";
+const dryRun = args['dry-run'] === 'true';
+const errorLike = args['error-like'] || '';
 
 const db = new Database(dbPath);
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 30000");
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 30000');
 ensureSchema(db);
 
 const statements = {
@@ -57,7 +57,7 @@ const statements = {
           AND latest_job.status = 'needs_review'
       )
     ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, j.lang, j.id
-    ${limit ? "LIMIT ?" : ""}
+    ${limit ? 'LIMIT ?' : ''}
   `),
   existingJob: db.prepare(`
     SELECT id, status
@@ -160,7 +160,21 @@ const queuedByLang = db
   )
   .all(provider, model, promptVersion);
 
-console.log(JSON.stringify({ ok: true, provider, model, prompt_version: promptVersion, error_like: errorLike, stats, queued_by_lang: queuedByLang }, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      ok: true,
+      provider,
+      model,
+      prompt_version: promptVersion,
+      error_like: errorLike,
+      stats,
+      queued_by_lang: queuedByLang
+    },
+    null,
+    2
+  )
+);
 db.close();
 
 function buildInput({ row, originalInput, badOutput }) {
@@ -173,10 +187,10 @@ function buildInput({ row, originalInput, badOutput }) {
   );
 
   return {
-    task: "repair_product_sense_localization_quality_warning",
+    task: 'repair_product_sense_localization_quality_warning',
     target_lang: row.lang,
     issue: {
-      code: "needs_review_validation_error",
+      code: 'needs_review_validation_error',
       validation_error: row.error,
       current_term: badOutput.sense_localization.term,
       current_reading: badOutput.sense_localization.reading,
@@ -189,9 +203,9 @@ function buildInput({ row, originalInput, badOutput }) {
       complete_only_target_lang: true,
       replace_existing_target_localization: true,
       keep_same_sense: true,
-      include_reading: row.lang === "zh" || row.lang === "ja",
-      include_pronunciation: row.lang === "en" || row.lang === "pt-BR",
-      use_brazilian_portuguese_for_pt_BR: row.lang === "pt-BR"
+      include_reading: row.lang === 'zh' || row.lang === 'ja',
+      include_pronunciation: row.lang === 'en' || row.lang === 'pt-BR',
+      use_brazilian_portuguese_for_pt_BR: row.lang === 'pt-BR'
     },
     product_entry: {
       id: row.product_entry_id,
@@ -225,59 +239,68 @@ function buildInput({ row, originalInput, badOutput }) {
 }
 
 function repairInstruction(lang, error, primaryLang) {
-  const sourceTermRule = primaryLang === lang
-    ? "If the target language is also the source language, keep the term exactly as the source word and put the sense distinction in the definition."
-    : "";
+  const sourceTermRule =
+    primaryLang === lang
+      ? 'If the target language is also the source language, keep the term exactly as the source word and put the sense distinction in the definition.'
+      : '';
   const termLanguageRule = /term language/i.test(error)
     ? [
-        "The term field must be a concise dictionary headword in the target language.",
+        'The term field must be a concise dictionary headword in the target language.',
         "Do not put explanations, romanization, source-language notes, 'alternative form of', 'variant of', or 'used in' phrases in the term field.",
-        "Move cross-reference details into the definition field, and choose the closest plain target-language headword when a lexical equivalent exists."
-      ].join(" ")
-    : "";
-  if (lang === "ja") {
+        'Move cross-reference details into the definition field, and choose the closest plain target-language headword when a lexical equivalent exists.'
+      ].join(' ')
+    : '';
+  if (lang === 'ja') {
     return [
-      "Rewrite as natural Japanese.",
-      "The term must contain Japanese kana or kanji.",
-      "Do not copy an English, Portuguese, pinyin, or romaji term as the Japanese term unless it is a widely used proper noun or acronym.",
-      "The reading must contain kana, not romaji.",
-      "The definition must be Japanese, not English.",
+      'Rewrite as natural Japanese.',
+      'The term must contain Japanese kana or kanji.',
+      'Do not copy an English, Portuguese, pinyin, or romaji term as the Japanese term unless it is a widely used proper noun or acronym.',
+      'The reading must contain kana, not romaji.',
+      'The definition must be Japanese, not English.',
       termLanguageRule,
       sourceTermRule,
       `Fix this validation error: ${error}`
-    ].filter(Boolean).join(" ");
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
-  if (lang === "zh") {
+  if (lang === 'zh') {
     return [
-      "Rewrite as natural Simplified Chinese.",
-      "The term must contain Chinese characters and no Japanese kana.",
-      "Do not copy Latin words, romaji, pinyin-only strings, or Japanese source forms as the Chinese term.",
-      "The reading must be pinyin in Latin letters.",
-      "The definition must be Chinese, not English or Japanese.",
+      'Rewrite as natural Simplified Chinese.',
+      'The term must contain Chinese characters and no Japanese kana.',
+      'Do not copy Latin words, romaji, pinyin-only strings, or Japanese source forms as the Chinese term.',
+      'The reading must be pinyin in Latin letters.',
+      'The definition must be Chinese, not English or Japanese.',
       termLanguageRule,
       sourceTermRule,
       `Fix this validation error: ${error}`
-    ].filter(Boolean).join(" ");
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
-  if (lang === "pt-BR") {
+  if (lang === 'pt-BR') {
     return [
-      "Rewrite as natural Brazilian Portuguese.",
-      "The term must not contain Chinese or Japanese characters.",
-      "Do not include source-language characters or cross-reference wording in the Portuguese term.",
-      "The pronunciation must match the Portuguese term.",
+      'Rewrite as natural Brazilian Portuguese.',
+      'The term must not contain Chinese or Japanese characters.',
+      'Do not include source-language characters or cross-reference wording in the Portuguese term.',
+      'The pronunciation must match the Portuguese term.',
       termLanguageRule,
       sourceTermRule,
       `Fix this validation error: ${error}`
-    ].filter(Boolean).join(" ");
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
   return [
-    "Rewrite as natural English.",
-    "The term must be an English dictionary headword or short English phrase.",
+    'Rewrite as natural English.',
+    'The term must be an English dictionary headword or short English phrase.',
     "Do not include Chinese/Japanese characters, pinyin, romanization, 'alternative form of', 'variant of', or 'used in' in the term field.",
     termLanguageRule,
     sourceTermRule,
     `Fix this validation error: ${error}`
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function compactLocalizations(localizations) {
@@ -295,50 +318,50 @@ function compactLocalizations(localizations) {
 }
 
 function outputSchema(lang) {
-  const required = ["lang", "term", "definition"];
-  const readingSchema = { type: ["string", "null"] };
-  const readingSystemSchema = { type: ["string", "null"] };
-  const pronunciationSchema = { type: ["string", "null"] };
-  const pronunciationSystemSchema = { type: ["string", "null"] };
-  if (lang === "zh" || lang === "ja") {
-    required.push("reading", "reading_system");
-    readingSchema.type = "string";
+  const required = ['lang', 'term', 'definition'];
+  const readingSchema = { type: ['string', 'null'] };
+  const readingSystemSchema = { type: ['string', 'null'] };
+  const pronunciationSchema = { type: ['string', 'null'] };
+  const pronunciationSystemSchema = { type: ['string', 'null'] };
+  if (lang === 'zh' || lang === 'ja') {
+    required.push('reading', 'reading_system');
+    readingSchema.type = 'string';
     readingSchema.minLength = 1;
-    readingSystemSchema.type = "string";
+    readingSystemSchema.type = 'string';
     readingSystemSchema.minLength = 1;
   }
-  if (lang === "en" || lang === "pt-BR") {
-    required.push("pronunciation", "pronunciation_system");
-    pronunciationSchema.type = "string";
+  if (lang === 'en' || lang === 'pt-BR') {
+    required.push('pronunciation', 'pronunciation_system');
+    pronunciationSchema.type = 'string';
     pronunciationSchema.minLength = 1;
-    pronunciationSystemSchema.type = "string";
+    pronunciationSystemSchema.type = 'string';
     pronunciationSystemSchema.minLength = 1;
   }
   return {
-    type: "object",
-    required: ["sense_localization", "example_localizations"],
+    type: 'object',
+    required: ['sense_localization', 'example_localizations'],
     properties: {
       sense_localization: {
-        type: "object",
+        type: 'object',
         required,
         properties: {
           lang: { const: lang },
-          term: { type: "string", minLength: 1 },
+          term: { type: 'string', minLength: 1 },
           reading: readingSchema,
           reading_system: readingSystemSchema,
           pronunciation: pronunciationSchema,
           pronunciation_system: pronunciationSystemSchema,
-          definition: { type: "string", minLength: 1 }
+          definition: { type: 'string', minLength: 1 }
         }
       },
-      example_localizations: { type: "array" }
+      example_localizations: { type: 'array' }
     }
   };
 }
 
 function parseMaybeJson(value) {
   try {
-    return JSON.parse(String(value || ""));
+    return JSON.parse(String(value || ''));
   } catch {
     return null;
   }
@@ -374,11 +397,11 @@ function parseArgs(argv) {
   const result = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
     const next = argv[i + 1];
-    result[key] = next && !next.startsWith("--") ? next : "true";
-    if (next && !next.startsWith("--")) i++;
+    result[key] = next && !next.startsWith('--') ? next : 'true';
+    if (next && !next.startsWith('--')) i++;
   }
   return result;
 }

@@ -40,5 +40,5 @@ const row = db.prepare(sql).get();
 if (row) {
   console.log(JSON.stringify(JSON.parse(row.data), null, 2));
 } else {
-  console.log("Not found");
+  console.log('Not found');
 }

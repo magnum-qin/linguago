@@ -49,10 +49,30 @@
                   "ja": "中間にある。真ん中。"
                 },
                 "localizations": {
-                  "en": { "term": "medium; intermediary", "pronunciation": "/ˈmiːdiəm/", "pronunciation_system": "IPA", "definition": "Of intermediate size, rank, or value." },
-                  "pt-BR": { "term": "médio", "pronunciation": "/ˈme.di.u/", "pronunciation_system": "IPA", "definition": "Que está no meio; que não é grande nem pequeno." },
-                  "zh": { "term": "中", "reading": "zhōng", "reading_system": "pinyin", "definition": "中等；居中；在中间。" },
-                  "ja": { "term": "中", "reading": "なか", "reading_system": "kana", "definition": "中間にある。真ん中。" }
+                  "en": {
+                    "term": "medium; intermediary",
+                    "pronunciation": "/ˈmiːdiəm/",
+                    "pronunciation_system": "IPA",
+                    "definition": "Of intermediate size, rank, or value."
+                  },
+                  "pt-BR": {
+                    "term": "médio",
+                    "pronunciation": "/ˈme.di.u/",
+                    "pronunciation_system": "IPA",
+                    "definition": "Que está no meio; que não é grande nem pequeno."
+                  },
+                  "zh": {
+                    "term": "中",
+                    "reading": "zhōng",
+                    "reading_system": "pinyin",
+                    "definition": "中等；居中；在中间。"
+                  },
+                  "ja": {
+                    "term": "中",
+                    "reading": "なか",
+                    "reading_system": "kana",
+                    "definition": "中間にある。真ん中。"
+                  }
                 },
                 "examples": [
                   {
@@ -100,10 +120,30 @@
                   "ja": "目標に当たる。"
                 },
                 "localizations": {
-                  "en": { "term": "hit; strike", "pronunciation": "/hɪt/; /straɪk/", "pronunciation_system": "IPA", "definition": "To hit or strike a target." },
-                  "pt-BR": { "term": "acertar", "pronunciation": "/a.seʁˈtaʁ/", "pronunciation_system": "IPA", "definition": "Atingir corretamente um alvo." },
-                  "zh": { "term": "中", "reading": "zhòng", "reading_system": "pinyin", "definition": "击中；命中目标。" },
-                  "ja": { "term": "当たる; 命中する", "reading": "あたる; めいちゅうする", "reading_system": "kana", "definition": "目標に当たる。" }
+                  "en": {
+                    "term": "hit; strike",
+                    "pronunciation": "/hɪt/; /straɪk/",
+                    "pronunciation_system": "IPA",
+                    "definition": "To hit or strike a target."
+                  },
+                  "pt-BR": {
+                    "term": "acertar",
+                    "pronunciation": "/a.seʁˈtaʁ/",
+                    "pronunciation_system": "IPA",
+                    "definition": "Atingir corretamente um alvo."
+                  },
+                  "zh": {
+                    "term": "中",
+                    "reading": "zhòng",
+                    "reading_system": "pinyin",
+                    "definition": "击中；命中目标。"
+                  },
+                  "ja": {
+                    "term": "当たる; 命中する",
+                    "reading": "あたる; めいちゅうする",
+                    "reading_system": "kana",
+                    "definition": "目標に当たる。"
+                  }
                 },
                 "examples": []
               }
@@ -150,10 +190,30 @@
               "ja": "挨拶として使われる言葉。"
             },
             "localizations": {
-              "en": { "term": "hello", "pronunciation": "/həˈloʊ/", "pronunciation_system": "IPA", "definition": "Used as a greeting." },
-              "pt-BR": { "term": "olá", "pronunciation": "/o.ˈla/", "pronunciation_system": "IPA", "definition": "Usado como saudação." },
-              "zh": { "term": "你好", "reading": "nǐ hǎo", "reading_system": "pinyin", "definition": "用于问候的致意语。" },
-              "ja": { "term": "こんにちは", "reading": "こんにちは", "reading_system": "kana", "definition": "挨拶として使われる言葉。" }
+              "en": {
+                "term": "hello",
+                "pronunciation": "/həˈloʊ/",
+                "pronunciation_system": "IPA",
+                "definition": "Used as a greeting."
+              },
+              "pt-BR": {
+                "term": "olá",
+                "pronunciation": "/o.ˈla/",
+                "pronunciation_system": "IPA",
+                "definition": "Usado como saudação."
+              },
+              "zh": {
+                "term": "你好",
+                "reading": "nǐ hǎo",
+                "reading_system": "pinyin",
+                "definition": "用于问候的致意语。"
+              },
+              "ja": {
+                "term": "こんにちは",
+                "reading": "こんにちは",
+                "reading_system": "kana",
+                "definition": "挨拶として使われる言葉。"
+              }
             },
             "examples": [
               {

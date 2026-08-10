@@ -17,23 +17,23 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 - Dictionary-generation LLM runtime: Unsloth Studio OpenAI-compatible API on the GPU cluster, replacing the older Ollama workflow.
 - Deployment: Wrangler via `npm run deploy`.
 
-Current production dictionary baseline is v85b D1 v2, deployed on 2026-08-06 JST
-with Worker version `7c8b4b59-c287-4584-9025-964d034035e8`, cache version
-`v85b-locale-fixed-29664`, and export counts
-`entries=29664`, `senses=35180`, `sense_localizations=140720`,
+Current production dictionary baseline is v86d D1 v2, deployed on 2026-08-06
+JST with cache version `v86d-sequential-form-lookup-29669` and export counts
+`entries=29669`, `senses=35193`, `sense_localizations=140772`,
 `examples=3030`, and `example_localizations=11898`.
 
-The release came from `outputs/d1-v2-product-native-export-v85b-locale-fixed`.
-Its D1 `published_at` value is `2026-08-06T06:29:09.247Z`. The audited v84
-rollback package is `backups/v84-rollback-native-before-v85-20260806-151653`.
+The release came from
+`outputs/d1-v2-product-native-export-v86-controlled13`. Its D1 `published_at`
+value is `2026-08-06T08:33:52.889Z`. The exact pre-v86 local database backup
+is `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-v86-controlled13-20260806-171547.db`.
 
 The local product DB and production D1 currently match after the quality-gated
 controlled-consensus release. Historical batch details below remain useful for
 pipeline diagnostics, but no longer describe an undeployed local delta.
 The current local main DB SHA256 is
-`44E26C50A9470B265C24A0B8F0F80EB155F0CAE531E123E2339744D603F7A63A`.
+`4A033CA5A860D906723D60DCC47A5F8C7401635DA9EE4CA1D1A9AD2C87BE1456`.
 Full native export/import, online API, focused API, and mobile/desktop render
-checks all pass. The known `duplicate_sense_localizations=98` warning remains
+checks all pass. The known `duplicate_sense_localizations=108` warning remains
 non-blocking.
 
 After batch 12, rebuilding the same strict pool found only `帰省` and `異音`.

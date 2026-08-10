@@ -13,10 +13,22 @@ const PROCESSED_DIR = path.join(__dirname, '../data/processed');
 
 // Core sample words for testing
 const TARGET_WORDS = new Set([
-  'hello', 'apple', 'water', 'book',
-  '你好', '苹果', '水', '书',
-  'こんにちは', 'りんご', '本', 'みず',
-  'olá', 'maçã', 'água', 'livro'
+  'hello',
+  'apple',
+  'water',
+  'book',
+  '你好',
+  '苹果',
+  '水',
+  '书',
+  'こんにちは',
+  'りんご',
+  '本',
+  'みず',
+  'olá',
+  'maçã',
+  'água',
+  'livro'
 ]);
 
 const goldenDatabase = {};
@@ -45,24 +57,27 @@ function addTranslation(sourceWord, targetLang, targetWord, sourceLang) {
 async function parseCCCedict() {
   const filePath = path.join(RAW_DIR, 'CC-CEDICT.txt.gz');
   if (!fs.existsSync(filePath)) return;
-  console.log("Parsing CC-CEDICT (ZH <-> EN)...");
-  
+  console.log('Parsing CC-CEDICT (ZH <-> EN)...');
+
   const fileStream = fs.createReadStream(filePath);
   const gunzip = zlib.createGunzip();
   const rl = readline.createInterface({ input: fileStream.pipe(gunzip), crlfDelay: Infinity });
-  
+
   for await (const line of rl) {
     if (line.startsWith('#')) continue;
     const match = line.match(/^(\S+)\s+(\S+)\s+\[([^\]]+)\]\s+\/(.+)\//);
     if (match) {
       const simplified = match[2];
       const glosses = match[4].split('/');
-      
+
       if (TARGET_WORDS.has(simplified)) {
         for (const gloss of glosses) {
-          const mainWord = gloss.split(' ')[0].toLowerCase().replace(/[^a-z]/g, ''); // Rough extraction
+          const mainWord = gloss
+            .split(' ')[0]
+            .toLowerCase()
+            .replace(/[^a-z]/g, ''); // Rough extraction
           if (TARGET_WORDS.has(mainWord)) {
-             addTranslation(simplified, 'en', mainWord, 'zh');
+            addTranslation(simplified, 'en', mainWord, 'zh');
           }
         }
       }
@@ -73,8 +88,8 @@ async function parseCCCedict() {
 async function parseECDICT() {
   const filePath = path.join(RAW_DIR, 'ecdict.csv');
   if (!fs.existsSync(filePath)) return;
-  console.log("Parsing ECDICT (EN <-> ZH)...");
-  
+  console.log('Parsing ECDICT (EN <-> ZH)...');
+
   return new Promise((resolve) => {
     fs.createReadStream(filePath)
       .pipe(csv())
@@ -85,7 +100,7 @@ async function parseECDICT() {
           // ECdict translations often look like "n. 苹果\nv. 苹果"
           for (const target of TARGET_WORDS) {
             if (transString.includes(target)) {
-               addTranslation(word, 'zh', target, 'en');
+              addTranslation(word, 'zh', target, 'en');
             }
           }
         }
@@ -97,16 +112,16 @@ async function parseECDICT() {
 async function parseJMdict() {
   const filePath = path.join(RAW_DIR, 'JMdict_e.gz');
   if (!fs.existsSync(filePath)) return;
-  console.log("Parsing JMdict (JA <-> EN)...");
-  
+  console.log('Parsing JMdict (JA <-> EN)...');
+
   // XML streaming is hard, we will do a fast line-by-line regex hack just for our target words to avoid OOM
   const fileStream = fs.createReadStream(filePath);
   const gunzip = zlib.createGunzip();
   const rl = readline.createInterface({ input: fileStream.pipe(gunzip), crlfDelay: Infinity });
-  
+
   let currentKeb = null;
   let currentReb = null;
-  
+
   for await (const line of rl) {
     if (line.includes('<keb>')) {
       currentKeb = line.match(/<keb>(.*?)<\/keb>/)?.[1];
@@ -132,24 +147,24 @@ async function parseJMdict() {
 async function parseKaikkiChinese() {
   const filePath = path.join(RAW_DIR, 'kaikki_Chinese.jsonl');
   if (!fs.existsSync(filePath)) return;
-  console.log("Parsing Kaikki Chinese (ZH <-> EN)...");
-  
+  console.log('Parsing Kaikki Chinese (ZH <-> EN)...');
+
   const fileStream = fs.createReadStream(filePath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
-  
+
   for await (const line of rl) {
     try {
       const entry = JSON.parse(line);
       const word = entry.word;
       if (!TARGET_WORDS.has(word)) continue;
-      
+
       const senses = entry.senses || [];
       for (const sense of senses) {
         const glosses = sense.glosses || [];
         for (const gloss of glosses) {
           const mainWord = gloss.split(';')[0].toLowerCase().trim();
           if (TARGET_WORDS.has(mainWord)) {
-             addTranslation(word, 'en', mainWord, 'zh');
+            addTranslation(word, 'en', mainWord, 'zh');
           }
         }
       }
@@ -167,7 +182,7 @@ async function main() {
   await parseECDICT();
   await parseJMdict();
   await parseKaikkiChinese();
-  
+
   // Clean up empty arrays
   const cleanDb = {};
   for (const [key, val] of Object.entries(goldenDatabase)) {
@@ -177,10 +192,10 @@ async function main() {
     }
     if (hasTrans) cleanDb[key] = val;
   }
-  
+
   const outputPath = path.join(PROCESSED_DIR, 'fusion_v1_sample.json');
   fs.writeFileSync(outputPath, JSON.stringify(cleanDb, null, 2));
-  
+
   console.log(`Fusion v1 complete! Merged translations for ${Object.keys(cleanDb).length} core words.`);
   console.log(`Saved to: ${outputPath}`);
 }

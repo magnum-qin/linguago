@@ -1,5 +1,149 @@
 # Codex Handoff
 
+## 2026-08-08 v90 full-rank expansion qualification
+
+- Expanded the read-only coverage scan from the first 100,000 gaps to all
+  267,263 ranked gaps at `max-rank=200000`. The unchanged quality filter
+  produced 4,930 clean rows (`zh=1164`, `ja=1085`, `pt-BR=2662`, `en=19`).
+- Unique-sense alignment retained 421 rows. The unchanged all-target,
+  two-independent-family reverse-evidence gate retained 68 rows. After
+  subtracting previously reviewed v90 batches, 64 rows remained.
+- The first new semantic-risk batch completed source review at `15/20` (75%).
+  Rejections exposed mandarin language/fruit, muffin/gem, object/occupation,
+  Platonism/realism, and broad botanical-term scope collisions. These patterns
+  are now scored by
+  `triage-dictionary-v2-product-source-gap-semantic-risk.mjs`.
+- The review runner initially produced 2 context-window errors and 13 truncated
+  JSON responses with a 1,024-token context and `max_tokens=320`. Resuming only
+  failed rows with a 2,048-token context and `max_tokens=500` completed all 20
+  without replaying valid rows.
+- A second reranked batch produced 12 accepts, 7 semantic rejects, and 1 invalid
+  evidence-bound response (`12/20`; at most `13/20` if retried successfully).
+  Misspellings, homographs, and overly broad OMW concepts dominate this lower
+  frequency tail. The 90% source-review gate therefore failed twice.
+- Stop before generation. No draft, product DB, D1, or Worker write occurred.
+  The next useful work is stronger candidate/source normalization, not a lower
+  acceptance threshold or a larger LLM batch.
+- Independent Gemma 4 31B adjudication of the 12 valid Qwen rejects produced
+  7 consensus rejects and 5 reviewer disagreements. Disagreements remain
+  manual review; model agreement is never counted as dictionary evidence.
+  `adjudicate-dictionary-v2-product-source-gap-reviews.mjs` now records this
+  boundary reproducibly.
+- Retrospective risk scoring moved all 7 consensus rejects above the automatic
+  ceiling (`score=8..10`). The final strict tail contained only 12 eligible
+  rows and its exploratory Qwen review reached 6 accepts, 5 rejects, and 1
+  invalid response. Even a successful retry could reach only `7/12`.
+- The expanded strict pool is now exhausted for automatic generation. Improve
+  source normalization and sense-level evidence ingestion before another LLM
+  qualification run.
+- Added
+  `audit-dictionary-v2-product-source-gap-parallel-agreement.mjs` as a read-only
+  diagnostic between exact WikDict bilingual senses and generated target-term
+  hints. Across 64 strict rows it found 22 rows with mismatches. In the 40
+  reviewed rows, all 7 Qwen/Gemma consensus rejects had a mismatch, while only
+  1 Qwen accept did. A single mismatch is therefore a ranking penalty, not a
+  hard block; multiple mismatches are high risk. Near CJK matches remain
+  visible and never count as publication evidence.
+- Harmonized the prefilter English lexical matcher with the final reverse
+  validator: both now support inflection, conservative derivational stems, and
+  one-character edit distance for compact terms of at least six characters.
+  This recovered only `certificação` and `cambojano` (`68 -> 70` strict
+  rows). Parallel agreement found two target-language mismatches in each:
+  credential/authentication scope for the former and language/nationality
+  scope for the latter. Both stayed above the risk ceiling; no LLM or DB write
+  followed.
+
+## 2026-08-08 v90 low-ambiguity second gate
+
+- Added `--max-hints-per-target` and `--max-total-target-hints` to
+  `subtract-dictionary-v2-product-source-gap-report.mjs`. The second gate used
+  at most two hints per target language and six target hints in total, leaving
+  19 candidates from the 77 unreviewed OMW-priority rows.
+- Source review correctly rejected `arábico` (part-of-speech mismatch) and
+  `apendicectomia` (Japanese scope mismatch). It initially marked `insólito`
+  accepted while returning null preferred terms. The reviewer validator now
+  requires every accepted row to bind all four preferred terms to supplied
+  evidence when `--require-hint-semantic-alignment true`; a strict retry fixed
+  `insólito`. Adding `encefalite` produced exactly 18/20 source-qualified rows.
+- Qwen generation validated 17/18 (`94.4%`); `incolor` was rejected for the thin
+  Portuguese definition `sem cor`. All 17 valid rows passed four-language
+  multi-family reverse evidence.
+- Gemma no-correction consensus accepted 14/17 initially. Structured retry
+  proposed `pendência` and `dezanove`; only `dezanove` retained independent
+  reverse support and then passed Gemma. `pendência` became Wiktionary-only in
+  Japanese and remained manual. Final verified yield is 15/20 (`75%`) in
+  `logs/product-source-gap-v90-omw-priority-low-ambiguity-verified-15.json`.
+- The second gate therefore also fails the required 80% final promote-rate
+  threshold. Do not write these rows to the product DB or start the 500-row
+  stage. The next candidate selector must account for grammatical role and
+  concept scope, not only hint count.
+
+## 2026-08-08 v90 OMW-priority gate result
+
+- No product DB, D1, or Worker write was performed in this experiment. The
+  product DB remains at 29,909 entries, 35,473 senses, and 141,892 sense
+  localizations.
+- The strict OMW-priority prefilter produced 97 candidates. A balanced 20-row
+  source review accepted 19/20; `luso` was correctly rejected for a
+  noun/adjective mismatch.
+- Generation originally accepted only 9/19 because source-review
+  `definition_contract` values in several target languages were English
+  placeholders. The supplement runner now keeps English contracts, keeps
+  Chinese/Japanese contracts only when their script and thickness are valid,
+  omits ambiguous Portuguese contracts, and permits only explicit structured
+  Gemma definition replacements to override that filter. The corrected dry-run
+  accepted 19/19.
+- Reverse validation now carries all English terms from the same aligned source
+  sense in `source_meaning_anchors`. This fixed false negatives such as
+  `foment` versus `provoke/stir up`, `deformed` versus `distorted`, and
+  `pointer` versus `cursor`, without adding a free-form synonym dictionary.
+  All 19 rows then had four-language, multi-family reverse support.
+- Independent Gemma 4 31B no-correction consensus accepted only 9/19 initially.
+  Structured correction retry safely selected eight rows and recovered five,
+  producing a final 14/19 (`73.7%`) no-correction intersection. This is below
+  the 80% scale gate, so do not write or promote this batch.
+- `build-dictionary-v2-product-source-gap-structured-correction-retry.mjs`
+  now rejects no-op replacements. Ambiguous replacements and corrections that
+  apply to `all` languages remain manual. Current residuals are `duplicação`,
+  `agrário`, `legislar`, `olaria`, and `ポインター`; do not force them through
+  deterministic promotion.
+- Node 11448 returned one upstream HTTP 500 in the first rerun. Nodes 11444 and
+  11447 completed the stable rerun with zero failures. This was an endpoint
+  reliability issue, not a JSON or validator failure.
+
+## 2026-08-06 v86d controlled-consensus release
+
+- Production is v86d: Worker `35880184-2258-44af-97e6-b00c08c7e2bf`, cache
+  `v86d-sequential-form-lookup-29669`, and D1
+  `published_at=2026-08-06T08:33:52.889Z`.
+- Online counts are `entries=29669`, `senses=35193`,
+  `sense_localizations=140772`, `examples=3030`, and
+  `example_localizations=11898`. The audited export is
+  `outputs/d1-v2-product-native-export-v86-controlled13`.
+- The batch promoted 13/13 controlled rows after strict four-language reverse
+  evidence and independent Gemma no-correction review: `biosphere`, `calcite`,
+  `osteoporosis`, `catamaran`, `crustacean`, `octane`, `prion`, `monotheism`,
+  `ionosphere`, `分度器`, `phenolphthalein`, `nonagon`, and `peritoneu`.
+- Product DB SHA256 is
+  `4A033CA5A860D906723D60DCC47A5F8C7401635DA9EE4CA1D1A9AD2C87BE1456`.
+  The pre-v86 DB backup SHA256 is
+  `44E26C50A9470B265C24A0B8F0F80EB155F0CAE531E123E2339744D603F7A63A`.
+- One release process was interrupted after schema reset and the first data
+  chunk, temporarily leaving D1 with entries but no senses. Replaying the
+  audited 18-chunk export restored the database. The push script now retries
+  each file and verifies all seven remote table counts against the manifest;
+  never report a release complete without this verification.
+- Do not use Windows PowerShell 5 `Invoke-RestMethod` with a raw non-ASCII JSON
+  string as a Unicode dictionary smoke test: it sent `分度器` as `???` and
+  created a false D1-miss diagnosis. Use Node `fetch`, an explicit UTF-8 byte
+  body, or Unicode escapes. The final focused check includes
+  `ja-protractor-form-lookup` to cover a display form whose canonical key is
+  romanized.
+- TypeScript, fast/published-risk/full import audits, complete online API,
+  focused API, and isolated mobile/desktop render checks pass. All blocking
+  audit counts and `flagged_senses` are zero. The duplicate-localization
+  warning is 108 and remains non-blocking.
+
 ## 2026-08-05 Definition-contract residual gate
 
 - Source-supply diagnostics confirmed that the source DB is already ranked to
@@ -138,14 +282,14 @@ Read this before making changes.
 
 ## Current Production Release
 
-Cloudflare production is dictionary v85b, deployed on 2026-08-06 JST:
+Cloudflare production is dictionary v86, deployed on 2026-08-06 JST:
 
-- Worker version: `7c8b4b59-c287-4584-9025-964d034035e8`
-- Worker cache: `v85b-locale-fixed-29664`
-- D1 `published_at`: `2026-08-06T06:29:09.247Z`
-- Counts: `entries=29664`, `senses=35180`, `sense_localizations=140720`,
+- Worker version: `35880184-2258-44af-97e6-b00c08c7e2bf`
+- Worker cache: `v86d-sequential-form-lookup-29669`
+- D1 `published_at`: `2026-08-06T08:33:52.889Z`
+- Counts: `entries=29669`, `senses=35193`, `sense_localizations=140772`,
   `examples=3030`, `example_localizations=11898`
-- Audited export: `outputs/d1-v2-product-native-export-v85b-locale-fixed`
+- Audited export: `outputs/d1-v2-product-native-export-v86-controlled13`
 - Pre-release product DB backup: `data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.before-v85-locale-fixed-20260806-151653.db`
 - Backup SHA256: `EEC7D7E9BA43D882526D14B9AC4F17CDEE40FAB805BAB9CF88F192578D7AD781`
 - Audited v84 rollback SQL package: `backups/v84-rollback-native-before-v85-20260806-151653`
@@ -2005,3 +2149,756 @@ production D1 remain unchanged.
   `EEC7D7E9BA43D882526D14B9AC4F17CDEE40FAB805BAB9CF88F192578D7AD781`.
   This audited set is now deployed as production v84. Online API, focused API,
   and mobile/desktop render checks pass.
+## 2026-08-07 v87 formal gate and scale-500 continuation
+
+- The fresh formal 100-candidate gate now passes without lowering any release
+  threshold. The merged results are `90/100` generation-valid, `88/100`
+  deterministic-supported, and `82/100` final Gemma-accepted. Gemma accepted
+  `82/88` evidence-supported rows (`93.2%`), above the required 90% consensus
+  rate. The final replay is
+  `logs/product-source-gap-v87-formal100-final-gated-replay.json`.
+- A fresh isolated copy at
+  `.tmp/v87-formal100-controlled-validation-20260807.db` received 81 draft
+  rows. One row (`cranium`) was rejected before writing because its Japanese
+  term and reading disagreed. Promote dry-run then found one real mojibake
+  draft: `映写機` had reading `えいしゃ���`. It was excluded from promote and
+  repaired to `えいしゃき` while remaining `needs_review=1`. The other 80
+  rows promoted cleanly in the isolated DB.
+- The isolated DB passes product fast audit, published-risk
+  (`flagged_senses=0`), native export, and full in-memory import audit. Export
+  counts are `entries=29741`, `senses=35273`, and
+  `sense_localizations=141092`; every blocking integrity count is zero. The
+  duplicate-localization count is a non-blocking warning (`116`).
+- The production DB was not changed. Its SHA-256 remained
+  `4A033CA5A860D906723D60DCC47A5F8C7401635DA9EE4CA1D1A9AD2C87BE1456`.
+
+Scale-500 candidate preparation:
+
+- The remaining independent round-trip pool contains only 323 candidates with
+  one exact hint per target language after excluding formal100. A separate
+  multi-hint pool was therefore routed through Gemma exact-sense/preferred-term
+  review rather than weakening the deterministic gate.
+- Gemma completed 280 multi-hint reviews: 182 approved, 98 rejected, and zero
+  failed calls. The strict pool reached 212 valid reviews with 178 approvals
+  before the remote path began failing. Merging the 360 approvals and applying
+  exact preferred-term binding retained 298 generation inputs in
+  `logs/product-source-gap-v87-scale500-generation-input.json`; 62 model
+  suggestions absent from the original independent hints were blocked.
+- The scale-500 isolated DB is
+  `.tmp/v87-scale500-checkpoint-validation-20260807.db`. It is a byte-identical
+  copy of the production DB and has not received a successful draft chunk yet.
+  Resume generation only with a fresh/verified checkpoint and never point the
+  command at the production DB.
+
+Current infrastructure blocker:
+
+- After the first 250 successful Gemma calls, every long inference request
+  through `100.99.99.99:1144x` began resetting at `18.98-19.00s` with
+  `ECONNRESET`. This reproduces on Gemma (143 and 155) and Qwen (56), with
+  compact, micro, ultra, minimal, streaming, and non-streaming requests.
+  Short `/api/health`, `/v1/models`, and `/v1/status` calls continue to pass.
+- Tailscale is direct to `lab-win` at about 16 ms, not DERP. SSH to the jump
+  host and ProxyJump both time out. Rebuilding only the 11447 mapping through
+  dashboard `/api/portproxy/delete` and `/api/portproxy/add` did not remove the
+  19-second reset. Treat these as infrastructure failures, not model rejects.
+- Unsloth 155 llama.cpp was updated through official `POST /api/llama/update`
+  from `b10194` to `b10297`; it reports `stale=false`, so an outdated runtime is
+  no longer the cause. The remaining fix must be made in the Windows jump-host
+  forwarding/firewall path or by restoring an SSH/direct tunnel.
+- `review-dictionary-v2-product-source-gap-candidates-unsloth.mjs` now supports
+  opt-in `--stream true` and reconstructs OpenAI SSE deltas before applying the
+  unchanged JSON validator. Default behavior remains non-streaming. Streaming
+  cannot fix the present incident because the reset occurs before the first
+  response byte.
+
+## 2026-08-07 v87 scale-298 readiness result
+
+The earlier 19-second reset was request-size dependent, not a model OOM. Short
+native Studio requests to `/api/inference/chat/completions` worked while larger
+request bodies through the Windows forwarding path reset. The production-safe
+workaround is `--prompt-mode nano-per-language`, native SSE streaming, and one
+language per request. Do not return to the older compact whole-record prompt on
+the current forwarding path.
+
+The final 20-row gate passed without relaxing validators: 20/20 generation
+valid, 20/20 deterministic reverse-evidence supported, and 18/20 independent
+Gemma no-correction accepts. Important fixes were:
+
+- definitions must not equal the translated term and have language-specific
+  minimum information content;
+- all-katakana Japanese terms use the term itself as deterministic reading;
+- the candidate `definition_contract` is included when informative;
+- Gemma receives up to 220 definition characters, not a 96-character fragment;
+- the per-language reviewer must not label the source language as `L`, because
+  Gemma confused it with the localization language;
+- `--recheck-rejected true` preserves accepted reviews and reruns only rejected
+  or failed rows after a reviewer-prompt fix.
+
+The scale run used 298 candidates. Generation produced 294 structurally valid
+rows (98.7%); deterministic reverse evidence supported 292. The corrected
+Gemma pass accepted 267/292 (91.4%) with zero failed calls. The final controlled
+replay is `logs/product-source-gap-v87-scale500-final-gated267-replay.json`.
+
+Checkpoint behavior is now suitable for dry generation as well as writes. It
+stores complete generated items after each chunk, keys candidates by
+`source_entry_id:source_sense_id`, supports endpoint migration on resume, and
+reconstructs the complete report. During the real run, 56 and then 47 failed;
+their circuit breakers opened, 147 continued, and an intentional interruption
+resumed from 200/298 without duplicate senses. Streaming body reads now have an
+explicit total timeout.
+
+The isolated DB received all 267 controlled drafts. Deterministic promote
+accepted 240/242 unique draft senses; two broad glosses remained draft. Fast
+audit and published-risk passed (`flagged_senses=0`). Native export and full
+memory import passed at 29,869 entries, 35,433 senses, and 141,732 sense
+localizations, with all blocking integrity counts zero. Production DB and D1
+were not modified.
+
+This proves the pipeline is ready for 5,000-candidate production chunks. Keep
+the same frozen prompt, validators, independent evidence policy, Qwen/Gemma
+family separation, chunk checkpoints, and isolated-first promotion. Do not
+publish every generation chunk; publish only after the configured 5,000-10,000
+accepted-sense release boundary and a full audit.
+## 2026-08-08 v87 scale-298 main merge and fresh-pool rebuild
+
+- The previously isolated v87 scale-298 result was replayed into the local main
+  product DB only after creating
+  `backups/linguago-v86-before-v87-scale298-promote-20260808.db`. The backup and
+  pre-write DB SHA-256 were both
+  `4A033CA5A860D906723D60DCC47A5F8C7401635DA9EE4CA1D1A9AD2C87BE1456`.
+- Replay inserted 242 draft senses and reused 25 existing senses. Deterministic
+  promote accepted 240 and left two `broad_gloss_key` rows as review drafts.
+  The audited publishable export now contains 29,869 entries, 35,433 senses,
+  and 141,732 localizations. TypeScript, fast audit, published-risk, native
+  export, and full in-memory import all pass; `flagged_senses=0`.
+- A v83-v87 attempt index now records 18,930 unique source-entry/sense attempts.
+  Rebuilding rank-200,000 coverage produced 267,369 gaps. Quality filtering and
+  history subtraction retained 471 rows; independent two-family/two-target
+  reverse evidence retained only 104 (`ja=19`, `pt-BR=85`). Do not pad this
+  pool to claim a nominal 5,000-row production batch.
+- Real source-review prompts through the Windows forwarding path reset the
+  socket around 800-1,000 prompt characters, while 400-600 characters and tiny
+  multilingual requests succeed. Node now records the nested fetch cause; the
+  observed failure is `read ECONNRESET`. `prompt-mode=nano` keeps the first
+  sample at 543 characters/560 UTF-8 bytes while preserving exact-sense, POS,
+  preferred-term, and definition-contract fields.
+- The 147/56 nano review smoke completed 20/20 valid calls with zero network or
+  JSON failures, but accepted only 7/20. Most rejects were genuine POS,
+  broad/narrow, homograph, or pt-PT/pt-BR mismatches. This fresh pool therefore
+  fails the candidate-quality expansion gate. No new generation, draft write,
+  D1 export, or deployment followed this review.
+
+## 2026-08-08 v87 post-promote gated-27 main merge
+
+- The fresh pool was rebuilt with conservative pt-BR filtering. Explicit
+  pt-PT forms such as `utilizador`, `multimédia`, `óptimo`, `acção`, and
+  `facto` are excluded before model review. The independent-source pool fell
+  from 104 to 98 candidates (`ja=19`, `pt-BR=79`).
+- Per-language Qwen source review produced 38 approvals from 98 candidates.
+  Qwen generation returned 36 structurally valid rows; source-required reverse
+  evidence retained 30; independent Gemma 4 31B review accepted 27. Model
+  agreement was never counted as a dictionary source.
+- The 27-row replay was first written and promoted in
+  `.tmp/v87-postpromote-gated27-validation-20260808.db`. TypeScript, fast
+  audit, published-risk, native export, and full in-memory import all passed.
+- Before the main write, the product DB was backed up as
+  `backups/linguago-v87-before-postpromote-gated27-20260808.db`; backup and
+  pre-write SHA-256 were both
+  `C5E1D93CEBAA722422CCADC94D6DD79AF96FE5ED8FD954B13441682B78CB07C8`.
+  Main replay and deterministic promote accepted 27/27.
+- The current local publishable export contains 29,896 entries, 35,460 senses,
+  and 141,840 sense localizations. All blocking integrity checks are zero and
+  `flagged_senses=0`. `duplicate_sense_localizations=116` remains a
+  non-blocking warning. D1 and the Worker were not changed in this stage.
+
+## 2026-08-08 v88 rank-100k candidate expansion
+
+- Expanding the raw coverage window from 50,000 to 100,000 proved that the
+  previous strict-pool shortage was partly a truncation effect. The clean pool
+  grew from 464 to 1,123 rows before sense alignment. The all-history attempt
+  index now contains 25,355 unique source-entry/sense attempts with zero JSON
+  parse failures.
+- Six deterministic pt-BR exclusions were added before model review:
+  `eletrónica`, `champô`, `polémico`, `falhanço`, `assembly`, and `escale`.
+  These are pt-PT forms or unsuitable pt-BR headword candidates; ambiguous
+  genuine lexemes still go to semantic review rather than a blanket suffix
+  rule.
+- Unique sense alignment retained 617 rows and rejected 500 ambiguous best
+  senses. The unchanged two-independent-family/two-target prefilter retained
+  66 (`ja=9`, `pt-BR=57`). Qwen source review was infrastructure-clean at
+  66/66 valid and retained 23. Qwen generation accepted 22/23; source-required
+  reverse evidence retained 18; Gemma 4 31B no-correction consensus retained
+  15.
+- The controlled 15-row replay was written only to the reused isolated
+  validation DB. Promote dry-run accepted 14 and blocked `demandar` as a broad
+  over-merged gloss. No promote apply or main-DB write followed.
+- Human inspection remains mandatory even after Qwen plus Gemma agreement.
+  Hold `causalidade`, `contagiar`, `boicotar`, `はし`, and `ワイシャツ` for
+  term/POS/register correction: examples include verb-to-noun drift, a less
+  natural Japanese equivalent, and non-mainland Chinese preferred terms.
+  Model consensus is a review layer, not proof that all four preferred terms
+  are suitable for production.
+
+## 2026-08-08 v88 inspected gated-9 main merge
+
+- Manual term-matrix inspection reduced the 15-row consensus set to nine
+  production candidates. The six held for manual correction are `demandar`,
+  `causalidade`, `contagiar`, `boicotar`, `はし`, and `ワイシャツ`; their
+  issues include source POS drift, broad noun-like translations for verbs,
+  non-mainland Chinese preferred terms, and overly broad Japanese/English
+  equivalents.
+- The controlled-input builder now accepts
+  `--exclude-source-entry-ids`, records those exclusions in its selection
+  policy, and classifies them as `manual_exclusion`. This makes the inspected
+  subset reproducible instead of relying on an edited report.
+- The final nine rows were replayed into the isolated validation DB first.
+  Draft write, deterministic promote dry-run, and promote apply all accepted
+  9/9. Fast audit, published-risk, native export, and full in-memory import
+  audit passed with all blocking counts at zero.
+- Before the main write, the product DB was backed up as
+  `backups/linguago-v88-before-gated9-promote-20260808.db`. The backup and
+  pre-write SHA-256 were
+  `3DD64E28221E91F856E2CD188B7EB8252FA50762E49643401997622CF808D3D4`.
+  Main replay and deterministic promote then accepted 9/9.
+- The current local publishable export contains 29,905 entries, 35,469 senses,
+  and 141,876 sense localizations. Full memory-import audit, sample lookups,
+  fast audit, and published-risk pass; `flagged_senses=0`, and all blocking
+  integrity counts are zero. The current main DB SHA-256 is
+  `5A43338B81941415B52EA21D7C07A45120E5B38E780190C3063C55DAAC7AD4D9`.
+- D1 and the Worker were not changed. The six manual exclusions remain
+  unpublished and should be repaired or replaced with stronger source
+  evidence before reconsideration.
+
+## 2026-08-08 v89 target-evidence recovery and gated-2 main merge
+
+- The all-history attempt index must use the broad filename prefix
+  `product-source-gap`, not only versioned `product-source-gap-vNN` prefixes.
+  The corrected v89 index scanned 2,271 reports and contains 25,421 unique
+  source entry/sense attempts with zero parse failures.
+- Rebuilding the rank-200,000/100,000 window produced 1,051 clean rows; unique
+  sense alignment retained 551. The first independent-source prefilter
+  selected zero rows because 23 source-supported candidates did not have two
+  target languages with strong reverse evidence.
+- Prefilter diagnostics exposed an over-strict boundary: a target such as
+  Japanese `基質` had an exact JMdict `substrate` match and the same OMW lexical
+  match, but unrelated JMdict senses made its ratio 1/3, just below 0.34. The
+  validator now accepts an exact strong-dictionary match plus an OMW lexical
+  match as two independent source families; the global 0.34 threshold was not
+  lowered. This recovered 11 pt-BR candidates.
+- Qwen source review was valid for 11/11 and accepted four. Qwen generation was
+  valid for 4/4 with zero endpoint failures; deterministic four-language
+  reverse evidence supported 4/4; independent Gemma 4 31B no-correction review
+  accepted 4/4 at confidence 1.0.
+- Promote dry-run rejected `incorrer` and `emular` as `broad_gloss_key`; they
+  remain manual split work. The inspected final subset contains `veemente` and
+  `coeficiente`. Both passed clean isolated write, promote dry-run/apply, fast
+  audit, published-risk, native export, and full in-memory import before main
+  merge.
+- The pre-write backup is
+  `backups/linguago-v89-before-gated2-promote-20260808.db`, SHA-256
+  `5A43338B81941415B52EA21D7C07A45120E5B38E780190C3063C55DAAC7AD4D9`.
+  The post-write main DB SHA-256 is
+  `2D968DAB2C5F3C758C78AFC052248C766B4B878A5B27E35146D13DE098E0103C`.
+- The current local publishable package contains 29,907 entries, 35,471 senses,
+  and 141,884 sense localizations. All release blockers and
+  `flagged_senses` are zero. D1 and the Worker were not changed.
+
+### v89 follow-up: controlled gloss precedence
+
+- The `broad_gloss_key` rejection for `incorrer` and `emular` exposed a
+  promotion-field bug rather than proving that each row required a sense
+  split. Their controlled generations had concise anchors (`incur`,
+  `emulate`), but the promoter replaced them with multilingual source
+  summaries from the report's `selected` rows.
+- `loadReportGlosses` now prefers `generated[].output.gloss_key` for valid
+  controlled replay rows and falls back to the source report gloss for
+  ordinary reports. The evidence threshold and broad-gloss validator remain
+  unchanged. Repeating the isolated promote dry-run accepts all four rows.
+- `incorrer` and `emular` are still not in the main DB. Human inspection found
+  a contradictory Japanese definition for `incorrer` (it included benefits
+  despite the negative `incur` sense) and unnatural Japanese grammar for
+  `emular`. Because the earlier Gemma review accepted both, require a new
+  targeted definition review and new no-correction consensus; do not fabricate
+  corrections from the old report.
+
+### v89 follow-up: corrected `incorrer` promotion
+
+- A fresh full-definition Gemma review rejected the old `incorrer` row and
+  required Japanese `受ける` to become `招く`, with a definition limited to
+  an unwelcome consequence. The correction was used only as a constraint for
+  a new Qwen generation; the old accepted output was not edited in place.
+- The regenerated row passed deterministic four-language reverse evidence and
+  a new Gemma full-definition review with `decision=accept`, confidence `1.0`,
+  and no correction. An isolated draft/write/promote cycle then passed fast,
+  published-risk, native export, and full in-memory import audits.
+- The same controlled replay was written to the main DB as draft and promoted
+  `1/1`. The local publishable package now contains 29,908 entries, 35,472
+  senses, and 141,888 sense localizations. All release blockers remain zero,
+  including `flagged_senses=0`.
+- The pre-write backup is
+  `backups/linguago-v89-before-incorrer-corrected-promote-20260808.db`, SHA-256
+  `2D968DAB2C5F3C758C78AFC052248C766B4B878A5B27E35146D13DE098E0103C`.
+  The resulting main DB SHA-256 is
+  `C62D9D738406E0948251D08F4F9C10B6C976B8FB0BD4334E198C4C54CF655F55`.
+- At this checkpoint `emular` remained unpublished for targeted
+  Japanese-definition cleanup. The follow-up below resolves it. D1 and the
+  Worker were not changed.
+
+### v89 follow-up: corrected `emular` promotion and language-focused review
+
+- The general full consensus prompt checked semantic agreement but twice
+  missed malformed Japanese grammar. The consensus tool now accepts
+  `--language-focus <en|pt-BR|zh|ja>` and explicitly proofreads the selected
+  localization for grammar, particles, syntax, and native dictionary style.
+- With `--language-focus ja`, Gemma rejected the original definition because
+  it lacked a valid predicate/particle structure. A first structured retry
+  fixed the grammar but introduced a circular definition using `倣う` to
+  define `倣う`; the same focused gate rejected it again.
+- A second structured retry generated the Japanese definition
+  `他の人や物の行動や性質などを模倣し、それに合わせようとすること。`.
+  It passed deterministic four-language reverse evidence and a fresh Gemma
+  review with `decision=accept`, confidence `1.0`, and no corrections.
+- Isolated and main draft/promote runs both accepted `1/1`. Fast,
+  published-risk, native export, and full in-memory import audits passed. The
+  local publishable package now contains 29,909 entries, 35,473 senses, and
+  141,892 sense localizations; all release blockers and `flagged_senses` are
+  zero.
+- The pre-write backup is
+  `backups/linguago-v89-before-emular-corrected-v2-promote-20260808.db`, SHA-256
+  `C62D9D738406E0948251D08F4F9C10B6C976B8FB0BD4334E198C4C54CF655F55`.
+  The resulting main DB SHA-256 is
+  `12DD08241B4ED705ED8CF1DCB97E9A292B312469035507D8A5F82F4714E7B325`.
+  D1 and the Worker remain unchanged.
+
+### v89 residual source-review audit
+
+- The seven remaining source-review rejects all lacked a bindable Chinese
+  target term. Five had only OMW support. `metástase` added only one-direction
+  Word2Word evidence, which is still insufficient.
+- `oclusão` had OMW plus reciprocal Word2Word evidence for Chinese `梗塞`, but
+  enabling `corpus_word2word` globally polluted the Portuguese source evidence
+  with unrelated corpus pairs and reduced its lexical match ratio to `0.2`.
+  The prefilter now supports
+  `--strong-supplemental-families-by-lang zh:corpus_word2word`, so a weak family
+  can be promoted only for one explicitly named language.
+- Even with that scoped option, `梗塞` was not emitted as a generation hint:
+  CC-CEDICT/Kaikki expose competing obstruction and infarction senses, so the
+  target-term ambiguity gate rejected automatic binding. This is expected and
+  must not be bypassed. All seven rows remain residual/manual; rebuild the next
+  coverage-gap pool instead of lowering the term evidence threshold.
+
+### 2026-08-08 v90 strict-pool exhaustion
+
+- Rebuilt the historical attempt index with prefix `product-source-gap` after
+  the v89 corrections: 2,353 files, 516 generation reports, 52 checkpoints,
+  19,370 unique source entries, and zero JSON parse failures.
+- The current main DB produced 267,263 ranked gaps. The 100,000-row scan became
+  1,040 clean candidates and 540 uniquely aligned senses. Strict reverse
+  evidence found 12 source-supported rows but **zero** rows with at least two
+  target-language hints, so no v90 LLM batch was started.
+- The 12 residuals expose only source-language plus English terms. Ten are
+  Portuguese forms; the other two are Japanese `過伸展` and Chinese `平方英里`.
+  They need new independent target-language dictionary evidence before
+  generation. The dominant rejection reasons were 374 strong-dictionary gloss
+  conflicts and 133 rows with no strong reverse evidence.
+- This is evidence-pool exhaustion, not an Unsloth capacity failure. Do not
+  send these rows to Qwen with invented target terms. The next expansion must
+  import or validate additional licensed multilingual evidence, then rerun the
+  same v90 filter/alignment/prefilter sequence.
+
+### 2026-08-08 supplemental-license enforcement
+
+- MUSE is not a production evidence source. Its four local source records are
+  licensed `CC BY-NC 4.0` and explicitly carry
+  `production_publishable=false`; they may be used only for internal research.
+- The reverse-evidence prefilter and final validator now read
+  `evidence_sources.metadata_json` and license metadata. They automatically
+  exclude source keys marked
+  non-publishable, families whose members are all non-publishable, and
+  non-commercial `BY-NC` data. `panlex-unmapped` remains blocked explicitly.
+- A regression run against
+  `.tmp/muse/openwn-muse-research-evidence.db` blocked all four MUSE source
+  keys and retained `selected_rows=0`. Do not merge MUSE into the production
+  combined evidence DB or promote it through `--strong-supplemental-families`.
+- MUSE exposed research-only lexical matches for some v90 anchors, but this
+  does not resolve the licensed independent-dictionary evidence shortage.
+  Continue source acquisition rather than lowering the v90 gate.
+
+### 2026-08-08 Wikidata Lexeme sense feasibility probe
+
+- `scripts/probe-wikidata-lexeme-sense-evidence.mjs` queries the official
+  Wikidata Query Service without writing SQLite. It requires an English Lexeme
+  sense and a target Lexeme sense to share the exact `P5137` concept item, and
+  requires the same Wikidata lexical-category item before counting a target.
+- The probe uses the existing `wikidata` family and CC0 structured data; it is
+  not a new independent family. It is a higher-precision extension of the
+  existing item-label evidence experiment.
+- On the 12 v90 source-supported residuals, 11 had no shared target Lexeme
+  sense. `rectangular` shared `Q209` with Portuguese/Japanese noun lexemes, but
+  the English lexeme is an adjective (`Q34698`) and the targets are nouns
+  (`Q1084`). The category gate rejected this concept-level false alignment.
+- Final result: zero rows with any compatible non-source target, zero with two
+  targets, and no evidence DB import. Wikidata Lexeme does not reopen v90.
+
+### 2026-08-08 v90 high-frequency manual residual queue
+
+- The 134 manual-review rows were dominated by 133 cases with no strong
+  reverse-dictionary evidence. A frequency-balanced 20-row queue was selected
+  at `zh=7`, `ja=7`, `pt-BR=6`; all 20 are genuinely absent from the product
+  DB by exact source-sense link, headword, and localization-term checks.
+- `select-dictionary-v2-product-source-gap-manual-review.mjs` now joins rows by
+  exact `source_entry_id:source_sense_id` rather than entry ID alone and emits
+  both the evidence record and an empty human-review template.
+- `annotate-dictionary-v2-product-source-gap-manual-review.mjs` performs the
+  read-only product lookup and classifies existing links before any manual
+  repair is planned.
+- The unresolved 20 senses are persisted in
+  `config/dictionary-overrides/source-gap-manual-residuals-v90.json`. The
+  coverage filter accepts `--exclude-source-sense-key-files` so future pools
+  skip only those exact senses, not every sense under the same source entry.
+- The exclusion regression reports `excluded_source_entry_ids=0`,
+  `excluded_source_sense_keys=20`, and exactly 20
+  `excluded_source_sense_key` rejects. No LLM, draft write, product mutation,
+  D1 export, or deployment occurred.
+
+### 2026-08-08 first locale form alias
+
+- Product tables do not store entry forms. `v2_entry_forms` is synthesized by
+  `export-dictionary-v2-product-native-d1-sql.mjs`, so spelling variants must
+  be added at export time rather than inserted as unsupported product senses.
+- The exporter now loads
+  `config/dictionary-overrides/product-entry-form-aliases.json` and fails if a
+  configured target is absent from the publishable export or its entry ID,
+  headword, or primary language no longer matches.
+- The first approved alias is European Portuguese `electrónica` to the
+  existing pt-BR `eletrônica` entry `23336` (`electronics`). Full native export
+  and in-memory import passed; both spellings returned the same entry and all
+  blocking audit counts remained zero.
+- A later semantic audit found that `activos` can safely map to the existing
+  pt-BR `bens` entry `30466` (`assets`), so it is now a reviewed
+  `locale_inflected_form` alias. `ativos` already resolves through an accepted
+  localization and was not duplicated. `poluentes` remains an exact
+  sense-level manual residual because its Kaikki form record is adjectival but
+  the OMW four-language concept is nominal.
+- The temporary alias export was deleted after verification, releasing
+  123,529,464 bytes. Product DB, D1, and Worker were not changed.
+
+### 2026-08-08 targeted source-sense probe
+
+- Added `scripts/build-dictionary-v2-product-targeted-source-sense-candidates.mjs`
+  and `config/dictionary-overrides/source-gap-targeted-canonical-senses-v90.json`
+  for exact merged entry/sense candidates omitted by ranked coverage scans.
+- The builder is read-only and rejects identity drift, missing source links,
+  and terms already represented in product data. Reviewed form evidence is
+  metadata only and cannot bypass the reverse-evidence gate.
+- The first target, noun `poluente`, built successfully as source candidate
+  `2080404:2080404` but the normal prefilter rejected it as
+  `strong_dictionary_gloss_conflict`. WikDict supplies the noun anchor
+  `pollutant`; Kaikki's `poluentes` source record is explicitly adjectival,
+  while the OMW four-language concept is nominal. Do not bridge this mismatch
+  and do not send it to an LLM.
+- The controlled `activos` alias passed native export plus full in-memory lookup
+  audit. Product DB, remote D1, and Worker remain unchanged.
+
+### 2026-08-08 exact WikDict lexentry alignment
+
+`build-dictionary-v2-product-wikdict-lexentry-candidates.mjs` resolves a merged
+v2 sense through `sense_source_links` before reading WikDict metadata. Never
+query `source_senses.id` with a coverage-report sense ID directly: reports
+store merged `senses.id`, not raw source-sense IDs.
+
+The builder accepts only WikDict rows with `is_good=1`, `score>=20`, and an
+exact shared `lexentry`. Multiple language pairs under that lexentry remain a
+single `wiktionary` evidence family. Output metadata therefore sets
+`one_source_family_only=true`, `independent_validation_required=true`, and
+`publication_evidence=false`; every row must still pass the normal strict
+reverse-evidence prefilter.
+
+The latest v90 funnels were:
+
+- 421 uniquely aligned rows -> 90 exact groups covering all target languages
+  -> 4 strict independent-evidence rows;
+- allowing two lexentry target languages produced 151 rows -> 8 strict rows ->
+  7 rows at semantic risk <=4;
+- 1,434 formerly `ambiguous_best_sense` rows -> 283 all-target exact groups ->
+  2 strict rows;
+- allowing two lexentry targets in the ambiguous pool produced 481 rows -> 6
+  strict rows -> 6 rows at semantic risk <=4.
+
+This fixes sense-selection ambiguity but does not solve the independent-source
+shortage. The low-risk tail remains below the 20-row source-review gate, so no
+LLM generation followed. High-quality parallel mismatches remain important:
+`pictograma`, `trema`, and `rúcula` show scope conflicts, while `arquétipo` has
+the narrower Japanese `元型` versus `原型` distinction. Product DB, D1, and
+Worker were not changed.
+## 2026-08-08 v90 exact-WikDict and Wikidata validation
+
+- Added `build-dictionary-v2-product-wikdict-lexentry-candidates.mjs`. It aligns
+  merged product senses to raw WikDict rows by the exact shared `lexentry` and
+  keeps Kaikki plus WikDict in one `wiktionary` family. Exact agreement across
+  several WikDict language pairs is useful alignment evidence, but never counts
+  as several independent publication sources.
+- Candidate-specific exact Wikidata labels (CC0, labels only, no aliases) raised
+  the strict two-target funnel to 50 rows. Risk triage retained 47 fresh rows.
+  Source review ran two 20-row samples: the first accepted 17/20; the second
+  accepted 19/20 with `cérvix` rejected because the model requested a Japanese
+  term outside the evidence-bound allow-list. Combined source-review acceptance
+  was exactly 36/40 (90%).
+- The first 20 approved rows generated 19/20 structurally valid outputs. The
+  only structural failure was `hipertexto` with `ja_reading_mismatch`.
+  Deterministic reverse evidence retained 17/20; the two remaining rows lacked
+  sufficient independent Chinese evidence.
+- Gemma 4 31B `nano` review initially accepted only 12/17 and incorrectly called
+  several concise definitions truncated. Rechecking only the five failed rows
+  with the full prompt accepted four. The final independent no-correction result
+  was 16/17. `polidez` remained correctly rejected because Japanese `丁寧` is an
+  adjectival term while the source noun requires `丁寧さ`.
+- The controlled 16-row replay wrote only to
+  `.tmp/v90-wikdict-lexentry-wikidata-controlled16-validation.db`. Promote first
+  flagged `neurônio` because generated gloss `nerve cell` did not token-overlap
+  English term `neuron`; converting the already independent Gemma consensus to
+  the supported semantic-review format resolved this synonym case without
+  weakening the deterministic rule. Promote then passed 16/16.
+- Isolated fast audit, published-risk, native export, and full memory import all
+  pass. Export counts are 29,925 entries, 35,489 senses, and 141,956 sense
+  localizations; all release blockers and `flagged_senses` are zero. Native full
+  audit requires an existing export manifest: run
+  `export-dictionary-v2-product-native-d1-sql.mjs` before
+  `audit-dictionary-v2-product-export.mjs --mode full`.
+- The main product DB was not modified. Its SHA-256 remains
+  `12DD08241B4ED705ED8CF1DCB97E9A292B312469035507D8A5F82F4714E7B325`.
+  D1 and the Worker were not changed.
+
+### v90 remaining reviewed pool and combined isolation
+
+- The remaining 16 source-approved candidates generated 16/16 valid outputs on
+  147/56 at one request per endpoint. Deterministic reverse evidence retained
+  15; `tanatologia` remained manual because Chinese `死亡学` had only the
+  Wiktionary family. Full-prompt Gemma review accepted 13/15.
+- Gemma correctly rejected `monismo` for a missing Portuguese preposition and
+  `mesoderma` for unnatural Portuguese/Japanese definitions. These rows were
+  not corrected or promoted. The accepted spelling variant `mesoderme` remained
+  a separate evidence-aligned candidate.
+- Across both reviewed batches the measured funnel is 36 source-approved -> 35
+  structurally valid -> 32 deterministic-supported -> 29 independent Gemma
+  no-correction accepts. Rates are 97.2%, 88.9%, 90.6% of supported rows, and
+  80.6% end-to-end respectively.
+- The two controlled replays were merged by exact
+  `source_entry_id:source_sense_id` and tested together in
+  `.tmp/v90-wikdict-lexentry-wikidata-controlled29-validation.db`. Draft write,
+  checkpoint construction, promote dry-run/apply, fast audit, published-risk,
+  native export, and full memory import all pass for 29/29.
+- The combined isolated export has 29,938 entries, 35,502 senses, and 142,008
+  sense localizations. All release blockers and `flagged_senses` are zero. The
+  seven remaining rows in the original 47-row pool were excluded by the
+  semantic-risk selector, not accidentally skipped.
+
+### v90 min-one-target expansion failure boundary
+
+- Lowering only the WikDict lexentry intake from two known target languages to
+  one increased the exact candidate pool from 632 to 932. Candidate-scoped
+  exact Wikidata labels expanded the strict all-target evidence result to 70;
+  semantic-risk triage retained 55. A refreshed attempt index covering 2,481
+  reports and 25,537 entry/sense attempts removed 40 historical rows, leaving
+  15 genuinely fresh candidates.
+- Qwen source review accepted 12/15. It correctly rejected `moleiro` for
+  Chinese/Japanese sense mismatch, misspelled `halibute`, and `impugnar` for a
+  Chinese sports-sense mismatch. Generation produced 10/12 structurally valid
+  rows; `ortiga` failed Japanese reading alignment and `incolor` had a thin
+  Portuguese definition. All ten valid rows passed deterministic evidence.
+- Independent full-prompt Gemma accepted only 3/10. Rejections exposed a
+  systemic quality loss: POS drift (`isento`), wrong Chinese term (`manjerona`),
+  malformed or calqued Japanese/Chinese definitions, and a factual geological
+  class error for `pleistoceno`. Therefore the whole min-one-target experiment
+  is blocked from draft/promote, including its three nominal accepts. Do not use
+  this route to pad the formal 100-row gate.
+- Reaching 100 formal rows now requires additional independent lexical evidence
+  or a separately validated correction lane. It must not be achieved by
+  weakening target-language coverage, source-family independence, or Gemma
+  no-correction consensus.
+
+### v90 evidence-acquisition priority after min-one failure
+
+- Run `dict:v2:coverage:report-evidence-deficits` against the two underlying
+  reverse-evidence reports, not their wrapper prefilter reports. The wrapper
+  contains `selected/rejected`; the diagnostic consumes `validations`.
+- The combined 932-row diagnostic contains 70 supported and 862 rejected rows.
+  The dominant blocker is still semantic conflict (`633`), not model capacity.
+  For actionable target evidence, there are 99 missing target checks: `zh=69`,
+  `ja=27`, and `pt-BR=3`. Of these, 72 have zero observed evidence families and
+  27 have one.
+- The report now emits `evidence_acquisition_priority`, including zero-family,
+  one-family, and round-trip deficits. This run ranks `zh=245`, `ja=98`, and
+  `pt-BR=6`. Acquire a traceable commercial-compatible Chinese-English family
+  first, then Japanese-English. More Portuguese aggregation is low priority.
+- PanLex publishes its snapshots under CC0, but PanLex is an aggregator with
+  source-level provenance. The project must continue mapping each PanLex source
+  back to its underlying family; PanLex itself is not an independent vote.
+  `panlex-unmapped` remains blocked even when the aggregate snapshot is usable.
+- The official PanLex source registry distinguishes explicit open permissions
+  from copyright-only or unknown source records. Do not infer an independent
+  production family solely from the aggregate license. Preserve original
+  source ID, provenance, and a reviewed family map.
+- OMW is already represented in the evidence database. Updating its English
+  release can improve gloss quality, but cannot create a second independent
+  Chinese or Japanese family. OmegaWiki remains blocked until an authoritative,
+  checksummed dump and license record are reproducibly available.
+- The product DB was not modified by this diagnostic. No draft, promote, D1,
+  Worker, or deployment action followed.
+
+### v90 OpenHowNet licensed reviewed evidence
+
+- The official THUNLP archive remains available at
+  `https://thunlp.oss-cn-qingdao.aliyuncs.com/OpenHowNet/resources.zip`.
+  The checked artifact is 74,698,239 bytes, last modified 2021-09-20, with
+  SHA-256 `DAAA31E2627E099E03CE15371F472C6F9EC5B3AAC71A4E5E2AB5C4F4F38C44D4`.
+- The archive contains 237,974 pickle-serialized senses. The research exporter
+  retained 216,329 useful Chinese-English sense pairs, representing 117,264
+  normalized Chinese terms and 118,423 English anchors. SQLite integrity passed.
+- `export-openhownet-research-evidence.py` requires the pinned archive hash
+  before deserializing the pickle. Publication status is controlled by
+  `config/dictionary-sources/openhownet-license.json`; missing or incomplete
+  provenance fails closed to research-only.
+- The official download page places the core data and API in the same OpenHowNet
+  download area and states that OpenHowNet uses MIT. The official repository
+  identifies itself as containing both core data and API and asks users of data
+  or API to cite the project papers. Preserve those citations and the official
+  URLs recorded in the license provenance file.
+- The exact-anchor research probe matched 42/69 current Chinese target deficits
+  (60.9%). Twenty-seven matches expose one Chinese term; 15 expose multiple
+  terms and require POS/sememe/sense disambiguation. This is strong feasibility
+  evidence, not a publication gate or permission to call Qwen.
+- The exporter now preserves English POS, Chinese POS, and the sememe definition
+  in `openhownet_sense_metadata`. The probe infers expected POS from the source
+  sense when available and otherwise from an unambiguous OMW synset suffix.
+  Both OpenHowNet language sides must match that POS for an exact binding.
+- POS binding retained 32/42 matches and rejected ten conflicts. Twenty-one
+  retained rows have one exact-POS Chinese term; eleven still have several.
+  The 21-row queue is emitted as `research_candidates` with status
+  `license_blocked_semantic_review`. It is not a generation input.
+- A unique POS-bound term is still not automatically correct. For example,
+  `categorize -> 分类` and `corolla -> 花冠` are specific, while
+  `circumflex -> 符号` is too broad. Sememe/manual semantic review remains
+  mandatory even after the license boundary is cleared.
+- Reproduce the probe with
+  `dict:v2:coverage:probe-openhownet-research`. It is hard-coded to report
+  `publication_evidence=false` and `generation_allowed=false` while source
+  metadata remains non-publishable.
+- The 2026-08-08 independent semantic review used Qwen 3.6 35B MTP on 11444
+  and Gemma 4 31B QAT on 11445. Both produced valid JSON for all 21 rows.
+  Qwen had 13 high-confidence accepts; Gemma had 15. Dual adjudication retained
+  13 high-confidence agreements, found one disagreement (`cureta -> 刮器`),
+  and blocked seven other rows. These agreements remain
+  `license_blocked_dual_model_accept` because that immutable report predates
+  the verified license record. Reuse the decisions only through the reviewed
+  evidence exporter; do not edit the historical report in place.
+- Reproduce each independent review with
+  `dict:v2:coverage:review-openhownet-research` and combine them with
+  `dict:v2:coverage:adjudicate-openhownet-research`. Load
+  `UNSLOTH_API_KEY` from `.env.local` into the process environment; never pass
+  or persist the token in reports. The reviewer supports `--resume true` and
+  fingerprints its 21-row input.
+- Re-exporting with the verified license record created
+  `.tmp/openhownet/openhownet-mit-evidence.db` with 216,329 paired senses and
+  SQLite integrity `ok`. Never merge this full database into production because
+  exact English anchors alone can still choose broad or mismatched lemmas.
+- `dict:v2:coverage:export-openhownet-reviewed` intersects the immutable probe,
+  Qwen/Gemma consensus, and MIT evidence DB. It produced an isolated
+  13-candidate/13-concept database at
+  `.tmp/openhownet/openhownet-reviewed-evidence.db`. Count it as one independent
+  `openhownet` family in the next coverage rebuild; it does not bypass the
+  normal multi-family, deterministic, or Gemma gates.
+- To avoid another 595 MB combined-DB copy,
+  `dict:v2:coverage:append-supplemental-evidence` transactionally appended the
+  13-row reviewed subset to the current v90 combined evidence DB. Integrity
+  remained `ok`; a metadata conflict would have aborted the append.
+- Re-running both strict min-one candidate pools increased supported rows from
+  70 to 73. The three genuinely new rows are Portuguese `maremoto`, `isômero`,
+  and `eucarionte`; all three were absent from the refreshed attempt index.
+- Formal Qwen source review accepted 3/3, structured generation produced 3/3
+  valid rows with no DB writes, deterministic reverse evidence supported all
+  four languages for 3/3, and independent Gemma 4 31B consensus accepted 3/3
+  at confidence 1.0 without correction. The next action is isolated-copy
+  draft/promote and full audit, not a write to the main product DB.
+- The 2026-08-10 isolated-copy human gate promoted only `maremoto` (sense
+  37668) and `isomero` (stored as `is\u00f4mero`, sense 37666). `eucarionte`
+  (sense 37667) stayed `draft_single_source`; all four localizations retain
+  `needs_review=1` because the generated English and Portuguese definitions
+  were too broad and omitted the defining membrane-bound nucleus. Qwen,
+  deterministic reverse evidence, and Gemma consensus had all passed, so this
+  is the reference case for why semantic specificity still needs a human gate.
+- The human-gated native export and full in-memory import audit passed with
+  29,911 entries, 35,475 senses, and 141,900 sense localizations. Localization
+  counts, duplicate sense orders, orphans, mojibake, HTML artifacts, and
+  published risk were all zero. Treat `eucarionte` as an expected absence from
+  publishable lookup samples until a targeted repair passes the same gates.
+- The main product DB SHA-256 remained
+  `12DD08241B4ED705ED8CF1DCB97E9A292B312469035507D8A5F82F4714E7B325`.
+  No main-DB write, D1 update, Worker change, or deployment followed.
+- A targeted 2026-08-10 repair then replaced the four-language definition
+  contract for `eucarionte` without patching SQLite directly. The reproducible
+  constraint is in
+  `config/dictionary-quality-repairs/eucarionte-definition.json`; build its
+  generation input with `dict:v2:coverage:build-definition-repair`.
+- Fresh Qwen generation preserved the required membrane-bound nucleus and
+  membrane-bound organelles in all four definitions. Deterministic reverse
+  evidence supported 4/4 languages with source-language reverse evidence
+  required, and independent Gemma accepted 1/1 at confidence 1.0 with no
+  corrections.
+- Isolated replay reused entry 37064 and sense 37667 rather than inserting a
+  duplicate. Promote accepted 1/1, cleared four review flags, and raised the
+  isolated publishable count to 35,476 senses. The full native export/import
+  audit passed with 29,912 entries and 141,904 sense localizations; all
+  blocking counters and sample failures were zero.
+- The promoter now accepts successful `writes[]` from a draft-apply report as
+  checkpoint items. Previously it recognized only `items{}`, so a reused draft
+  produced `checkpoint_sense_ids=0` and was silently skipped during promote.
+  Keep this compatibility path for controlled replay and resume workflows.
+- This repaired row still exists only in the isolated validation database.
+  The main DB hash is unchanged, and no D1 or Worker release has occurred.
+- Main product DB, D1, and Worker remained unchanged.
+
+### v90 OpenHowNet three-row main-DB promotion
+
+- The later 2026-08-10 controlled main-DB replay supersedes the final two
+  isolation-only statements above. Before writing, the exact previous database
+  was copied to
+  `backups/linguago-v90-before-openhownet-3-promote-20260810.db`; its SHA-256 is
+  `12DD08241B4ED705ED8CF1DCB97E9A292B312469035507D8A5F82F4714E7B325`.
+- `maremoto`, `isomero` (stored as `is\u00f4mero`), and `eucarionte` were replayed
+  as drafts. The repaired `eucarionte` replay reused sense 37667 and replaced
+  its four draft localizations before any promotion.
+- Promotion was intentionally split by review provenance. The original batch
+  promoted senses 37666 and 37668 while explicitly excluding 37667. The
+  repaired checkpoint, reverse-evidence report, and new Gemma review then
+  promoted 37667 separately. Results were 2/2 and 1/1, with 12 localizations
+  promoted and no rejected rows.
+- Main product DB fast audit, published-risk audit, native export, and full
+  in-memory import audit all passed. The current local package contains 29,912
+  entries, 35,476 senses, and 141,904 sense localizations. All blocking
+  counters are zero, `flagged_senses=0`, and lookup samples for `maremoto`,
+  `is\u00f4mero`, and `eucarionte` pass.
+- The new main DB SHA-256 is
+  `6C40303FAEA55A3CBE00CD45430A314B3EADB813093149B1C28593F099EEAA77`.
+  Export artifacts are under
+  `outputs/d1-v2-product-native-export-v90-openhownet-main`. This has not been
+  pushed to Cloudflare D1, and no Worker deployment or cache bump has occurred.
+
+### v90 OpenHowNet production release
+
+- The later 2026-08-10 release supersedes the final local-only sentence above.
+  Production D1 now contains 29,912 entries, 35,476 senses, 141,904 sense
+  localizations, 3,030 examples, and 11,898 example localizations. Health reports
+  `published_at=2026-08-10T08:06:06.996Z`.
+- The pre-release remote D1 backup is
+  `backups/linguago-dictionary-before-v90-openhownet-20260810.sql`, size
+  124,007,767 bytes, SHA-256
+  `3B92328B5EA067D6C3C2B6D108AF81FC204EEE0608254E32F068DB0FE4379CE1`.
+- Worker cache version is `v90-openhownet-3-29912`. Deployed Worker Version ID:
+  `dc83a972-1a3b-4402-ba43-87fc9f97f80c`.
+- Remote D1 verification matched the export manifest after upload. The complete
+  online dictionary regression, focused API check, and focused Playwright
+  render check passed. Mobile and desktop renders for `maremoto`, `is\u00f4mero`,
+  and `eucarionte` used the dictionary provider and had no horizontal overflow.
+- The focused online check now pins the v90 counts and includes the three new
+  Portuguese entries so a later release cannot silently lose them.

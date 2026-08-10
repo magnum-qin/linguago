@@ -1,19 +1,19 @@
-import { chromium } from "playwright";
+import { chromium } from 'playwright';
 
-const url = "https://translation-pwa.qhzggzh-linguago.workers.dev";
+const url = 'https://translation-pwa.qhzggzh-linguago.workers.dev';
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1365, height: 768 } });
 
-await page.goto(url, { waitUntil: "networkidle" });
-await page.waitForSelector("#resultCard");
+await page.goto(url, { waitUntil: 'networkidle' });
+await page.waitForSelector('#resultCard');
 
 async function snapshot(label) {
   return page.evaluate((name) => {
-    const result = document.querySelector("#resultCard")?.getBoundingClientRect();
-    const tabs = document.querySelector("#resultLanguageTabs")?.getBoundingClientRect();
-    const translation = document.querySelector("#translationCard")?.getBoundingClientRect();
-    const activeTab = document.querySelector(".result-tab.active")?.getBoundingClientRect();
+    const result = document.querySelector('#resultCard')?.getBoundingClientRect();
+    const tabs = document.querySelector('#resultLanguageTabs')?.getBoundingClientRect();
+    const translation = document.querySelector('#translationCard')?.getBoundingClientRect();
+    const activeTab = document.querySelector('.result-tab.active')?.getBoundingClientRect();
     return {
       label: name,
       bodyClasses: document.body.className,
@@ -29,14 +29,14 @@ async function snapshot(label) {
   }, label);
 }
 
-const idle = await snapshot("idle");
-await page.locator("#textInput").fill("你好");
-await page.locator("#translateButton").click();
+const idle = await snapshot('idle');
+await page.locator('#textInput').fill('你好');
+await page.locator('#translateButton').click();
 await page.waitForTimeout(250);
-const loading = await snapshot("loading");
+const loading = await snapshot('loading');
 await page.waitForSelector("#resultCard:not([aria-busy='true'])", { timeout: 30000 });
 await page.waitForTimeout(650);
-const result = await snapshot("result");
+const result = await snapshot('result');
 
 console.log(
   JSON.stringify(
