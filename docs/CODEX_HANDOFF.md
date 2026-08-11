@@ -3316,6 +3316,37 @@ exist.
   publishable, has `reviewed_subset=true`, and records independent dual-model
   semantic review. Raw OpenHowNet can never activate this path.
 - With the option disabled, the extended DB still selects the original 1,579
-  strict rows. With it enabled, the pool selects 1,679 rows, adding 100 Chinese
-  source senses. These are candidates only; no draft, product write, D1 push,
-  or Worker deployment has occurred.
+  strict rows. The initial unrestricted diagnostic selected 1,679 rows, but it
+  also trusted older, less-specific reviewed subsets and admitted broad anchors
+  such as `steel` for `合金钢`. That result is superseded and must not be used.
+- The gate now also requires an explicit
+  `--reviewed-supplemental-source-keys` allowlist. Allowing only
+  `openhownet-official-2021-reviewed-e633a6d65e32` selects 1,645 rows: 1,579
+  baseline rows plus 66 Chinese senses. After historical-attempt and duplicate
+  exclusion, 63 fresh Chinese entries remain.
+
+### 2026-08-11 v93 Chinese reviewed-source production pilot
+
+- A fresh 20-row Qwen generation dry-run returned 18 structurally valid rows
+  with zero API failures. Two genuine reading errors were rejected:
+  `看门狗` was emitted as `kàn mén gǒu` instead of `kān mén gǒu`, and `时装店`
+  was emitted as `shíshāngdiàn` instead of `shí zhuāng diàn`.
+- Replay exposed an additional Japanese reading containing U+FFFD for `贫困线`.
+  Both the generation validator and the independent reverse-evidence validator
+  now reject mojibake and HTML artifacts themselves. Do not rely on a previous
+  report's `valid=true` flag across validation-version changes.
+- The database was restored from its pre-write backup and replayed. Seventeen
+  clean rows were written as `draft_single_source/needs_review`; fast audit and
+  published-risk passed without changing publishable counts.
+- Deterministic reverse evidence supported all 17 clean rows. Independent
+  Gemma 4 31B no-correction review accepted only 9 and rejected 8 semantic or
+  term-specificity errors. The accepted words are `个人所得税`, `保释金`,
+  `呼吸困难`, `补助金`, `适用性`, `毛细管`, `舱室`, `老战士`, and `搅拌器`.
+- Those 9 passed promote dry-run and apply. The audited local export now has
+  31,065 entries, 37,290 senses, and 149,160 sense localizations. Full in-memory
+  import, fast audit, TypeScript checks, and published-risk all pass; blockers
+  remain zero. D1 and Worker are still on v93 and have not been updated from
+  this local increment.
+- This pilot's final consensus yield is 9/20. It validates the conservative
+  pipeline but does not qualify the remaining 43-entry delta for automatic
+  bulk generation. Continue in bounded cohorts and preserve the Gemma gate.

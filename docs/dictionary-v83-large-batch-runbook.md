@@ -3189,8 +3189,22 @@ The strict prefilter option
 `--allow-reviewed-supplemental-source-roundtrip true` is intentionally
 default-off. It may satisfy source round-trip only from publishable evidence
 rows whose source metadata records `reviewed_subset=true` and independent
-dual-model semantic review. Verify both modes after changes: disabled must
-preserve the baseline pool; enabled may add only reviewed source senses. In the
-v93 run, disabled selected 1,579 rows and enabled selected 1,679, including 100
-Chinese rows. Treat those rows as source-review candidates, not as drafts or
-publishable senses.
+dual-model semantic review. It now also requires an explicit
+`--reviewed-supplemental-source-keys` allowlist. Enabling the boolean without a
+source key fails closed. This matters because the first unrestricted diagnostic
+selected 1,679 rows but also trusted older, broader reviewed subsets; that
+result is superseded.
+
+With only `openhownet-official-2021-reviewed-e633a6d65e32` allowed, the v93
+strict pool selects 1,645 rows, including 66 Chinese rows above the 1,579-row
+baseline. Historical-attempt and duplicate exclusion leaves 63 fresh Chinese
+entries. Treat these as candidates, not publication evidence by themselves.
+
+The first 20-row generation pilot produced 18 Qwen-valid rows, then current
+content-integrity validation removed a Japanese U+FFFD reading and wrote 17
+clean drafts. Reverse evidence supported all 17, but independent Gemma 4 31B
+accepted only 9 without corrections. Promote only those 9. The local audited
+result is 31,065 entries, 37,290 senses, and 149,160 localizations; D1 remains
+unchanged. The 9/20 final-consensus yield is below a bulk-expansion gate, so run
+the remaining fresh rows only in bounded cohorts and keep all deterministic and
+independent-review checks enabled.

@@ -17,6 +17,10 @@ const DEFAULT_ENDPOINTS = [
 ];
 const DEFAULT_MODEL = 'unsloth/Qwen3.6-35B-A3B-MTP-GGUF';
 const SOURCE = 'unsloth:source-gap-supplement-20260622';
+const HTML_ENTITY_RE = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#x[0-9a-fA-F]{1,6});/u;
+const REPLACEMENT_CHAR_RE = /[\uFFFD]/u;
+const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
+const JAPANESE_MOJIBAKE_RE = /[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u;
 const MANUAL_RESIDUAL_SOURCE_ENTRY_IDS = new Set([2512756, 2482999, 2734525, 2607307, 2639444, 2399378, 2649794]);
 const FUNCTION_GLOSSES = new Set([
   'a',
@@ -2084,6 +2088,8 @@ function validateOutput(row, output) {
   }
   if (!nonEmpty(output.gloss_key)) errors.push('missing_gloss_key');
   if (isBroadGlossKey(output.gloss_key)) errors.push('broad_gloss_key');
+  validateGeneratedText(errors, 'headword', output.headword);
+  validateGeneratedText(errors, 'gloss_key', output.gloss_key);
   if (!output.localizations || typeof output.localizations !== 'object') errors.push('missing_localizations');
   const preferredTerms = row?.candidate_evidence_review?.preferred_terms || {};
   for (const lang of LANGS) {
@@ -2101,6 +2107,9 @@ function validateOutput(row, output) {
       errors.push(`preferred_term_mismatch_${lang}`);
     }
     if (!nonEmpty(loc.definition)) errors.push(`missing_definition_${lang}`);
+    for (const field of ['term', 'reading', 'pronunciation', 'definition']) {
+      validateGeneratedText(errors, `${field}_${lang}`, loc[field]);
+    }
     if (definitionTooThin(loc.definition, lang, loc.term)) errors.push(`thin_definition_${lang}`);
     if (!termLanguageLooksRight(loc.term, lang)) errors.push(`term_language_${lang}`);
     if (!definitionLanguageLooksRight(loc.definition, lang)) errors.push(`definition_language_${lang}`);
@@ -2158,6 +2167,19 @@ function validateOutput(row, output) {
   const knownMismatch = knownSemanticMismatch(row, output);
   if (knownMismatch) errors.push(knownMismatch);
   return { errors };
+}
+
+function validateGeneratedText(errors, field, value) {
+  const text = String(value || '').trim();
+  if (!text) return;
+  if (
+    REPLACEMENT_CHAR_RE.test(text) ||
+    LATIN1_MOJIBAKE_RE.test(text) ||
+    JAPANESE_MOJIBAKE_RE.test(text)
+  ) {
+    errors.push(`mojibake_${field}`);
+  }
+  if (HTML_ENTITY_RE.test(text)) errors.push(`html_artifact_${field}`);
 }
 
 function normalizeGeneratedOutput(row, output) {

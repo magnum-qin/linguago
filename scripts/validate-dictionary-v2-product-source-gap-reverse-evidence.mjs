@@ -8,6 +8,10 @@ const DEFAULT_SUPPLEMENTAL_SOURCE_DB =
 const DEFAULT_REPORT =
   "logs/product-source-gap-v83-two-lang-evidence-validation-tier-c-smoke-20-v2-dry-run.json";
 const TARGET_LANGS = ["en", "pt-BR", "zh", "ja"];
+const HTML_ENTITY_RE = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#x[0-9a-fA-F]{1,6});/u;
+const REPLACEMENT_CHAR_RE = /[\uFFFD]/u;
+const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
+const JAPANESE_MOJIBAKE_RE = /[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u;
 const STRONG_REVERSE_SOURCES = {
   en: new Set(["ecdict"]),
   "pt-BR": new Set(["freedict-por-eng", "wikdict-pt-en"]),
@@ -85,7 +89,9 @@ if ((inputMode === "reviewed" || inputMode === "reviewed-suggested") && !generat
 if (inputMode === "aligned" && !generated.length && reviewedCandidates.length) {
   throw new Error("Aligned candidate report has no valid sense_alignment/first_sense_localizations rows.");
 }
-const rows = includeInvalid ? generated : generated.filter((row) => row.valid === true);
+const rows = (includeInvalid ? generated : generated.filter((row) => row.valid === true)).filter(
+  (row) => !generatedRowHasContentArtifact(row)
+);
 const db = new Database(sourceDbPath, { readonly: true, fileMustExist: true });
 db.pragma("query_only = ON");
 const supplementalDb = supplementalSourceDbPath
@@ -343,6 +349,33 @@ function validateGeneratedRow(row) {
     decision,
     languages
   };
+}
+
+function generatedRowHasContentArtifact(row) {
+  const output = row?.output || {};
+  const values = [
+    output.headword,
+    output.gloss_key,
+    ...TARGET_LANGS.flatMap((lang) => {
+      const localization = output.localizations?.[lang] || {};
+      return [
+        localization.term,
+        localization.reading,
+        localization.pronunciation,
+        localization.definition
+      ];
+    })
+  ];
+  return values.some((value) => {
+    const text = String(value || "").trim();
+    return Boolean(
+      text &&
+        (HTML_ENTITY_RE.test(text) ||
+          REPLACEMENT_CHAR_RE.test(text) ||
+          LATIN1_MOJIBAKE_RE.test(text) ||
+          JAPANESE_MOJIBAKE_RE.test(text))
+    );
+  });
 }
 
 function loadProductRows(filePath) {

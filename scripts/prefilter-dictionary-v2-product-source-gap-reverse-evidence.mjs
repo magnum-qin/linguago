@@ -57,6 +57,17 @@ const requireExistingLocalizationRoundtrip =
   args["require-existing-localization-roundtrip"] === "true";
 const allowReviewedSupplementalSourceRoundtrip =
   args["allow-reviewed-supplemental-source-roundtrip"] === "true";
+const allowedReviewedSupplementalSourceKeys = new Set(
+  String(args["reviewed-supplemental-source-keys"] || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+if (allowReviewedSupplementalSourceRoundtrip && !allowedReviewedSupplementalSourceKeys.size) {
+  throw new Error(
+    "--allow-reviewed-supplemental-source-roundtrip requires --reviewed-supplemental-source-keys"
+  );
+}
 const minExistingLocalizationRoundtripFamilies = boundedInteger(
   args["min-existing-localization-roundtrip-families"],
   2,
@@ -128,7 +139,8 @@ if (
     if (
       productionPublishable &&
       metadata.reviewed_subset === true &&
-      /independent_.+_and_.+confidence/iu.test(String(metadata.semantic_review || ""))
+      /independent_.+_and_.+confidence/iu.test(String(metadata.semantic_review || "")) &&
+      allowedReviewedSupplementalSourceKeys.has(row.source_key)
     ) {
       reviewedSupplementalSourceKeys.add(row.source_key);
     }
@@ -212,6 +224,7 @@ const summary = {
   require_all_target_independent_evidence: requireAllTargetIndependentEvidence,
   require_existing_localization_roundtrip: requireExistingLocalizationRoundtrip,
   allow_reviewed_supplemental_source_roundtrip: allowReviewedSupplementalSourceRoundtrip,
+  allowed_reviewed_supplemental_source_keys: [...allowedReviewedSupplementalSourceKeys].sort(),
   minimum_existing_localization_roundtrip_families: minExistingLocalizationRoundtripFamilies,
   strong_supplemental_families: [...strongSupplementalFamilies].sort(),
   strong_supplemental_families_by_lang: serializeLangFamilyMap(
@@ -257,6 +270,7 @@ const evidenceOutput = {
     minimum_independent_target_families: minIndependentTargetFamilies,
     require_existing_localization_roundtrip: requireExistingLocalizationRoundtrip,
     allow_reviewed_supplemental_source_roundtrip: allowReviewedSupplementalSourceRoundtrip,
+    allowed_reviewed_supplemental_source_keys: [...allowedReviewedSupplementalSourceKeys].sort(),
     minimum_existing_localization_roundtrip_families: minExistingLocalizationRoundtripFamilies,
     strong_supplemental_families: [...strongSupplementalFamilies].sort(),
     strong_supplemental_families_by_lang: serializeLangFamilyMap(
