@@ -822,3 +822,14 @@ qualified 2,000-row cohort onto v91, retained 1,610 rows under current
 validation, and removed 48 exact same-reading duplicate senses for a net 1,562
 sense increase. All local, export/import, online API, and mobile/desktop render
 gates passed.
+
+Production is now v93 strict-fresh115. It adds 115 senses
+selected through independent Qwen/Gemma review, deterministic four-language
+reverse evidence, and final no-correction consensus. Candidate counts are
+31,056 entries, 37,273 senses, 149,092 sense localizations, 3,030 examples, and
+11,898 example localizations. The native package is
+`outputs/d1-v2-product-native-export-v93-strict-fresh115`; local fast,
+published-risk, and full memory-import audits pass with all blockers at zero.
+Cache version is `v93-strict-fresh115-31056`; D1 `published_at` is
+`2026-08-11T12:22:19.638Z`, and Worker Version ID is
+`5161673d-b817-4b1e-82b1-484d676c2974`.

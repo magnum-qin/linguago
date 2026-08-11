@@ -3106,3 +3106,25 @@ localizations. All blocking audits, remote count verification, online API, and
 mobile/desktop rendering passed. Cache version is
 `v92-pressure1562-31039`; Worker Version ID is
 `24626b8f-5f31-4a01-ab42-c3c9709b699a`.
+
+## 2026-08-11 v93 strict fresh-candidate replay
+
+Rebuild the strict pool after refreshing the historical-attempt index; otherwise
+most apparently new rows are repeats. The v92 rebuild contained 1,692 strict
+rows but only 197 fresh rows and 158 unique-entry candidates after the gate.
+
+The accepted path is Qwen source review, independent Gemma source review, Qwen
+four-language generation, deterministic reverse evidence in all four languages,
+then Gemma no-correction review. The final production set is 115 senses. Exclude
+`ampicilina`, `perfídia`, and the second overlapping `liberalismo` sense rather
+than weakening semantic or entry-level validators.
+
+For replay, use the controlled report to write drafts, but use the corresponding
+dual-approved source report as `--report` during promote. The latter preserves
+the source gloss used by semantic validation. The v93 candidate export passes a
+full in-memory import at 31,056 entries, 37,273 senses, and 149,092
+localizations, with every blocking counter and published-risk at zero.
+It was released with cache `v93-strict-fresh115-31056`, D1
+`published_at=2026-08-11T12:22:19.638Z`, and Worker Version ID
+`5161673d-b817-4b1e-82b1-484d676c2974`. Focused API and desktop/mobile render
+checks passed after deployment.

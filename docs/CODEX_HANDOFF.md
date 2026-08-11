@@ -3210,3 +3210,34 @@ exist.
   D1 `published_at=2026-08-11T08:35:33.797Z`.
 - Worker cache is `v92-pressure1562-31039`; deployed Worker Version ID is
   `24626b8f-5f31-4a01-ab42-c3c9709b699a`.
+
+### 2026-08-11 v93 strict fresh-candidate production release
+
+- Rebuilt the v92 coverage-gap pool under the frozen independent-family policy.
+  Of 1,692 strict rows, the historical-attempt index left 197 genuinely fresh
+  rows and 158 unique-entry candidates after the 20-row gate.
+- Qwen source review, independent Gemma review, deterministic four-language
+  reverse evidence, and Gemma no-correction review produced 115 publishable
+  senses. Three rows were deliberately excluded: `ampicilina` and `perfídia`
+  failed semantic validation, while a second `liberalismo` sense overlapped an
+  earlier accepted sense.
+- Replay into the main DB promoted 14/14 gate rows and 101/101 remaining rows.
+  The promote validator must receive the dual-approved source report as
+  `--report`; passing the controlled generation report loses the original
+  source gloss and causes false generic-gloss semantic-drift failures.
+- The pre-write backup is
+  `backups/linguago-v92-before-strict-fresh115-20260811-211837.db`; its SHA-256
+  matches the pre-write product DB.
+- The production native package is
+  `outputs/d1-v2-product-native-export-v93-strict-fresh115`. Full memory import
+  passed at `entries=31056`, `senses=37273`,
+  `sense_localizations=149092`, `examples=3030`, and
+  `example_localizations=11898`; all blocking counters and published-risk are
+  zero. Duplicate-localization warnings are 384 and remain non-blocking.
+- D1 `published_at=2026-08-11T12:22:19.638Z`. Worker cache is
+  `v93-strict-fresh115-31056`; deployed Worker Version ID is
+  `5161673d-b817-4b1e-82b1-484d676c2974`. Online focused API and mobile/desktop
+  render checks passed with no horizontal overflow.
+- Gemma `nano` final-review prompts can omit `decision` even with a larger token
+  limit. Retry only those rows once with `prompt-mode=full`; do not interpret a
+  truncated response as acceptance.
