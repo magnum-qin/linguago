@@ -3373,3 +3373,25 @@ exist.
   on the previous v93 release; this increment is local only.
 - There are 23 untouched entries left in this reviewed OpenHowNet delta. Keep
   them in bounded cohorts because cohort 2's final consensus yield was 12/20.
+
+### 2026-08-12 v93 Chinese reviewed-source completion
+
+- Cohort 3 processed 20 untouched entries. Qwen passed 16/20; the four rejected
+  rows had Chinese reading mismatches and were not forced into draft. Reverse
+  evidence supported all 16 clean drafts, and Gemma accepted 9 without
+  corrections.
+- The final cohort processed the remaining three entries. Qwen and reverse
+  evidence passed 3/3; Gemma accepted `败血病` and `链反应` and rejected
+  `裁判权`. Only the two agreements were promoted.
+- The complete 63-entry delta is exhausted. Its final funnel is 63 candidates,
+  56 clean drafts, and 32 independent no-correction promotions. Twenty-four
+  Gemma-rejected rows remain unpublished drafts; seven generation-invalid rows
+  were never written. Do not retry this pool as fresh work.
+- The final audited local export contains 31,088 entries, 37,313 senses, and
+  149,252 sense localizations. Full import has zero orphans, duplicate sense
+  orders, mojibake, HTML artifacts, and published-risk flags. The non-blocking
+  duplicate-localization warning remains 390.
+- This 32/63 final promotion yield confirms that reviewed OpenHowNet source-side
+  support is useful but not sufficient for bulk translation. A new production
+  batch requires a fresh independent-evidence pool and a new bounded gate. The
+  online D1/Worker remains on v93; this 32-sense increment is local only.

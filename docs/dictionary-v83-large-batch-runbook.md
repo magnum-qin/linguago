@@ -3221,3 +3221,21 @@ all passed reverse evidence, but Gemma accepted only 12 without corrections.
 Those 12 were promoted, producing a clean local export of 31,077 entries,
 37,302 senses, and 149,208 localizations. The remaining 23 untouched rows still
 require bounded generation and independent review; no D1 update has occurred.
+
+The final two bounded cohorts exhausted this 63-entry delta. Cohort 3 produced
+16 clean drafts from 20 candidates and 9 Gemma agreements. The last three rows
+produced three clean drafts and two Gemma agreements. Across the complete pool:
+
+- candidates: 63
+- clean drafts: 56
+- independent no-correction promotions: 32
+- Gemma-rejected unpublished drafts: 24
+- generation-invalid rows never written: 7
+
+The final local full audit reports 31,088 entries, 37,313 senses, and 149,252
+localizations, with all blocking integrity fields at zero. Do not regenerate
+these 63 entries under another source-sense key: rebuild the attempt index and
+exclude at source-entry level. The pool is exhausted, and the 32/63 final yield
+does not qualify this evidence path for an unattended bulk run. Acquire or
+align another independent source family, rebuild strict coverage, and repeat a
+fresh bounded gate before any further large batch. D1 remains unchanged.
