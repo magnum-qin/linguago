@@ -3161,3 +3161,19 @@ Japanese and Portuguese lemmas express provide/give. The next expansion should
 add sense-specific source-side overlap from CC-CEDICT/OpenHowNet for zh,
 JMdict/EJDict for ja, and FreeDict/Dicionario Aberto for pt-BR. Do not promote
 rows merely because OMW supplies all three target-language term lists.
+
+## Chinese near-unlock source-side pilot
+
+Use `npm run dict:v2:coverage:report-zh-source-overlap` for Chinese source
+candidates. The report distinguishes exact headword coverage from actual
+English-anchor overlap and, when raw OpenHowNet metadata is available, binds
+both language POS tags to the OMW-derived expected POS. Headword coverage alone
+is never publication evidence.
+
+The v93 full run over 462 Chinese near-unlock senses found 198 OpenHowNet
+headword matches, 124 anchor overlaps, and 104 unique POS-compatible research
+candidates. The first dual-model 20-row gate reached only 14 strict consensus
+accepts despite zero API/JSON failures. Do not generate from this pool yet.
+Broad anchors such as `take`, `paper`, and `reflect` need stronger
+sense-specificity checks; rerun a fresh 20-row gate and require at least 18
+strict consensus accepts before expansion.

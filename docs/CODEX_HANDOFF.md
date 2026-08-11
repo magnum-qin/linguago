@@ -3266,3 +3266,29 @@ exist.
   identifies 1,221 diagnostic near-unlock rows among 3,956 manual candidates.
   This report is not publication evidence; the next implementation target is
   sense-specific source-side lexical overlap, starting with 462 Chinese rows.
+
+### 2026-08-11 v93 Chinese near-unlock source-side pilot
+
+- Node code-point inspection confirmed all `462` Chinese near-unlock
+  headwords are valid UTF-8. Mojibake shown by PowerShell `Get-Content` is a
+  console decoding issue, not report corruption.
+- Rechecking CC-CEDICT and the already-reviewed OpenHowNet subset found zero
+  new exact headword matches. This is expected because these evidence sources
+  were already part of the strict prefilter that created the near-unlock set.
+- `report-dictionary-v2-product-source-gap-zh-source-overlap.mjs` performs the
+  correct Chinese source-side lookup: exact Chinese headword, deterministic
+  English-anchor overlap, then OpenHowNet Chinese/English POS binding. Against
+  the complete MIT OpenHowNet DB it found `198/462` headword matches,
+  `124/462` anchor overlaps, and `104` unique POS-compatible research rows.
+- The 20-row dual-model pilot was structurally stable: Qwen 35B produced
+  `20/20` valid reviews and approved 15; Gemma 4 31B produced `20/20` valid
+  reviews and approved 19. Strict consensus accepted only `14/20`, with six
+  disagreements. Nothing was generated, promoted, or published.
+- Exact English strings can still be too broad: `take` for `夺去`, `paper` for
+  `学术论文`, and `reflect` for `映出` caused model disagreement. Do not expand
+  the 104-row pool yet. Add a sense-specificity gate and require a fresh
+  consensus result of at least `18/20` before draft generation.
+- `probe-openhownet-source-gap-deficits.mjs` now accepts `near_unlock` input
+  plus `--lang` and `--limit`. Its English-anchor-to-Chinese-target direction
+  is not the right diagnostic for Chinese source rows; use the source-overlap
+  script for that case.

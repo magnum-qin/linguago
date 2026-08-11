@@ -12,6 +12,8 @@ const evidenceDbPath = requiredPath(args['evidence-db']);
 const outPath = path.resolve(args.out || 'logs/product-source-gap-openhownet-research-probe.json');
 const scope = String(args.scope || 'deficits').trim().toLowerCase();
 if (!['deficits', 'all'].includes(scope)) throw new Error(`Unsupported --scope: ${scope}`);
+const lang = String(args.lang || '').trim();
+const limit = integer(args.limit, Number.MAX_SAFE_INTEGER, 1);
 const excludeProbePaths = String(args['exclude-probes'] || args['exclude-probe'] || '')
   .split(',')
   .map((value) => value.trim())
@@ -30,7 +32,9 @@ for (const reportPath of reportPaths) {
     ? report.validations
     : Array.isArray(report.selected)
       ? report.selected
-      : [];
+      : Array.isArray(report.near_unlock)
+        ? report.near_unlock
+        : [];
   for (const row of rows) {
     const key = candidateKey(row);
     if (!key || excludedCandidateKeys.has(key)) continue;
@@ -47,10 +51,13 @@ for (const reportPath of reportPaths) {
   }
 }
 const reportRows = [...reportRowsByKey.values()];
-const targets = reportRows.filter((row) => scope === 'all' || (
-  row.reason === 'insufficient_independent_target_evidence' &&
-  (row.generation_hints?.zh?.evidence_families || []).length < 2
-));
+const targets = reportRows
+  .filter((row) => !lang || row.source_lang === lang)
+  .filter((row) => scope === 'all' || (
+    row.reason === 'insufficient_independent_target_evidence' &&
+    (row.generation_hints?.zh?.evidence_families || []).length < 2
+  ))
+  .slice(0, limit);
 
 const db = new Database(evidenceDbPath, { readonly: true, fileMustExist: true });
 db.pragma('query_only = ON');
@@ -253,6 +260,12 @@ function requiredPath(value) {
   const resolved = path.resolve(required(value, 'path'));
   if (!fs.existsSync(resolved)) throw new Error(`File not found: ${resolved}`);
   return resolved;
+}
+
+function integer(value, fallback, minimum) {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= minimum ? parsed : fallback;
 }
 
 function relative(value) {
