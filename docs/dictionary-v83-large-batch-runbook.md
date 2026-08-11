@@ -3128,3 +3128,19 @@ It was released with cache `v93-strict-fresh115-31056`, D1
 `published_at=2026-08-11T12:22:19.638Z`, and Worker Version ID
 `5161673d-b817-4b1e-82b1-484d676c2974`. Focused API and desktop/mobile render
 checks passed after deployment.
+
+## Post-v93 residual-pool behavior
+
+After a successful release, rebuild both sense alignment and the historical
+attempt index before selecting more rows. The first v93 rebuild left only 39
+fresh unique-entry rows. Qwen/Gemma source consensus retained 14; generation
+found four already-complete drafts, produced nine valid new rows, and final
+Gemma consensus retained eight. These eight passed isolated and main-local
+promotion with all blockers at zero but were not deployed as a standalone
+release.
+
+When reverse evidence contains more rows than the final consensus report,
+filter it with `filter-dictionary-v2-product-source-gap-reverse-report.mjs`
+before building the promotion checkpoint. The checkpoint builder should keep
+failing if an evidence row has no corresponding unique draft; do not weaken
+that invariant.

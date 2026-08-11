@@ -3241,3 +3241,22 @@ exist.
 - Gemma `nano` final-review prompts can omit `decision` even with a larger token
   limit. Retry only those rows once with `prompt-mode=full`; do not interpret a
   truncated response as acceptance.
+
+### 2026-08-11 post-v93 strict residual batch (local only)
+
+- Re-aligning the v93 product DB reduced the strict pool from 1,692 to 1,579.
+  After rebuilding the historical-attempt index, only 39 fresh unique-entry
+  rows remained: 36 pt-BR and 3 ja.
+- Four-node Qwen source review approved 30/39 at confidence 0.9. Independent
+  Gemma review approved 14, and dual adjudication retained those 14.
+- Generation skipped four rows already represented by complete source-gap
+  drafts. Of the ten new generations, nine passed structure and all nine passed
+  deterministic reverse evidence in every language. Final Gemma no-correction
+  review accepted eight and rejected `internacionalismo`.
+- The exact final8 replay and checkpoint-scoped promote passed 8/8 in an
+  isolated v93 clone and again in the main local DB. Fast audit and
+  published-risk pass at `publishable_senses=37281` and `flagged_senses=0`.
+- Backup before the local write is
+  `backups/linguago-v93-before-strict-fresh8-20260811-222229.db`. This batch is
+  intentionally not deployed by itself; production remains v93 with 37,273
+  senses until more audited rows are accumulated.
