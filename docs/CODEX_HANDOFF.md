@@ -3350,3 +3350,26 @@ exist.
 - This pilot's final consensus yield is 9/20. It validates the conservative
   pipeline but does not qualify the remaining 43-entry delta for automatic
   bulk generation. Continue in bounded cohorts and preserve the Gemma gate.
+
+### 2026-08-12 v93 Chinese reviewed-source cohort 2
+
+- Rebuilding the historical attempt index and excluding by source entry, not
+  only entry/sense pair, produced the expected 43 untouched entries. Entry-level
+  exclusion is required because another sense of an already attempted entry can
+  otherwise re-enter a later cohort.
+- Initial Qwen generation accepted 15/20. All five rejects paired a kana-only
+  Japanese term with a different kana reading. One explicit model retry fixed
+  0/5, confirming that prompt repetition is not a reliable repair.
+- `supplement-dictionary-v2-product-source-gaps-unsloth.mjs` now deterministically
+  sets a kana-only Japanese term's reading to the term itself. Replaying all 20
+  original outputs under the current validator accepted 20/20 without another
+  model call. This is normalization, not a relaxed reading check.
+- All 20 were written as drafts and passed fast/risk audit. Reverse evidence
+  supported 20/20, while independent Gemma accepted 12 and rejected 8. Only the
+  12 no-correction agreements were promoted.
+- The complete local export now contains 31,077 entries, 37,302 senses, and
+  149,208 sense localizations. Full in-memory audit has zero orphans, duplicate
+  sense orders, mojibake, HTML artifacts, and published-risk flags. D1 remains
+  on the previous v93 release; this increment is local only.
+- There are 23 untouched entries left in this reviewed OpenHowNet delta. Keep
+  them in bounded cohorts because cohort 2's final consensus yield was 12/20.

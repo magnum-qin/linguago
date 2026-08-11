@@ -2220,7 +2220,14 @@ function normalizeGeneratedOutput(row, output) {
     }
   }
   const jaLoc = normalized.localizations.ja;
-  if (jaLoc && typeof jaLoc === 'object' && !readingLooksRight(jaLoc.reading, 'ja') && kanaOnly(jaLoc.term)) {
+  // A kana-only Japanese term is already its own phonetic reading. Always
+  // prefer it over model-supplied expansions or unrelated kana strings.
+  if (
+    jaLoc &&
+    typeof jaLoc === 'object' &&
+    kanaOnly(jaLoc.term) &&
+    normalizeJapaneseReading(jaLoc.reading) !== normalizeJapaneseReading(jaLoc.term)
+  ) {
     normalized.localizations = { ...normalized.localizations };
     normalized.localizations.ja = {
       ...jaLoc,

@@ -3208,3 +3208,16 @@ result is 31,065 entries, 37,290 senses, and 149,160 localizations; D1 remains
 unchanged. The 9/20 final-consensus yield is below a bulk-expansion gate, so run
 the remaining fresh rows only in bounded cohorts and keep all deterministic and
 independent-review checks enabled.
+
+The second bounded cohort initially generated 15/20 valid rows. Five failures
+were kana-only Japanese terms whose model-supplied readings expanded or changed
+the visible term. Retrying the model fixed 0/5. A kana-only term is already a
+phonetic spelling, so the supplement normalizer now always uses the term itself
+as its reading before validation. Current-code replay then accepted 20/20.
+
+Do not generalize this override to kanji terms. Kanji readings must continue to
+match JMdict or a narrow verified compositional rule. The 20 normalized drafts
+all passed reverse evidence, but Gemma accepted only 12 without corrections.
+Those 12 were promoted, producing a clean local export of 31,077 entries,
+37,302 senses, and 149,208 localizations. The remaining 23 untouched rows still
+require bounded generation and independent review; no D1 update has occurred.
