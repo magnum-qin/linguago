@@ -3081,3 +3081,28 @@ execute and deploy work. Before overwriting D1, either obtain a remote export or
 re-audit the exact previous native release package and verify its manifest
 counts equal online `/api/health`. For this release the verified rollback is
 `outputs/d1-v2-product-native-export-v90-openhownet-main`.
+
+## 2026-08-11 v92 qualified-cohort production replay
+
+The frozen 2,000-row qualification was replayed onto v91 without new model
+calls. Current validation retained 1,610 of the previously accepted 1,619 rows;
+nine failed the newer Japanese-reading check. Promotion dry-run accepted all
+1,610 retained rows.
+
+Before production, duplicate triage identified 48 exact four-language,
+same-reading pairs within the new checkpoint. Merge source links and remove
+only those exact duplicates. Do not merge the eight exact-term/definition pairs
+whose readings differ. The resulting production increment is 1,562 senses and
+1,007 entries.
+
+For legacy controlled reports, top-level `selection_policy` may substitute for
+missing per-row provenance only when it certifies controlled model consensus,
+independent no-correction review, final evidence/consensus gating, and
+`automatic_promotion=false`. Candidate IDs must still occur in the named Gemma
+consensus as unchanged accepts.
+
+Final v92 D1 counts are 31,039 entries, 37,158 senses, and 148,632
+localizations. All blocking audits, remote count verification, online API, and
+mobile/desktop rendering passed. Cache version is
+`v92-pressure1562-31039`; Worker Version ID is
+`24626b8f-5f31-4a01-ab42-c3c9709b699a`.

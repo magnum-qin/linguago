@@ -663,6 +663,11 @@ function validateControlledConsensusReplay(replay, rowsById) {
   if (consensus?.policy?.automatic_promotion !== false) {
     throw new Error('Controlled consensus report permits automatic promotion');
   }
+  const reportLevelControlledProvenance =
+    replay?.selection_policy?.lane === 'controlled_model_consensus' &&
+    replay?.selection_policy?.automatic_promotion === false &&
+    replay?.selection_policy?.final_generation_evidence_consensus_gate === true &&
+    replay?.selection_policy?.require_independent_no_correction_consensus === true;
 
   const acceptedKeys = new Set(
     (consensus.reviews || [])
@@ -681,10 +686,15 @@ function validateControlledConsensusReplay(replay, rowsById) {
     const sourceEntryId = String(item?.source_entry_id);
     const sourceSenseId = Number(item?.source_sense_id ?? item?.output?.source_sense_id);
     const row = rowsById.get(sourceEntryId);
-    if (row?.candidate_review_provenance?.kind !== 'controlled_model_consensus') {
+    const rowLevelControlledProvenance =
+      row?.candidate_review_provenance?.kind === 'controlled_model_consensus';
+    if (!rowLevelControlledProvenance && !reportLevelControlledProvenance) {
       throw new Error(`Controlled replay row ${sourceEntryId} lacks controlled_model_consensus provenance`);
     }
-    if (row?.candidate_review_provenance?.automatic_promotion !== false) {
+    if (
+      rowLevelControlledProvenance &&
+      row?.candidate_review_provenance?.automatic_promotion !== false
+    ) {
       throw new Error(`Controlled replay row ${sourceEntryId} has unsafe promotion policy`);
     }
     if (!acceptedKeys.has(`${Number(sourceEntryId)}:${sourceSenseId}`)) {

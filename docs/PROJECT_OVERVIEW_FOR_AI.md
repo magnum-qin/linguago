@@ -814,10 +814,11 @@ better deterministic target alignment.
 
 ## Current production baseline (2026-08-11)
 
-Production is v91 ECDICT 120: 30,032 entries, 35,596 senses, 142,384 sense
+Production is v92 pressure replay: 31,039 entries, 37,158 senses, 148,632 sense
 localizations, 3,030 examples, and 11,898 example localizations. Worker cache
-is `v91-ecdict120-30032`; Worker Version ID is
-`999818a7-cd16-464c-8b7a-e8048f439b28`. The batch used Qwen generation,
-deterministic four-language reverse evidence, independent Gemma no-correction
-review, controlled draft replay, and exact production promotion. All local,
-export/import, online API, and mobile/desktop render gates passed.
+is `v92-pressure1562-31039`; Worker Version ID is
+`24626b8f-5f31-4a01-ab42-c3c9709b699a`. The release replayed the previously
+qualified 2,000-row cohort onto v91, retained 1,610 rows under current
+validation, and removed 48 exact same-reading duplicate senses for a net 1,562
+sense increase. All local, export/import, online API, and mobile/desktop render
+gates passed.

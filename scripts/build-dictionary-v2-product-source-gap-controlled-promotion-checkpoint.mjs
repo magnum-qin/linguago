@@ -5,22 +5,44 @@ const args = parseArgs(process.argv.slice(2));
 const basePath = requiredPath(args.base, 'base');
 const correctionPath = requiredPath(args.correction, 'correction');
 const replayPath = requiredPath(args.replay, 'replay');
+const baseReplayPath = args['base-replay'] ? requiredPath(args['base-replay'], 'base-replay') : null;
+const skipMissingReplay = args['skip-missing-replay'] === 'true';
 const outPath = path.resolve(required(args.out, 'out'));
 const base = readJson(basePath);
 const correction = readJson(correctionPath);
 const replay = readJson(replayPath);
+const baseReplay = baseReplayPath ? readJson(baseReplayPath) : null;
 
 const replayBySource = new Map(
   (replay.writes || []).map((row) => [candidateKey(row), row])
 );
+const baseReplayBySource = new Map(
+  (baseReplay?.writes || []).map((row) => [candidateKey(row), row])
+);
 const items = {};
+const skipped = [];
 
 for (const row of base.generated || []) {
-  addItem(row, Number(row.product_entry_id), Number(row.product_sense_id), 'base_consensus');
+  const write = baseReplayBySource.get(candidateKey(row));
+  if (baseReplay && !write) {
+    if (!skipMissingReplay) throw new Error(`Missing base replay write for ${candidateKey(row)}`);
+    skipped.push({ lane: 'base_consensus', candidate: candidateKey(row) });
+    continue;
+  }
+  addItem(
+    row,
+    Number(write?.product_entry_id ?? row.product_entry_id),
+    Number(write?.product_sense_id ?? row.product_sense_id),
+    'base_consensus'
+  );
 }
 for (const row of correction.generated || []) {
   const write = replayBySource.get(candidateKey(row));
-  if (!write) throw new Error(`Missing correction replay write for ${candidateKey(row)}`);
+  if (!write) {
+    if (!skipMissingReplay) throw new Error(`Missing correction replay write for ${candidateKey(row)}`);
+    skipped.push({ lane: 'correction_consensus', candidate: candidateKey(row) });
+    continue;
+  }
   addItem(row, Number(write.product_entry_id), Number(write.product_sense_id), 'correction_consensus');
 }
 
@@ -29,6 +51,7 @@ const output = {
   generated_at: new Date().toISOString(),
   sources: {
     base: relative(basePath),
+    base_replay: baseReplayPath ? relative(baseReplayPath) : null,
     correction: relative(correctionPath),
     replay: relative(replayPath)
   },
@@ -36,9 +59,11 @@ const output = {
     base: (base.generated || []).length,
     correction: (correction.generated || []).length,
     total: Object.keys(items).length,
-    unique_product_senses: new Set(Object.values(items).map((row) => row.product_sense_id)).size
+    unique_product_senses: new Set(Object.values(items).map((row) => row.product_sense_id)).size,
+    skipped_missing_replay: skipped.length
   },
-  items
+  items,
+  skipped
 };
 
 if (output.summary.total !== output.summary.unique_product_senses) {

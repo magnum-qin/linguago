@@ -3174,3 +3174,39 @@ exist.
 - Complete online regression, focused API, and mobile/desktop Edge rendering
   passed. `comercialização` resolves through D1 with four-language data and
   IPA, and no tested viewport has horizontal overflow.
+
+### 2026-08-11 v92 pressure cohort production release
+
+- Replayed the previously isolated v90 pressure-2,000 qualification cohort on
+  a fresh v91 clone. Current validators accepted 1,610/1,619 rows; nine rows
+  were rejected for Japanese reading mismatches and were not written.
+- Legacy controlled reports store consensus provenance in top-level
+  `selection_policy`, while newer reports may store it per candidate. Replay
+  accepts the legacy form only when the report requires independent
+  no-correction consensus, disables automatic promotion, and every candidate
+  still matches an accepted `source_entry_id + source_sense_id` in the named
+  Gemma consensus report.
+- Promotion dry-run accepted 1,610/1,610. Duplicate triage then found 48 exact
+  same-reading four-language duplicate pairs entirely inside this checkpoint.
+  Their source links were merged and duplicate senses removed. Eight otherwise
+  exact pairs with reading differences were deliberately retained.
+- Net production increase is 1,007 entries, 1,562 senses, and 6,248 sense
+  localizations. Final D1 counts are `entries=31039`, `senses=37158`,
+  `sense_localizations=148632`, `examples=3030`, and
+  `example_localizations=11898`.
+- Fast audit, published-risk, native export, full in-memory import, remote D1
+  count verification, online API regression, focused API, and mobile/desktop
+  render checks all passed. Blocking counters remain zero and
+  `flagged_senses=0`. Duplicate localization warnings are 381; the retained
+  cases are reading-distinct, manual-review, or likely-keep.
+- Pre-release backup is
+  `backups/linguago-v91-before-pressure1562-20260811-173518.db`, SHA-256
+  `01E073923BF9E12E49E82449B72CD8A364CE662C62DE63D224D36FB86CEEC30C`.
+  The post-release product DB SHA-256 is
+  `34E57DA3CD2FC403DC1211BA694D99D958E9777074D739033D91D160AB0E1ABC`.
+- Native package is `outputs/d1-v2-product-native-export-v92-pressure1562`;
+  manifest SHA-256 is
+  `152B176163DC1D008F19FB78D726DA0B0B69E2F22892BE195B152BC27C9059B9`.
+  D1 `published_at=2026-08-11T08:35:33.797Z`.
+- Worker cache is `v92-pressure1562-31039`; deployed Worker Version ID is
+  `24626b8f-5f31-4a01-ab42-c3c9709b699a`.

@@ -5,9 +5,9 @@ const baseUrl = process.env.PWA_URL || 'https://translation-pwa.qhzggzh-linguago
 const outDir = path.resolve('output/online-dictionary-focused-check');
 const langs = ['zh', 'en', 'pt-BR', 'ja'];
 const expectedCounts = {
-  entries: 30032,
-  senses: 35596,
-  sense_localizations: 142384,
+  entries: 31039,
+  senses: 37158,
+  sense_localizations: 148632,
   examples: 3030,
   example_localizations: 11898
 };
@@ -51,6 +51,13 @@ const cases = [
     term: 'comercializa\u00e7\u00e3o',
     minSenses: 1,
     expectedTerms: ['commercialization']
+  },
+  {
+    id: 'pt-radicalismo',
+    term: 'radicalismo',
+    minSenses: 1,
+    requirePronunciationGroups: true,
+    expectedTerms: ['radicalism']
   },
   {
     id: 'pt-supersimetria',
