@@ -30,8 +30,11 @@ const confidenceThreshold = boundedNumber(args['confidence-threshold'], 0.9, 0, 
 const timeoutMs = boundedInteger(args['timeout-ms'], 120_000, 1_000);
 const maxTokens = boundedInteger(args['max-tokens'], 320, 100);
 const maxAttempts = boundedInteger(args['max-attempts'], 2, 1, 4);
+const checkpointEvery = boundedInteger(args['checkpoint-every'], 20, 1);
+const checkpointIntervalMs = boundedInteger(args['checkpoint-interval-ms'], 10_000, 1_000);
 const resume = args.resume === 'true';
 const retryInvalidOnResume = args['retry-invalid-on-resume'] === 'true';
+const stopAfterApproved = boundedInteger(args['stop-after-approved'], Number.MAX_SAFE_INTEGER, 1);
 const prewarm = args.prewarm !== 'false';
 const forceReload = args['force-reload'] === 'true';
 const loadTimeoutMs = boundedInteger(args['load-timeout-ms'], 300_000, 1_000);
@@ -45,6 +48,20 @@ const requireSenseAlignment = args['require-sense-alignment'] === 'true';
 const requireHintSemanticAlignment = args['require-hint-semantic-alignment'] === 'true';
 const requireDefinitionContract = args['require-definition-contract'] === 'true';
 const stream = args.stream === 'true';
+const responseFormat = String(args['response-format'] || 'none').trim().toLowerCase();
+const excludeReviewPaths = String(args['exclude-reviews'] || '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map((value) => path.resolve(value));
+const excludeReviewKey = String(args['exclude-review-key'] || 'entry');
+
+if (!['entry', 'candidate'].includes(excludeReviewKey)) {
+  throw new Error(`Invalid --exclude-review-key: ${excludeReviewKey}`);
+}
+if (!['none', 'json-object'].includes(responseFormat)) {
+  throw new Error(`Invalid --response-format: ${responseFormat}`);
+}
 
 if (!fs.existsSync(reportPath)) throw new Error(`Coverage report not found: ${reportPath}`);
 if (!token) throw new Error('Missing --token or UNSLOTH_API_KEY');
@@ -61,7 +78,19 @@ const findCorroboratingEvidence = sourceDb?.prepare(`
 `);
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-const allCandidates = Array.isArray(report.selected) ? report.selected : [];
+const excludedReviews = excludeReviewPaths.flatMap((filePath) => {
+  if (!fs.existsSync(filePath)) throw new Error(`Excluded review report not found: ${filePath}`);
+  const excluded = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  return Array.isArray(excluded.reviews) ? excluded.reviews : [];
+});
+const excludedCandidateKeys = new Set(excludedReviews.map(candidateKey));
+const excludedEntryIds = new Set(excludedReviews.map((row) => Number(row.source_entry_id)).filter(Number.isInteger));
+const allCandidates = (Array.isArray(report.selected) ? report.selected : [])
+  .filter((row) =>
+    excludeReviewKey === 'candidate'
+      ? !excludedCandidateKeys.has(candidateKey(row))
+      : !excludedEntryIds.has(Number(row.source_entry_id))
+  );
 if (!allCandidates.length) throw new Error('Coverage report has no selected rows');
 if (requireSenseAlignment) {
   const unaligned = allCandidates.filter(
@@ -85,6 +114,9 @@ const reusableReviews = existingReviews.filter(
 );
 const completedIds = new Set(reusableReviews.map(candidateKey));
 const targetCandidates = allCandidates.slice(offset, offset + limit);
+const targetCandidateOrder = new Map(
+  targetCandidates.map((row, index) => [candidateKey(row), index])
+);
 const pendingCandidates = targetCandidates.filter((row) => !completedIds.has(candidateKey(row)));
 if (debugPromptPath && targetCandidates.length) {
   const payload = compactPayload(targetCandidates[0]);
@@ -157,22 +189,36 @@ console.log(
 
 async function runPool(rows) {
   let nextIndex = 0;
+  let completedSinceWrite = 0;
+  let lastWriteAt = performance.now();
 
   async function worker(workerIndex) {
-    while (nextIndex < rows.length) {
+    while (nextIndex < rows.length && approvedReviewCount() < stopAfterApproved) {
       const row = rows[nextIndex++];
       const review = await reviewWithRetry(row, workerIndex);
       reviews.push(review);
+      completedSinceWrite += 1;
       console.log(
         `[${reviews.length}/${targetCandidates.length}] source=${row.source_entry_id} ${row.word} ` +
           `decision=${review.valid ? review.decision : 'error'} confidence=${review.confidence ?? '-'} ` +
           `endpoint=${review.endpoint ? endpointPort(review.endpoint) : '-'}`
       );
-      writeOutputs();
+      if (
+        completedSinceWrite >= checkpointEvery ||
+        performance.now() - lastWriteAt >= checkpointIntervalMs
+      ) {
+        writeOutputs();
+        completedSinceWrite = 0;
+        lastWriteAt = performance.now();
+      }
     }
   }
 
   await Promise.all(endpoints.map((_, index) => worker(index)));
+}
+
+function approvedReviewCount() {
+  return reviews.filter((row) => row?.approved === true).length;
 }
 
 async function reviewWithRetry(row, startEndpointIndex) {
@@ -215,6 +261,7 @@ async function reviewRow(row, endpoint, attempt, previousError) {
       max_tokens: maxTokens,
       enable_thinking: false,
       reasoning_effort: 'none',
+      ...(responseFormat === 'json-object' ? { response_format: { type: 'json_object' } } : {}),
       messages:
         promptMode === 'micro' || promptMode === 'nano'
           ? [{ role: 'user', content: buildPrompt(payload, previousError) }]
@@ -278,6 +325,7 @@ async function reviewRowNanoPerLanguage(payload, row, endpoint, attempt, previou
         max_tokens: maxTokens,
         enable_thinking: false,
         reasoning_effort: 'none',
+        ...(responseFormat === 'json-object' ? { response_format: { type: 'json_object' } } : {}),
         messages: [{ role: 'user', content: prompt }]
       },
       timeoutMs
@@ -380,7 +428,7 @@ function buildNanoLanguagePrompt(payload, lang, candidates, previousError) {
     target_lang: lang,
     candidates
   };
-  return `I=${JSON.stringify(input)} Pick the closest neutral candidate only if sense, POS, grammatical form, perspective, number, register and scope match; ignore bad alternatives. Reject if none; manual if ambiguous. For pt-BR reject pt-PT-only usage. reason<=8 words. JSON only {"decision":"accept|reject|manual_review","confidence":0,"term":null,"definition":"","reason":""}${previousError ? ` R=${previousError.slice(0, 18)}` : ''}`;
+  return `I=${JSON.stringify(input)} Pick the closest neutral candidate only if sense, POS, grammatical form, perspective, number, register and scope match; ignore bad alternatives. Reject if none; manual if ambiguous. For pt-BR reject pt-PT-only usage. reason<=8 words. JSON only {"decision":"accept|reject|manual_review","confidence":0,"term":null,"definition":"","reason":""}${previousError ? ' Previous output was invalid; return complete JSON only.' : ''}`;
 }
 
 function mergeUsage(usages) {
@@ -502,7 +550,7 @@ function buildPrompt(payload, previousError) {
       g: payload.proposed_gloss,
       h: hints
     };
-    return `Exact dictionary-sense gate. Reject homograph, wrong POS, or broad/narrow mismatch; manual if ambiguous. Every non-null h term must mean the same exact w/g sense. confidence>=.90 only if safe. JSON only {"decision":"accept|reject|manual_review","confidence":0,"english_anchor":"","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"","evidence":[""],"risk_flags":[]} I=${JSON.stringify(input)}${previousError ? ` R=${previousError.slice(0, 18)}` : ''}`;
+    return `Exact dictionary-sense gate. Reject homograph, wrong POS, or broad/narrow mismatch; manual if ambiguous. Every non-null h term must mean the same exact w/g sense. confidence>=.90 only if safe. JSON only {"decision":"accept|reject|manual_review","confidence":0,"english_anchor":"","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"","evidence":[""],"risk_flags":[]} I=${JSON.stringify(input)}${previousError ? ' Previous output was invalid; return complete JSON only.' : ''}`;
   }
   if (promptMode === 'micro') {
     const verifiedHints = payload.verified_translation_hints || {};
@@ -523,7 +571,7 @@ Gloss/localizations may be bilingual target-language translations; never reject 
 ${requireHintSemanticAlignment ? 'Also require the FIRST h term in every language to express this exact sense and grammatical role. Reject any polysemy, homograph, overly broad/narrow, or wrong-part-of-speech hint. Return those exact first h terms as preferred_terms when accepting.\n' : ''}
 Reject semantic mismatch/name; manual if ambiguous. confidence>=.90 only if safe.
 JSON {"decision":"accept|reject|manual_review","confidence":0,"english_anchor":"","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"","evidence":[""],"risk_flags":[]}
-${previousError ? `Retry:${previousError.slice(0, 30)}\n` : ''}Input=${JSON.stringify(microPayload)}`;
+${previousError ? 'Previous output was invalid; return complete JSON only.\n' : ''}Input=${JSON.stringify(microPayload)}`;
   }
   const strictHintRules = requireHintSemanticAlignment
     ? `This is also a strict target-term gate. Review the FIRST verified_translation_hints term for every language.
@@ -540,7 +588,7 @@ ${strictHintRules}
 Hints passed reverse-dictionary lookup but may reflect the wrong sense of a polysemous English anchor. Use a hinted preferred term only when it matches the exact gloss.
 Confidence >=0.90 only when safe for four-language generation. Keep reason/evidence under 14 words; at most two risk flags.
 ${requireDefinitionContract ? 'When accepting, definition_contract must give one short native-language definition for each preferred term. All four definitions must have identical grammatical role, domain, and semantic breadth; exclude extra senses and factual details not shared by the anchor.\n' : ''}Return JSON only: {"decision":"accept|reject|manual_review","confidence":0.0,"english_anchor":"exact English sense","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"short","evidence":["short"],"risk_flags":[]}
-${previousError ? `Retry after invalid response: ${previousError.slice(0, 120)}\n` : ''}Input=${JSON.stringify(payload)}`;
+${previousError ? 'Previous output was invalid; return complete JSON only.\n' : ''}Input=${JSON.stringify(payload)}`;
 }
 
 function buildLegacyPrompt(payload, previousError) {
@@ -574,7 +622,7 @@ Return exactly:
   "evidence": ["one concrete lexical comparison"],
   "risk_flags": ["wrong_homograph" | "wrong_language" | "proper_name" | "source_ambiguous" | "rare_or_regional" | "sense_mismatch"]
 }
-${previousError ? `Previous attempt failed validation: ${previousError.slice(0, 240)}\n` : ''}
+${previousError ? 'Previous output was invalid; return complete JSON only.\n' : ''}
 Input:
 ${JSON.stringify(payload)}`;
 }
@@ -623,8 +671,8 @@ function validateReview(parsed, row = null) {
 
 function buildOutput() {
   const ordered = [...reviews].sort((a, b) => {
-    const ai = targetCandidates.findIndex((row) => candidateKey(row) === candidateKey(a));
-    const bi = targetCandidates.findIndex((row) => candidateKey(row) === candidateKey(b));
+    const ai = targetCandidateOrder.get(candidateKey(a)) ?? Number.MAX_SAFE_INTEGER;
+    const bi = targetCandidateOrder.get(candidateKey(b)) ?? Number.MAX_SAFE_INTEGER;
     return ai - bi;
   });
   const approved = ordered.filter((row) => row.approved);
@@ -644,6 +692,8 @@ function buildOutput() {
     endpoints,
     prewarm,
     stream,
+    response_format: responseFormat,
+    prompt_mode: promptMode,
     prewarm_results: prewarmResults,
     confidence_threshold: confidenceThreshold,
     offset,
@@ -682,6 +732,7 @@ function buildApprovedReport() {
     generated_at: new Date().toISOString(),
     source_report: path.relative(process.cwd(), reportPath),
     evidence_review: path.relative(process.cwd(), outPath),
+    exclude_review_key: excludeReviewKey,
     confidence_threshold: confidenceThreshold,
     selected_count: selected.length,
     selected
@@ -779,6 +830,7 @@ function buildRejectedReport() {
     generated_at: new Date().toISOString(),
     source_report: path.relative(process.cwd(), reportPath),
     evidence_review: path.relative(process.cwd(), outPath),
+    exclude_review_key: excludeReviewKey,
     selected_count: selected.length,
     selected
   };

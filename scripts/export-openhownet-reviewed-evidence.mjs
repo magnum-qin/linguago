@@ -6,16 +6,27 @@ import Database from 'better-sqlite3';
 const args = parseArgs(process.argv.slice(2));
 const sourceDbPath = requiredPath(args['source-db']);
 const probePath = requiredPath(args.probe);
-const consensusPath = requiredPath(args.consensus);
+const consensusPaths = String(args.consensus || '')
+  .split(',')
+  .map((value) => requiredPath(value.trim()));
 const outPath = path.resolve(args.out || '.tmp/openhownet/openhownet-reviewed-evidence.db');
 
 const probe = JSON.parse(fs.readFileSync(probePath, 'utf8'));
-const consensus = JSON.parse(fs.readFileSync(consensusPath, 'utf8'));
-if (consensus.research_only !== true || consensus.production_publishable !== false) {
-  throw new Error('Expected the isolated dual-model review report');
+const consensuses = consensusPaths.map((consensusPath) => JSON.parse(fs.readFileSync(consensusPath, 'utf8')));
+if (consensuses.some((consensus) => consensus.research_only !== true || consensus.production_publishable !== false)) {
+  throw new Error('Expected isolated dual-model review reports');
 }
-const acceptedKeys = new Set((consensus.decisions || []).filter((row) => row.consensus_accept).map((row) => row.candidate_key));
-const candidates = (probe.research_candidates || []).filter((row) => acceptedKeys.has(row.candidate_key));
+const acceptedDecisions = new Map(consensuses
+  .flatMap((consensus) => consensus.decisions || [])
+  .filter((row) => row.consensus_accept)
+  .map((row) => [row.candidate_key, row]));
+const candidates = [
+  ...(probe.research_candidates || []),
+  ...(probe.selection_candidates || [])
+].filter((row) => acceptedDecisions.has(row.candidate_key)).map((row) => ({
+  ...row,
+  zh_term: row.zh_term || acceptedDecisions.get(row.candidate_key)?.selected_zh_term
+}));
 if (!candidates.length) throw new Error('No dual-model accepted candidates');
 
 const sourceDb = new Database(sourceDbPath, { readonly: true, fileMustExist: true });
@@ -79,8 +90,10 @@ const reviewedMetadata = {
   reviewed_candidate_count: candidates.length,
   semantic_review: 'independent_qwen35b_and_gemma4_31b_confidence_gte_0.9',
   probe_sha256: sha256File(probePath),
-  consensus_sha256: sha256File(consensusPath)
+  consensus_sha256: sha256(consensusPaths.map(sha256File).join(':')),
+  consensus_report_count: consensusPaths.length
 };
+const reviewedSourceKey = `${source.source_key}-reviewed-${reviewedMetadata.consensus_sha256.slice(0, 12)}`;
 const insertSource = out.prepare('INSERT INTO evidence_sources VALUES (?, ?, ?, ?, ?, ?)');
 const insertEvidence = out.prepare(`INSERT OR IGNORE INTO lexical_evidence
   (source_key, source_family, lang, term, normalized_key, english_gloss, english_normalized_key, concept_id)
@@ -88,9 +101,9 @@ const insertEvidence = out.prepare(`INSERT OR IGNORE INTO lexical_evidence
 const insertMetadata = out.prepare('INSERT OR IGNORE INTO openhownet_sense_metadata VALUES (?, ?, ?, ?, ?, ?)');
 const insertProvenance = out.prepare('INSERT OR IGNORE INTO reviewed_evidence_provenance VALUES (?, ?, ?, ?)');
 const write = out.transaction(() => {
-  insertSource.run(source.source_key, source.source_family, source.lang, `${source.lexicon_spec}; dual-model reviewed subset`, source.license, JSON.stringify(reviewedMetadata));
+  insertSource.run(reviewedSourceKey, source.source_family, source.lang, `${source.lexicon_spec}; dual-model reviewed subset`, source.license, JSON.stringify(reviewedMetadata));
   for (const row of selected) {
-    insertEvidence.run(row.source_key, row.source_family, row.lang, row.term, row.normalized_key, row.english_gloss, row.english_normalized_key, row.concept_id);
+    insertEvidence.run(reviewedSourceKey, row.source_family, row.lang, row.term, row.normalized_key, row.english_gloss, row.english_normalized_key, row.concept_id);
     insertMetadata.run(row.sense_id, row.zh_term, row.en_term, row.zh_pos, row.en_pos, row.sememe_definition);
     insertProvenance.run(row.candidate_key, row.concept_id, reviewedMetadata.probe_sha256, reviewedMetadata.consensus_sha256);
   }
@@ -109,5 +122,6 @@ function normalize(value) { return String(value || '').normalize('NFKC').trim().
 function normalizePos(value) { const text = normalize(value); if (['n', 'noun'].includes(text)) return 'noun'; if (['v', 'verb'].includes(text)) return 'verb'; if (['a', 'adj', 'adjective'].includes(text)) return 'adjective'; if (['r', 'adv', 'adverb'].includes(text)) return 'adverb'; return text; }
 function posMatches(expected, actual) { return normalizePos(expected) === normalizePos(actual); }
 function sha256File(file) { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'); }
+function sha256(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
 function requiredPath(value) { if (!value) throw new Error('Missing required path argument'); const result = path.resolve(value); if (!fs.existsSync(result)) throw new Error(`File not found: ${result}`); return result; }
 function parseArgs(argv) { const out = {}; for (let i = 0; i < argv.length; i++) { if (!argv[i].startsWith('--')) continue; const key = argv[i].slice(2); const next = argv[i + 1]; if (next && !next.startsWith('--')) { out[key] = next; i++; } else out[key] = true; } return out; }

@@ -16,6 +16,8 @@ const rejectedOutPath = path.resolve(
 const minLangs = boundedInteger(args['min-langs'], 2, 1, 4);
 const maxLangs = boundedInteger(args['max-langs'], 3, minLangs, 4);
 const requireUniqueBest = args['require-unique-best'] !== 'false';
+const expandAmbiguousBest = args['expand-ambiguous-best'] === 'true';
+const expandAllEligible = args['expand-all-eligible'] === 'true';
 const preferCurrentSense = args['prefer-current-sense'] === 'true';
 
 if (!fs.existsSync(reportPath)) throw new Error(`Coverage report not found: ${reportPath}`);
@@ -77,13 +79,15 @@ let duplicateAlignedCandidates = 0;
 for (const candidate of candidates) {
   const result = alignCandidate(candidate);
   if (result.ok) {
-    const key = `${Number(result.row.source_entry_id)}:${Number(result.row.first_sense_id)}`;
-    if (alignedCandidateKeys.has(key)) {
-      duplicateAlignedCandidates += 1;
-      continue;
+    for (const row of result.rows || [result.row]) {
+      const key = `${Number(row.source_entry_id)}:${Number(row.first_sense_id)}`;
+      if (alignedCandidateKeys.has(key)) {
+        duplicateAlignedCandidates += 1;
+        continue;
+      }
+      alignedCandidateKeys.add(key);
+      selected.push(row);
     }
-    alignedCandidateKeys.add(key);
-    selected.push(result.row);
   } else rejected.push({ ...candidateIdentity(candidate), sense_alignment: result.alignment });
 }
 db.close();
@@ -108,6 +112,8 @@ const common = {
     min_langs: minLangs,
     max_langs: maxLangs,
     require_unique_best: requireUniqueBest,
+    expand_ambiguous_best: expandAmbiguousBest,
+    expand_all_eligible: expandAllEligible,
     prefer_current_sense: preferCurrentSense,
     complete_senses_are_excluded: maxLangs < 4,
     accepted_product_linked_senses_are_excluded: true,
@@ -152,6 +158,23 @@ function alignCandidate(candidate) {
     : null;
   if (currentSense) return alignedResult(candidate, currentSense, senses, eligible, 'current_candidate_sense');
 
+  if (expandAllEligible) {
+    const expandable = eligible.filter((sense) => sense.clean_lang_count <= maxLangs);
+    if (!expandable.length) {
+      return rejectedResult('already_complete_aligned_sense', candidate, senses, eligible);
+    }
+    return {
+      ok: true,
+      rows: expandable.map((sense) => alignedResult(
+        candidate,
+        sense,
+        senses,
+        eligible,
+        'expanded_all_eligible_senses'
+      ).row)
+    };
+  }
+
   const bestLangCount = Math.max(...eligible.map((sense) => sense.clean_lang_count));
   const bestByCoverage = eligible.filter((sense) => sense.clean_lang_count === bestLangCount);
   if (bestLangCount > maxLangs) {
@@ -160,6 +183,18 @@ function alignCandidate(candidate) {
 
   const bestConfidence = Math.max(...bestByCoverage.map((sense) => sense.confidence));
   const finalists = bestByCoverage.filter((sense) => sense.confidence === bestConfidence);
+  if (expandAmbiguousBest && finalists.length > 1) {
+    return {
+      ok: true,
+      rows: finalists.map((sense) => alignedResult(
+        candidate,
+        sense,
+        senses,
+        eligible,
+        'expanded_tied_max_clean_languages_then_confidence'
+      ).row)
+    };
+  }
   if (requireUniqueBest && finalists.length !== 1) {
     return rejectedResult('ambiguous_best_sense', candidate, senses, finalists);
   }

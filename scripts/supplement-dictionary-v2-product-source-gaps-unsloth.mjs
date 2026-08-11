@@ -2701,7 +2701,12 @@ function applyOutputs(items, stats) {
         stats.entries_inserted++;
       }
 
-      let senseId = statements.getSense.get(entryId, item.gloss_key, appliedSenseStatus)?.id;
+      // Draft candidates are already deduplicated by reviewed source-sense
+      // identity. Reusing a draft by model-generated gloss can collapse distinct
+      // senses whose concise English labels happen to be identical.
+      let senseId = publishable
+        ? statements.getSense.get(entryId, item.gloss_key, appliedSenseStatus)?.id
+        : null;
       if (senseId) {
         stats.senses_reused++;
       } else {

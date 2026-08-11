@@ -106,10 +106,14 @@ const candidates = db
   .map((candidate) => {
     const sourceEntryId = checkpointSourceBySense.get(Number(candidate.sense_id)) || null;
     const sourceGloss = sourceEntryId ? reportGlossBySource.get(sourceEntryId) : null;
+    const effectiveGlossKey =
+      sourceGloss && (!isBroadGlossKey(sourceGloss) || isBroadGlossKey(candidate.gloss_key))
+        ? sourceGloss
+        : candidate.gloss_key;
     return {
       ...candidate,
       source_entry_id: sourceEntryId,
-      effective_gloss_key: sourceGloss || candidate.gloss_key
+      effective_gloss_key: effectiveGlossKey
     };
   })
   .filter((candidate) => {

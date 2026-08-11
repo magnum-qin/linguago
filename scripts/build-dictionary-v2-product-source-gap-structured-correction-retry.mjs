@@ -86,7 +86,7 @@ function inspectCorrections(candidate, corrections) {
     if (current && normalizeTerm(current, language) === normalizeTerm(replacement, language)) {
       return { ok: false, reason: 'no_op_replacement' };
     }
-    if (/\s(?:\/|or)\s|[|;]/iu.test(replacement)) {
+    if (field !== 'definition' && /\s(?:\/|or)\s|[|;]/iu.test(replacement)) {
       return { ok: false, reason: 'ambiguous_replacement' };
     }
     if (

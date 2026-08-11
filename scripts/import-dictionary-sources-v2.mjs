@@ -157,8 +157,11 @@ async function importEcDict({ limit }) {
     source_key: 'ecdict',
     source_name: 'ECDICT',
     source_url: 'https://github.com/skywind3000/ECDICT',
-    license: 'Verify upstream license before redistribution',
-    metadata_json: JSON.stringify({ file: 'data/raw/ecdict.csv' })
+    license: 'MIT',
+    metadata_json: JSON.stringify({
+      file: 'data/raw/ecdict.csv',
+      license_url: 'https://github.com/skywind3000/ECDICT/blob/master/LICENSE'
+    })
   });
   const file = path.resolve('data/raw/ecdict.csv');
   if (!fs.existsSync(file)) return { skipped: true, reason: 'missing data/raw/ecdict.csv' };

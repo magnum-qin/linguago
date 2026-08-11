@@ -32,6 +32,7 @@ const terms = [
   { term: 'maremoto', expectedText: ['seaquake', 'IPA'] },
   { term: 'is\u00f4mero', expectedText: ['isomer', 'IPA'] },
   { term: 'eucarionte', expectedText: ['eukaryote', 'membrane-bound nucleus', 'IPA'] },
+  { term: 'comercializa\u00e7\u00e3o', expectedText: ['commercialization', 'IPA'] },
   { term: 'supersimetria', expectedText: ['supersymmetry', 'IPA'] }
 ];
 

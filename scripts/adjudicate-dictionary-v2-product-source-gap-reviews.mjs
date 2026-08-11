@@ -7,6 +7,9 @@ const args = parseArgs(process.argv.slice(2));
 const primaryPath = requiredPath(args.primary, 'primary');
 const secondaryPath = requiredPath(args.secondary, 'secondary');
 const outPath = requiredPath(args.out, 'out', false);
+const sourceReportPath = args.report ? requiredPath(args.report, 'report') : null;
+const approvedOutPath = args['approved-out'] ? requiredPath(args['approved-out'], 'approved-out', false) : null;
+if (approvedOutPath && !sourceReportPath) throw new Error('--report is required with --approved-out');
 const primary = readReviews(primaryPath);
 const secondary = new Map(readReviews(secondaryPath).map((row) => [key(row), row]));
 
@@ -44,7 +47,29 @@ const output = {
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
-console.log(JSON.stringify({ ok: true, out: relative(outPath), summary: output.summary }, null, 2));
+let approvedCount = null;
+if (approvedOutPath) {
+  const sourceReport = JSON.parse(fs.readFileSync(sourceReportPath, 'utf8'));
+  if (!Array.isArray(sourceReport.selected)) throw new Error(`Source report has no selected array: ${sourceReportPath}`);
+  const acceptedKeys = new Set(adjudicated.filter((row) => row.decision === 'consensus_accept').map(key));
+  const selected = sourceReport.selected
+    .filter((row) => acceptedKeys.has(key(row)))
+    .map((row) => ({
+      ...row,
+      dual_source_review: adjudicated.find((item) => key(item) === key(row))
+    }));
+  approvedCount = selected.length;
+  fs.mkdirSync(path.dirname(approvedOutPath), { recursive: true });
+  fs.writeFileSync(approvedOutPath, `${JSON.stringify({
+    ok: true,
+    generated_at: new Date().toISOString(),
+    source_report: relative(sourceReportPath),
+    adjudication_report: relative(outPath),
+    selected_count: selected.length,
+    selected
+  }, null, 2)}\n`, 'utf8');
+}
+console.log(JSON.stringify({ ok: true, out: relative(outPath), approved_out: approvedOutPath ? relative(approvedOutPath) : null, approved_count: approvedCount, summary: output.summary }, null, 2));
 
 function readReviews(file) {
   const report = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -65,7 +90,7 @@ function compact(row) {
 }
 
 function key(row) {
-  return `${row.source_entry_id}:${row.source_sense_id}`;
+  return `${row.source_entry_id}:${row.source_sense_id ?? row.first_sense_id}`;
 }
 
 function countBy(rows, selector) {

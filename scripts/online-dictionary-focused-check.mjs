@@ -5,9 +5,9 @@ const baseUrl = process.env.PWA_URL || 'https://translation-pwa.qhzggzh-linguago
 const outDir = path.resolve('output/online-dictionary-focused-check');
 const langs = ['zh', 'en', 'pt-BR', 'ja'];
 const expectedCounts = {
-  entries: 29912,
-  senses: 35476,
-  sense_localizations: 141904,
+  entries: 30032,
+  senses: 35596,
+  sense_localizations: 142384,
   examples: 3030,
   example_localizations: 11898
 };
@@ -46,6 +46,12 @@ const cases = [
   { id: 'pt-maremoto', term: 'maremoto', minSenses: 1, expectedTerms: ['seaquake', '\u6d77\u9707'] },
   { id: 'pt-isomero', term: 'is\u00f4mero', minSenses: 1, expectedTerms: ['isomer', '\u5f02\u6784\u4f53'] },
   { id: 'pt-eucarionte', term: 'eucarionte', minSenses: 1, expectedTerms: ['eukaryote', '\u771f\u6838\u751f\u7269'] },
+  {
+    id: 'pt-comercializacao',
+    term: 'comercializa\u00e7\u00e3o',
+    minSenses: 1,
+    expectedTerms: ['commercialization']
+  },
   {
     id: 'pt-supersimetria',
     term: 'supersimetria',

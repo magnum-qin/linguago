@@ -19,6 +19,14 @@ const loadTimeoutMs = integer(args['load-timeout-ms'], 300000, 1000);
 const maxSeqLength = integer(args['max-seq-length'], 1024, 512);
 const forceReload = args['force-reload'] === 'true';
 const resume = args.resume === 'true';
+const recheckFailed = args['recheck-failed'] === 'true';
+const excludeReviewPaths = String(args['exclude-reviews'] || '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map((value) => path.resolve(value));
+const candidateSet = String(args['candidate-set'] || 'research').trim().toLowerCase();
+if (!['research', 'selection'].includes(candidateSet)) throw new Error(`Unsupported --candidate-set: ${candidateSet}`);
 
 if (!fs.existsSync(reportPath)) throw new Error(`Report not found: ${reportPath}`);
 if (!endpoint || !model || !token) throw new Error('Required: --endpoint, --model, and UNSLOTH_API_KEY');
@@ -27,11 +35,17 @@ const source = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 if (source?.policy?.research_only !== true || source?.policy?.production_publishable !== false) {
   throw new Error('Input is not explicitly marked research-only and non-publishable');
 }
-const candidates = (source.research_candidates || []).slice(0, limit);
+const candidateRows = candidateSet === 'selection' ? source.selection_candidates : source.research_candidates;
+const excludedCandidateKeys = loadExcludedCandidateKeys(excludeReviewPaths);
+const candidates = (candidateRows || [])
+  .filter((row) => !excludedCandidateKeys.has(row.candidate_key))
+  .slice(0, limit);
 const fingerprint = sha256(JSON.stringify(candidates));
 const existing = resume && fs.existsSync(outPath) ? JSON.parse(fs.readFileSync(outPath, 'utf8')) : null;
 if (existing && existing.input_fingerprint !== fingerprint) throw new Error('Resume fingerprint mismatch');
-const reviews = Array.isArray(existing?.reviews) ? existing.reviews : [];
+const reviews = Array.isArray(existing?.reviews)
+  ? existing.reviews.filter((row) => !(recheckFailed && row?.valid !== true))
+  : [];
 const completed = new Set(reviews.map((row) => row.candidate_key));
 const prewarm = await loadModel();
 
@@ -68,17 +82,20 @@ async function reviewWithRetry(candidate) {
       }, timeoutMs);
       const content = String(response?.choices?.[0]?.message?.content || '');
       const parsed = parseJson(content);
-      validate(parsed);
+      validate(parsed, candidate);
       const suggested = parsed.suggested_zh_term == null ? null : String(parsed.suggested_zh_term).trim() || null;
+      const selected = parsed.selected_zh_term == null ? null : String(parsed.selected_zh_term).trim() || null;
       return {
         candidate_key: candidate.candidate_key,
         valid: true,
         decision: parsed.decision,
         confidence: Number(parsed.confidence),
-        approved: parsed.decision === 'accept' && Number(parsed.confidence) >= confidenceThreshold && !suggested,
+        approved: parsed.decision === 'accept' && Number(parsed.confidence) >= confidenceThreshold && !suggested &&
+          (candidateSet !== 'selection' || candidate.zh_terms.includes(selected)),
         reason: String(parsed.reason || '').trim(),
         risk_flags: Array.isArray(parsed.risk_flags) ? parsed.risk_flags.map(String) : [],
         suggested_zh_term: suggested,
+        selected_zh_term: selected,
         attempt,
         seconds: Number(((performance.now() - started) / 1000).toFixed(3)),
         usage: response?.usage || null
@@ -91,6 +108,19 @@ async function reviewWithRetry(candidate) {
 }
 
 function prompt(candidate, previousError) {
+  if (candidateSet === 'selection') {
+    return [
+      'Select the one Simplified Chinese lemma that precisely expresses the same lexical sense as the source word and exact English anchor.',
+      'You may select only from the supplied candidates. Reject when none is exact; use manual_review when the evidence is insufficient.',
+      'Require the same part of speech, scope, register, and modern ordinary meaning.',
+      `Source: ${candidate.word} (${candidate.source_lang})`,
+      `English anchor: ${candidate.english_anchor}`,
+      `Expected POS: ${candidate.expected_pos || 'unknown'}`,
+      `Chinese candidates and sememes: ${JSON.stringify(candidate.term_evidence || [])}`,
+      previousError ? `Previous response error: ${previousError}` : '',
+      'Return exactly: {"decision":"accept|reject|manual_review","confidence":0.0,"selected_zh_term":null,"reason":"","risk_flags":[],"suggested_zh_term":null}'
+    ].filter(Boolean).join('\n');
+  }
   return [
     'Judge whether the proposed Simplified Chinese lemma precisely expresses the same lexical sense as the source word and exact English anchor.',
     'Require the same part of speech, scope, register, and modern ordinary meaning.',
@@ -106,11 +136,14 @@ function prompt(candidate, previousError) {
   ].filter(Boolean).join('\n');
 }
 
-function validate(value) {
+function validate(value, candidate) {
   if (!value || !['accept', 'reject', 'manual_review'].includes(value.decision)) throw new Error('invalid_decision');
   if (!Number.isFinite(Number(value.confidence)) || Number(value.confidence) < 0 || Number(value.confidence) > 1) throw new Error('invalid_confidence');
   if (typeof value.reason !== 'string' || !value.reason.trim()) throw new Error('missing_reason');
   if (!Array.isArray(value.risk_flags)) throw new Error('invalid_risk_flags');
+  if (candidateSet === 'selection' && value.decision === 'accept' && !candidate.zh_terms.includes(String(value.selected_zh_term || '').trim())) {
+    throw new Error('selected_term_not_in_candidates');
+  }
 }
 
 async function loadModel() {
@@ -168,12 +201,25 @@ function writeReport() {
   fs.writeFileSync(outPath, JSON.stringify({
     ok: true, generated_at: new Date().toISOString(), research_only: true, production_publishable: false,
     generation_allowed: false, publication_evidence: false, source_report: path.relative(process.cwd(), reportPath),
-    input_fingerprint: fingerprint, reviewer, endpoint, model, gguf_variant: variant || null,
+    input_fingerprint: fingerprint, candidate_set: candidateSet, reviewer, endpoint, model, gguf_variant: variant || null,
+    excluded_review_reports: excludeReviewPaths.map((file) => path.relative(process.cwd(), file)),
+    excluded_candidate_count: excludedCandidateKeys.size,
     confidence_threshold: confidenceThreshold, prewarm, summary: summarize(), reviews
   }, null, 2), 'utf8');
 }
 
 function sha256(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
+function loadExcludedCandidateKeys(files) {
+  const keys = new Set();
+  for (const file of files) {
+    if (!fs.existsSync(file)) throw new Error(`Exclude review not found: ${file}`);
+    const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+    for (const row of [...(report.reviews || []), ...(report.decisions || [])]) {
+      if (row?.candidate_key) keys.add(String(row.candidate_key));
+    }
+  }
+  return keys;
+}
 function parseArgs(argv) { const out = {}; for (let i = 0; i < argv.length; i++) { if (!argv[i].startsWith('--')) continue; const key = argv[i].slice(2); const next = argv[i + 1]; if (next && !next.startsWith('--')) { out[key] = next; i++; } else out[key] = true; } return out; }
 function integer(value, fallback, min) { const n = Number(value ?? fallback); if (!Number.isInteger(n) || n < min) throw new Error(`Invalid integer: ${value}`); return n; }
 function number(value, fallback, min, max) { const n = Number(value ?? fallback); if (!Number.isFinite(n) || n < min || n > max) throw new Error(`Invalid number: ${value}`); return n; }

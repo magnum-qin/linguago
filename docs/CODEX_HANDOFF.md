@@ -1,5 +1,46 @@
 # Codex Handoff
 
+## 2026-08-10 v90 isolated 500-row scale gate
+
+- The fixed 500-candidate cohort completed real chunked draft writes in
+  `.tmp/validation/linguago-v90-scale500.db`. Checkpoint resume finished with
+  `482/500` valid drafts (`96.4%`), zero endpoint failures, ten committed
+  50-row chunks, 482 unique product senses, 1,928 localizations, and 482 source
+  links. The production DB, D1, and Worker were not changed.
+- Deterministic reverse evidence supported all 482 valid generations in all
+  four languages. Initial independent Gemma 4 31B consensus accepted 349,
+  rejected 132, and failed to parse one response.
+- Structured correction selected 116 safe field replacements. Qwen regenerated
+  98 valid rows; 88 retained strict reverse evidence; Gemma accepted 64. Six of
+  those still carried source-review risk flags, so controlled replay wrote only
+  58 corrected drafts. The final strict promote cohort was therefore
+  `349 + 58 = 407/500` (`81.4%`).
+- `promote-dictionary-v2-product-source-gap-drafts.mjs` previously replaced a
+  narrow draft `gloss_key` such as `excerpt` with a broad multilingual hint
+  list from the source-review report. This caused 101 false
+  `broad_gloss_key` rejects. It now retains the narrow draft gloss whenever the
+  report gloss is broad; genuinely broad draft glosses remain blocked.
+- Both promote dry-runs and applies accepted all 407 strict rows. The isolated
+  publishable count rose from 35,476 to 35,883. Fast audit and published-risk
+  passed with `flagged_senses=0`, no review localization leakage, no duplicate
+  sense order, no orphan, no mojibake, and no HTML artifact.
+- Native D1 export plus in-memory import passed at 30,317 entries, 35,883
+  senses, and 143,532 sense localizations. Export output is
+  `outputs/d1-v2-product-native-export-v90-scale500-validation`; it is a local
+  validation artifact and must not be deployed.
+- The 2,000-row pressure gate is now blocked by source-qualified candidate
+  supply, not model or checkpoint reliability. Re-aligning all 4,930 clean
+  rows produced 3,095 unique candidates, but the unchanged two-independent-
+  source-family/all-target gate retained only 646.
+- An unseen OpenHowNet probe found 655 exact POS-bound rows. Dual Qwen/Gemma
+  review of the 291 single-term rows accepted 202 intersections and exported
+  188 MIT-backed lexical evidence rows. Re-running strict prefilter still
+  retained 646 rows: these additions strengthen Chinese target terms but do
+  not provide a second independent source family for the pt-BR/ja source term.
+  Do not count reviewer agreement as source evidence and do not relax the
+  two-family source gate. The next useful work is additional source-language
+  sense evidence or safer WikDict/FreeDict/JMdict source-sense rebinding.
+
 ## 2026-08-08 v90 full-rank expansion qualification
 
 - Expanded the read-only coverage scan from the first 100,000 gaps to all
@@ -2902,3 +2943,234 @@ Worker were not changed.
   and `eucarionte` used the dictionary provider and had no horizontal overflow.
 - The focused online check now pins the v90 counts and includes the three new
   Portuguese entries so a later release cannot silently lose them.
+
+### v90 large-scale gate: reviewed OpenHowNet expansion
+
+- Two aligned coverage reports contained 540 and 421 rows but only 75 overlaps,
+  for 886 unique candidate senses. The OpenHowNet probe now accepts multiple
+  reports, deduplicates by `source_entry_id:first_sense_id`, and can exclude an
+  earlier probe so model review is not repeated.
+- A new isolated OpenHowNet review pass found 86 exact POS-bound rows. Qwen and
+  Gemma independently agreed on 38/57 unique-term rows and 20/29 finite-choice
+  rows. The 58 accepted candidates exported to 59 MIT-provenance evidence rows;
+  the combined evidence DB now has 131 OpenHowNet rows and passes SQLite
+  integrity checking. All subsets still use one `openhownet` source family.
+- Strict reverse prefiltering of the 886-row union selected 180 rows using two
+  independent source families, three target languages, and two-family existing
+  localization round trips. Source review accepted 64/100 in the older slice
+  and 61/80 in the unseen slice. Network failures were zero. The low raw rate is
+  caused by real homograph, POS, and broad/narrow mismatches, so source review is
+  now an explicit candidate-selection stage rather than a reason to weaken the
+  evidence gate.
+- The merged 125 source-reviewed candidates supplied a fixed 100-row generation
+  gate. Qwen produced 98 structurally valid entries, with zero endpoint failures;
+  deterministic reverse evidence supported all 98 valid rows in all four
+  languages. Initial Gemma no-correction consensus accepted 57. Safe structured
+  correction cycles added 19, then 3, then 2 unique accepts, reaching 81/100.
+  This passes the required 80% final promote-quality gate without writing drafts.
+- Two validator lessons are now encoded in scripts. Retry prompts must never
+  include raw parser errors because models may judge that text as lexical input.
+  Also, semicolons are ambiguous in a term/reading replacement but valid inside
+  a complete definition; the structured-correction validator now distinguishes
+  those fields.
+- The generation and publication mechanics are therefore validated for scale,
+  but the current strict candidate pool is not large enough for the planned
+  500-row write/resume gate. Do not claim 5,000-row production readiness until
+  at least 500 source-reviewed candidates exist and that real draft checkpoint,
+  resume, promote, and audit run is completed. Production remains v90 and no
+  database writes or deployments were made by this gate.
+## 2026-08-10 all-eligible scale-pool checkpoint
+
+- The source-sense aligner now supports `--expand-all-eligible true`. It
+  produced 24,898 unique senses and 3,527 rows after the current strict reverse
+  evidence gate.
+- A fresh entry-unique 100-row source review reached Qwen 55/100, Gemma 56/100,
+  and dual acceptance 44/100. This is not ready for generation. Semantic/POS
+  drift, not endpoint capacity, is the blocker; no product DB, D1, or Worker
+  write occurred.
+- The Dicionario Aberto definition probe can restrict work with
+  `--validation-report` and `--validation-decisions`. A manual-review-only
+  100-row dual-model pilot yielded 75 reviewed definitions but zero net strict
+  candidates because Dicionario Aberto alone did not provide the required
+  second independent source family. Do not run the remaining 259 rows under
+  the same evidence configuration.
+
+## 2026-08-11 v90 isolated 2,000-row scale qualification
+
+The final v3 pressure cohort passed the large-batch quality gate in an isolated
+database. Production v90, remote D1, and the Worker were not modified.
+
+- The manifest contains exactly 2,000 semantic groups. Candidate deduplication
+  must use candidate/sense identity, not only `source_entry_id`; entry-only
+  merging previously discarded distinct senses.
+- Qwen generated all 2,000 checkpoint items across ports 11444, 11447, and
+  11448: 1,898 were structurally accepted, 102 rejected, and infrastructure
+  failures were zero. The checkpoint audit found 1,898 unique draft senses,
+  7,592 localizations, zero duplicate senses, and zero bad localization counts.
+- Deterministic reverse evidence supported 1,868 rows. Initial independent
+  Gemma consensus accepted 1,376 unchanged. One bounded correction cycle added
+  243 rows after fresh generation, reverse evidence, and no-correction Gemma
+  acceptance.
+- The final controlled cohort promoted 1,619/2,000 senses (80.95%). Promotion
+  used an exact checkpoint assembled from 1,376 base writes and 243 correction
+  replay writes; dry-run scanned and accepted all 1,619 before apply.
+- Fast audit and published-risk passed. The isolated database has 37,095
+  publishable senses, exactly 1,619 above v90, with `flagged_senses=0` and all
+  structural/content blockers at zero.
+- Native export produced 30,929 entries, 37,095 senses, 148,380 sense
+  localizations, 3,030 examples, and 11,898 example localizations in 19 chunks.
+  Full in-memory import matched the manifest exactly; duplicate orders,
+  orphans, mojibake, HTML artifacts, and bad localization counts were all zero.
+
+The frozen scale path is: source review, candidate-key deduplication,
+checkpointed draft generation, deterministic reverse evidence, independent
+no-correction consensus, bounded correction with fresh review, exact checkpoint
+promotion, fast/published-risk audits, then native export and full import audit.
+A risk flag may pass only when review explicitly resolves an alternative,
+polysemy, or register distinction. Unresolved scope, POS, homograph, and
+preferred-term conflicts remain blocked.
+
+Operational lessons:
+
+- Reconstruct the complete generation report from checkpoint writes after a
+  resumed/chunked run; the final process report may cover only one segment.
+- Merge reports by candidate identity so multiple senses under one entry remain.
+- Draft apply reports store successful rows in `writes[]`, including reused
+  drafts; promotion checkpoint builders must consume them.
+- Inspect command lines before stopping stale Node clients. Never terminate all
+  Node processes because unrelated work can share the executable.
+- Preferred-term failures are normally evidence-contract failures, not token
+  truncation; extra output tokens do not justify relaxing term alignment.
+
+Authoritative artifacts are local under
+`.tmp/validation/linguago-v90-pressure2000-v3.db` and
+`.tmp/validation/v90-pressure2000-v3-export`. They remain untracked. This gate
+proves that the pipeline mechanics can scale, but it is not a production
+release and does not by itself prove that 5,000 fresh high-quality candidates
+exist.
+
+### 2026-08-11 5,000-row candidate-capacity check
+
+- The strict prefilter contains only 3,527 candidates. Of these, 3,025 had
+  already entered source review and the validated v3 manifest consumed 2,000
+  approved semantic groups. There is not a fresh 5,000-row strict pool.
+- Expanding to the broader 24,898-sense aligned report leaves 21,873 unreviewed
+  senses and 9,998 unique entries, but those rows have not passed the strict
+  independent-evidence prefilter.
+- A first broad-pool run used an incompatible micro/evidence-bound prompt and
+  was stopped after 271 reviews with zero approvals. A corrected compact-prompt,
+  entry-balanced 20-row gate also produced zero approvals: nine valid semantic
+  rejects and eleven evidence-bound preferred-term failures.
+- Therefore do not launch a 5,000-row generation from the broad pool. The
+  infrastructure is scale-qualified; candidate supply is not. Acquire or align
+  more independent lexical evidence, rebuild the strict prefilter, and require a
+  fresh source-review gate before attempting 5,000 drafts.
+
+### 2026-08-11 ECDICT and Japanese WordNet evidence expansion
+
+- Recomputing the old evidence pool with the current prefilter code produced
+  `3,016` strict candidates. Use this number as the A/B baseline; the older
+  `3,527` report came from earlier prefilter behavior and is not directly
+  comparable.
+- The official ECDICT repository is MIT licensed. The checked-in CSV is UTF-8,
+  although Windows PowerShell `Get-Content` may display it as mojibake. Verify
+  bytes with Node `TextDecoder('utf-8')` before treating the file as corrupt.
+- `export-ecdict-chinese-evidence.mjs` binds exact, minimum-two-character
+  Chinese terms from ECDICT's translation field to the English anchors in the
+  OpenHowNet deficit probe. OpenHowNet is candidate discovery only; exported
+  evidence is attributed solely to ECDICT.
+- ECDICT added `239` lexical evidence rows and raised the same-code strict pool
+  from `3,016` to `3,098`. Adding the candidate-bound, bidirectionally unique
+  Japanese WordNet subset raised it to `3,105`, a total net gain of `89` with
+  no relaxed quality gate.
+- A fresh 20-row OpenHowNet dual-model diagnostic was structurally clean:
+  Qwen approved `5/20`, Gemma approved `11/20`, and strict consensus accepted
+  `5/20`. The downloaded OpenHowNet archive still lacks a separately verified
+  data license, so these reviews remain diagnostic and must not be exported as
+  production evidence.
+- The reproducible expanded artifacts are
+  `.tmp/combined/v90-production5000-ecdict-zh-japanese-wordnet-biunique-evidence.db`,
+  `logs/product-coverage-gaps-v90-production5000-expanded-strict-prefilter.json`,
+  and its matching `-evidence.json` report. The pool is still `1,895` short of
+  5,000, so production generation remains blocked on evidence supply rather
+  than GPU capacity.
+
+### 2026-08-11 full ECDICT Chinese extraction gate
+
+- `export-ecdict-chinese-evidence.mjs --validation-report` now extracts
+  conservative 2-12 character Chinese segments for every English anchor in the
+  current validation report. It removes POS and domain labels, but extracted
+  terms still require the unchanged reverse-dictionary and independent-family
+  checks before selection.
+- The full scan covered `19,684` distinct anchors, matched `10,215` candidates,
+  and exported `19,720` ECDICT evidence rows. Combining it with the safe
+  Japanese WordNet subset raised the current-code strict pool from `3,016` to
+  `3,420`, a net gain of `404` candidates (`215` entry-unique).
+- An unfiltered entry-unique 20-row review reached only `14/20` dual consensus.
+  Real ambiguous cases included `abstenção`, `harmônico`, and `rotatividade`.
+  Do not review or generate from the unfiltered 404-row delta.
+- The reusable low-risk filter requires the zh generation hint to include the
+  `ecdict` family and requires exactly one bound English term and one bound
+  Chinese term. It retains `165` entry-unique candidates.
+- Compact whole-object prompts produced malformed or evidence-incomplete JSON.
+  The optional OpenAI-compatible `response_format=json_object` did not fix the
+  problem and caused one 120-second timeout on this Unsloth backend. Keep it
+  disabled by default.
+- `nano-per-language` produced valid JSON for `20/20` Qwen and `20/20` Gemma
+  reviews. Qwen approved `20/20`, Gemma approved `19/20`, and strict dual-model
+  consensus accepted `19/20` (95%). This clears the bounded source-review gate
+  for the remaining low-risk ECDICT subset, not for the full 404-row delta.
+- Key reports are
+  `logs/product-coverage-gaps-v90-production5000-ecdict-extracted-low-risk-entry-unique.json`
+  and `logs/product-source-gap-v90-production5000-ecdict-low-risk20-consensus.json`.
+  No draft, product DB, D1, or Worker write occurred.
+
+### 2026-08-11 ECDICT low-risk generation and isolated promotion
+
+- Reviewing the remaining low-risk cohort produced `144/165` strict Qwen/Gemma
+  source-review accepts. Qwen generation wrote `135/144` valid drafts to the
+  isolated `.tmp/validation/linguago-v90-ecdict144.db`; production v90 was not
+  modified.
+- Deterministic reverse evidence supported `132/135` valid drafts. Independent
+  Gemma no-correction review accepted `120/132`, rejected 5, and left 7 as
+  manual residual because their responses omitted decision/confidence fields.
+- Do not use `nano` with 20-character definition snippets: Gemma correctly
+  rejects them as truncated. The reviewer now sends up to 220 characters plus
+  term and pronunciation, and normalizes both compact and full A/R/M decision
+  forms.
+- On the 155 llama.cpp backend, concurrency 2 can leave requests queued after
+  the client stops. Use concurrency 1. If this happens, POST `/v1/unload`, wait
+  for an empty status, reload the exact model/variant, and resume the report.
+- Promotion dry-run and apply selected exactly 120 rows. The isolated fast
+  audit passed with `publishable_senses=35596`; published-risk remained
+  `flagged_senses=0`, and localization counts, sense order, orphan, mojibake,
+  and HTML checks were all zero.
+- Primary reports end in `dual-approved144-generation-full.json`,
+  `dual-approved144-reverse-evidence.json`, `final-gemma-v2.json`, and
+  `dual-approved144-promote-apply.json`. This is an isolated qualification,
+  not a D1 or Worker release.
+
+### 2026-08-11 v91 ECDICT 120 production release
+
+- The 135 validated generation outputs were deterministically replayed into the
+  main product DB as drafts. Reverse evidence plus final Gemma consensus then
+  promoted exactly 120; 15 remain non-publishable residuals.
+- The pre-write DB backup is
+  `backups/linguago-v90-before-ecdict120-promote-20260811-170001.db`, SHA-256
+  `6C40303FAEA55A3CBE00CD45430A314B3EADB813093149B1C28593F099EEAA77`.
+- The v91 native package is
+  `outputs/d1-v2-product-native-export-v91-ecdict120`. Full memory import and
+  remote count verification passed at `entries=30032`, `senses=35596`,
+  `sense_localizations=142384`, `examples=3030`, and
+  `example_localizations=11898`. D1 `published_at` is
+  `2026-08-11T08:02:52.212Z`.
+- Wrangler remote export failed with OAuth error 10000. The exact current v90
+  rollback package `outputs/d1-v2-product-native-export-v90-openhownet-main`
+  was therefore re-audited against the pre-release online counts and passed a
+  full memory import. Its manifest SHA-256 is
+  `A53DFF2018A962149076253F893DF4EB5F332CFFE63919EA934B89BFF0310FEA`.
+- Worker cache is `v91-ecdict120-30032`; deployed Worker Version ID is
+  `999818a7-cd16-464c-8b7a-e8048f439b28`.
+- Complete online regression, focused API, and mobile/desktop Edge rendering
+  passed. `comercialização` resolves through D1 with four-language data and
+  IPA, and no tested viewport has horizontal overflow.

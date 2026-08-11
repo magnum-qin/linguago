@@ -13,10 +13,13 @@ const gemmaMap = new Map(gemma.reviews.map((row) => [row.candidate_key, row]));
 const keys = [...new Set([...qwenMap.keys(), ...gemmaMap.keys()])].sort();
 const decisions = keys.map((candidateKey) => {
   const a = qwenMap.get(candidateKey); const b = gemmaMap.get(candidateKey);
-  const accept = [a, b].every((row) => row?.valid && row.decision === 'accept' && row.confidence >= threshold && !row.suggested_zh_term);
+  const selectedTerms = [a?.selected_zh_term, b?.selected_zh_term].filter(Boolean);
+  const sameSelectedTerm = selectedTerms.length === 0 || (selectedTerms.length === 2 && selectedTerms[0] === selectedTerms[1]);
+  const accept = sameSelectedTerm && [a, b].every((row) => row?.valid && row.decision === 'accept' && row.confidence >= threshold && !row.suggested_zh_term);
   const disagreement = Boolean(a && b && a.decision !== b.decision);
   return {
     candidate_key: candidateKey,
+    selected_zh_term: accept && selectedTerms.length === 2 ? selectedTerms[0] : null,
     status: accept ? 'license_blocked_dual_model_accept' : disagreement ? 'license_blocked_model_disagreement' : 'license_blocked_manual_review',
     consensus_accept: accept, generation_allowed: false, publication_evidence: false,
     qwen: pick(a), gemma: pick(b)
@@ -42,5 +45,5 @@ function readResearchReport(file) {
   if (report.research_only !== true || report.production_publishable !== false) throw new Error(`Unsafe review metadata: ${file}`);
   return report;
 }
-function pick(row) { return row ? { valid: row.valid, decision: row.decision, confidence: row.confidence, approved: row.approved, reason: row.reason || row.error || '', risk_flags: row.risk_flags || [], suggested_zh_term: row.suggested_zh_term || null } : null; }
+function pick(row) { return row ? { valid: row.valid, decision: row.decision, confidence: row.confidence, approved: row.approved, reason: row.reason || row.error || '', risk_flags: row.risk_flags || [], suggested_zh_term: row.suggested_zh_term || null, selected_zh_term: row.selected_zh_term || null } : null; }
 function parseArgs(argv) { const out = {}; for (let i = 0; i < argv.length; i++) { if (!argv[i].startsWith('--')) continue; const key = argv[i].slice(2); const next = argv[i + 1]; if (next && !next.startsWith('--')) { out[key] = next; i++; } else out[key] = true; } return out; }

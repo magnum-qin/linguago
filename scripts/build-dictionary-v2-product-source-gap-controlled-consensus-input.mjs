@@ -13,6 +13,7 @@ const consensusModelFamily = String(args['consensus-model-family'] || 'gemma').t
 const allowUnhintedSuggestions = args['allow-unhinted-suggestions'] === 'true'
 const allowJaNoDerivation = args['allow-ja-no-derivation'] === 'true'
 const bindEvidenceValidatedSuggestions = args['bind-evidence-validated-suggestions'] === 'true'
+const allowResolvedRiskFlags = args['allow-resolved-risk-flags'] === 'true'
 const minTargetHintFamilies = boundedInteger(args['min-target-hint-families'], 0, 0)
 const excludedSourceEntryIds = new Set(
   String(args['exclude-source-entry-ids'] || '')
@@ -71,6 +72,7 @@ const output = {
     allow_ja_no_derivation: allowJaNoDerivation,
     minimum_target_hint_families: minTargetHintFamilies,
     bind_evidence_validated_suggestions: bindEvidenceValidatedSuggestions,
+    allow_resolved_risk_flags: allowResolvedRiskFlags,
     excluded_source_entry_ids: [...excludedSourceEntryIds].sort((a, b) => a - b),
     generation_model_family: generationModelFamily,
     consensus_model_family: consensusModelFamily,
@@ -112,7 +114,10 @@ function inspect(row) {
   const review = row?.candidate_evidence_review
   if (review?.decision !== 'accept') return reject('source_review_not_accepted')
   if (Number(review.confidence) < confidenceThreshold) return reject('source_review_confidence_below_threshold')
-  if ((review.risk_flags || []).length) return reject('source_review_has_risk_flags')
+  const riskFlags = Array.isArray(review.risk_flags) ? review.risk_flags : []
+  if (riskFlags.length && !(allowResolvedRiskFlags && riskFlags.every(isResolvedRiskFlag))) {
+    return reject('source_review_has_risk_flags')
+  }
   if (!row?.sense_alignment || row.sense_alignment.status !== 'aligned') return reject('sense_not_aligned')
   if (!Number.isInteger(Number(row.first_sense_id))) return reject('missing_source_sense_id')
   if (evidenceValidatedKeys && !evidenceValidatedKeys.has(candidateKey(row))) {
@@ -166,6 +171,15 @@ function inspect(row) {
   }
 
   return acceptedRow(row)
+}
+
+function isResolvedRiskFlag(value) {
+  const flag = String(value || '').trim()
+  if (!flag) return false
+  const resolved = /(excluded|ignored|corrected|rejected in favor|but (?:the )?(?:selected|preferred|primary|precise|correct)|also (?:present|listed).*(?:correct|align)|provided as an alternative.*specific|in context.*(?:correct|unambiguous)|context (?:implies|disambiguates)|given the (?:explicit )?(?:gloss|anchor|context)|specific gloss|can also mean|polysem|ambiguous|secondary meaning|associated with.*but|context.*acceptable|context.*accepted)/iu
+  const registerOnly = /\b(colloquial|archaic|loanword origin|katakana loan|spelling variant|outdated terminology)\b/iu
+  const unresolved = /not strict|wrong|mismatch|broader than|narrower than|hypernym|subset|different sense|implies .* rather|usually means .*not|slightly narrower|wrong part|noun, source|noun form for verb|specific to .* while|female-specific|singular|plural/iu
+  return (resolved.test(flag) || registerOnly.test(flag)) && !unresolved.test(flag)
 }
 
 function acceptedRow(row) {

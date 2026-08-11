@@ -10,18 +10,47 @@ const reportPaths = String(required(args.reports, 'reports'))
   .map((value) => requiredPath(value.trim()));
 const evidenceDbPath = requiredPath(args['evidence-db']);
 const outPath = path.resolve(args.out || 'logs/product-source-gap-openhownet-research-probe.json');
+const scope = String(args.scope || 'deficits').trim().toLowerCase();
+if (!['deficits', 'all'].includes(scope)) throw new Error(`Unsupported --scope: ${scope}`);
+const excludeProbePaths = String(args['exclude-probes'] || args['exclude-probe'] || '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map(requiredPath);
+const excludedCandidateKeys = new Set(
+  excludeProbePaths.flatMap((probePath) =>
+    (JSON.parse(fs.readFileSync(probePath, 'utf8')).probes || []).map(candidateKey)
+  )
+);
 
-const validations = reportPaths.flatMap((reportPath) => {
+const reportRowsByKey = new Map();
+for (const reportPath of reportPaths) {
   const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-  return (report.validations || []).map((row) => ({
-    ...row,
-    diagnostic_source_report: relative(reportPath)
-  }));
-});
-const targets = validations.filter((row) =>
+  const rows = Array.isArray(report.validations)
+    ? report.validations
+    : Array.isArray(report.selected)
+      ? report.selected
+      : [];
+  for (const row of rows) {
+    const key = candidateKey(row);
+    if (!key || excludedCandidateKeys.has(key)) continue;
+    const existing = reportRowsByKey.get(key);
+    if (existing) {
+      existing.diagnostic_source_reports.push(relative(reportPath));
+      continue;
+    }
+    reportRowsByKey.set(key, {
+      ...row,
+      candidate_key: key,
+      diagnostic_source_reports: [relative(reportPath)]
+    });
+  }
+}
+const reportRows = [...reportRowsByKey.values()];
+const targets = reportRows.filter((row) => scope === 'all' || (
   row.reason === 'insufficient_independent_target_evidence' &&
   (row.generation_hints?.zh?.evidence_families || []).length < 2
-);
+));
 
 const db = new Database(evidenceDbPath, { readonly: true, fileMustExist: true });
 db.pragma('query_only = ON');
@@ -43,7 +72,7 @@ const findExact = db.prepare(`
 `);
 
 const probes = targets.map((row) => {
-  const anchor = String(row.evidence?.anchor || row.source_meaning_anchor || '').trim();
+  const anchor = englishAnchor(row);
   const matches = findExact.all(normalize(anchor));
   const expectedPos = inferExpectedPos(row);
   const boundMatches = matches.map((match) => ({
@@ -57,7 +86,7 @@ const probes = targets.map((row) => {
     match.pos_binding === 'exact' || match.pos_binding === 'internal_consistent'
   );
   return {
-    candidate_key: row.candidate_key,
+    candidate_key: row.candidate_key || `${row.source_entry_id}:${row.first_sense_id}`,
     word: row.word,
     source_lang: row.source_lang,
     english_anchor: anchor,
@@ -97,12 +126,33 @@ const researchCandidates = probes
     generation_allowed: false,
     publication_evidence: false
   }));
+const selectionCandidates = probes
+  .filter((row) => row.sense_binding === 'exact_pos_multiple_terms')
+  .map((row) => ({
+    candidate_key: row.candidate_key,
+    word: row.word,
+    source_lang: row.source_lang,
+    english_anchor: row.english_anchor,
+    expected_pos: row.expected_pos,
+    zh_terms: row.exact_pos_terms,
+    term_evidence: row.exact_pos_terms.map((term) => ({
+      term,
+      sememe_definitions: unique(row.concepts
+        .filter((concept) => concept.pos_binding === 'exact' && concept.term === term)
+        .map((concept) => concept.sememe_definition))
+    })),
+    status: 'license_blocked_term_selection_review',
+    generation_allowed: false,
+    publication_evidence: false
+  }));
 const output = {
   ok: true,
   generated_at: new Date().toISOString(),
   policy: {
+    scope,
     research_only: true,
-    production_publishable: metadata.production_publishable === true,
+    production_publishable: false,
+    source_provenance_publishable: metadata.production_publishable === true,
     exact_english_anchor_only: true,
     publication_evidence: false,
     generation_allowed: false,
@@ -115,6 +165,7 @@ const output = {
     metadata
   },
   source_reports: reportPaths.map(relative),
+  excluded_probes: excludeProbePaths.map(relative),
   evidence_db: relative(evidenceDbPath),
   summary: {
     target_rows: probes.length,
@@ -130,6 +181,7 @@ const output = {
     unmatched: probes.filter((row) => !row.exact_match).length
   },
   research_candidates: researchCandidates,
+  selection_candidates: selectionCandidates,
   probes
 };
 
@@ -149,6 +201,13 @@ function inferExpectedPos(row) {
     .map((suffix) => ({ n: 'noun', v: 'verb', a: 'adjective', r: 'adverb' })[suffix])
     .filter(Boolean));
   return inferred.length === 1 ? inferred[0] : null;
+}
+
+function englishAnchor(row) {
+  const explicit = String(row.evidence?.anchor || row.source_meaning_anchor || '').trim();
+  if (explicit) return explicit;
+  const english = (row.first_sense_localizations || []).find((localization) => localization?.lang === 'en');
+  return String(english?.term || english?.definition || '').trim();
 }
 
 function normalizePos(value) {
@@ -171,6 +230,10 @@ function classifyPosBinding(expected, enPos, zhPos) {
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))].sort();
+}
+
+function candidateKey(row) {
+  return String(row?.candidate_key || `${row?.source_entry_id || ''}:${row?.first_sense_id || ''}`).trim();
 }
 
 function safeJson(value) {

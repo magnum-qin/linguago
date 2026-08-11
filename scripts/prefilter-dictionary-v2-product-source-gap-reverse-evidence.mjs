@@ -33,7 +33,10 @@ const supplementalSourceDbPath = supplementalSourceDbArg.toLowerCase() === "none
     : fs.existsSync(defaultSupplementalSourceDbPath)
       ? defaultSupplementalSourceDbPath
       : null;
-const reportPath = path.resolve(args.report || DEFAULT_REPORT);
+const reportPaths = String(args.report || DEFAULT_REPORT)
+  .split(",")
+  .map((value) => path.resolve(value.trim()));
+const reportPath = reportPaths[0];
 const outPath = path.resolve(args.out || defaultOutPath(reportPath));
 const evidenceOutPath = path.resolve(args["evidence-out"] || defaultEvidenceOutPath(outPath));
 const limit = boundedInteger(args.limit, 50, 1);
@@ -45,6 +48,11 @@ const requireOmwTargetLangs = boundedInteger(args["require-omw-target-langs"], 0
 const requirePtPronunciation = args["require-pt-pronunciation"] === "true";
 const requireJmdictHint = args["require-jmdict-hint"] === "true";
 const requireAllTargetIndependentEvidence = args["require-all-target-independent-evidence"] === "true";
+const minIndependentTargetFamilies = boundedInteger(
+  args["min-independent-target-families"],
+  2,
+  1
+);
 const requireExistingLocalizationRoundtrip =
   args["require-existing-localization-roundtrip"] === "true";
 const minExistingLocalizationRoundtripFamilies = boundedInteger(
@@ -70,7 +78,7 @@ const excludeAmbiguousOmw = args["exclude-ambiguous-omw"] !== "false";
 for (const filePath of [
   sourceDbPath,
   ...(supplementalSourceDbPath ? [supplementalSourceDbPath] : []),
-  reportPath
+  ...reportPaths
 ]) {
   if (!fs.existsSync(filePath)) throw new Error(`Required file not found: ${filePath}`);
 }
@@ -78,8 +86,16 @@ if (requirePtPronunciation && !fs.existsSync(ptPronunciationDbPath)) {
   throw new Error(`Portuguese pronunciation DB not found: ${ptPronunciationDbPath}`);
 }
 
-const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-const candidates = Array.isArray(report.selected) ? report.selected : [];
+const reports = reportPaths.map((filePath) => JSON.parse(fs.readFileSync(filePath, "utf8")));
+const report = reports[0];
+const inputCandidatesByKey = new Map();
+for (const sourceReport of reports) {
+  for (const row of Array.isArray(sourceReport.selected) ? sourceReport.selected : []) {
+    const key = String(row.candidate_key || `${row.source_entry_id || ''}:${row.first_sense_id || ''}`);
+    if (!inputCandidatesByKey.has(key)) inputCandidatesByKey.set(key, row);
+  }
+}
+const candidates = [...inputCandidatesByKey.values()];
 const db = new Database(sourceDbPath, { readonly: true, fileMustExist: true });
 db.pragma("query_only = ON");
 const supplementalDb = supplementalSourceDbPath
@@ -202,9 +218,9 @@ const output = {
   ...report,
   ok: true,
   generated_at: new Date().toISOString(),
-  source_report: path.relative(process.cwd(), reportPath),
+  source_report: reportPaths.map((filePath) => path.relative(process.cwd(), filePath)),
   reverse_evidence_report: path.relative(process.cwd(), evidenceOutPath),
-  summary: { ...(report.summary || {}), reverse_evidence_prefilter: summary },
+  summary: { input_reports: reportPaths.length, reverse_evidence_prefilter: summary },
   selected_count: selected.length,
   selected
 };
@@ -215,7 +231,7 @@ const evidenceOutput = {
   supplemental_source_db: supplementalSourceDbPath
     ? path.relative(process.cwd(), supplementalSourceDbPath)
     : null,
-  source_report: path.relative(process.cwd(), reportPath),
+  source_report: reportPaths.map((filePath) => path.relative(process.cwd(), filePath)),
   policy: {
     omw_only_auto_pass: false,
     minimum_matching_sources: minSources,
@@ -226,6 +242,7 @@ const evidenceOutput = {
     require_pt_pronunciation: requirePtPronunciation,
     require_jmdict_hint: requireJmdictHint,
     require_all_target_independent_evidence: requireAllTargetIndependentEvidence,
+    minimum_independent_target_families: minIndependentTargetFamilies,
     require_existing_localization_roundtrip: requireExistingLocalizationRoundtrip,
     minimum_existing_localization_roundtrip_families: minExistingLocalizationRoundtripFamilies,
     strong_supplemental_families: [...strongSupplementalFamilies].sort(),
@@ -260,10 +277,11 @@ function validateCandidate(row) {
   }
 
   const rows = lookupVariants(sourceLang, sourceTerm).flatMap((term) => findSenses.all(normalizeTerm(term), sourceLang));
-  const evidence = [
-    ...rows.flatMap((sourceRow) => extractEvidence(sourceRow, sourceLang, anchor)),
-    ...supplementalEvidenceForTerm(sourceLang, sourceTerm, anchor)
-  ];
+  const dictionaryEvidence = rows.flatMap((sourceRow) =>
+    extractEvidence(sourceRow, sourceLang, anchor)
+  );
+  const supplementalEvidence = supplementalEvidenceForTerm(sourceLang, sourceTerm, anchor);
+  const evidence = [...dictionaryEvidence, ...supplementalEvidence];
   const strong = evidence.filter((item) => item.strength === "strong");
   const matches = strong.filter((item) => item.matches_anchor);
   const matchingSources = new Set(matches.map((item) => item.source));
@@ -277,8 +295,17 @@ function validateCandidate(row) {
     matchingSources.add("omw-30");
     matchingSourceFamilies.add("omw");
   }
-  const glosses = new Set(strong.map((item) => normalizeText(item.english_gloss)).filter(Boolean));
-  const matchingGlosses = new Set(matches.map((item) => normalizeText(item.english_gloss)).filter(Boolean));
+  // Supplemental concept sources are additive evidence. Their unrelated senses
+  // must not make a candidate that already passed dictionary ambiguity checks
+  // fail merely because another evidence DB was attached.
+  const dictionaryStrong = dictionaryEvidence.filter((item) => item.strength === "strong");
+  const dictionaryMatches = dictionaryStrong.filter((item) => item.matches_anchor);
+  const glosses = new Set(
+    dictionaryStrong.map((item) => normalizeText(item.english_gloss)).filter(Boolean)
+  );
+  const matchingGlosses = new Set(
+    dictionaryMatches.map((item) => normalizeText(item.english_gloss)).filter(Boolean)
+  );
   const matchRatio = glosses.size ? matchingGlosses.size / glosses.size : 0;
   const details = {
     anchor,
@@ -319,7 +346,7 @@ function validateCandidate(row) {
       lang !== sourceLang &&
       lang !== "en" &&
       Array.isArray(value?.evidence_families) &&
-      value.evidence_families.length >= 2
+      value.evidence_families.length >= minIndependentTargetFamilies
     ).length;
     const requiredIndependentTargets = ["pt-BR", "zh", "ja"].filter(
       (lang) => lang !== sourceLang

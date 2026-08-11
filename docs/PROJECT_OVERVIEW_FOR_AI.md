@@ -811,3 +811,13 @@ two OMW target languages produces 183 candidates, all English-source, with 163
 fresh. Do not use that English-only pool to claim the balanced four-language
 gate has passed; non-English lanes need another independent reverse source or
 better deterministic target alignment.
+
+## Current production baseline (2026-08-11)
+
+Production is v91 ECDICT 120: 30,032 entries, 35,596 senses, 142,384 sense
+localizations, 3,030 examples, and 11,898 example localizations. Worker cache
+is `v91-ecdict120-30032`; Worker Version ID is
+`999818a7-cd16-464c-8b7a-e8048f439b28`. The batch used Qwen generation,
+deterministic four-language reverse evidence, independent Gemma no-correction
+review, controlled draft replay, and exact production promotion. All local,
+export/import, online API, and mobile/desktop render gates passed.

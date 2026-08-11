@@ -30,6 +30,9 @@ const chatPath = normalizeChatPath(args['chat-path'] || '/v1/chat/completions');
 const streamResponse = args.stream === 'true';
 const promptMode = String(args['prompt-mode'] || 'full');
 const languageFocus = args['language-focus'] ? String(args['language-focus']) : null;
+const concurrency = boundedInteger(args.concurrency, 1, 1);
+const checkpointEvery = boundedInteger(args['checkpoint-every'], 10, 1);
+const checkpointIntervalMs = boundedInteger(args['checkpoint-interval-ms'], 10_000, 100);
 
 if (languageFocus && !['en', 'pt-BR', 'zh', 'ja'].includes(languageFocus)) {
   throw new Error(`Invalid --language-focus: ${languageFocus}`);
@@ -72,6 +75,12 @@ if (!targets.length) throw new Error('No non-supported generated candidates foun
 const targetIds = new Set(
   targets.map((target) => sourceSenseKey(target.evidence.source_entry_id, target.evidence.source_sense_id))
 );
+const targetOrder = new Map(
+  targets.map((target, index) => [
+    sourceSenseKey(target.evidence.source_entry_id, target.evidence.source_sense_id),
+    index
+  ])
+);
 const resumedReviews =
   resume && fs.existsSync(outPath)
     ? (readJson(outPath).reviews || []).filter(
@@ -93,15 +102,33 @@ const prewarm = pendingTargets.length ? await loadReviewerModel() : { ok: true, 
 if (!prewarm.ok) throw new Error(`Reviewer model load failed: ${prewarm.error}`);
 
 const reviews = [...resumedReviews];
-for (const target of pendingTargets) {
-  const review = await reviewWithRetry(target);
-  reviews.push(review);
-  console.log(
-    `[${reviews.length}/${targets.length}] source=${review.source_entry_id} ${review.word} ` +
-      `decision=${review.valid ? review.decision : 'error'} confidence=${review.confidence ?? '-'}`
-  );
-  writeReports();
-}
+let nextPendingIndex = 0;
+let completedSinceCheckpoint = 0;
+let lastCheckpointAt = Date.now();
+await Promise.all(
+  Array.from({ length: Math.min(concurrency, Math.max(1, pendingTargets.length)) }, async () => {
+    while (true) {
+      const pendingIndex = nextPendingIndex++;
+      if (pendingIndex >= pendingTargets.length) return;
+      const review = await reviewWithRetry(pendingTargets[pendingIndex]);
+      reviews.push(review);
+      completedSinceCheckpoint++;
+      console.log(
+        `[${reviews.length}/${targets.length}] source=${review.source_entry_id} ${review.word} ` +
+          `decision=${review.valid ? review.decision : 'error'} confidence=${review.confidence ?? '-'}`
+      );
+      if (
+        completedSinceCheckpoint >= checkpointEvery ||
+        Date.now() - lastCheckpointAt >= checkpointIntervalMs
+      ) {
+        writeReports();
+        completedSinceCheckpoint = 0;
+        lastCheckpointAt = Date.now();
+      }
+    }
+  })
+);
+writeReports();
 
 const output = buildOutput();
 console.log(
@@ -340,9 +367,16 @@ function buildPrompt(payload, previousError) {
 }
 
 function buildNanoPrompt(payload, previousError) {
-  const compact = Object.entries(payload.generated_localizations || {})
-    .map(([lang, value]) => `${lang}:${String(value?.term || '').trim()}|${String(value?.definition || '').trim().slice(0, 20)}`)
-    .join(';');
+  const compact = Object.fromEntries(
+    Object.entries(payload.generated_localizations || {}).map(([lang, value]) => [
+      lang,
+      {
+        term: String(value?.term || '').trim(),
+        pronunciation: String(value?.reading || value?.pronunciation || '').trim(),
+        definition: String(value?.definition || '').trim().slice(0, 220)
+      }
+    ])
+  );
   return [
     'JSON only. Check all X terms and definitions mean M.',
     `W=${JSON.stringify(payload.source_word)};L=${payload.source_language};M=${JSON.stringify(payload.english_anchor)};X=${JSON.stringify(compact)}.`,
@@ -367,9 +401,17 @@ function buildPerLanguagePrompt(payload, lang, localization, previousError) {
 
 function normalizeReview(value) {
   if (!promptMode.startsWith('nano') || !value || typeof value !== 'object') return value;
-  const decisions = { A: 'accept', R: 'reject', M: 'manual_review' };
+  const decisions = {
+    A: 'accept',
+    ACCEPT: 'accept',
+    R: 'reject',
+    REJECT: 'reject',
+    M: 'manual_review',
+    MANUAL_REVIEW: 'manual_review'
+  };
+  const compactDecision = String(value.d ?? value.decision ?? '').toUpperCase();
   return {
-    decision: decisions[String(value.d || '').toUpperCase()] || value.decision,
+    decision: decisions[compactDecision] || value.decision,
     confidence: value.c ?? value.confidence,
     reason: value.r ?? value.reason,
     corrections: []
@@ -414,9 +456,14 @@ async function loadReviewerModel() {
 }
 
 function buildOutput() {
-  const valid = reviews.filter((row) => row.valid);
+  const orderedReviews = [...reviews].sort(
+    (left, right) =>
+      (targetOrder.get(sourceSenseKey(left.source_entry_id, left.source_sense_id)) ?? Number.MAX_SAFE_INTEGER) -
+      (targetOrder.get(sourceSenseKey(right.source_entry_id, right.source_sense_id)) ?? Number.MAX_SAFE_INTEGER)
+  );
+  const valid = orderedReviews.filter((row) => row.valid);
   return {
-    ok: reviews.every((row) => row.valid),
+    ok: orderedReviews.every((row) => row.valid),
     generated_at: new Date().toISOString(),
     generation_report: path.relative(process.cwd(), generationPath),
     evidence_report: path.relative(process.cwd(), evidencePath),
@@ -429,6 +476,9 @@ function buildOutput() {
       stream: streamResponse,
       prompt_mode: promptMode,
       language_focus: languageFocus,
+      concurrency,
+      checkpoint_every: checkpointEvery,
+      checkpoint_interval_ms: checkpointIntervalMs,
       automatic_promotion: false
     },
     prewarm,
@@ -439,29 +489,28 @@ function buildOutput() {
       rejected: valid.filter((row) => row.decision === 'reject').length,
       manual_review: valid.filter((row) => row.decision === 'manual_review').length,
       consensus_accepted: valid.filter((row) => row.consensus_accepted).length,
-      failed: reviews.filter((row) => !row.valid).length
+      failed: orderedReviews.filter((row) => !row.valid).length
     },
-    reviews
+    reviews: orderedReviews
   };
 }
 
 function writeReports() {
   const output = buildOutput();
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
+  writeJsonAtomically(outPath, output);
   fs.mkdirSync(path.dirname(acceptedOutPath), { recursive: true });
-  fs.writeFileSync(
-    acceptedOutPath,
-    `${JSON.stringify(
-      {
-        ...output,
-        reviews: reviews.filter((row) => row.consensus_accepted)
-      },
-      null,
-      2
-    )}\n`,
-    'utf8'
-  );
+  writeJsonAtomically(acceptedOutPath, {
+    ...output,
+    reviews: output.reviews.filter((row) => row.consensus_accepted)
+  });
+}
+
+function writeJsonAtomically(filePath, value) {
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  fs.rmSync(filePath, { force: true });
+  fs.renameSync(temporaryPath, filePath);
 }
 
 async function postJson(pathName, body, timeout) {
@@ -548,7 +597,7 @@ async function getJson(pathName, timeout) {
 
 function validateReview(parsed) {
   if (!['accept', 'reject', 'manual_review'].includes(parsed?.decision)) {
-    throw new Error('invalid_decision');
+    throw new Error(`invalid_decision:${JSON.stringify(parsed).slice(0, 240)}`);
   }
   const confidence = Number(parsed?.confidence);
   if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
