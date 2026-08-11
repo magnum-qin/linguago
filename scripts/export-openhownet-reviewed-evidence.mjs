@@ -46,10 +46,22 @@ const findEvidence = sourceDb.prepare(`
     AND e.normalized_key = ?
     AND e.english_normalized_key = ?
 `);
+const findEvidenceByConcept = sourceDb.prepare(`
+  SELECT e.*, m.sense_id, m.zh_term, m.en_term, m.zh_pos, m.en_pos, m.sememe_definition
+  FROM lexical_evidence e
+  JOIN openhownet_sense_metadata m ON e.concept_id = 'openhownet:' || m.sense_id
+  WHERE e.source_family = 'openhownet'
+    AND e.lang = 'zh'
+    AND e.normalized_key = ?
+    AND e.concept_id = ?
+`);
 
 const selected = [];
 for (const candidate of candidates) {
-  const rows = findEvidence.all(normalize(candidate.zh_term), normalize(candidate.english_anchor));
+  const conceptIds = [...new Set((candidate.matching_concepts || []).map(String).filter(Boolean))];
+  const rows = conceptIds.length
+    ? conceptIds.flatMap((conceptId) => findEvidenceByConcept.all(normalize(candidate.zh_term), conceptId))
+    : findEvidence.all(normalize(candidate.zh_term), normalize(candidate.english_anchor));
   const exact = rows.filter((row) => posMatches(candidate.expected_pos, row.zh_pos) && posMatches(candidate.expected_pos, row.en_pos));
   if (!exact.length) throw new Error(`Reviewed candidate no longer binds exactly: ${candidate.candidate_key}`);
   for (const row of exact) selected.push({ ...row, candidate_key: candidate.candidate_key });

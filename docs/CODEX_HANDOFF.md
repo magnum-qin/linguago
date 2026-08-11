@@ -3292,3 +3292,30 @@ exist.
   plus `--lang` and `--limit`. Its English-anchor-to-Chinese-target direction
   is not the right diagnostic for Chinese source rows; use the source-overlap
   script for that case.
+
+### 2026-08-11 v93 Chinese specificity gate and reviewed evidence
+
+- The source-overlap report now includes matching and complete OpenHowNet gloss
+  lists. The review prompt applies bidirectional equivalence and explicitly
+  rejects generic English hypernyms when the Chinese lemma is more specific.
+- A fresh, non-overlapping 20-row gate passed the required threshold: Qwen
+  approved `20/20`, Gemma approved `18/20`, and strict consensus retained
+  `18/20`. The two disagreements (`landscape`/`风景画` and `安全门`/`emergency
+  exit`) demonstrate the intended scope protection.
+- Re-reviewing all `104` POS-compatible rows under the same prompt produced
+  `104/104` structurally valid reviews from both models. Qwen approved 98,
+  Gemma approved 94, and strict consensus retained 92. Twelve rows remain
+  blocked; no model disagreement was converted into evidence.
+- `export-openhownet-reviewed-evidence.mjs` can now bind reviewed
+  `matching_concepts`, which is required when a semicolon-delimited anchor
+  matches one exact OpenHowNet concept rather than the whole anchor string.
+  The exported subset has 92 reviewed candidates and 115 lexical concepts.
+- `prefilter-dictionary-v2-product-source-gap-reverse-evidence.mjs` adds the
+  default-off `--allow-reviewed-supplemental-source-roundtrip true` gate. It
+  accepts supplemental source-side round-trip only when source metadata is
+  publishable, has `reviewed_subset=true`, and records independent dual-model
+  semantic review. Raw OpenHowNet can never activate this path.
+- With the option disabled, the extended DB still selects the original 1,579
+  strict rows. With it enabled, the pool selects 1,679 rows, adding 100 Chinese
+  source senses. These are candidates only; no draft, product write, D1 push,
+  or Worker deployment has occurred.

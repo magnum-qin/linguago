@@ -123,13 +123,18 @@ function prompt(candidate, previousError) {
   }
   return [
     'Judge whether the proposed Simplified Chinese lemma precisely expresses the same lexical sense as the source word and exact English anchor.',
-    'Require the same part of speech, scope, register, and modern ordinary meaning.',
-    'Reject overly broad/narrow terms, obsolete terms, domain mismatch, literal calques, and non-lemma phrases.',
+    'Apply a strict bidirectional equivalence test: the Chinese lemma in this sense must entail the English anchor, and the English anchor must identify this Chinese sense without relying on unstated context.',
+    'Require the same part of speech, scope, register, domain, and modern ordinary meaning.',
+    'Reject a generic English hypernym when the Chinese lemma is more specific, even if the generic word appears as one dictionary gloss.',
+    'Use the complete OpenHowNet gloss list contrastively. If another gloss reveals a narrower or different core sense than the anchor, reject unless the matching glosses and sememes clearly isolate the requested sense.',
+    'Reject overly broad/narrow terms, obsolete terms, domain mismatch, literal calques, non-lemma phrases, and matches that work only in one collocation.',
     'Use manual_review when ambiguity cannot be resolved from the supplied evidence.',
     `Source: ${candidate.word} (${candidate.source_lang})`,
     `English anchor: ${candidate.english_anchor}`,
     `Expected POS: ${candidate.expected_pos || 'unknown'}`,
     `Proposed zh lemma: ${candidate.zh_term}`,
+    `OpenHowNet glosses matching the anchor: ${JSON.stringify(candidate.matching_glosses || [])}`,
+    `All OpenHowNet glosses for the Chinese lemma: ${JSON.stringify(candidate.all_openhownet_glosses || [])}`,
     `Sememe definitions: ${JSON.stringify(candidate.sememe_definitions || [])}`,
     previousError ? `Previous response error: ${previousError}` : '',
     'Return exactly: {"decision":"accept|reject|manual_review","confidence":0.0,"reason":"","risk_flags":[],"suggested_zh_term":null}'

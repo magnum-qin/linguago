@@ -62,6 +62,10 @@ const researchCandidates = uniqueBy(rows.filter((row) => row.pilot_candidate).ma
   english_anchor: row.anchor,
   expected_pos: row.expected_pos,
   zh_term: row.word,
+  matching_glosses: unique(row.openhownet.evidence
+    .filter((item) => item.overlap !== 'none' && item.pos_binding !== 'conflict')
+    .map((item) => item.gloss)),
+  all_openhownet_glosses: unique(row.openhownet.evidence.map((item) => item.gloss)),
   matching_concepts: row.openhownet.evidence
     .filter((item) => item.overlap !== 'none' && item.pos_binding !== 'conflict')
     .map((item) => item.concept_id),

@@ -55,6 +55,8 @@ const minIndependentTargetFamilies = boundedInteger(
 );
 const requireExistingLocalizationRoundtrip =
   args["require-existing-localization-roundtrip"] === "true";
+const allowReviewedSupplementalSourceRoundtrip =
+  args["allow-reviewed-supplemental-source-roundtrip"] === "true";
 const minExistingLocalizationRoundtripFamilies = boundedInteger(
   args["min-existing-localization-roundtrip-families"],
   2,
@@ -104,6 +106,7 @@ const supplementalDb = supplementalSourceDbPath
 supplementalDb?.pragma("query_only = ON");
 const blockedSupplementalSourceKeys = new Set();
 const blockedSupplementalFamilies = new Set(["panlex-unmapped"]);
+const reviewedSupplementalSourceKeys = new Set();
 if (
   supplementalDb?.prepare(
     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'evidence_sources'"
@@ -122,6 +125,13 @@ if (
     if (!familyStatus.has(family)) familyStatus.set(family, []);
     familyStatus.get(family).push(productionPublishable);
     if (!productionPublishable) blockedSupplementalSourceKeys.add(row.source_key);
+    if (
+      productionPublishable &&
+      metadata.reviewed_subset === true &&
+      /independent_.+_and_.+confidence/iu.test(String(metadata.semantic_review || ""))
+    ) {
+      reviewedSupplementalSourceKeys.add(row.source_key);
+    }
   }
   for (const [family, statuses] of familyStatus) {
     if (family && statuses.length && statuses.every((status) => !status)) {
@@ -201,12 +211,14 @@ const summary = {
   require_jmdict_hint: requireJmdictHint,
   require_all_target_independent_evidence: requireAllTargetIndependentEvidence,
   require_existing_localization_roundtrip: requireExistingLocalizationRoundtrip,
+  allow_reviewed_supplemental_source_roundtrip: allowReviewedSupplementalSourceRoundtrip,
   minimum_existing_localization_roundtrip_families: minExistingLocalizationRoundtripFamilies,
   strong_supplemental_families: [...strongSupplementalFamilies].sort(),
   strong_supplemental_families_by_lang: serializeLangFamilyMap(
     strongSupplementalFamiliesByLang
   ),
   blocked_supplemental_source_keys: [...blockedSupplementalSourceKeys].sort(),
+  reviewed_supplemental_source_keys: [...reviewedSupplementalSourceKeys].sort(),
   blocked_supplemental_families: [...blockedSupplementalFamilies].sort(),
   supplemental_source_db: supplementalSourceDbPath
     ? path.relative(process.cwd(), supplementalSourceDbPath)
@@ -244,6 +256,7 @@ const evidenceOutput = {
     require_all_target_independent_evidence: requireAllTargetIndependentEvidence,
     minimum_independent_target_families: minIndependentTargetFamilies,
     require_existing_localization_roundtrip: requireExistingLocalizationRoundtrip,
+    allow_reviewed_supplemental_source_roundtrip: allowReviewedSupplementalSourceRoundtrip,
     minimum_existing_localization_roundtrip_families: minExistingLocalizationRoundtripFamilies,
     strong_supplemental_families: [...strongSupplementalFamilies].sort(),
     strong_supplemental_families_by_lang: serializeLangFamilyMap(
@@ -425,8 +438,15 @@ function looksProperOrNamedAnchor(value) {
 }
 
 function sourceTermRoundTrips(lang, sourceTerm, anchor) {
-  return findForwardTargetTerms(anchor, lang).some((item) =>
+  const dictionaryRoundTrip = findForwardTargetTerms(anchor, lang).some((item) =>
     item.terms.some((term) => termsEquivalent(lang, term, sourceTerm))
+  );
+  if (dictionaryRoundTrip) return true;
+  if (!allowReviewedSupplementalSourceRoundtrip) return false;
+  return supplementalEvidenceForTerm(lang, sourceTerm, anchor).some((item) =>
+    item.strength === "strong" &&
+    item.matches_anchor === true &&
+    reviewedSupplementalSourceKeys.has(item.source)
   );
 }
 

@@ -3177,3 +3177,20 @@ accepts despite zero API/JSON failures. Do not generate from this pool yet.
 Broad anchors such as `take`, `paper`, and `reflect` need stronger
 sense-specificity checks; rerun a fresh 20-row gate and require at least 18
 strict consensus accepts before expansion.
+
+After a source-side pilot passes, rerun the complete research pool with the
+same specificity prompt. The v93 Chinese run retained 92 of 104 candidates by
+strict Qwen/Gemma consensus and exported 115 reviewed OpenHowNet concepts.
+When an anchor contains semicolon-separated alternatives, export only the
+POS-bound `matching_concepts`; do not require the complete anchor string to
+equal one source gloss.
+
+The strict prefilter option
+`--allow-reviewed-supplemental-source-roundtrip true` is intentionally
+default-off. It may satisfy source round-trip only from publishable evidence
+rows whose source metadata records `reviewed_subset=true` and independent
+dual-model semantic review. Verify both modes after changes: disabled must
+preserve the baseline pool; enabled may add only reviewed source senses. In the
+v93 run, disabled selected 1,579 rows and enabled selected 1,679, including 100
+Chinese rows. Treat those rows as source-review candidates, not as drafts or
+publishable senses.
