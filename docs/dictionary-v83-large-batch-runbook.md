@@ -3144,3 +3144,20 @@ filter it with `filter-dictionary-v2-product-source-gap-reverse-report.mjs`
 before building the promotion checkpoint. The checkpoint builder should keep
 failing if an evidence row has no corresponding unique draft; do not weaken
 that invariant.
+
+## Manual-evidence capacity after strict-pool exhaustion
+
+Run `npm run dict:v2:coverage:report-manual-evidence-capacity -- --report
+<strict-evidence-report>` after the entry-level fresh pool reaches zero. The
+v93 report contains 3,956 manual rows; 3,129 have only the OMW family. A
+diagnostic near-unlock bucket requiring unambiguous OMW support and at least two
+aligned target languages contains 1,221 rows: 462 zh, 448 ja, 310 pt-BR, and 1
+en.
+
+This bucket is capacity planning, not publication evidence. Several apparently
+complete OMW alignments are semantically too broad or attach the wrong sense;
+for example, a Chinese `买得起` candidate aligned to an `afford` synset whose
+Japanese and Portuguese lemmas express provide/give. The next expansion should
+add sense-specific source-side overlap from CC-CEDICT/OpenHowNet for zh,
+JMdict/EJDict for ja, and FreeDict/Dicionario Aberto for pt-BR. Do not promote
+rows merely because OMW supplies all three target-language term lists.

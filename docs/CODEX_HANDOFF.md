@@ -3260,3 +3260,9 @@ exist.
   `backups/linguago-v93-before-strict-fresh8-20260811-222229.db`. This batch is
   intentionally not deployed by itself; production remains v93 with 37,273
   senses until more audited rows are accumulated.
+
+- Entry-level exclusion confirms the current strict fresh pool is exhausted.
+  `report-dictionary-v2-product-source-gap-manual-evidence-capacity.mjs`
+  identifies 1,221 diagnostic near-unlock rows among 3,956 manual candidates.
+  This report is not publication evidence; the next implementation target is
+  sense-specific source-side lexical overlap, starting with 462 Chinese rows.

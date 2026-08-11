@@ -70,6 +70,7 @@
     "dict:v2:coverage:supplement-unsloth": "node scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs",
     "dict:v2:coverage:validate-reverse-evidence": "node scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs",
     "dict:v2:coverage:prefilter-reverse-evidence": "node scripts/prefilter-dictionary-v2-product-source-gap-reverse-evidence.mjs",
+    "dict:v2:coverage:report-manual-evidence-capacity": "node scripts/report-dictionary-v2-product-source-gap-manual-evidence-capacity.mjs",
     "dict:v2:coverage:select-manual-review": "node scripts/select-dictionary-v2-product-source-gap-manual-review.mjs",
     "dict:v2:coverage:adjudicate-source-reviews": "node scripts/adjudicate-dictionary-v2-product-source-gap-reviews.mjs",
     "dict:v2:coverage:audit-parallel-agreement": "node scripts/audit-dictionary-v2-product-source-gap-parallel-agreement.mjs",
