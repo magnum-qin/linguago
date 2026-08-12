@@ -3145,6 +3145,40 @@ exist.
   `--require-hint-family zh:ecdict`. Runtime reports remain under `logs/` and
   are not committed.
 
+### 2026-08-12 Dicionario Aberto fresh-evidence qualification
+
+- The latest v93 evidence DB already contains all three historical reviewed
+  Dicionario Aberto subsets (75, 78, and 75 rows). Replaying those reports does
+  not create a new pool.
+- `select-dicionario-aberto-definition-review-candidates.mjs` now builds fresh,
+  research-only review cohorts from exact Portuguese headwords. It excludes
+  current product entries, the complete historical attempt index, previously
+  reviewed source entries, unusable cross-reference definitions, unknown POS,
+  and non-single English anchors. Exclusion must be source-entry-wide, not only
+  by candidate key; alternate senses of an already reviewed entry must not
+  re-enter later cohorts.
+- The reviewed-evidence exporter now marks its metadata with
+  `reviewed_subset=true`, exact-headword scope, and POS binding. The prefilter
+  still accepts such source-side round-trip evidence only through an explicit
+  source-key allowlist.
+- The first 20-row review was run before target-side deterministic filtering.
+  Qwen accepted 18 and Gemma 20, but the resulting 18-row subset passed the
+  full strict prefilter at 0/18: 2 source-gloss conflicts, 11 localization
+  round-trip failures, 4 insufficient target-evidence failures, and 1 named
+  anchor rejection. Do not reuse this cohort as publication evidence.
+- Correct order is: structural selection -> target-side deterministic gate
+  with one existing source family -> Dicionario Aberto dual-model definition
+  review -> reviewed subset export -> strict two-family prefilter. Applying
+  the corrected order found 20 candidates. Qwen accepted 16 and Gemma 19;
+  strict intersection was 16/20, below the required 18/20.
+- Expanding the definition-order choice to at most 12 did not weaken target
+  evidence rules. After excluding every source entry from both review attempts,
+  only 15 untouched target-qualified candidates remain. Do not run them as a
+  20-row gate or lower the threshold. No product DB, D1, or Worker write occurred.
+- Runtime reports and temporary evidence DBs remain under `logs/` and `.tmp/`.
+  The next expansion needs at least five additional entry-unique candidates
+  with complete target evidence, or another independent sense-bound source.
+
 ### 2026-08-11 ECDICT low-risk generation and isolated promotion
 
 - Reviewing the remaining low-risk cohort produced `144/165` strict Qwen/Gemma

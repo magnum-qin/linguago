@@ -60,6 +60,9 @@ const sourceKey = `dicionario-aberto-definitions-reviewed-${sha256(`${qwenSha}:$
 const metadata = {
   production_publishable: true,
   research_only: false,
+  reviewed_subset: true,
+  exact_normalized_headword: true,
+  part_of_speech_bound_when_available: true,
   source_resource: probe.source_resource,
   source_url: probe.source_url,
   source_license: probe.license,
