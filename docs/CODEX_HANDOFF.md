@@ -3673,8 +3673,30 @@ exist.
   and `baricentro -> 质心` qualify. Across all 24 residual rows, nine qualify;
   the other seven are adjective-form resolutions such as `cubic -> 立方体的`
   and still need the normal dual-model review.
-- Nine rows are below the 20-row remote-review gate. No model call, reviewed
+- Historical-attempt filtering reduces the nine exact intersections to seven
+  reviewable rows: four fresh and three evidence-upgrade revalidations.
+  `obstrutivo` and `baricentro` remain blocked by historical model review
+  rejects and must never be reintroduced merely because ECDICT intersects.
+- Seven rows are below the 20-row remote-review gate. No model call, reviewed
   evidence export, generation, product database write, D1 update, or Worker
   deployment followed. The next safe action is to add at least 11 independently
   bound Japanese or other target-evidence candidates, then run one bounded
   dual-model review over the combined cohort.
+
+### 2026-08-12 v93 JMdict reading-alias evidence boundary
+
+- The canonical JMdict import indexes the first written form but does not index
+  every `<reb>` as a source-entry alias. This made common kana entries appear
+  to have only Wiktionary-family source support.
+- `probe-jmdict-reading-source-gap-conflicts.mjs` streams the original compressed
+  JMdict XML and requires an exact reading, applicable reading/sense
+  restrictions, an exact semicolon-split English gloss, and one unique JMdict
+  entry. It found 58/129 exact source-side bindings and exported 84 candidate-
+  bound evidence rows when `--evidence-out` was explicitly supplied.
+- Re-running the complete strict prefilter raised source-supported rows only
+  from 171 to 172. All 58 Japanese rows still failed later target-language,
+  round-trip, or ambiguity gates; none became publishable. The only newly
+  supported row was `climatologia`, unlocked by the prior reviewed
+  OpenHowNet/Dicionário Aberto evidence, not by JMdict.
+- This is a useful importer/evidence fix but not additional translation-batch
+  capacity. Do not count 58 source bindings as 58 generation candidates.

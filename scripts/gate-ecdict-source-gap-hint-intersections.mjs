@@ -8,8 +8,13 @@ const args = parseArgs(process.argv.slice(2));
 const reportPath = requiredPath(args.report);
 const csvPath = requiredPath(args.csv || '.tmp/ecdict/ecdict-official.csv');
 const outPath = path.resolve(args.out || 'logs/product-source-gap-ecdict-exact-hint-gate.json');
+const historyPath = args.history ? requiredPath(args.history) : null;
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const rows = Array.isArray(report.selected) ? report.selected : [];
+const historyByEntry = historyPath
+  ? new Map((JSON.parse(fs.readFileSync(historyPath, 'utf8')).selected || [])
+      .map((row) => [String(row.source_entry_id), row]))
+  : new Map();
 const anchors = new Set(rows.flatMap((row) => hintTerms(row, 'en').map(normalizeEnglish)));
 const ecdictByAnchor = new Map();
 
@@ -61,6 +66,13 @@ const assessed = rows.map((row) => {
         : sharedTerms.length !== 1
           ? sharedTerms.length === 0 ? 'no_shared_zh_hint' : 'multiple_shared_zh_hints'
           : 'qualified';
+  const history = historyByEntry.get(String(row.source_entry_id));
+  const historicalEvidence = history?.evidence || [];
+  const reviewCohort = historicalEvidence.includes('review_reject')
+    ? 'blocked_historical_review_reject'
+    : history
+      ? 'evidence_upgrade_revalidation'
+      : 'fresh';
   return {
     candidate_key: row.candidate_key || `${row.source_entry_id}:${row.first_sense_id}`,
     word: row.word,
@@ -71,12 +83,17 @@ const assessed = rows.map((row) => {
     chinese_hints: chineseHints,
     shared_exact_chinese_terms: sharedTerms,
     status,
+    review_cohort: reviewCohort,
+    historical_evidence: historicalEvidence,
+    historical_attempts: history?.attempts || 0,
     anchor_checks: anchorChecks,
     candidate: row
   };
 });
 
-const qualified = assessed.filter((row) => row.status === 'qualified');
+const qualified = assessed.filter((row) =>
+  row.status === 'qualified' && row.review_cohort !== 'blocked_historical_review_reject'
+);
 const output = {
   ok: true,
   generated_at: new Date().toISOString(),
@@ -88,10 +105,16 @@ const output = {
     product_database_write: false
   },
   source_report: relative(reportPath),
+  history_report: historyPath ? relative(historyPath) : null,
   ecdict_csv: relative(csvPath),
   summary: {
     input_rows: rows.length,
     qualified_rows: qualified.length,
+    qualified_fresh_rows: qualified.filter((row) => row.review_cohort === 'fresh').length,
+    qualified_revalidation_rows: qualified.filter((row) => row.review_cohort === 'evidence_upgrade_revalidation').length,
+    blocked_historical_review_rejects: assessed.filter((row) =>
+      row.status === 'qualified' && row.review_cohort === 'blocked_historical_review_reject'
+    ).length,
     statuses: countBy(assessed, (row) => row.status)
   },
   selected: qualified,

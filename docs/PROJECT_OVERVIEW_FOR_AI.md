@@ -875,7 +875,14 @@ consensus threshold or reuse stale fresh snapshots.
 The ECDICT second-tier residual now has an additional deterministic target-term
 gate. It requires all exact English anchors for a candidate to intersect the
 same single Chinese generation hint, using strict token boundaries. This leaves
-9/24 candidates, including only 2/9 from the earlier semantic-risk subset. The
-cohort is below the 20-row model-review minimum, so it remains local and
-unpublished. Combine it with at least 11 newly bound independent-evidence rows
+9/24 exact intersections, but history filtering leaves only seven reviewable
+rows: four fresh and three evidence-upgrade revalidations. Two historical
+review rejects remain blocked. The cohort is below the 20-row model-review minimum, so it remains local and
+unpublished. Combine it with at least 13 newly bound independent-evidence rows
 before invoking Qwen/Gemma; do not relax the gate or write these rows directly.
+
+A reading-aware JMdict probe recovered 58 exact source-side kana bindings, but
+the strict end-to-end prefilter unlocked zero Japanese publication candidates:
+their target-language evidence and round trips remain insufficient. Treat this
+as source-index repair, not generation capacity. `climatologia` is the only
+new strict-supported row and came from previously reviewed OpenHowNet/DA data.
