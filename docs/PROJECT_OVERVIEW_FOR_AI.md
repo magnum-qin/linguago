@@ -852,3 +852,14 @@ published-risk, and full memory-import audits pass with all blockers at zero.
 Cache version is `v93-strict-fresh115-31056`; D1 `published_at` is
 `2026-08-11T12:22:19.638Z`, and Worker Version ID is
 `5161673d-b817-4b1e-82b1-484d676c2974`.
+
+## Latest local-only dictionary delta (2026-08-12)
+
+The local product database contains eight additional pt-BR source-gap senses
+from the locale-gated WikDict/Wikidata-alias pilot, for 37,321 publishable
+senses. This delta is not deployed. Generation normalizes Chinese target terms
+and definitions to Simplified Chinese before pinyin generation, and promotion
+rechecks that constraint. Bounded promotions must pass the cohort report with
+`--restrict-to-report true`; do not promote by source prefix and limit alone.
+All local fast, published-risk, full export, and in-memory import audits pass
+with blocking counts at zero.

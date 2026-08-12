@@ -7,11 +7,16 @@ const reportPath = requiredPath("report");
 const historyPath = requiredPath("history");
 const freshPath = requiredPath("fresh");
 const productDbPath = requiredPath("product-db");
+const ptPronunciationDbPath = requiredPath("pt-pronunciation-db");
 const outPath = path.resolve(
   args.out || "logs/product-source-gap-evidence-upgrade-revalidation.json"
 );
 const limit = boundedInteger(args.limit, 20, 1);
 const offset = boundedInteger(args.offset, 0, 0);
+const KNOWN_SEMANTIC_RESIDUALS = new Set([
+  "pt-BR|dobragem|dubbing",
+  "pt-BR|excreção|excretion"
+]);
 
 const report = readJson(reportPath);
 const history = readJson(historyPath);
@@ -31,10 +36,25 @@ const findLinkedProductSense = productDb.prepare(`
     AND ps.status IN ('accepted', 'draft_single_source')
   LIMIT 1
 `);
+const ptPronunciationDb = new Database(ptPronunciationDbPath, {
+  readonly: true,
+  fileMustExist: true
+});
+ptPronunciationDb.pragma("query_only = ON");
+const findBrazilianPortuguesePronunciation = ptPronunciationDb.prepare(`
+  SELECT 1
+  FROM portuguese_pronunciations
+  WHERE normalized_key = ?
+    AND region IN ('Brazil', 'São-Paulo', 'Rio-de-Janeiro', 'Caipira',
+                   'Southern-Brazil', 'Northeast-Brazil')
+  LIMIT 1
+`);
 
 const eligible = rows
   .filter(hasSingleHintPerLanguage)
   .filter((row) => !findLinkedProductSense.get(Number(row.first_sense_id)))
+  .filter(hasRequiredBrazilianPortugueseEvidence)
+  .filter((row) => !KNOWN_SEMANTIC_RESIDUALS.has(semanticResidualKey(row)))
   .map((row) => {
     const historyRow = historyByEntry.get(String(row.source_entry_id));
     const isFresh = freshEntries.has(String(row.source_entry_id));
@@ -64,6 +84,11 @@ const summary = {
   current_product_unlinked_rows: rows.filter(
     (row) => !findLinkedProductSense.get(Number(row.first_sense_id))
   ).length,
+  locale_or_semantic_residual_rows: rows.filter(
+    (row) =>
+      !hasRequiredBrazilianPortugueseEvidence(row) ||
+      KNOWN_SEMANTIC_RESIDUALS.has(semanticResidualKey(row))
+  ).length,
   eligible_rows: eligible.length,
   selected_rows: selected.length,
   offset,
@@ -86,11 +111,14 @@ const output = {
   history_report: relative(historyPath),
   fresh_report: relative(freshPath),
   product_db: relative(productDbPath),
+  pt_pronunciation_db: relative(ptPronunciationDbPath),
   policy: {
     fresh_candidates_first: true,
     historical_review_rejects_excluded: true,
     historical_revalidation_requires_unique_wikidata_qid: true,
     current_product_links_excluded: true,
+    pt_br_source_requires_brazilian_pronunciation: true,
+    confirmed_source_anchor_residuals_excluded: true,
     historical_generation_or_transport_failures_may_be_revalidated: true,
     offset,
     publication_evidence: false
@@ -103,6 +131,7 @@ const output = {
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
 productDb.close();
+ptPronunciationDb.close();
 console.log(JSON.stringify({ ok: output.ok, out: relative(outPath), summary }, null, 2));
 if (!output.ok) process.exitCode = 1;
 
@@ -111,6 +140,27 @@ function hasSingleHintPerLanguage(row) {
   return ["en", "pt-BR", "zh", "ja"].every(
     (lang) => Array.isArray(hints[lang]?.terms) && hints[lang].terms.length === 1
   );
+}
+
+function hasRequiredBrazilianPortugueseEvidence(row) {
+  if (row.source_lang !== "pt-BR") return true;
+  return Boolean(
+    findBrazilianPortuguesePronunciation.get(normalize(row.word))
+  );
+}
+
+function semanticResidualKey(row) {
+  return [row.source_lang, normalize(row.word), englishAnchor(row)].join("|");
+}
+
+function englishAnchor(row) {
+  const hinted = row.generation_hints?.en?.terms?.[0];
+  if (hinted) return normalize(hinted);
+  return normalize(String(row.gloss_key || "").replace(/^en:\s*/iu, "").split(";")[0]);
+}
+
+function normalize(value) {
+  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase("pt-BR");
 }
 
 function compareRows(left, right) {

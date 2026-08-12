@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import * as OpenCC from 'opencc-js';
 
 const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
@@ -8,6 +9,7 @@ const DEFAULT_SOURCE_PREFIX = 'unsloth:source-gap-supplement';
 const STOP_TOKENS = new Set(['and', 'are', 'for', 'from', 'into', 'the', 'with']);
 const HTML_ENTITY_RE = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#x[0-9a-fA-F]{1,6});/u;
 const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
+const traditionalToSimplified = OpenCC.Converter({ from: 'tw', to: 'cn' });
 const TRADITIONAL_SMOKE_RE = /[這個們來說時還後發聽與對會裡學開關體]/u;
 
 const args = parseArgs(process.argv.slice(2));
@@ -17,6 +19,7 @@ const limit = boundedNumber(args.limit, 500);
 const sourcePrefix = String(args.source || DEFAULT_SOURCE_PREFIX);
 const checkpointPath = args.checkpoint ? path.resolve(args.checkpoint) : null;
 const reportPath = args.report ? path.resolve(args.report) : null;
+const restrictToReport = args['restrict-to-report'] === 'true';
 const semanticReviewPath = args['semantic-review'] ? path.resolve(args['semantic-review']) : null;
 const reverseEvidencePath = args['reverse-evidence'] ? path.resolve(args['reverse-evidence']) : null;
 const semanticReviewConfidence = boundedConfidence(args['semantic-review-confidence'], 0.9);
@@ -35,6 +38,7 @@ const outPath = path.resolve(
 if (!fs.existsSync(dbPath)) throw new Error(`Product DB not found: ${dbPath}`);
 if (checkpointPath && !fs.existsSync(checkpointPath)) throw new Error(`Checkpoint not found: ${checkpointPath}`);
 if (reportPath && !fs.existsSync(reportPath)) throw new Error(`Coverage report not found: ${reportPath}`);
+if (restrictToReport && !reportPath) throw new Error('--restrict-to-report requires --report');
 if (semanticReviewPath && !fs.existsSync(semanticReviewPath)) {
   throw new Error(`Semantic review not found: ${semanticReviewPath}`);
 }
@@ -48,6 +52,10 @@ const checkpointProductSenseBySourceSense = checkpointPath
   ? loadCheckpointProductSenseBySourceSense(checkpointPath)
   : new Map();
 const reportGlossBySource = reportPath ? loadReportGlosses(reportPath) : new Map();
+const reportSourceSenseIds = reportPath ? loadReportSourceSenseIds(reportPath) : [];
+if (restrictToReport && !reportSourceSenseIds.length) {
+  throw new Error('Restricted coverage report has no source sense IDs');
+}
 const semanticApprovals = semanticReviewPath
   ? loadSemanticApprovals(
       semanticReviewPath,
@@ -58,6 +66,16 @@ const semanticApprovals = semanticReviewPath
 const reverseEvidenceApprovals = reverseEvidencePath ? loadReverseEvidenceApprovals(reverseEvidencePath) : null;
 const checkpointClause = checkpointPath
   ? `AND ps.id IN (${checkpointSenseIds.length ? checkpointSenseIds.map((_, index) => `@checkpoint_${index}`).join(', ') : 'NULL'})`
+  : '';
+const reportClause = restrictToReport
+  ? `AND EXISTS (
+      SELECT 1
+      FROM product_sense_source_links restricted_link
+      WHERE restricted_link.product_sense_id = ps.id
+        AND restricted_link.source_sense_id IN (${reportSourceSenseIds
+          .map((_, index) => `@report_sense_${index}`)
+          .join(', ')})
+    )`
   : '';
 
 const db = new Database(dbPath);
@@ -94,6 +112,7 @@ const candidates = db
       AND ps.status = 'draft_single_source'
       AND pl.source LIKE @sourcePrefix
       ${checkpointClause}
+      ${reportClause}
     ORDER BY pe.frequency_rank IS NULL, pe.frequency_rank, pe.id, ps.sense_order, ps.id
     LIMIT @queryLimit
   `
@@ -101,7 +120,8 @@ const candidates = db
   .all({
     sourcePrefix: `${sourcePrefix}%`,
     queryLimit: reverseEvidenceApprovals || semanticReviewPath ? 100000 : limit,
-    ...Object.fromEntries(checkpointSenseIds.map((id, index) => [`checkpoint_${index}`, id]))
+    ...Object.fromEntries(checkpointSenseIds.map((id, index) => [`checkpoint_${index}`, id])),
+    ...Object.fromEntries(reportSourceSenseIds.map((id, index) => [`report_sense_${index}`, id]))
   })
   .map((candidate) => {
     const sourceEntryId = checkpointSourceBySense.get(Number(candidate.sense_id)) || null;
@@ -162,6 +182,8 @@ const stats = {
   source_prefix: sourcePrefix,
   checkpoint: checkpointPath ? path.relative(process.cwd(), checkpointPath) : null,
   report: reportPath ? path.relative(process.cwd(), reportPath) : null,
+  restrict_to_report: restrictToReport,
+  report_source_sense_ids: reportSourceSenseIds.length,
   semantic_review: semanticReviewPath ? path.relative(process.cwd(), semanticReviewPath) : null,
   reverse_evidence: reverseEvidencePath ? path.relative(process.cwd(), reverseEvidencePath) : null,
   reverse_evidence_approvals_loaded: reverseEvidenceApprovals?.size || 0,
@@ -264,6 +286,18 @@ function loadReportGlosses(filePath) {
         String(row.first_gloss_key || row.gloss_key || row.first_gloss_preview || row.gloss_preview || '').trim()
     ])
   );
+}
+
+function loadReportSourceSenseIds(filePath) {
+  const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const rows = report?.selected || report?.residuals || [];
+  return [
+    ...new Set(
+      rows
+        .map((row) => Number(row?.first_sense_id ?? row?.source_sense_id))
+        .filter(Number.isInteger)
+    )
+  ];
 }
 
 function loadSemanticApprovals(filePath, confidenceThreshold, productSenseBySourceSense) {
@@ -378,6 +412,16 @@ function validateCandidate(candidate) {
     if (hasHtmlArtifact(loc.term) || hasHtmlArtifact(loc.definition)) errors.push(`html_artifact_${lang}`);
     if (!termLanguageLooksRight(loc.term, lang)) errors.push(`term_language_${lang}`);
     if (!definitionLanguageLooksRight(loc.definition, lang)) errors.push(`definition_language_${lang}`);
+    if (lang === 'zh' && traditionalToSimplified(loc.definition) !== loc.definition) {
+      errors.push('zh_definition_not_simplified');
+    }
+    if (
+      lang === 'zh' &&
+      candidate.primary_lang !== 'zh' &&
+      traditionalToSimplified(loc.term) !== loc.term
+    ) {
+      errors.push('zh_term_not_simplified');
+    }
     if (lang === 'zh' && !readingLooksRight(loc.reading, 'zh')) errors.push('missing_zh_reading');
     if (lang === 'ja' && !readingLooksRight(loc.reading, 'ja')) errors.push('missing_ja_reading');
     if ((lang === 'en' || lang === 'pt-BR') && !ipaLooksRight(loc.pronunciation)) {

@@ -3476,3 +3476,36 @@ exist.
   `radiotelescopio`. This is below the 20-row gate, so the exact-lexentry lane
   is exhausted. Acquire or align another independent concept-ID source before
   any further generation.
+
+### 2026-08-12 v93 locale-gated Wikidata alias pilot
+
+- The revalidation selector now requires a Kaikki Portuguese pronunciation
+  database and an explicitly Brazilian pronunciation for pt-BR candidates.
+  `arsenio` is filtered as pt-PT, while `dobragem|dubbing` and
+  `excrecao|excretion` remain explicit semantic residuals. This gate reduced
+  the 19 real unlinked candidates to 13 eligible rows.
+- Qwen/Gemma adjudication approved 12/13 rows; `radiotelescopio` remained
+  rejected. Generation initially accepted all 12, but the first manual output
+  inspection found Traditional Chinese target terms that the old validator did
+  not reject. The database was restored from
+  `backups/linguago-v93-before-wikidata-alias-qid-dual12-20260812-151533.db`
+  before publication.
+- Source-gap generation now converts non-source Chinese terms and all Chinese
+  definitions to Simplified Chinese before computing deterministic pinyin.
+  Promote validation independently rejects non-Simplified Chinese definitions,
+  and rejects non-Simplified Chinese terms when Chinese is not the source
+  language. A Chinese source headword remains unchanged to preserve exact
+  source lookup and source-term alignment.
+- Promote can now use `--restrict-to-report true`. Always use it for bounded
+  cohorts so a changed database sort order cannot select older drafts. The
+  report must contain source sense IDs; the generated audit records the
+  restriction and whitelist size.
+- Replaying the corrected cohort created and promoted eight genuinely missing
+  senses. `tanatologia` was already complete, and three other rows were stopped
+  by existing-equivalent-sense checks instead of creating duplicates. The
+  resulting local product database has 37,321 publishable senses.
+- TypeScript, fast audit, published-risk, and full native export/in-memory
+  import all pass. All blocking counts remain zero, including flagged senses,
+  bad localization counts, duplicate sense orders, orphans, mojibake, and HTML
+  artifacts. Production D1 remains v93; this eight-sense increment is local
+  only.

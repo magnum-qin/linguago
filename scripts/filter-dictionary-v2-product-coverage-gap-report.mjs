@@ -248,7 +248,8 @@ function isLikelyPtPtHeadword(word) {
       'pol\u00e9mico',
       'falhan\u00e7o',
       'assembly',
-      'escale'
+      'escale',
+      'arsénio'
     ]).has(value)
   )
     return true;

@@ -5,6 +5,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { pinyin } from 'pinyin-pro';
+import * as OpenCC from 'opencc-js';
 
 const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
@@ -21,6 +22,7 @@ const HTML_ENTITY_RE = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#x[0-9a-fA-F]{
 const REPLACEMENT_CHAR_RE = /[\uFFFD]/u;
 const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
 const JAPANESE_MOJIBAKE_RE = /[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u;
+const traditionalToSimplified = OpenCC.Converter({ from: 'tw', to: 'cn' });
 const MANUAL_RESIDUAL_SOURCE_ENTRY_IDS = new Set([2512756, 2482999, 2734525, 2607307, 2639444, 2399378, 2649794]);
 const FUNCTION_GLOSSES = new Set([
   'a',
@@ -2206,6 +2208,17 @@ function normalizeGeneratedOutput(row, output) {
   if (!normalized.localizations || typeof normalized.localizations !== 'object') return normalized;
   applyGenerationHintTerms(row, normalized);
   applyReviewedEvidenceTerms(row, normalized);
+  const originalZhLoc = normalized.localizations.zh;
+  if (originalZhLoc && typeof originalZhLoc === 'object') {
+    normalized.localizations = { ...normalized.localizations };
+    normalized.localizations.zh = {
+      ...originalZhLoc,
+      ...(row.source_lang === 'zh'
+        ? {}
+        : { term: traditionalToSimplified(String(originalZhLoc.term || '').trim()) }),
+      definition: traditionalToSimplified(String(originalZhLoc.definition || '').trim())
+    };
+  }
   const zhLoc = normalized.localizations.zh;
   if (row.source_lang !== 'zh' && zhLoc && typeof zhLoc === 'object' && /[\p{Script=Han}]/u.test(String(zhLoc.term || ''))) {
     const deterministicReading = expectedChineseReadings(zhLoc.term)[0];
