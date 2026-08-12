@@ -3509,3 +3509,38 @@ exist.
   bad localization counts, duplicate sense orders, orphans, mojibake, and HTML
   artifacts. Production D1 remains v93; this eight-sense increment is local
   only.
+
+### 2026-08-12 v93 post-pilot evidence capacity
+
+- Rebuilding the complete `product-source-gap` attempt index scanned 2,907
+  reports with zero parse failures and recorded 20,985 source entries / 28,116
+  entry-sense attempts. Do not use version-only filename prefixes; they omit
+  older unversioned attempt reports.
+- The evidence-upgrade selector now treats the current history index as
+  authoritative. A row present in an old fresh snapshot is no longer fresh if
+  it has any current history, and any historical `review_reject` always wins.
+  This fixed `radiotelescopio`, which an old fresh report had incorrectly
+  allowed to bypass two later review rejections.
+- The exact WikDict/Wikidata alias lane has only four revalidation candidates
+  left and no genuinely fresh candidates. It is below the 20-row gate and is
+  exhausted for production expansion.
+- Evidence-deficit analysis over 506 exact-lexentry candidates found Chinese
+  as the dominant missing independent target: 72 insufficient-evidence rows
+  plus 24 failed Chinese round trips. Japanese is second (15 plus 13), while
+  Portuguese has only one round-trip deficit.
+- A new OpenHowNet probe supports automatic exclusion of historical review
+  keys from a directory. Directory exclusion reads only top-level `reviews`;
+  explicit `--exclude-probes` remains the only way to exclude probe/candidate
+  arrays. This distinction prevents a probe from excluding itself.
+- After historical review exclusion, OpenHowNet produced 17 unique-term and
+  seven multi-term candidates. A bounded gate used all 17 unique terms and the
+  first three selection candidates. Qwen had 19/20 structurally valid reviews;
+  Gemma had 20/20. Strict dual-model consensus retained only 15/20 (75%), below
+  the required 18/20.
+- The five blocked rows were semantic, not infrastructure failures:
+  `ideograma` (symbol versus writing-system scope), `consanguinidade`
+  (terminology scope), `comensalismo` (specific biological relation versus
+  broad coexistence), `pederastia` (practice versus person/object), and
+  `surata` (conflicting source meaning). No reviewed evidence was exported, no
+  translation generation ran, and the product database was not modified by
+  this failed gate.

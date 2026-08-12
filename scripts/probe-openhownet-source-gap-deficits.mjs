@@ -19,10 +19,24 @@ const excludeProbePaths = String(args['exclude-probes'] || args['exclude-probe']
   .map((value) => value.trim())
   .filter(Boolean)
   .map(requiredPath);
+const excludeReviewDir = args['exclude-review-dir']
+  ? requiredDirectory(args['exclude-review-dir'])
+  : null;
+const excludeReviewPattern = String(args['exclude-review-pattern'] || 'openhownet').toLowerCase();
+const excludeReviewPaths = excludeReviewDir
+  ? fs.readdirSync(excludeReviewDir, { withFileTypes: true })
+      .filter((entry) =>
+        entry.isFile() &&
+        entry.name.endsWith('.json') &&
+        entry.name.toLowerCase().includes(excludeReviewPattern)
+      )
+      .map((entry) => path.join(excludeReviewDir, entry.name))
+  : [];
 const excludedCandidateKeys = new Set(
-  excludeProbePaths.flatMap((probePath) =>
-    (JSON.parse(fs.readFileSync(probePath, 'utf8')).probes || []).map(candidateKey)
-  )
+  [
+    ...excludeProbePaths.flatMap(loadExcludedProbeCandidateKeys),
+    ...excludeReviewPaths.flatMap(loadExcludedReviewCandidateKeys)
+  ]
 );
 
 const reportRowsByKey = new Map();
@@ -163,6 +177,9 @@ const output = {
     exact_english_anchor_only: true,
     publication_evidence: false,
     generation_allowed: false,
+    historical_candidate_keys_excluded: excludedCandidateKeys.size,
+    exclude_review_dir: excludeReviewDir ? relative(excludeReviewDir) : null,
+    exclude_review_pattern: excludeReviewDir ? excludeReviewPattern : null,
     reason: metadata.reason || 'OpenHowNet data-license boundary is not cleared.'
   },
   source: {
@@ -260,6 +277,40 @@ function requiredPath(value) {
   const resolved = path.resolve(required(value, 'path'));
   if (!fs.existsSync(resolved)) throw new Error(`File not found: ${resolved}`);
   return resolved;
+}
+
+function requiredDirectory(value) {
+  const directoryPath = path.resolve(value);
+  if (!fs.existsSync(directoryPath) || !fs.statSync(directoryPath).isDirectory()) {
+    throw new Error(`Required directory not found: ${directoryPath}`);
+  }
+  return directoryPath;
+}
+
+function readReportOrNull(filePath) {
+  let report;
+  try {
+    report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+  return report;
+}
+
+function loadExcludedProbeCandidateKeys(filePath) {
+  const report = readReportOrNull(filePath);
+  if (!report) return [];
+  return ['probes', 'research_candidates', 'selection_candidates']
+    .flatMap((key) => Array.isArray(report[key]) ? report[key] : [])
+    .map(candidateKey)
+    .filter(Boolean);
+}
+
+function loadExcludedReviewCandidateKeys(filePath) {
+  const report = readReportOrNull(filePath);
+  return (Array.isArray(report?.reviews) ? report.reviews : [])
+    .map(candidateKey)
+    .filter(Boolean);
 }
 
 function integer(value, fallback, minimum) {

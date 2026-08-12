@@ -863,3 +863,11 @@ rechecks that constraint. Bounded promotions must pass the cohort report with
 `--restrict-to-report true`; do not promote by source prefix and limit alone.
 All local fast, published-risk, full export, and in-memory import audits pass
 with blocking counts at zero.
+
+The subsequent independent-evidence capacity check did not open another
+production batch. The exact WikDict/Wikidata lane has only four historical
+revalidation rows left. A fresh 20-row OpenHowNet mapping gate reached strict
+Qwen/Gemma consensus on 15/20, below the required 18/20, so it produced no
+reviewed evidence, LLM translations, drafts, or database writes. The next pool
+must improve sense-specific Chinese evidence selection; do not lower the
+consensus threshold or reuse stale fresh snapshots.

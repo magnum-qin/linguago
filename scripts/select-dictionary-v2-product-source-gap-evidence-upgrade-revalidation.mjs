@@ -57,10 +57,12 @@ const eligible = rows
   .filter((row) => !KNOWN_SEMANTIC_RESIDUALS.has(semanticResidualKey(row)))
   .map((row) => {
     const historyRow = historyByEntry.get(String(row.source_entry_id));
-    const isFresh = freshEntries.has(String(row.source_entry_id));
+    const wasInFreshSnapshot = freshEntries.has(String(row.source_entry_id));
     const evidence = new Set(historyRow?.evidence || []);
+    if (evidence.has("review_reject")) return null;
+    const isFresh = wasInFreshSnapshot && !historyRow;
     const qidLock = row.reverse_evidence_prefilter?.wikidata_hint_lock;
-    if (!isFresh && (!qidLock?.locked || evidence.has("review_reject"))) return null;
+    if (!isFresh && !qidLock?.locked) return null;
     return {
       ...row,
       evidence_upgrade_revalidation: {
@@ -101,6 +103,10 @@ const summary = {
   excluded_review_rejects: rows.filter((row) =>
     (historyByEntry.get(String(row.source_entry_id))?.evidence || []).includes("review_reject")
   ).length,
+  stale_fresh_snapshot_rows: rows.filter((row) => {
+    const entryId = String(row.source_entry_id);
+    return freshEntries.has(entryId) && historyByEntry.has(entryId);
+  }).length,
   require_single_hint_per_language: true,
   revalidation_requires_unique_wikidata_qid: true
 };
