@@ -3441,6 +3441,36 @@ exist.
   unique exact-lexentry candidates to 155 strict candidates. A refreshed
   all-history index scanned 2,875 reports with zero parse failures and recorded
   20,981 source entries / 28,112 entry-sense attempts.
+
+### 2026-08-12 v93 Wikidata QID and alias boundary
+
+- `prefilter-dictionary-v2-product-source-gap-reverse-evidence.mjs` now has an
+  opt-in `--lock-hints-to-unique-wikidata-concept true` gate. It narrows terms
+  only when exactly one Wikidata QID covers every candidate language and the
+  intersection with each existing hint list contains exactly one term. The QID
+  and locked terms are retained in the report; ambiguous or incomplete QIDs do
+  not change the hints.
+- Expanding exact-label Wikidata evidence locked 80 of 166 strict candidates,
+  but after history and current-product exclusions only 15 real gaps remained.
+  Adding exact Wikidata alias matches increased strict candidates to 171 and
+  real unlinked single-hint candidates to 19 (13 fresh, 6 evidence-upgrade
+  revalidations). This is evidence expansion, not a weaker source-family gate.
+- `select-dictionary-v2-product-source-gap-evidence-upgrade-revalidation.mjs`
+  builds an auditable bounded cohort. It prioritizes fresh rows, excludes all
+  historical `review_reject` rows, requires a unique QID for historical
+  revalidation, and excludes senses already linked to accepted or draft product
+  rows. Always pass the current product DB with `--product-db`.
+- A first 20-row diagnostic accidentally included 19 already-complete product
+  senses; generation correctly skipped them. This is why product-link exclusion
+  belongs before model review, not only inside the generation script.
+- The corrected 19-row real-gap cohort passed Qwen at 18/19, but independent
+  Gemma accepted only 15/18. `excrecao` had a Chinese waste-noun versus
+  excretion-process mismatch. `dobragem` and `arsenio` exposed pt-PT headwords
+  incorrectly treated as pt-BR (`dublagem` and `arsenico` are the expected
+  Brazilian forms). No generation or database write followed this failed gate.
+- Current conclusion: exact WikDict lexentry plus unique Wikidata QID is useful,
+  but the remaining tail still needs a pt-PT/pt-BR source-language correction
+  layer and stricter target POS/process alignment before another scale pilot.
 - After entry-level history exclusion and single-hint filtering, only three
   genuinely fresh rows remain: `glicogenio`, `dobragem`, and
   `radiotelescopio`. This is below the 20-row gate, so the exact-lexentry lane

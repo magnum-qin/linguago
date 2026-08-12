@@ -87,6 +87,8 @@ const ptPronunciationDbPath = path.resolve(
 );
 const excludeCapitalizedAnchor = args["exclude-capitalized-anchor"] !== "false";
 const excludeAmbiguousOmw = args["exclude-ambiguous-omw"] !== "false";
+const lockHintsToUniqueWikidataConcept =
+  args["lock-hints-to-unique-wikidata-concept"] === "true";
 
 for (const filePath of [
   sourceDbPath,
@@ -180,6 +182,14 @@ const findSupplementalByTerm = supplementalDb?.prepare(`
   WHERE normalized_key = ? AND lang = ?
   ORDER BY source_key, concept_id, english_gloss
 `);
+const findWikidataConceptRowsByEnglish = lockHintsToUniqueWikidataConcept
+  ? supplementalDb?.prepare(`
+      SELECT source_key, source_family, lang, term, english_gloss, concept_id
+      FROM lexical_evidence
+      WHERE english_normalized_key = ? AND source_family = 'wikidata'
+      ORDER BY concept_id, lang, term
+    `)
+  : null;
 const ptPronunciationDb = requirePtPronunciation
   ? new Database(ptPronunciationDbPath, { readonly: true, fileMustExist: true })
   : null;
@@ -202,7 +212,8 @@ const selected = supported.slice(0, limit).map((item) => ({
   reverse_evidence_prefilter: {
     matching_sources: item.evidence?.matching_sources || [],
     match_ratio: item.evidence?.match_ratio ?? null,
-    target_coverage_count: item.target_coverage_count
+    target_coverage_count: item.target_coverage_count,
+    wikidata_hint_lock: item.wikidata_hint_lock
   }
 }));
 const summary = {
@@ -237,7 +248,8 @@ const summary = {
     ? path.relative(process.cwd(), supplementalSourceDbPath)
     : null,
   exclude_capitalized_anchor: excludeCapitalizedAnchor,
-  exclude_ambiguous_omw: excludeAmbiguousOmw
+  exclude_ambiguous_omw: excludeAmbiguousOmw,
+  lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept
 };
 const output = {
   ...report,
@@ -278,7 +290,8 @@ const evidenceOutput = {
     ),
     pt_pronunciation_db: requirePtPronunciation ? path.relative(process.cwd(), ptPronunciationDbPath) : null,
     exclude_capitalized_anchor: excludeCapitalizedAnchor,
-    exclude_ambiguous_omw: excludeAmbiguousOmw
+    exclude_ambiguous_omw: excludeAmbiguousOmw,
+    lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept
   },
   summary,
   validations
@@ -368,7 +381,12 @@ function validateCandidate(row) {
         matching_omw_synsets: alignedOmw.matchingSynsets
       });
     }
-    const generationHints = buildGenerationHints(row, anchor, alignedOmw);
+    const rawGenerationHints = buildGenerationHints(row, anchor, alignedOmw);
+    const wikidataHintLock = lockGenerationHintsToUniqueWikidataConcept(
+      rawGenerationHints,
+      anchor
+    );
+    const generationHints = wikidataHintLock.generation_hints;
     const independentTargetEvidence = Object.entries(generationHints).filter(([lang, value]) =>
       lang !== sourceLang &&
       lang !== "en" &&
@@ -412,6 +430,7 @@ function validateCandidate(row) {
     ).length;
     return result(row, "supported", "strong_reverse_dictionary_evidence", details, {
       generation_hints: generationHints,
+      wikidata_hint_lock: wikidataHintLock.audit,
       target_coverage_count: targetCoverageCount,
       omw_target_coverage_count: omwTargetCoverageCount
     });
@@ -575,6 +594,76 @@ function buildGenerationHints(row, anchor, alignedOmw = alignedOmwTargetTerms(ro
     }
   }
   return hints;
+}
+
+function lockGenerationHintsToUniqueWikidataConcept(generationHints, anchor) {
+  if (!lockHintsToUniqueWikidataConcept || !findWikidataConceptRowsByEnglish) {
+    return { generation_hints: generationHints, audit: { enabled: false, locked: false } };
+  }
+
+  const rows = anchorCandidates(anchor).flatMap((candidate) =>
+    findWikidataConceptRowsByEnglish.all(normalizeTerm(candidate))
+  );
+  const concepts = new Map();
+  for (const row of rows) {
+    if (!row.concept_id || !generationHints[row.lang]?.terms?.length) continue;
+    if (!concepts.has(row.concept_id)) concepts.set(row.concept_id, new Map());
+    const byLang = concepts.get(row.concept_id);
+    if (!byLang.has(row.lang)) byLang.set(row.lang, []);
+    byLang.get(row.lang).push(row.term);
+  }
+
+  const requiredLangs = Object.keys(generationHints);
+  const qualified = [];
+  for (const [conceptId, termsByLang] of concepts) {
+    const lockedTerms = {};
+    let valid = true;
+    for (const lang of requiredLangs) {
+      const hintKeys = new Set(generationHints[lang].terms.map(normalizeTerm));
+      const matches = unique(termsByLang.get(lang) || []).filter((term) =>
+        hintKeys.has(normalizeTerm(term))
+      );
+      if (matches.length !== 1) {
+        valid = false;
+        break;
+      }
+      lockedTerms[lang] = matches[0];
+    }
+    if (valid) qualified.push({ concept_id: conceptId, terms: lockedTerms });
+  }
+
+  if (qualified.length !== 1) {
+    return {
+      generation_hints: generationHints,
+      audit: {
+        enabled: true,
+        locked: false,
+        qualified_concept_count: qualified.length,
+        qualified_concept_ids: qualified.map((item) => item.concept_id)
+      }
+    };
+  }
+
+  const match = qualified[0];
+  const lockedHints = Object.fromEntries(
+    Object.entries(generationHints).map(([lang, value]) => [
+      lang,
+      {
+        ...value,
+        terms: [match.terms[lang]],
+        wikidata_concept_lock: match.concept_id
+      }
+    ])
+  );
+  return {
+    generation_hints: lockedHints,
+    audit: {
+      enabled: true,
+      locked: true,
+      concept_id: match.concept_id,
+      terms: match.terms
+    }
+  };
 }
 
 function orderGenerationHintTerms(lang, terms, anchor, provenance) {

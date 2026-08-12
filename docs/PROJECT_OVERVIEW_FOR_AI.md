@@ -6,6 +6,25 @@ This is the high-signal briefing for AI coding agents working in this repository
 
 LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and dictionary lookup, with dictionary-first word lookup, provider/model switching, KV caching, and structured streaming translation.
 
+## Latest Dictionary Work Boundary (2026-08-12)
+
+- Production remains the stable v93 D1/Worker baseline. The local product DB
+  also contains a separately audited, unpublished 32-sense increment; do not
+  infer that local counts are already online.
+- The current expansion blocker is semantic evidence capacity, not Unsloth
+  connectivity. Exact shared WikDict lexentry alignment is one Wiktionary
+  family and never counts as multiple independent sources.
+- Candidate hints can now be narrowed with
+  `--lock-hints-to-unique-wikidata-concept true`, but only for one unique QID
+  with one exact intersecting term in every language.
+- Always run
+  `dict:v2:coverage:select-evidence-upgrade-revalidation` with the current
+  `--product-db` before remote review. It excludes accepted/draft product links
+  and historical quality rejects.
+- The latest real-gap alias/QID pilot reached Qwen 18/19 but Gemma only 15/18,
+  below the 90% gate. No product DB write occurred. Fix pt-PT versus pt-BR source
+  labels and noun/process target mismatches before the next production pilot.
+
 ## Current Architecture
 
 - Frontend: Vue 3 + Vuetify + Tailwind CSS built by Vite.

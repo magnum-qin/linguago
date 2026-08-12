@@ -84,6 +84,7 @@
     "dict:v2:coverage:append-supplemental-evidence": "node scripts/append-supplemental-evidence-db.mjs",
     "dict:v2:coverage:build-definition-repair": "node scripts/build-dictionary-v2-product-source-gap-definition-repair.mjs",
     "dict:v2:coverage:index-source-gap-attempts": "node scripts/build-dictionary-v2-product-source-gap-attempt-index.mjs",
+    "dict:v2:coverage:select-evidence-upgrade-revalidation": "node scripts/select-dictionary-v2-product-source-gap-evidence-upgrade-revalidation.mjs",
     "dict:v2:coverage:source-gap-residuals": "node scripts/report-dictionary-v2-product-source-gap-residuals.mjs",
     "dict:v2:merge:senses": "node scripts/merge-dictionary-v2-senses.mjs",
     "dict:v2:create-llm-jobs": "node scripts/create-dictionary-v2-llm-jobs.mjs",
