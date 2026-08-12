@@ -8,9 +8,13 @@ LinguaGo is a Cloudflare-hosted Vue PWA for multilingual translation and diction
 
 ## Latest Dictionary Work Boundary (2026-08-12)
 
-- Production remains the stable v93 D1/Worker baseline. The local product DB
-  also contains a separately audited, unpublished 32-sense increment; do not
-  infer that local counts are already online.
+- Production is v94. D1 and the local audited export agree at 31,106 entries,
+  37,331 senses, 149,324 sense localizations, 3,030 examples, and 11,898 example
+  localizations. Cache version is `v94-evidence-final58-31106`; Worker Version
+  ID is `03b6efac-2fc0-4b25-b5e6-8fa3a18b6fc9`.
+- The v94 release includes all audited local increments accumulated after the
+  prior v93 deployment: net `+50` entries and `+58` publishable senses. Eight
+  additional generated rows remain unpublished drafts/manual review.
 - The current expansion blocker is semantic evidence capacity, not Unsloth
   connectivity. Exact shared WikDict lexentry alignment is one Wiktionary
   family and never counts as multiple independent sources.
@@ -853,16 +857,17 @@ Cache version is `v93-strict-fresh115-31056`; D1 `published_at` is
 `2026-08-11T12:22:19.638Z`, and Worker Version ID is
 `5161673d-b817-4b1e-82b1-484d676c2974`.
 
-## Latest local-only dictionary delta (2026-08-12)
+## V94 evidence-final58 release (2026-08-12)
 
-The local product database contains eight additional pt-BR source-gap senses
-from the locale-gated WikDict/Wikidata-alias pilot, for 37,321 publishable
-senses. This delta is not deployed. Generation normalizes Chinese target terms
-and definitions to Simplified Chinese before pinyin generation, and promotion
-rechecks that constraint. Bounded promotions must pass the cohort report with
-`--restrict-to-report true`; do not promote by source prefix and limit alone.
-All local fast, published-risk, full export, and in-memory import audits pass
-with blocking counts at zero.
+The production package is `outputs/d1-v93-final10-main`. Fast audit,
+published-risk, native export, full memory import, remote count verification,
+online dictionary regression, focused API checks, and mobile/desktop render
+checks all pass. D1 `published_at` is `2026-08-12T14:29:23.239Z`.
+
+Generation normalizes Chinese target terms and definitions to Simplified
+Chinese before pinyin generation, and promotion rechecks that constraint.
+Bounded promotions must pass the cohort report with `--restrict-to-report true`;
+do not promote by source prefix and limit alone.
 
 The subsequent independent-evidence capacity check did not open another
 production batch. The exact WikDict/Wikidata lane has only four historical

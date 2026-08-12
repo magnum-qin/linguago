@@ -3308,3 +3308,14 @@ from the validation copy. The reverse-evidence gate again selected exactly 10
 rows, and promote accepted 10/10. The main export is
 `outputs/d1-v93-final10-main` with the same counts and zero blocking fields.
 Eight generated rows remain draft/manual review. D1 and Worker remain unchanged.
+
+The accumulated audited main DB was subsequently released as v94. Before the
+push, export the remote D1 with `wrangler d1 export --remote`; the backup for
+this release is
+`backups/linguago-dictionary-before-v93-final10-20260812-233445.sql`, SHA-256
+`E0D9057EC93F3D6F21FCC023B5531F2862CCA999F5519BE49FF7F36BD8BB163F`.
+The native push verified 31,106 entries, 37,331 senses, and 149,324
+localizations remotely. Cache `v94-evidence-final58-31106` was deployed as
+Worker Version ID `03b6efac-2fc0-4b25-b5e6-8fa3a18b6fc9`. Update focused
+expected counts in the same release; otherwise the API check reports a stale
+baseline even when D1 and `/health` are correct.

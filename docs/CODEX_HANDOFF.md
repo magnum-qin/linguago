@@ -3736,4 +3736,18 @@ exist.
 - The main export at `outputs/d1-v93-final10-main` has 31,106 entries, 37,331
   senses, and 149,324 localizations. All blocking integrity fields and
   `flagged_senses` are zero. Ten senses are newly publishable; eight additional
-  rows remain unpublished drafts. D1 and Worker remain unchanged.
+  rows remain unpublished drafts.
+- The complete accumulated local delta was released as v94. Remote D1 was
+  backed up to
+  `backups/linguago-dictionary-before-v93-final10-20260812-233445.sql`
+  (130,356,807 bytes, SHA-256
+  `E0D9057EC93F3D6F21FCC023B5531F2862CCA999F5519BE49FF7F36BD8BB163F`).
+  The 19-chunk push verified remote counts against the manifest.
+- Production D1 now has 31,106 entries, 37,331 senses, 149,324 localizations,
+  3,030 examples, and 11,898 example localizations; `published_at` is
+  `2026-08-12T14:29:23.239Z`. Worker cache is
+  `v94-evidence-final58-31106`; deployed Worker Version ID is
+  `03b6efac-2fc0-4b25-b5e6-8fa3a18b6fc9`.
+- Online dictionary regression, updated focused counts, all ten newly promoted
+  term checks, and mobile/desktop render checks passed. No horizontal overflow
+  was detected.

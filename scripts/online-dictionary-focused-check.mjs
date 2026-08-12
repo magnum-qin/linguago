@@ -5,9 +5,9 @@ const baseUrl = process.env.PWA_URL || 'https://translation-pwa.qhzggzh-linguago
 const outDir = path.resolve('output/online-dictionary-focused-check');
 const langs = ['zh', 'en', 'pt-BR', 'ja'];
 const expectedCounts = {
-  entries: 31056,
-  senses: 37273,
-  sense_localizations: 149092,
+  entries: 31106,
+  senses: 37331,
+  sense_localizations: 149324,
   examples: 3030,
   example_localizations: 11898
 };
@@ -67,6 +67,16 @@ const cases = [
     expectedReadings: ['/su.pe.si.me.\u02c8t\u027ei.\u0250/'],
     expectedTerms: ['supersymmetry', '\u8d85\u5bf9\u79f0', '\u8d85\u5bfe\u79f0\u7406\u8ad6']
   },
+  { id: 'v94-unilateralmente', term: 'unilateralmente', minSenses: 1, expectedTerms: ['one-sidedly'] },
+  { id: 'v94-paleontologia', term: 'paleontologia', minSenses: 1, expectedTerms: ['paleontology'] },
+  { id: 'v94-atalaia', term: 'atalaia', minSenses: 1, expectedTerms: ['watchtower'] },
+  { id: 'v94-taxonomia', term: 'taxonomia', minSenses: 1, expectedTerms: ['taxonomy'] },
+  { id: 'v94-embriologia', term: 'embriologia', minSenses: 1, expectedTerms: ['embryology'] },
+  { id: 'v94-condimento', term: 'condimento', minSenses: 1, expectedTerms: ['condiment'] },
+  { id: 'v94-climatologia', term: 'climatologia', minSenses: 1, expectedTerms: ['climatology'] },
+  { id: 'v94-mineralogia', term: 'mineralogia', minSenses: 1, expectedTerms: ['mineralogy'] },
+  { id: 'v94-corola', term: 'corola', minSenses: 1, expectedTerms: ['corolla'] },
+  { id: 'v94-racionalismo', term: 'racionalismo', minSenses: 1, expectedTerms: ['rationalism'] },
   {
     id: 'ja-protractor-form-lookup',
     term: '\u5206\u5ea6\u5668',
