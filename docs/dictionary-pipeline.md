@@ -3490,6 +3490,15 @@ in the 15-row single-anchor pool. Multi-term hints are not publication evidence
 and cannot fill a bounded gate. QID locking uses a one-time in-memory Wikidata
 index; do not restore per-anchor scans of the full lexical-evidence table.
 
+The next target-evidence expansion added six exact, POS-bound, dual-reviewed
+OpenHowNet Chinese terms to the 15-row Dicionário Aberto pool. The resulting
+21-row source-definition gate retained only 17 rows after requiring Qwen and
+Gemma approval plus an identical supporting definition order. This is below
+the 18/20 gate, so the reviewed evidence remains research-only and no draft is
+generated. Exact Chinese hint intersection is available through
+`probe-openhownet-source-gap-deficits.mjs --require-exact-zh-hint-intersection
+true`; it must remain default-off and followed by dual-model review.
+
 ## v85b Controlled-Consensus Release (2026-08-06)
 
 A fresh exact-sense batch used Qwen generation, deterministic four-language

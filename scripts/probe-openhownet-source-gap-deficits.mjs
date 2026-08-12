@@ -12,6 +12,8 @@ const evidenceDbPath = requiredPath(args['evidence-db']);
 const outPath = path.resolve(args.out || 'logs/product-source-gap-openhownet-research-probe.json');
 const scope = String(args.scope || 'deficits').trim().toLowerCase();
 if (!['deficits', 'all'].includes(scope)) throw new Error(`Unsupported --scope: ${scope}`);
+const requireExactZhHintIntersection =
+  args['require-exact-zh-hint-intersection'] === 'true';
 const lang = String(args.lang || '').trim();
 const limit = integer(args.limit, Number.MAX_SAFE_INTEGER, 1);
 const excludeProbePaths = String(args['exclude-probes'] || args['exclude-probe'] || '')
@@ -125,7 +127,9 @@ const probes = targets.map((row) => {
     unique_term_count: terms.length,
     ambiguity: terms.length === 0 ? 'unmatched' : terms.length === 1 ? 'single_term' : 'multiple_terms',
     terms,
-    concepts: boundMatches
+    concepts: boundMatches,
+    zh_hint_terms: generationHintTerms(row, 'zh'),
+    zh_evidence_deficit: hasZhEvidenceDeficit(row)
   };
 });
 db.close();
@@ -133,6 +137,11 @@ db.close();
 const matched = probes.filter((row) => row.exact_match);
 const researchCandidates = probes
   .filter((row) => row.sense_binding === 'exact_pos_single_term')
+  .filter((row) => !requireExactZhHintIntersection || (
+    row.zh_evidence_deficit && row.zh_hint_terms.some((term) =>
+      normalizeTargetTerm(term) === normalizeTargetTerm(row.exact_pos_terms[0])
+    )
+  ))
   .map((row) => ({
     candidate_key: row.candidate_key,
     word: row.word,
@@ -177,6 +186,7 @@ const output = {
     exact_english_anchor_only: true,
     publication_evidence: false,
     generation_allowed: false,
+    require_exact_zh_hint_intersection: requireExactZhHintIntersection,
     historical_candidate_keys_excluded: excludedCandidateKeys.size,
     exclude_review_dir: excludeReviewDir ? relative(excludeReviewDir) : null,
     exclude_review_pattern: excludeReviewDir ? excludeReviewPattern : null,
@@ -200,6 +210,8 @@ const output = {
     exact_pos_bound_rows: matched.filter((row) => row.sense_binding.startsWith('exact_pos_')).length,
     exact_pos_single_term_rows: matched.filter((row) => row.sense_binding === 'exact_pos_single_term').length,
     exact_pos_multiple_term_rows: matched.filter((row) => row.sense_binding === 'exact_pos_multiple_terms').length,
+    filtered_research_candidates: researchCandidates.length,
+    filtered_selection_candidates: selectionCandidates.length,
     internal_pos_only_rows: matched.filter((row) => row.sense_binding === 'internal_pos_only').length,
     pos_conflict_rows: matched.filter((row) => row.sense_binding === 'pos_conflict').length,
     unmatched: probes.filter((row) => !row.exact_match).length
@@ -215,6 +227,20 @@ console.log(JSON.stringify({ out: relative(outPath), ...output.summary }, null, 
 
 function normalize(value) {
   return String(value || '').normalize('NFKC').toLocaleLowerCase('en').trim().replace(/\s+/gu, ' ');
+}
+
+function normalizeTargetTerm(value) {
+  return String(value || '').normalize('NFKC').toLocaleLowerCase('zh').trim();
+}
+
+function generationHintTerms(row, targetLang) {
+  return unique((row.generation_hints?.[targetLang]?.terms || []).map(String));
+}
+
+function hasZhEvidenceDeficit(row) {
+  if (row.reason === 'insufficient_independent_target_evidence') return true;
+  return (row.existing_localization_roundtrip?.checks || [])
+    .some((check) => check.lang === 'zh' && check.passed === false);
 }
 
 function inferExpectedPos(row) {

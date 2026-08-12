@@ -3203,6 +3203,42 @@ exist.
   write drafts until at least five additional candidates are supplied by a
   genuinely independent, sense-bound source.
 
+### 2026-08-12 Dicionario Aberto target-evidence expansion gate
+
+- Re-exporting EJDict against all 735 fresh Dicionário Aberto candidates found
+  148 exact English/Japanese intersections, but all were already present in
+  the v93 combined evidence DB. The merge added zero rows, so EJDict is
+  exhausted for this cohort.
+- A new OpenHowNet diagnostic used only candidate rows not present in any prior
+  OpenHowNet review. Of 656 untouched rows, 126 had one POS-bound OpenHowNet
+  Chinese term. Requiring an existing Chinese evidence deficit and exact term
+  equality with the candidate's Chinese generation hint reduced this to six:
+  `racionalismo`, `embriologia`, `climatologia`, `mineralogia`, `cóclea`, and
+  `olivina`.
+- `probe-openhownet-source-gap-deficits.mjs` implements this default-off gate
+  as `--require-exact-zh-hint-intersection true`. The report records the gate
+  and now reports the filtered research/selection candidate counts. It does
+  not permit generation or publication by itself.
+- Qwen 35B MTP and Gemma 4 31B accepted all six OpenHowNet bindings. Exporting
+  their strict consensus added six reviewed OpenHowNet rows and raised the
+  target-qualified Dicionário Aberto pool from 15 to 21.
+- The subsequent Dicionário Aberto definition review did not pass the release
+  gate. Qwen approved 19/21 and Gemma 18/21, but requiring both approval and a
+  shared supporting definition order retained only 17/21. `albina` is a
+  mineral in the supplied definition, `vagueza` is a historical painting term,
+  and `calejado` does not match the modern sexual sense of `horny`. For
+  `cóclea`, Qwen selected the historical `Caracol` definition while Gemma
+  selected a mixed `Canal auditivo / Parafuso de Archimedes` definition; the
+  order intersection is empty and must remain blocked.
+- OpenHowNet multiple-term candidates add no fallback capacity: none of their
+  terms intersects the existing Chinese generation hints for the outstanding
+  Chinese evidence deficits. Do not ask a model to select from this unrelated
+  term set.
+- No translation generation, draft insertion, product DB write, D1 update, or
+  Worker deployment followed this failed 17/21 gate. The next expansion needs
+  another independent target dictionary or a new non-overlapping source-gap
+  lane; do not lower the 18/20 threshold.
+
 ### 2026-08-11 ECDICT low-risk generation and isolated promotion
 
 - Reviewing the remaining low-risk cohort produced `144/165` strict Qwen/Gemma
