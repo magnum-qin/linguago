@@ -871,3 +871,11 @@ Qwen/Gemma consensus on 15/20, below the required 18/20, so it produced no
 reviewed evidence, LLM translations, drafts, or database writes. The next pool
 must improve sense-specific Chinese evidence selection; do not lower the
 consensus threshold or reuse stale fresh snapshots.
+
+The ECDICT second-tier residual now has an additional deterministic target-term
+gate. It requires all exact English anchors for a candidate to intersect the
+same single Chinese generation hint, using strict token boundaries. This leaves
+9/24 candidates, including only 2/9 from the earlier semantic-risk subset. The
+cohort is below the 20-row model-review minimum, so it remains local and
+unpublished. Combine it with at least 11 newly bound independent-evidence rows
+before invoking Qwen/Gemma; do not relax the gate or write these rows directly.

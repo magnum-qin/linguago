@@ -3658,3 +3658,23 @@ exist.
   `surata` (conflicting source meaning). No reviewed evidence was exported, no
   translation generation ran, and the product database was not modified by
   this failed gate.
+
+### 2026-08-12 v93 ECDICT exact target-hint gate
+
+- The 24-row ECDICT second-tier residual is not a clean translation batch. Many
+  rows combine multiple historical English, Chinese, or Japanese hints. A new
+  read-only gate, `gate-ecdict-source-gap-hint-intersections.mjs`, requires
+  every exact ECDICT English anchor to support the same single existing Chinese
+  generation hint before a candidate can enter model review.
+- Chinese extraction uses complete token boundaries. It must not truncate an
+  alphanumeric term such as `凝血因子II` into the false exact match `凝血因子`.
+  This boundary bug was caught and fixed during the first dry report.
+- Of the nine previously low semantic-risk rows, only `paleontologia -> 古生物学`
+  and `baricentro -> 质心` qualify. Across all 24 residual rows, nine qualify;
+  the other seven are adjective-form resolutions such as `cubic -> 立方体的`
+  and still need the normal dual-model review.
+- Nine rows are below the 20-row remote-review gate. No model call, reviewed
+  evidence export, generation, product database write, D1 update, or Worker
+  deployment followed. The next safe action is to add at least 11 independently
+  bound Japanese or other target-evidence candidates, then run one bounded
+  dual-model review over the combined cohort.
