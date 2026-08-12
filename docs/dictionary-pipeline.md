@@ -3483,6 +3483,13 @@ Wiktionary family with WikDict. The unavailable historical PanLex API must not
 become a network dependency; any future PanLex snapshot import must preserve
 its underlying source groups.
 
+Dicionário Aberto multi-anchor diagnostics remain research-only. An expanded
+1,651-row structural pool yielded 124 target-supported rows, but only `corola`
+could be reduced to one four-language Wikidata QID and it was already present
+in the 15-row single-anchor pool. Multi-term hints are not publication evidence
+and cannot fill a bounded gate. QID locking uses a one-time in-memory Wikidata
+index; do not restore per-anchor scans of the full lexical-evidence table.
+
 ## v85b Controlled-Consensus Release (2026-08-06)
 
 A fresh exact-sense batch used Qwen generation, deterministic four-language

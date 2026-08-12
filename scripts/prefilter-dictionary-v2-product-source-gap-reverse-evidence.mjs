@@ -182,13 +182,8 @@ const findSupplementalByTerm = supplementalDb?.prepare(`
   WHERE normalized_key = ? AND lang = ?
   ORDER BY source_key, concept_id, english_gloss
 `);
-const findWikidataConceptRowsByEnglish = lockHintsToUniqueWikidataConcept
-  ? supplementalDb?.prepare(`
-      SELECT source_key, source_family, lang, term, english_gloss, concept_id
-      FROM lexical_evidence
-      WHERE english_normalized_key = ? AND source_family = 'wikidata'
-      ORDER BY concept_id, lang, term
-    `)
+const wikidataConceptRowsByEnglish = lockHintsToUniqueWikidataConcept && supplementalDb
+  ? buildWikidataConceptIndex(supplementalDb)
   : null;
 const ptPronunciationDb = requirePtPronunciation
   ? new Database(ptPronunciationDbPath, { readonly: true, fileMustExist: true })
@@ -597,12 +592,12 @@ function buildGenerationHints(row, anchor, alignedOmw = alignedOmwTargetTerms(ro
 }
 
 function lockGenerationHintsToUniqueWikidataConcept(generationHints, anchor) {
-  if (!lockHintsToUniqueWikidataConcept || !findWikidataConceptRowsByEnglish) {
+  if (!lockHintsToUniqueWikidataConcept || !wikidataConceptRowsByEnglish) {
     return { generation_hints: generationHints, audit: { enabled: false, locked: false } };
   }
 
   const rows = anchorCandidates(anchor).flatMap((candidate) =>
-    findWikidataConceptRowsByEnglish.all(normalizeTerm(candidate))
+    wikidataConceptRowsByEnglish.get(normalizeTerm(candidate)) || []
   );
   const concepts = new Map();
   for (const row of rows) {
@@ -664,6 +659,22 @@ function lockGenerationHintsToUniqueWikidataConcept(generationHints, anchor) {
       terms: match.terms
     }
   };
+}
+
+function buildWikidataConceptIndex(database) {
+  const index = new Map();
+  const rows = database.prepare(`
+    SELECT source_key, source_family, lang, term, english_gloss,
+      english_normalized_key, concept_id
+    FROM lexical_evidence
+    WHERE source_family = 'wikidata'
+    ORDER BY english_normalized_key, concept_id, lang, term
+  `).all();
+  for (const row of rows) {
+    if (!index.has(row.english_normalized_key)) index.set(row.english_normalized_key, []);
+    index.get(row.english_normalized_key).push(row);
+  }
+  return index;
 }
 
 function orderGenerationHintTerms(lang, terms, anchor, provenance) {

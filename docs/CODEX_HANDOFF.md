@@ -3179,6 +3179,30 @@ exist.
   The next expansion needs at least five additional entry-unique candidates
   with complete target evidence, or another independent sense-bound source.
 
+### 2026-08-12 Dicionario Aberto multi-anchor boundary
+
+- Allowing multi-term English anchors is research-only and must be explicitly
+  enabled with `--allow-multi-english-anchor true`. The default selector still
+  requires a single English anchor. The expanded structural pool contained
+  1,651 entry-unique rows; 124 passed the existing target-evidence diagnostic.
+- None of the 110 rows added beyond the single-anchor pool produced a unique
+  four-language Wikidata concept lock. Across the complete 124-row supported
+  set, only `corola` locked to `Q1840192`, and it was already one of the 15
+  single-anchor candidates. Multi-term surface agreement therefore adds zero
+  safe candidates and must not be used to pad the required 20-row gate.
+- The five manual single-anchor rows (`oficioso`, `gloriosamente`,
+  `concatenação`, `refracção`, and `assombrosamente`) have no strong reverse
+  dictionary evidence at all. They are not threshold-edge rows and cannot be
+  rescued by treating Dicionário Aberto as its own second source family.
+- Unique-QID locking previously queried the large evidence table once per
+  anchor and took longer than five minutes for 1,651 rows. The prefilter now
+  loads the approximately 1,406 Wikidata rows into an in-memory index once.
+  The same 124-row lock pass completes in about 9.4 seconds and the full
+  1,651-row diagnostic in about 30.1 seconds, without changing lock semantics.
+- Current capacity remains 15 fresh candidates. Do not call Qwen/Gemma or
+  write drafts until at least five additional candidates are supplied by a
+  genuinely independent, sense-bound source.
+
 ### 2026-08-11 ECDICT low-risk generation and isolated promotion
 
 - Reviewing the remaining low-risk cohort produced `144/165` strict Qwen/Gemma

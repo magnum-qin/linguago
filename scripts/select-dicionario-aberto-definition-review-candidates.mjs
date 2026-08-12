@@ -12,6 +12,7 @@ const dbPath = requiredPath(args.db, 'db');
 const outPath = path.resolve(required(args.out, 'out'));
 const limit = positiveInteger(args.limit, 20);
 const maxDefinitions = positiveInteger(args['max-definitions'], 1);
+const allowMultiEnglishAnchor = booleanValue(args['allow-multi-english-anchor'], false);
 const excludePaths = csv(args['exclude-reviews']).map((value) => requiredPath(value, 'exclude-reviews'));
 const eligibleReportPath = args['eligible-report']
   ? requiredPath(args['eligible-report'], 'eligible-report')
@@ -96,7 +97,8 @@ const output = {
     exact_source_headword: true,
     known_part_of_speech: true,
     maximum_dictionary_definitions: maxDefinitions,
-    single_english_anchor: true,
+    single_english_anchor: !allowMultiEnglishAnchor,
+    multi_english_anchor_requires_downstream_deterministic_binding: allowMultiEnglishAnchor,
     exclude_cross_reference_only_definitions: true,
     exclude_historical_attempt_entries: true,
     exclude_existing_product_entries: true,
@@ -145,10 +147,13 @@ function assess(row) {
   if (!['noun', 'verb', 'adjective', 'adverb'].includes(pos)) reasons.push('unknown_part_of_speech');
   if (definitions.length < 1 || definitions.length > maxDefinitions) reasons.push('definition_count_out_of_range');
   if (!usableDefinitions.length) reasons.push('no_usable_definition');
-  if (!anchor || /[;|/]/u.test(anchor) || /\b(?:or|and)\b/iu.test(anchor)) {
+  if (!anchor || (!allowMultiEnglishAnchor && (/[;|/]/u.test(anchor) || /\b(?:or|and)\b/iu.test(anchor)))) {
     reasons.push('non_single_english_anchor');
   }
-  if (!/^[a-z][a-z '-]{1,60}$/iu.test(anchor)) reasons.push('invalid_english_anchor_shape');
+  const anchorShape = allowMultiEnglishAnchor
+    ? /^[a-z][a-z '|/;-]{1,180}$/iu
+    : /^[a-z][a-z '-]{1,60}$/iu;
+  if (!anchorShape.test(anchor)) reasons.push('invalid_english_anchor_shape');
   if (/^(?:thing|person|place|state|act|action|object|matter|quality|condition)$/iu.test(anchor)) {
     reasons.push('generic_english_anchor');
   }
@@ -208,5 +213,6 @@ function csv(value) { return String(value || '').split(',').map((item) => item.t
 function required(value, name) { if (!value) throw new Error(`Missing --${name}`); return String(value); }
 function requiredPath(value, name) { const result = path.resolve(required(value, name)); if (!fs.existsSync(result)) throw new Error(`File not found: ${result}`); return result; }
 function positiveInteger(value, fallback) { const parsed = Number(value ?? fallback); if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`Invalid positive integer: ${value}`); return parsed; }
+function booleanValue(value, fallback) { if (value === undefined) return fallback; return !['false', '0', 'no'].includes(String(value).toLowerCase()); }
 function relative(value) { return path.relative(process.cwd(), value); }
 function parseArgs(argv) { const out = {}; for (let index = 0; index < argv.length; index += 1) { const token = argv[index]; if (!token.startsWith('--')) continue; const key = token.slice(2); const next = argv[index + 1]; out[key] = next && !next.startsWith('--') ? argv[++index] : true; } return out; }
