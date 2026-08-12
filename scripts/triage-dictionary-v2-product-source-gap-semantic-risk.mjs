@@ -2,8 +2,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import * as OpenCC from 'opencc-js';
 
 const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
+const traditionalToSimplified = OpenCC.Converter({ from: 'tw', to: 'cn' });
 const args = parseArgs(process.argv.slice(2));
 const reportPath = requiredPath(args.report, 'report');
 const outPath = requiredPath(args.out, 'out');
@@ -70,6 +72,11 @@ function assess(row) {
   else if (maxTargetHints > 2) add('target_hint_fanout_gt_2', 1);
   if (targetHintCount > 8) add('total_target_hints_gt_8', 3);
   else if (targetHintCount > 6) add('total_target_hints_gt_6', 1);
+  for (const lang of targetLangs) {
+    if (hasDistinctHintChoices(lang, hints[lang])) {
+      add(`distinct_${lang}_hint_choices`, pos ? 3 : 5);
+    }
+  }
 
   const english = hints.en.map(normalizeLatin);
   if (english.some((value) => /^(?:sense|failure|original|job|task|thing|person|place|state|act|action)$/u.test(value))) {
@@ -205,6 +212,17 @@ function normalizePos(value) {
 
 function normalizeLatin(value) {
   return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/gu, '').toLowerCase().trim();
+}
+
+function hasDistinctHintChoices(lang, values) {
+  if (values.length < 2) return false;
+  const normalized = values.map((value) => {
+    const text = String(value || '').normalize('NFKC').trim().toLocaleLowerCase('und');
+    if (lang === 'zh') return traditionalToSimplified(text);
+    if (lang === 'en') return text.replace(/\bcentre\b/gu, 'center').replace(/[\s-]+/gu, ' ');
+    return text;
+  });
+  return new Set(normalized).size > 1;
 }
 
 function countBy(rows, selector, flatten = false) {

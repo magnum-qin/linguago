@@ -3125,6 +3125,26 @@ exist.
   and `logs/product-source-gap-v90-production5000-ecdict-low-risk20-consensus.json`.
   No draft, product DB, D1, or Worker write occurred.
 
+### 2026-08-12 ECDICT second-tier exhaustion check
+
+- The original entry-unique ECDICT delta had 215 rows. The 165-row low-risk
+  cohort was already fully reviewed and later yielded the v91 release, so it
+  must be excluded before looking for another batch.
+- The 50 untouched rows are fresh and unlinked, but they are mostly low-frequency
+  Portuguese entries. Requiring ECDICT in the Chinese hint and at most two hints
+  per target leaves 24 rows.
+- The semantic-risk triage now treats distinct target hints as a real ambiguity,
+  while collapsing Traditional/Simplified Chinese equivalents and the English
+  `centre`/`center` spelling pair. This reduces the second-tier pool to nine
+  rows at risk score 4 or lower; only `paleontologia` and `baricentro` score 0.
+- Do not send this residual to a 20-row model gate or lower the 18/20 threshold.
+  The ECDICT lane is exhausted for automatic expansion until another independent,
+  sense-bound source resolves the remaining alternatives.
+- `subtract-dictionary-v2-product-source-gap-report.mjs` supports repeatable
+  family constraints through `--require-hint-family lang:family`, for example
+  `--require-hint-family zh:ecdict`. Runtime reports remain under `logs/` and
+  are not committed.
+
 ### 2026-08-11 ECDICT low-risk generation and isolated promotion
 
 - Reviewing the remaining low-risk cohort produced `144/165` strict Qwen/Gemma

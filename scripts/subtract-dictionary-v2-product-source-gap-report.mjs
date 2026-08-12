@@ -21,6 +21,7 @@ const minFirstSenseLangs = optionalPositiveInteger(
   args['min-first-sense-langs'],
   'min-first-sense-langs'
 );
+const requiredHintFamilies = parseRequiredHintFamilies(args['require-hint-family']);
 
 if (!excludePaths.length) throw new Error('Missing --exclude');
 
@@ -50,6 +51,11 @@ const eligible = selected.filter((row) => {
   if (
     minFirstSenseLangs &&
     Number(row.first_sense_clean_localization_lang_count || 0) < minFirstSenseLangs
+  ) return false;
+  if (
+    requiredHintFamilies.some(({ lang, family }) =>
+      !(row?.generation_hints?.[lang]?.evidence_families || []).includes(family)
+    )
   ) return false;
   if (singleHintPerTarget) {
     const targetLangs = ['en', 'pt-BR', 'zh', 'ja'].filter((lang) => lang !== row.source_lang);
@@ -97,6 +103,7 @@ const output = {
       max_total_target_hints: maxTotalTargetHints,
       min_word_length: minWordLength,
       min_first_sense_langs: minFirstSenseLangs,
+      required_hint_families: requiredHintFamilies,
       limit,
       remaining_rows: remaining.length
     }
@@ -133,6 +140,21 @@ function optionalPositiveInteger(value, name) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`Invalid --${name}: ${value}`);
   return parsed;
+}
+
+function parseRequiredHintFamilies(value) {
+  if (!value) return [];
+  return String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const separator = item.indexOf(':');
+      if (separator <= 0 || separator === item.length - 1) {
+        throw new Error(`Invalid --require-hint-family value: ${item}; expected lang:family`);
+      }
+      return { lang: item.slice(0, separator), family: item.slice(separator + 1) };
+    });
 }
 
 function readReport(filePath) {
