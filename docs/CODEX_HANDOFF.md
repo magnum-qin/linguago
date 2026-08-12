@@ -3700,3 +3700,34 @@ exist.
   OpenHowNet/Dicionário Aberto evidence, not by JMdict.
 - This is a useful importer/evidence fix but not additional translation-batch
   capacity. Do not count 58 source bindings as 58 generation candidates.
+
+### 2026-08-12 v93 independent-evidence final gate
+
+- `gate-ejdict-source-gap-hint-intersections.mjs` now provides a read-only
+  EJDict lane. It requires every exact English anchor to intersect the same
+  single Japanese generation hint and excludes historical review rejects.
+- A 20-row cohort was assembled from exact ECDICT intersections, previously
+  dual-reviewed Dicionario Aberto/OpenHowNet rows, exact EJDict locks, one fresh
+  strict candidate, and four unique-Wikidata revalidations. The initial Qwen
+  run used `max_tokens=420`; 17 responses were truncated. Retrying only invalid
+  rows with `max_tokens=800` and `max_seq_length=1536` produced 20 valid reviews.
+  Treat this as an output-budget failure, not a model-quality or network failure.
+- Qwen rejected three genuine term/sense mismatches. Replacements were
+  `modulacao -> 変調`, `racionalismo -> 合理主義`, and the aligned OMW sense
+  `goiva -> 圆凿`. A PowerShell-built temporary report initially encoded the
+  last Chinese generation hint as `??`; the source localization itself was
+  correct. Always inspect generated JSON as UTF-8 before blaming the model.
+- The replacement cohort passed Qwen 20/20. Independent Gemma 4 31B accepted
+  19/20; `cubico` remained reviewer disagreement and was excluded. Generation
+  dry-run then accepted 18/19 with zero network or JSON failures. The remaining
+  failure, `alternadamente`, repeated the Japanese term as its definition and
+  failed `thin_definition_ja`.
+- Post-generation reverse evidence is still mandatory. It retained only 10/18:
+  `unilateralmente`, `paleontologia`, `atalaia`, `taxonomia`, `embriologia`,
+  `condimento`, `climatologia`, `mineralogia`, `corola`, and `racionalismo`.
+  The other eight are drafts/manual review, even though both models agreed.
+- An isolated validation DB promoted those 10 rows. Fast audit, published-risk,
+  native D1 export, and full in-memory import all passed. The validated export
+  has 31,106 entries, 37,331 senses, and 149,324 localizations; all blocking
+  integrity fields and `flagged_senses` are zero. The main product DB, D1, and
+  Worker remain unchanged.

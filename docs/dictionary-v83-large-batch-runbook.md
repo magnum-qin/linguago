@@ -3273,3 +3273,33 @@ evidence achieved Qwen 19/20 and Gemma 19/19, but generation accepted only
 16/19 and included two non-JMdict Japanese terms. It is not production input.
 Applying the correct order left only three fresh rows after the refreshed
 history index, so this lane cannot supply another 20-row gate.
+
+## V93 exact-hint replacement cohort
+
+The next bounded lane combined exact ECDICT and EJDict hint intersections with
+previously reviewed definition evidence. Use this order:
+
+1. require four single generation hints and exclude all historical review rejects;
+2. run Qwen source review with `max_tokens=800` and `max_seq_length=1536`;
+3. replace semantic rejects only with a deterministic aligned source sense;
+4. run independent Gemma source review and require at least 18/20 consensus;
+5. generate with `apply=false` and enforce reviewed preferred terms;
+6. run post-generation reverse evidence before writing or promoting drafts;
+7. replay accepted outputs into an isolated DB, then promote only the reverse-
+   supported fixed checkpoint;
+8. run fast, published-risk, native export, and full memory-import audits.
+
+Measured funnel: 20 Qwen-approved candidates, 19 Qwen/Gemma consensus rows, 18
+valid generated rows, and 10 post-generation reverse-supported promotions. The
+model calls had zero network failures after the output budget was raised. Do
+not use model consensus as a replacement for reverse dictionary evidence.
+
+Two operational failures are now documented. First, `max_tokens=420` truncated
+17 strict structured reviews; retry only invalid rows with 800 tokens. Second,
+a PowerShell-generated temporary JSON changed `圆凿` to `??` inside
+`generation_hints`, while the source localization remained valid. Inspect the
+actual JSON/code points and repair the report before retrying the single row.
+
+The isolated export is `outputs/d1-v93-final10-validation` with 31,106 entries,
+37,331 senses, and 149,324 localizations. All blocking audit fields are zero.
+This is validation evidence only: production DB/D1/Worker remain unchanged.
