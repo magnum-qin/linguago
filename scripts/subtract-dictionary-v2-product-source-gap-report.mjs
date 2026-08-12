@@ -17,6 +17,10 @@ const singleHintPerTarget = args['single-hint-per-target'] === 'true';
 const maxHintsPerTarget = optionalPositiveInteger(args['max-hints-per-target'], 'max-hints-per-target');
 const maxTotalTargetHints = optionalPositiveInteger(args['max-total-target-hints'], 'max-total-target-hints');
 const minWordLength = optionalPositiveInteger(args['min-word-length'], 'min-word-length');
+const minFirstSenseLangs = optionalPositiveInteger(
+  args['min-first-sense-langs'],
+  'min-first-sense-langs'
+);
 
 if (!excludePaths.length) throw new Error('Missing --exclude');
 
@@ -43,6 +47,10 @@ const eligible = selected.filter((row) => {
   const senseId = row.source_sense_id ?? row.first_sense_id ?? row.output?.source_sense_id;
   if (excludedEntryWildcards.has(entryId) || excludedKeys.has(`${entryId}:${senseId}`)) return false;
   if (minWordLength && [...String(row.word || '')].length < minWordLength) return false;
+  if (
+    minFirstSenseLangs &&
+    Number(row.first_sense_clean_localization_lang_count || 0) < minFirstSenseLangs
+  ) return false;
   if (singleHintPerTarget) {
     const targetLangs = ['en', 'pt-BR', 'zh', 'ja'].filter((lang) => lang !== row.source_lang);
     if (!targetLangs.every((lang) => row?.generation_hints?.[lang]?.terms?.length === 1)) return false;
@@ -88,6 +96,7 @@ const output = {
       max_hints_per_target: maxHintsPerTarget,
       max_total_target_hints: maxTotalTargetHints,
       min_word_length: minWordLength,
+      min_first_sense_langs: minFirstSenseLangs,
       limit,
       remaining_rows: remaining.length
     }

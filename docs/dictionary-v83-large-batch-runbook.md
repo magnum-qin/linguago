@@ -3239,3 +3239,37 @@ exclude at source-entry level. The pool is exhausted, and the 32/63 final yield
 does not qualify this evidence path for an unattended bulk run. Acquire or
 align another independent source family, rebuild strict coverage, and repeat a
 fresh bounded gate before any further large batch. D1 remains unchanged.
+
+## Post-v93 residual gate result
+
+Do not infer semantic alignment from entry-level language coverage or from
+`first_sense_clean_localization_lang_count`. A fresh residual experiment found
+307 unattempted strict entries, but four independent 20-row Qwen source-review
+cohorts approved only 12, 12, 10, and 8 rows. Even the cohort requiring four
+clean first-sense localizations failed because the underlying fusion had joined
+parallel bilingual senses with different meanings.
+
+The subtraction helper accepts `--min-first-sense-langs <n>` for diagnostics.
+It is not an evidence gate. Before resuming generation, require target terms to
+share an exact independent lexentry or concept identifier with the source
+sense. Then run a fresh, entry-disjoint 20-row source review and require at
+least 18 approvals. If that gate fails, stop before Gemma, generation, or any
+database write.
+
+Exact lexentry alignment must not skip the independent-evidence stage. The
+required order is:
+
+1. build exact shared WikDict lexentry candidates;
+2. run strict reverse-evidence prefilter with at least two independent source
+   families for every non-source target;
+3. require localization round trip and a JMdict-backed Japanese hint;
+4. rebuild the all-history attempt index with prefix `product-source-gap`;
+5. exclude at source-entry level and require one generation hint per target;
+6. run a fresh 20-row Qwen/Gemma source-review gate;
+7. only then run Qwen generation with `apply=false`.
+
+The v93 diagnostic that reviewed exact lexentries before strict reverse
+evidence achieved Qwen 19/20 and Gemma 19/19, but generation accepted only
+16/19 and included two non-JMdict Japanese terms. It is not production input.
+Applying the correct order left only three fresh rows after the refreshed
+history index, so this lane cannot supply another 20-row gate.

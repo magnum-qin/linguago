@@ -3395,3 +3395,54 @@ exist.
   support is useful but not sufficient for bulk translation. A new production
   batch requires a fresh independent-evidence pool and a new bounded gate. The
   online D1/Worker remains on v93; this 32-sense increment is local only.
+
+### 2026-08-12 v93 fresh all-language source-review gates
+
+- Rebuilding the complete historical-attempt index left 307 genuinely
+  unattempted strict entries: 280 pt-BR, 24 Japanese, and 3 Chinese. These rows
+  are candidates only; none was written to the product database.
+- Four non-overlapping Qwen 35B source-review gates failed the required 18/20
+  threshold. The approved counts were 12/20 for the unfiltered pool, 12/20
+  after single-hint filtering, 10/20 after semantic-risk-zero triage, and 8/20
+  when requiring four clean localizations on the first sense.
+- The failures are semantic evidence defects, not API or JSON instability.
+  Typical errors include river bank versus financial bank, trajectory versus
+  ballistic trajectory, biological decay versus nuclear decay, and noun versus
+  process mismatches.
+- `first_sense_clean_localization_lang_count=4` is not proof that all four
+  localizations express one concept. The fusion source can still attach an
+  incorrect parallel bilingual sense to that source sense. Treat this field as
+  a completeness diagnostic only.
+- `subtract-dictionary-v2-product-source-gap-report.mjs` now supports
+  `--min-first-sense-langs`, but this option must not be used as publication
+  evidence. It is useful only for cohort analysis followed by strict review.
+- Do not proceed to Gemma consensus, generation, draft insertion, or D1 release
+  from this residual pool. The next data-quality change must bind target terms
+  to an exact lexentry or concept identifier from a genuinely independent
+  source, then pass a fresh non-overlapping 18/20 source-review gate.
+
+### 2026-08-12 v93 exact-lexentry residual boundary
+
+- Expanding exact shared WikDict lexentry alignment over the 23,057-row aligned
+  gap report produced 1,824 all-target rows. After the old historical-attempt
+  index, 317 appeared fresh. A single-hint diagnostic cohort reached Qwen
+  19/20 and independent Gemma 19/19, showing that exact lexentry plus one term
+  per target is a useful semantic-alignment signal.
+- That diagnostic cohort was intentionally generated only with `apply=false`.
+  Generation accepted 16/19. `bioma` and `sinodo` exposed Japanese terms not
+  present in JMdict, while `panetone` omitted the source-evidence verdict. No
+  draft or publishable row was written.
+- The diagnostic ordering was incomplete: exact WikDict lexentry alignment is
+  one Wiktionary family and must be followed by the normal strict independent
+  reverse-evidence prefilter before source review or generation. Do not reuse
+  the 19-row dry-run as a production cohort.
+- Re-running in the correct order used all-target independent evidence,
+  localization round trip, and `--require-jmdict-hint true`. This reduced 506
+  unique exact-lexentry candidates to 155 strict candidates. A refreshed
+  all-history index scanned 2,875 reports with zero parse failures and recorded
+  20,981 source entries / 28,112 entry-sense attempts.
+- After entry-level history exclusion and single-hint filtering, only three
+  genuinely fresh rows remain: `glicogenio`, `dobragem`, and
+  `radiotelescopio`. This is below the 20-row gate, so the exact-lexentry lane
+  is exhausted. Acquire or align another independent concept-ID source before
+  any further generation.
