@@ -3727,7 +3727,13 @@ exist.
   `condimento`, `climatologia`, `mineralogia`, `corola`, and `racionalismo`.
   The other eight are drafts/manual review, even though both models agreed.
 - An isolated validation DB promoted those 10 rows. Fast audit, published-risk,
-  native D1 export, and full in-memory import all passed. The validated export
-  has 31,106 entries, 37,331 senses, and 149,324 localizations; all blocking
-  integrity fields and `flagged_senses` are zero. The main product DB, D1, and
-  Worker remain unchanged.
+  native D1 export, and full in-memory import all passed. The same fixed replay,
+  main-DB-specific sense checkpoint, and reverse-evidence checkpoint were then
+  applied to the main product DB. Before the write, the backup
+  `linguago_v2_product_top5000_freedict_filtered_candidate.before-v93-final10-20260812-232846.db`
+  was created and matched SHA-256
+  `D84E80BD03FD59D6445F0F10613011DE1BDD7FEBD6569010BE8B6B59FA214E66`.
+- The main export at `outputs/d1-v93-final10-main` has 31,106 entries, 37,331
+  senses, and 149,324 localizations. All blocking integrity fields and
+  `flagged_senses` are zero. Ten senses are newly publishable; eight additional
+  rows remain unpublished drafts. D1 and Worker remain unchanged.

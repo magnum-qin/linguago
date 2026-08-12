@@ -3302,4 +3302,9 @@ actual JSON/code points and repair the report before retrying the single row.
 
 The isolated export is `outputs/d1-v93-final10-validation` with 31,106 entries,
 37,331 senses, and 149,324 localizations. All blocking audit fields are zero.
-This is validation evidence only: production DB/D1/Worker remain unchanged.
+After that validation, the fixed replay was written to the main product DB and
+a new main-DB sense checkpoint was generated; never reuse product sense IDs
+from the validation copy. The reverse-evidence gate again selected exactly 10
+rows, and promote accepted 10/10. The main export is
+`outputs/d1-v93-final10-main` with the same counts and zero blocking fields.
+Eight generated rows remain draft/manual review. D1 and Worker remain unchanged.
