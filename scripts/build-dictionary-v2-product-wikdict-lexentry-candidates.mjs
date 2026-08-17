@@ -106,8 +106,13 @@ function assessRow(row) {
     : [];
   const targetLangs = LANGS.filter((lang) => lang !== row.source_lang);
   const groups = new Map();
+  let productLinkedCandidates = 0;
 
   for (const candidate of candidates) {
+    if (candidate.accepted_product_link || candidate.draft_product_link) {
+      productLinkedCandidates += 1;
+      continue;
+    }
     const targetLang = wikdictTargetLanguage(candidate.source);
     if (!targetLang || targetLang === row.source_lang) continue;
     const provenanceRows = sourceMetadataBySense
@@ -136,8 +141,14 @@ function assessRow(row) {
   if (!qualified.length) {
     return {
       decision: 'rejected',
-      reason: groups.size ? 'insufficient_target_language_coverage' : 'no_high_quality_lexentry',
+      reason:
+        !groups.size && productLinkedCandidates
+          ? 'all_lexentry_senses_product_linked'
+          : groups.size
+            ? 'insufficient_target_language_coverage'
+            : 'no_high_quality_lexentry',
       observed_lexentry_groups: groups.size,
+      product_linked_candidates: productLinkedCandidates,
       row
     };
   }
@@ -204,6 +215,7 @@ function buildRow(row, group, targetLangs) {
     clean_lang_count: member.clean_lang_count,
     source_term_exact: member.source_term_exact,
     accepted_product_link: member.accepted_product_link,
+    draft_product_link: member.draft_product_link,
     wikdict_target_lang: member.target_lang,
     wikdict_lexentry: group.lexentry,
     wikdict_score: member.wikdict.score,

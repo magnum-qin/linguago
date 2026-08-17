@@ -1,8 +1,11 @@
+import './lib/load-local-env.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import Database from 'better-sqlite3';
 import * as OpenCC from 'opencc-js';
+import { validateDefinitionContract } from './lib/source-review-contract.mjs';
+import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 
 const DEFAULT_REPORT = 'logs/product-coverage-gaps-v83-after-tier-b-complete-strict.json';
 const DEFAULT_OUT = 'logs/product-source-gap-candidate-evidence-review.json';
@@ -34,9 +37,19 @@ const checkpointEvery = boundedInteger(args['checkpoint-every'], 20, 1);
 const checkpointIntervalMs = boundedInteger(args['checkpoint-interval-ms'], 10_000, 1_000);
 const resume = args.resume === 'true';
 const retryInvalidOnResume = args['retry-invalid-on-resume'] === 'true';
+const retryDecisionsOnResume = new Set(
+  String(args['retry-decisions'] || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+for (const decision of retryDecisionsOnResume) {
+  if (!DECISIONS.has(decision)) throw new Error(`Invalid --retry-decisions value: ${decision}`);
+}
 const stopAfterApproved = boundedInteger(args['stop-after-approved'], Number.MAX_SAFE_INTEGER, 1);
 const prewarm = args.prewarm !== 'false';
 const forceReload = args['force-reload'] === 'true';
+const unloadBeforeLoad = args['unload-before-load'] === 'true';
 const loadTimeoutMs = boundedInteger(args['load-timeout-ms'], 300_000, 1_000);
 const maxSeqLength = boundedInteger(args['max-seq-length'], 1024, 512);
 const speculativeType = String(args['speculative-type'] || 'off');
@@ -47,6 +60,7 @@ const debugPromptOnly = args['debug-prompt-only'] === 'true';
 const requireSenseAlignment = args['require-sense-alignment'] === 'true';
 const requireHintSemanticAlignment = args['require-hint-semantic-alignment'] === 'true';
 const requireDefinitionContract = args['require-definition-contract'] === 'true';
+const requireDailyPrimary = args['require-daily-primary'] === 'true';
 const stream = args.stream === 'true';
 const responseFormat = String(args['response-format'] || 'none').trim().toLowerCase();
 const excludeReviewPaths = String(args['exclude-reviews'] || '')
@@ -110,7 +124,9 @@ const existingReviews = resume ? loadExistingReviews(outPath) : [];
 // A completed invalid review has already exhausted maxAttempts. Replaying it on
 // every resume wastes model time; make that retry an explicit recovery action.
 const reusableReviews = existingReviews.filter(
-  (row) => row?.valid === true || !retryInvalidOnResume
+  (row) =>
+    !retryDecisionsOnResume.has(row?.decision) &&
+    (row?.valid === true || !retryInvalidOnResume)
 );
 const completedIds = new Set(reusableReviews.map(candidateKey));
 const targetCandidates = allCandidates.slice(offset, offset + limit);
@@ -167,6 +183,9 @@ if (prewarm && prewarmResults.every((row) => !row.ok)) {
     `All endpoints failed prewarm: ${prewarmResults.map((row) => `${endpointPort(row.endpoint)}=${row.error}`).join('; ')}`
   );
 }
+const activeEndpoints = prewarm
+  ? prewarmResults.filter((row) => row.ok).map((row) => row.endpoint)
+  : endpoints;
 
 await runPool(pendingCandidates);
 writeOutputs();
@@ -214,7 +233,7 @@ async function runPool(rows) {
     }
   }
 
-  await Promise.all(endpoints.map((_, index) => worker(index)));
+  await Promise.all(activeEndpoints.map((_, index) => worker(index)));
 }
 
 function approvedReviewCount() {
@@ -223,12 +242,15 @@ function approvedReviewCount() {
 
 async function reviewWithRetry(row, startEndpointIndex) {
   let lastError = null;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const endpoint = endpoints[(startEndpointIndex + attempt - 1) % endpoints.length];
+  const endpointAttempts = [];
+  const attemptLimit = Math.max(maxAttempts, activeEndpoints.length);
+  for (let attempt = 1; attempt <= attemptLimit; attempt++) {
+    const endpoint = activeEndpoints[(startEndpointIndex + attempt - 1) % activeEndpoints.length];
     try {
       return await reviewRow(row, endpoint, attempt, lastError);
     } catch (error) {
       lastError = errorMessage(error);
+      endpointAttempts.push({ endpoint, attempt, error: lastError });
     }
   }
   return {
@@ -236,11 +258,14 @@ async function reviewWithRetry(row, startEndpointIndex) {
     source_sense_id: Number(row.first_sense_id ?? row.source_sense_id) || null,
     word: row.word,
     source_lang: row.source_lang,
-    valid: false,
-    decision: null,
-    confidence: null,
+    valid: true,
+    decision: 'manual_review',
+    confidence: 0,
     approved: false,
     endpoint: null,
+    reason: 'All healthy model endpoints returned invalid or failed responses.',
+    risk_flags: ['model_review_failed_all_endpoints'],
+    endpoint_attempts: endpointAttempts,
     error: lastError
   };
 }
@@ -368,6 +393,22 @@ async function reviewRowNanoPerLanguage(payload, row, endpoint, attempt, previou
   const definitionContract = Object.fromEntries(
     reviews.map((item) => [item.lang, item.definition || null])
   );
+  const combinedReview = {
+    decision,
+    confidence,
+    english_anchor: preferredTerms.en || String(payload.proposed_gloss || '').trim(),
+    reason: reviews.map((item) => `${item.lang}:${item.reason || item.decision}`).join('; '),
+    evidence: reviews.map((item) => `${item.lang}:${item.term || item.decision}`),
+    risk_flags: reviews
+      .filter((item) => item.decision !== 'accept')
+      .map((item) => `${item.lang}_${item.decision}`),
+    preferred_terms: normalizePreferredTerms(preferredTerms),
+    definition_contract: normalizeDefinitionContract(definitionContract)
+  };
+  const combinedErrors = validateReview(combinedReview, row);
+  if (combinedErrors.length) {
+    throw new Error(`invalid_combined_review:${combinedErrors.join(',')}`);
+  }
   return {
     source_entry_id: Number(row.source_entry_id),
     source_sense_id: Number(row.first_sense_id ?? row.source_sense_id) || null,
@@ -383,14 +424,7 @@ async function reviewRowNanoPerLanguage(payload, row, endpoint, attempt, previou
     decision,
     confidence,
     approved: decision === 'accept' && confidence >= confidenceThreshold,
-    english_anchor: preferredTerms.en || String(payload.proposed_gloss || '').trim(),
-    reason: reviews.map((item) => `${item.lang}:${item.reason || item.decision}`).join('; '),
-    evidence: reviews.map((item) => `${item.lang}:${item.term || item.decision}`),
-    risk_flags: reviews
-      .filter((item) => item.decision !== 'accept')
-      .map((item) => `${item.lang}_${item.decision}`),
-    preferred_terms: normalizePreferredTerms(preferredTerms),
-    definition_contract: normalizeDefinitionContract(definitionContract),
+    ...combinedReview,
     language_reviews: reviews
   };
 }
@@ -406,7 +440,10 @@ function nanoLanguageCandidates(payload, lang) {
   if (Array.isArray(supplied) && supplied.length) {
     const seen = new Set();
     return supplied
-      .map((value) => String(value).trim())
+      .map((value) => {
+        const term = String(value).trim();
+        return lang === 'zh' ? traditionalToSimplified(term) : term;
+      })
       .filter((value) => {
         const key = value.toLocaleLowerCase(lang === 'pt-BR' ? 'pt-BR' : undefined);
         if (!value || seen.has(key)) return false;
@@ -428,7 +465,10 @@ function buildNanoLanguagePrompt(payload, lang, candidates, previousError) {
     target_lang: lang,
     candidates
   };
-  return `I=${JSON.stringify(input)} Pick the closest neutral candidate only if sense, POS, grammatical form, perspective, number, register and scope match; ignore bad alternatives. Reject if none; manual if ambiguous. For pt-BR reject pt-PT-only usage. reason<=8 words. JSON only {"decision":"accept|reject|manual_review","confidence":0,"term":null,"definition":"","reason":""}${previousError ? ' Previous output was invalid; return complete JSON only.' : ''}`;
+  const definitionRule = requireDefinitionContract
+    ? ` If accepting, definition must be a nonempty natural ${lang} dictionary definition for this exact sense and grammatical role; never copy the English gloss into another language.`
+    : '';
+  return `I=${JSON.stringify(input)} Pick the closest neutral candidate only if sense, POS, grammatical form, perspective, number, register and scope match; ignore bad alternatives. If accepting, copy term exactly from candidates; never paraphrase or invent one.${definitionRule} Reject if none; manual if ambiguous. For pt-BR reject pt-PT-only usage. For zh require neutral Mainland usage; allow Taiwan-only usage only when no Mainland equivalent exists. reason<=8 words. JSON only {"decision":"accept|reject|manual_review","confidence":0,"term":null,"definition":"","reason":""}${previousError ? ' Previous output was invalid; return complete JSON only.' : ''}`;
 }
 
 function mergeUsage(usages) {
@@ -477,6 +517,19 @@ function compactPayload(row) {
           changed: row.sense_alignment.changed,
           aligned_clean_lang_count: row.sense_alignment.aligned_clean_lang_count,
           policy: row.sense_alignment.policy
+        }
+      : null,
+    daily_sense_selection: row.daily_sense_selection
+      ? {
+          score: row.daily_sense_selection.score,
+          changed: row.daily_sense_selection.changed,
+          alternatives: (row.daily_sense_selection.alternatives || []).slice(0, 12).map((item) => ({
+            source_sense_id: item.id,
+            part_of_speech: item.part_of_speech,
+            gloss: item.gloss,
+            source: item.source,
+            blocked_reason: item.blocked_reason
+          }))
         }
       : null,
     source_sense_evidence: compactSourceSenseEvidence(row),
@@ -537,6 +590,32 @@ function compactGenerationHints(row) {
 }
 
 function buildPrompt(payload, previousError) {
+  if (promptMode === 'locked-contract') {
+    const lockedTerms = Object.fromEntries(
+      Object.entries(payload.verified_translation_hints || {}).map(([lang, value]) => [
+        lang,
+        Array.isArray(value?.terms) ? value.terms[0] || null : null
+      ])
+    );
+    const input = {
+      word: payload.headword,
+      source_language: payload.source_language,
+      english_anchor: payload.proposed_gloss,
+      locked_terms: lockedTerms,
+      evidence: payload.supplemental_evidence.map((row) => [
+        row.source_key,
+        row.part_of_speech,
+        row.gloss
+      ])
+    };
+    return `Review one locked four-language dictionary sense as a whole.
+The four locked_terms are immutable: copy them exactly into preferred_terms; never replace, normalize, or inflect them.
+Accept only if every locked term has the same concept, part of speech, domain, and semantic breadth as english_anchor. Reject a person/action, material/object, process/state, or broad/narrow mismatch. Use manual_review when evidence is insufficient.
+When accepting, write one short explanatory definition in EACH language, not a synonym or the term itself. Each definition must be a natural phrase or sentence with at least four meaningful words (Chinese/Japanese: at least eight characters). Definitions must express exactly the same scope. Chinese must be neutral Mainland Chinese.
+Always include evidence as an array containing one short, non-empty comparison grounded in the supplied evidence. Never omit evidence, even when the decision is reject or manual_review.
+JSON only: {"decision":"accept|reject|manual_review","confidence":0,"english_anchor":"","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"","evidence":[""],"risk_flags":[]}
+Input=${JSON.stringify(input)}${previousError ? '\nPrevious output failed validation. Copy locked terms exactly and return complete JSON only.' : ''}`;
+  }
   if (promptMode === 'nano') {
     const hints = Object.fromEntries(
       Object.entries(payload.verified_translation_hints || {}).map(([lang, value]) => [
@@ -550,7 +629,7 @@ function buildPrompt(payload, previousError) {
       g: payload.proposed_gloss,
       h: hints
     };
-    return `Exact dictionary-sense gate. Reject homograph, wrong POS, or broad/narrow mismatch; manual if ambiguous. Every non-null h term must mean the same exact w/g sense. confidence>=.90 only if safe. JSON only {"decision":"accept|reject|manual_review","confidence":0,"english_anchor":"","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"","evidence":[""],"risk_flags":[]} I=${JSON.stringify(input)}${previousError ? ' Previous output was invalid; return complete JSON only.' : ''}`;
+    return `Exact dictionary-sense gate. Reject homograph, wrong POS, or broad/narrow mismatch; manual if ambiguous. Every non-null h term must mean the same exact w/g sense. zh must be neutral Mainland Chinese; allow a Taiwan-only term only when no established Mainland equivalent exists. confidence>=.90 only if safe. JSON only {"decision":"accept|reject|manual_review","confidence":0,"english_anchor":"","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"","evidence":[""],"risk_flags":[]} I=${JSON.stringify(input)}${previousError ? ' Previous output was invalid; return complete JSON only.' : ''}`;
   }
   if (promptMode === 'micro') {
     const verifiedHints = payload.verified_translation_hints || {};
@@ -570,6 +649,7 @@ function buildPrompt(payload, previousError) {
 Gloss/localizations may be bilingual target-language translations; never reject only because language differs.
 ${requireHintSemanticAlignment ? 'Also require the FIRST h term in every language to express this exact sense and grammatical role. Reject any polysemy, homograph, overly broad/narrow, or wrong-part-of-speech hint. Return those exact first h terms as preferred_terms when accepting.\n' : ''}
 Reject semantic mismatch/name; manual if ambiguous. confidence>=.90 only if safe.
+zh terms must use neutral Mainland Chinese; a Taiwan-only term is allowed only if Mainland Chinese has no established equivalent.
 JSON {"decision":"accept|reject|manual_review","confidence":0,"english_anchor":"","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"","evidence":[""],"risk_flags":[]}
 ${previousError ? 'Previous output was invalid; return complete JSON only.\n' : ''}Input=${JSON.stringify(microPayload)}`;
   }
@@ -577,17 +657,24 @@ ${previousError ? 'Previous output was invalid; return complete JSON only.\n' : 
     ? `This is also a strict target-term gate. Review the FIRST verified_translation_hints term for every language.
 Accept only when every returned preferred term expresses the same exact sense, semantic scope, and grammatical category as the source headword.
 Reject action/object, process/state, person/profession, material/object, singular/plural, or broad/narrow mismatches. Do not accept an ordinary part-of-speech shift.
+Infer grammatical category from morphology and dictionary wording when the source POS field is missing. In particular, do not treat an adjective as a noun merely because an English gloss is ambiguous between both categories.
+Distinguish a capability or quality from a concrete feature, and general dispersion from administrative or political decentralization.
 Definitions implied by the preferred terms must not add domains absent from english_anchor, such as thermal conductivity when the anchor is specifically electrical.
+The zh preferred term must be neutral Mainland Chinese. Reject a Taiwan-only supplied term when an established Mainland equivalent exists; permit Taiwan fallback only when no Mainland equivalent exists.
 When accepting, preferred_terms must copy the exact matching supplied hint form; use null only when that language has no safe exact hint.`
     : 'Target-language localizations and hints are reviewed by later gates. A noisy target hint must not reject a genuine source sense; add a risk flag instead.';
+  const dailyPrimaryRule = requireDailyPrimary
+    ? `This batch is for everyday high-frequency vocabulary. Accept only when proposed_gloss is a common modern daily sense of the headword. Compare daily_sense_selection.alternatives when present. Reject a merely valid but technical, historical, proper-name, metalinguistic, rare-homograph, or non-primary sense when a clearly more common everyday sense exists. Do not invent or switch source_sense_id; rejection sends the entry back for alternate-sense selection.`
+    : '';
   return `Conservative source-sense review. Decide only whether proposed_gloss is a real sense of the source-language headword.
 accept=genuine primary/secondary, inflected, figurative, regional, archaic, transliterated, or close-synonym sense.
 reject=another word/language/homograph/name/spelling or unrelated concept. manual_review=ambiguous or thin evidence.
 Use source_sense_evidence as lexical evidence; JMdict/FreeDict/CC-CEDICT/ECDICT entries are authoritative when present.
+${dailyPrimaryRule}
 ${strictHintRules}
 Hints passed reverse-dictionary lookup but may reflect the wrong sense of a polysemous English anchor. Use a hinted preferred term only when it matches the exact gloss.
 Confidence >=0.90 only when safe for four-language generation. Keep reason/evidence under 14 words; at most two risk flags.
-${requireDefinitionContract ? 'When accepting, definition_contract must give one short native-language definition for each preferred term. All four definitions must have identical grammatical role, domain, and semantic breadth; exclude extra senses and factual details not shared by the anchor.\n' : ''}Return JSON only: {"decision":"accept|reject|manual_review","confidence":0.0,"english_anchor":"exact English sense","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"short","evidence":["short"],"risk_flags":[]}
+  ${requireDefinitionContract ? 'When accepting, definition_contract must give one short definition written natively in each matching language. Never copy the English gloss into pt-BR, zh, or ja. All four definitions must have identical grammatical role, domain, and semantic breadth; exclude extra senses and factual details not shared by the anchor.\n' : ''}Return JSON only: {"decision":"accept|reject|manual_review","confidence":0.0,"english_anchor":"exact English sense","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"short","evidence":["short"],"risk_flags":[]}
 ${previousError ? 'Previous output was invalid; return complete JSON only.\n' : ''}Input=${JSON.stringify(payload)}`;
 }
 
@@ -644,18 +731,7 @@ function validateReview(parsed, row = null) {
     }
   }
   if (requireDefinitionContract && parsed.decision === 'accept') {
-    if (
-      !parsed.definition_contract ||
-      typeof parsed.definition_contract !== 'object' ||
-      Array.isArray(parsed.definition_contract)
-    ) {
-      errors.push('invalid_definition_contract');
-    } else {
-      for (const lang of ['en', 'pt-BR', 'zh', 'ja']) {
-        const value = parsed.definition_contract[lang];
-        if (typeof value !== 'string' || !value.trim()) errors.push(`invalid_definition_contract_${lang}`);
-      }
-    }
+    errors.push(...validateDefinitionContract(parsed.definition_contract, parsed.preferred_terms));
   }
   if (requireHintSemanticAlignment && parsed.decision === 'accept' && row) {
     const bound = evidenceBoundPreferredTerms(row, { preferred_terms: parsed.preferred_terms });
@@ -684,6 +760,12 @@ function buildOutput() {
     manual_review: ordered.filter((row) => row.decision === 'manual_review').length,
     failed: ordered.filter((row) => !row.valid).length
   };
+  const endpointCounts = Object.fromEntries(
+    activeEndpoints.map((endpoint) => [
+      endpoint,
+      ordered.filter((row) => row.endpoint === endpoint).length
+    ])
+  );
   return {
     ok: ordered.length === targetCandidates.length && counts.failed === 0,
     created_at: new Date().toISOString(),
@@ -694,11 +776,13 @@ function buildOutput() {
     stream,
     response_format: responseFormat,
     prompt_mode: promptMode,
+    require_daily_primary: requireDailyPrimary,
+    retry_decisions: [...retryDecisionsOnResume],
     prewarm_results: prewarmResults,
     confidence_threshold: confidenceThreshold,
     offset,
     elapsed_seconds: secondsSince(started),
-    summary: counts,
+    summary: { ...counts, active_endpoints: activeEndpoints.length, endpoint_counts: endpointCounts },
     reviews: ordered
   };
 }
@@ -896,37 +980,18 @@ function parseOpenAiEventStream(text) {
 async function prewarmEndpoints() {
   return Promise.all(
     endpoints.map(async (endpoint) => {
-      const startedAt = performance.now();
       const variant = variants[endpointPort(endpoint)] || null;
-      try {
-        const status = await getJson(endpoint, '/v1/status', 30_000);
-        const sameModel =
-          status?.active_model === model &&
-          (!variant || status?.gguf_variant === variant) &&
-          (!status?.context_length || Number(status.context_length) === maxSeqLength) &&
-          (!status?.speculative_type || status.speculative_type === speculativeType);
-        if (sameModel && !forceReload) {
-          return { endpoint, ok: true, skipped: true, seconds: secondsSince(startedAt), variant };
-        }
-        const body = {
-          model_path: model,
-          max_seq_length: maxSeqLength,
-          load_in_4bit: false,
-          speculative_type: speculativeType
-        };
-        if (variant) body.gguf_variant = variant;
-        await postJson(endpoint, '/v1/load', body, loadTimeoutMs);
-        return { endpoint, ok: true, skipped: false, seconds: secondsSince(startedAt), variant };
-      } catch (error) {
-        return {
-          endpoint,
-          ok: false,
-          skipped: false,
-          seconds: secondsSince(startedAt),
-          variant,
-          error: errorMessage(error)
-        };
-      }
+      return ensureUnslothModel({
+        endpoint,
+        token,
+        model,
+        variant,
+        maxSeqLength,
+        speculativeType,
+        loadTimeoutMs,
+        forceReload,
+        unloadBeforeLoad
+      });
     })
   );
 }

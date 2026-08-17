@@ -1,6 +1,10 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  canonicalEnglishSpellingVariant,
+  looksProperOrNamedEnglishAnchor
+} from "./lib/source-gap-lexical-contract.mjs";
 
 const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
 const DEFAULT_SUPPLEMENTAL_SOURCE_DB =
@@ -82,6 +86,18 @@ const strongSupplementalFamilies = new Set(
 const strongSupplementalFamiliesByLang = parseLangFamilyMap(
   args["strong-supplemental-families-by-lang"]
 );
+const strongSupplementalSourceKeys = new Set(
+  String(args["strong-supplemental-source-keys"] || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+const allowedCandidateBoundRoundtripSourceKeys = new Set(
+  String(args["candidate-bound-source-roundtrip-keys"] || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
 const ptPronunciationDbPath = path.resolve(
   args["pt-pronunciation-db"] || "data/processed/kaikki_portuguese_pronunciations.db"
 );
@@ -89,6 +105,7 @@ const excludeCapitalizedAnchor = args["exclude-capitalized-anchor"] !== "false";
 const excludeAmbiguousOmw = args["exclude-ambiguous-omw"] !== "false";
 const lockHintsToUniqueWikidataConcept =
   args["lock-hints-to-unique-wikidata-concept"] === "true";
+const requireSourceIdentity = args["require-source-identity"] !== "false";
 
 for (const filePath of [
   sourceDbPath,
@@ -120,6 +137,7 @@ supplementalDb?.pragma("query_only = ON");
 const blockedSupplementalSourceKeys = new Set();
 const blockedSupplementalFamilies = new Set(["panlex-unmapped"]);
 const reviewedSupplementalSourceKeys = new Set();
+const candidateBoundRoundtripSourceKeys = new Set();
 if (
   supplementalDb?.prepare(
     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'evidence_sources'"
@@ -146,6 +164,14 @@ if (
     ) {
       reviewedSupplementalSourceKeys.add(row.source_key);
     }
+    if (
+      productionPublishable &&
+      metadata.candidate_bound === true &&
+      metadata.evidence_strength === "exact_reciprocal_candidate_bound" &&
+      allowedCandidateBoundRoundtripSourceKeys.has(row.source_key)
+    ) {
+      candidateBoundRoundtripSourceKeys.add(row.source_key);
+    }
   }
   for (const [family, statuses] of familyStatus) {
     if (family && statuses.length && statuses.every((status) => !status)) {
@@ -160,6 +186,24 @@ const findSenses = db.prepare(`
   JOIN source_senses ss ON ss.source_entry_id = se.id
   WHERE se.normalized_key = ? AND se.lang = ?
   ORDER BY ds.source_key, ss.sense_order, ss.id
+`);
+const findSourceEntryIdentity = db.prepare(`
+  SELECT id, word, normalized_key, source_lang
+  FROM entries
+  WHERE id = ?
+`);
+const findCanonicalTermFrequency = db.prepare(`
+  SELECT frequency_rank
+  FROM entries
+  WHERE source_lang = ? AND normalized_key = ?
+  ORDER BY frequency_rank IS NULL, frequency_rank, id
+  LIMIT 1
+`);
+const canonicalTermFrequencyCache = new Map();
+const findSourceSenseIdentity = db.prepare(`
+  SELECT id, entry_id
+  FROM senses
+  WHERE id = ?
 `);
 const findJmdictTerm = db.prepare(`
   SELECT 1
@@ -182,6 +226,11 @@ const findSupplementalByTerm = supplementalDb?.prepare(`
   WHERE normalized_key = ? AND lang = ?
   ORDER BY source_key, concept_id, english_gloss
 `);
+const reverseGlossTargetIndexes = new Map([
+  ["pt-BR", buildReverseGlossTargetIndex(["freedict-por-eng", "wikdict-pt-en"], "pt-BR")],
+  ["ja", buildReverseGlossTargetIndex(["jmdict"], "ja")],
+  ["zh", buildReverseGlossTargetIndex(["cc-cedict", "wikdict-zh-en"], "zh")]
+]);
 const wikidataConceptRowsByEnglish = lockHintsToUniqueWikidataConcept && supplementalDb
   ? buildWikidataConceptIndex(supplementalDb)
   : null;
@@ -236,6 +285,8 @@ const summary = {
   strong_supplemental_families_by_lang: serializeLangFamilyMap(
     strongSupplementalFamiliesByLang
   ),
+  strong_supplemental_source_keys: [...strongSupplementalSourceKeys].sort(),
+  candidate_bound_source_roundtrip_keys: [...candidateBoundRoundtripSourceKeys].sort(),
   blocked_supplemental_source_keys: [...blockedSupplementalSourceKeys].sort(),
   reviewed_supplemental_source_keys: [...reviewedSupplementalSourceKeys].sort(),
   blocked_supplemental_families: [...blockedSupplementalFamilies].sort(),
@@ -244,7 +295,8 @@ const summary = {
     : null,
   exclude_capitalized_anchor: excludeCapitalizedAnchor,
   exclude_ambiguous_omw: excludeAmbiguousOmw,
-  lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept
+  lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept,
+  require_source_identity: requireSourceIdentity
 };
 const output = {
   ...report,
@@ -283,10 +335,13 @@ const evidenceOutput = {
     strong_supplemental_families_by_lang: serializeLangFamilyMap(
       strongSupplementalFamiliesByLang
     ),
+    strong_supplemental_source_keys: [...strongSupplementalSourceKeys].sort(),
+    candidate_bound_source_roundtrip_keys: [...candidateBoundRoundtripSourceKeys].sort(),
     pt_pronunciation_db: requirePtPronunciation ? path.relative(process.cwd(), ptPronunciationDbPath) : null,
     exclude_capitalized_anchor: excludeCapitalizedAnchor,
     exclude_ambiguous_omw: excludeAmbiguousOmw,
-    lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept
+    lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept,
+    require_source_identity: requireSourceIdentity
   },
   summary,
   validations
@@ -301,13 +356,43 @@ ptPronunciationDb?.close();
 console.log(JSON.stringify({ ok: true, out: path.relative(process.cwd(), outPath), evidence_out: path.relative(process.cwd(), evidenceOutPath), summary }, null, 2));
 
 function validateCandidate(row) {
+  const boundCandidateKey = candidateKey(row);
   const sourceLang = row.source_lang;
   const sourceTerm = String(row.word || "").trim();
   const anchor = englishAnchor(row);
   if (!sourceTerm || !anchor || !STRONG_SOURCES[sourceLang]) {
     return result(row, "unsupported", !sourceTerm ? "missing_source_term" : "missing_english_anchor");
   }
-  if (excludeCapitalizedAnchor && looksProperOrNamedAnchor(anchor)) {
+  if (requireSourceIdentity) {
+    const sourceEntryId = Number(row.source_entry_id);
+    const sourceSenseId = Number(row.first_sense_id ?? row.source_sense_id);
+    const entry = Number.isInteger(sourceEntryId)
+      ? findSourceEntryIdentity.get(sourceEntryId)
+      : null;
+    const sense = Number.isInteger(sourceSenseId)
+      ? findSourceSenseIdentity.get(sourceSenseId)
+      : null;
+    const identityMatches =
+      entry &&
+      sense &&
+      entry.source_lang === sourceLang &&
+      normalizeTerm(entry.normalized_key) === normalizeTerm(sourceTerm) &&
+      Number(sense.entry_id) === sourceEntryId;
+    if (!identityMatches) {
+      return result(row, "unsupported", "stale_source_identity_mismatch", null, {
+        source_identity: {
+          requested_entry_id: Number.isInteger(sourceEntryId) ? sourceEntryId : null,
+          requested_sense_id: Number.isInteger(sourceSenseId) ? sourceSenseId : null,
+          requested_word: sourceTerm,
+          requested_lang: sourceLang,
+          actual_entry_word: entry?.word ?? null,
+          actual_entry_lang: entry?.source_lang ?? null,
+          actual_sense_entry_id: sense?.entry_id ?? null
+        }
+      });
+    }
+  }
+  if (excludeCapitalizedAnchor && looksProperOrNamedEnglishAnchor(anchor)) {
     return result(row, "unsupported", "capitalized_proper_or_named_english_anchor");
   }
 
@@ -315,7 +400,7 @@ function validateCandidate(row) {
   const dictionaryEvidence = rows.flatMap((sourceRow) =>
     extractEvidence(sourceRow, sourceLang, anchor)
   );
-  const supplementalEvidence = supplementalEvidenceForTerm(sourceLang, sourceTerm, anchor);
+  const supplementalEvidence = supplementalEvidenceForTerm(sourceLang, sourceTerm, anchor, boundCandidateKey);
   const evidence = [...dictionaryEvidence, ...supplementalEvidence];
   const strong = evidence.filter((item) => item.strength === "strong");
   const matches = strong.filter((item) => item.matches_anchor);
@@ -349,7 +434,7 @@ function validateCandidate(row) {
     aligned_omw_synsets: alignedOmw.synsets,
     aligned_omw_target_coverage: alignedOmw.targetCoverage,
     aligned_omw_terms: alignedOmw.terms,
-    aligned_omw_term_checks: explainAlignedOmwTerms(alignedOmw, anchor, sourceLang),
+    aligned_omw_term_checks: explainAlignedOmwTerms(alignedOmw, anchor, sourceLang, boundCandidateKey),
     unambiguous_omw_support: unambiguousOmwSupport,
     match_ratio: round(matchRatio),
     matching_evidence: matches.slice(0, 12),
@@ -361,11 +446,13 @@ function validateCandidate(row) {
     matchingSourceFamilies.size >= minSourceFamilies &&
     (glosses.size <= 2 || matchRatio >= minMatchRatio)
   ) {
-    const sourceRoundTrip = sourceLang === "en" ? true : sourceTermRoundTrips(sourceLang, sourceTerm, anchor);
+    const sourceRoundTrip = sourceLang === "en"
+      ? true
+      : sourceTermRoundTrips(sourceLang, sourceTerm, anchor, boundCandidateKey);
     if (!sourceRoundTrip) {
       return result(row, "unsupported", "english_anchor_does_not_translate_back_to_source_term", details);
     }
-    const localizationRoundTrip = existingLocalizationsRoundTrip(row, anchor);
+    const localizationRoundTrip = existingLocalizationsRoundTrip(row, anchor, boundCandidateKey);
     if (requireExistingLocalizationRoundtrip && !localizationRoundTrip.passed) {
       return result(row, "unsupported", "existing_localization_does_not_round_trip", details, {
         existing_localization_roundtrip: localizationRoundTrip
@@ -460,25 +547,26 @@ function hintHasJmdictTerm(generationHints) {
   return (generationHints.ja?.terms || []).some((term) => findJmdictTerm.get(normalizeTerm(term)));
 }
 
-function looksProperOrNamedAnchor(value) {
-  const text = String(value || "").trim();
-  return /^[A-Z][A-Za-z'-]*(?:\s+[A-Z][A-Za-z'-]*)*$/u.test(text);
-}
-
-function sourceTermRoundTrips(lang, sourceTerm, anchor) {
-  const dictionaryRoundTrip = findForwardTargetTerms(anchor, lang).some((item) =>
+function sourceTermRoundTrips(lang, sourceTerm, anchor, boundCandidateKey) {
+  const dictionaryRoundTrip = findForwardTargetTerms(anchor, lang, boundCandidateKey).some((item) =>
     item.terms.some((term) => termsEquivalent(lang, term, sourceTerm))
   );
   if (dictionaryRoundTrip) return true;
+  const supplemental = supplementalEvidenceForTerm(lang, sourceTerm, anchor, boundCandidateKey);
+  if (supplemental.some((item) =>
+    item.strength === "strong" &&
+    item.matches_anchor === true &&
+    candidateBoundRoundtripSourceKeys.has(item.source)
+  )) return true;
   if (!allowReviewedSupplementalSourceRoundtrip) return false;
-  return supplementalEvidenceForTerm(lang, sourceTerm, anchor).some((item) =>
+  return supplemental.some((item) =>
     item.strength === "strong" &&
     item.matches_anchor === true &&
     reviewedSupplementalSourceKeys.has(item.source)
   );
 }
 
-function existingLocalizationsRoundTrip(row, anchor) {
+function existingLocalizationsRoundTrip(row, anchor, boundCandidateKey) {
   const localizations = Array.isArray(row.first_sense_localizations)
     ? row.first_sense_localizations
     : [];
@@ -487,7 +575,7 @@ function existingLocalizationsRoundTrip(row, anchor) {
   );
   const checks = targetLocalizations.map((item) => {
     const termChecks = splitTerms(item.term).map((term) => {
-      const families = [...targetTermRoundTripFamilies(item.lang, term, anchor)].sort();
+      const families = [...targetTermRoundTripFamilies(item.lang, term, anchor, boundCandidateKey)].sort();
       return {
         term,
         evidence_families: families,
@@ -508,7 +596,7 @@ function existingLocalizationsRoundTrip(row, anchor) {
   };
 }
 
-function targetTermRoundTripFamilies(lang, term, anchor) {
+function targetTermRoundTripFamilies(lang, term, anchor, boundCandidateKey) {
   const families = new Set();
   const rows = lookupVariants(lang, term).flatMap((variant) =>
     findSenses.all(normalizeTerm(variant), lang)
@@ -518,7 +606,7 @@ function targetTermRoundTripFamilies(lang, term, anchor) {
       families.add(evidenceFamily(item.source, item.source_family));
     }
   }
-  for (const item of supplementalEvidenceForTerm(lang, term, anchor)) {
+  for (const item of supplementalEvidenceForTerm(lang, term, anchor, boundCandidateKey)) {
     if (item.matches_anchor) families.add(evidenceFamily(item.source, item.source_family));
   }
   return families;
@@ -526,9 +614,15 @@ function targetTermRoundTripFamilies(lang, term, anchor) {
 
 function buildGenerationHints(row, anchor, alignedOmw = alignedOmwTargetTerms(row, anchor)) {
   const hints = {};
+  const boundCandidateKey = candidateKey(row);
   const sourceLang = row.source_lang;
   const sourceTerm = String(row.word || "").trim();
-  if (sourceLang !== "en") {
+  if (sourceLang === "en") {
+    hints.en = {
+      terms: [sourceTerm],
+      sources: ["source_term"]
+    };
+  } else {
     hints.en = {
       terms: anchorCandidates(anchor).slice(0, 6),
       sources: ["source_english_anchor"]
@@ -539,25 +633,95 @@ function buildGenerationHints(row, anchor, alignedOmw = alignedOmwTargetTerms(ro
       hints[lang] = { terms: [sourceTerm], sources: ["source_term"] };
       continue;
     }
-    const omwTerms = unique(alignedOmw.terms?.[lang] || []).filter((term) =>
-      targetTermHasReverseSupport(lang, term, anchor)
+    const repair = [
+      ...(Array.isArray(row?.target_term_repairs) ? row.target_term_repairs : []),
+      ...(row?.target_term_repair ? [row.target_term_repair] : [])
+    ].find((item) => item?.target_lang === lang);
+    const repairedTerms = repair
+      ? unique(repair.terms || []).filter((term) =>
+          targetTermHasReverseSupport(lang, term, anchor, boundCandidateKey)
+        )
+      : [];
+    const orderedRepairedTerms = repairedTerms.length
+      ? orderGenerationHintTerms(lang, repairedTerms, anchor, "dictionary_validated_target_repair", boundCandidateKey)
+      : [];
+    const repairedFamilies = orderedRepairedTerms.length
+      ? generationHintEvidenceFamilies(
+          lang,
+          orderedRepairedTerms[0],
+          anchor,
+          "dictionary_validated_target_repair",
+          boundCandidateKey
+        )
+      : [];
+    if (repairedFamilies.length >= minIndependentTargetFamilies) {
+      hints[lang] = {
+        terms: orderedRepairedTerms.slice(0, 6),
+        sources: ["target-term-repair-v1"],
+        provenance: "dictionary_validated_target_repair",
+        evidence_families: repairedFamilies
+      };
+      continue;
+    }
+    // A term from the same unambiguous OMW synset is concept-bound evidence.
+    // Prefer it over a plain reverse-gloss hit, which may select a related but
+    // broader, narrower, or otherwise incompatible sense.
+    const omwTerms = alignedOmwHintTerms(
+      alignedOmw,
+      lang,
+      anchor,
+      boundCandidateKey
     );
     if (omwTerms.length) {
-      const orderedTerms = orderGenerationHintTerms(lang, omwTerms, anchor, "omw_synset");
+      const orderedTerms = orderGenerationHintTerms(lang, omwTerms, anchor, "omw_synset", boundCandidateKey);
       hints[lang] = {
         terms: orderedTerms.slice(0, 6),
         sources: ["omw-30", ...unique(alignedOmw.synsets || []).map((synset) => `omw:${synset}`)],
         provenance: "omw_synset",
-        evidence_families: generationHintEvidenceFamilies(lang, orderedTerms[0], anchor, "omw_synset")
+        evidence_families: generationHintEvidenceFamilies(lang, orderedTerms[0], anchor, "omw_synset", boundCandidateKey)
       };
       continue;
     }
-    const supplementalMatches = findSupplementalTargetTerms(anchor, lang).filter((item) =>
-      targetTermHasReverseSupport(lang, item.term, anchor)
+    const lexicalReverseGlossMatches = findReverseGlossTargetTerms(anchor, lang).filter((item) =>
+      targetTermHasReverseSupport(lang, item.term, anchor, boundCandidateKey)
+    );
+    if (lexicalReverseGlossMatches.length) {
+      const terms = unique(lexicalReverseGlossMatches.map((item) => item.term));
+      const priorityByTerm = new Map();
+      for (const item of lexicalReverseGlossMatches) {
+        const key = normalizeTerm(item.term);
+        const priority = Number(item.anchor_priority || 0);
+        priorityByTerm.set(key, Math.min(priorityByTerm.get(key) ?? Infinity, priority));
+      }
+      const orderedTerms = [...terms].sort((left, right) => {
+        const priorityDifference =
+          (priorityByTerm.get(normalizeTerm(left)) ?? Infinity) -
+          (priorityByTerm.get(normalizeTerm(right)) ?? Infinity);
+        if (priorityDifference) return priorityDifference;
+        return compareGenerationHintTerms(
+          lang, left, right, anchor, "reverse_dictionary_gloss", boundCandidateKey
+        );
+      });
+      hints[lang] = {
+        terms: orderedTerms.slice(0, 6),
+        sources: unique(lexicalReverseGlossMatches.map((item) => item.source)),
+        provenance: "reverse_dictionary_gloss",
+        evidence_families: generationHintEvidenceFamilies(
+          lang,
+          orderedTerms[0],
+          anchor,
+          "reverse_dictionary_gloss",
+          boundCandidateKey
+        )
+      };
+      continue;
+    }
+    const supplementalMatches = findSupplementalTargetTerms(anchor, lang, boundCandidateKey).filter((item) =>
+      targetTermHasReverseSupport(lang, item.term, anchor, boundCandidateKey)
     );
     if (supplementalMatches.length) {
       const terms = unique(supplementalMatches.map((item) => item.term));
-      const orderedTerms = orderGenerationHintTerms(lang, terms, anchor, "open_wordnet");
+      const orderedTerms = orderGenerationHintTerms(lang, terms, anchor, "open_wordnet", boundCandidateKey);
       hints[lang] = {
         terms: orderedTerms.slice(0, 6),
         sources: unique(supplementalMatches.map((item) => item.source_key)),
@@ -566,15 +730,16 @@ function buildGenerationHints(row, anchor, alignedOmw = alignedOmwTargetTerms(ro
           lang,
           orderedTerms[0],
           anchor,
-          "open_wordnet"
+          "open_wordnet",
+          boundCandidateKey
         )
       };
       continue;
     }
-    const matches = findForwardTargetTerms(anchor, lang);
+    const matches = findForwardTargetTerms(anchor, lang, boundCandidateKey);
     if (matches.length) {
       const terms = unique(matches.flatMap((item) => item.terms));
-      const orderedTerms = orderGenerationHintTerms(lang, terms, anchor, "forward_reverse_dictionary");
+      const orderedTerms = orderGenerationHintTerms(lang, terms, anchor, "forward_reverse_dictionary", boundCandidateKey);
       hints[lang] = {
         terms: orderedTerms.slice(0, 6),
         sources: unique(matches.map((item) => item.source)),
@@ -583,7 +748,8 @@ function buildGenerationHints(row, anchor, alignedOmw = alignedOmwTargetTerms(ro
           lang,
           orderedTerms[0],
           anchor,
-          "forward_reverse_dictionary"
+          "forward_reverse_dictionary",
+          boundCandidateKey
         )
       };
     }
@@ -677,20 +843,57 @@ function buildWikidataConceptIndex(database) {
   return index;
 }
 
-function orderGenerationHintTerms(lang, terms, anchor, provenance) {
-  return [...terms].sort((left, right) => {
-    const familyDifference =
-      generationHintEvidenceFamilies(lang, right, anchor, provenance).length -
-      generationHintEvidenceFamilies(lang, left, anchor, provenance).length;
-    if (familyDifference) return familyDifference;
-    if (lang !== "pt-BR" || !findPtPronunciation) return 0;
-    const leftHasPronunciation = Boolean(findPtPronunciation.get(normalizePtPronunciationKey(left)));
-    const rightHasPronunciation = Boolean(findPtPronunciation.get(normalizePtPronunciationKey(right)));
-    return Number(rightHasPronunciation) - Number(leftHasPronunciation);
-  });
+function orderGenerationHintTerms(lang, terms, anchor, provenance, boundCandidateKey) {
+  return [...terms].sort((left, right) =>
+    compareGenerationHintTerms(lang, left, right, anchor, provenance, boundCandidateKey)
+  );
 }
 
-function generationHintEvidenceFamilies(lang, term, anchor, provenance) {
+function compareGenerationHintTerms(lang, left, right, anchor, provenance, boundCandidateKey) {
+  if (lang === "zh") {
+    const mainlandDifference =
+      mainlandChineseTermPriority(left) - mainlandChineseTermPriority(right);
+    if (mainlandDifference) return mainlandDifference;
+    const frequencyDifference =
+      canonicalTermFrequency(lang, left) - canonicalTermFrequency(lang, right);
+    if (frequencyDifference) return frequencyDifference;
+  }
+  const familyDifference =
+    generationHintEvidenceFamilies(lang, right, anchor, provenance, boundCandidateKey).length -
+    generationHintEvidenceFamilies(lang, left, anchor, provenance, boundCandidateKey).length;
+  if (familyDifference) return familyDifference;
+  if (lang !== "pt-BR" || !findPtPronunciation) return 0;
+  const leftHasPronunciation = Boolean(findPtPronunciation.get(normalizePtPronunciationKey(left)));
+  const rightHasPronunciation = Boolean(findPtPronunciation.get(normalizePtPronunciationKey(right)));
+  return Number(rightHasPronunciation) - Number(leftHasPronunciation);
+}
+
+function canonicalTermFrequency(lang, term) {
+  const cacheKey = `${lang}\u0000${normalizeTerm(term)}`;
+  if (canonicalTermFrequencyCache.has(cacheKey)) {
+    return canonicalTermFrequencyCache.get(cacheKey);
+  }
+  let bestRank = Number.MAX_SAFE_INTEGER;
+  for (const variant of lookupVariants(lang, term)) {
+    const rank = Number(
+      findCanonicalTermFrequency.get(lang, normalizeTerm(variant))?.frequency_rank
+    );
+    if (Number.isFinite(rank) && rank > 0) bestRank = Math.min(bestRank, rank);
+  }
+  canonicalTermFrequencyCache.set(cacheKey, bestRank);
+  return bestRank;
+}
+
+function mainlandChineseTermPriority(value) {
+  const term = normalizeTerm(value);
+  // Keep this list narrow and evidence-backed. These are Taiwan/legacy unit
+  // forms that must not outrank the modern mainland term when both exist.
+  if (term === "千升") return 0;
+  if (new Set(["公秉", "千公升", "竏", "千竔"]).has(term)) return 2;
+  return 1;
+}
+
+function generationHintEvidenceFamilies(lang, term, anchor, provenance, boundCandidateKey) {
   if (!term) return [];
   const families = new Set();
   for (const row of lookupVariants(lang, term).flatMap((variant) => findSenses.all(normalizeTerm(variant), lang))) {
@@ -705,6 +908,7 @@ function generationHintEvidenceFamilies(lang, term, anchor, provenance) {
       findSupplementalByTerm.all(normalizeTerm(variant), lang)
     )) {
       if (
+        supplementalRowMatchesCandidate(row, boundCandidateKey) &&
         supplementalFamilyIsEligible(row.source_family, row.source_key) &&
         lexicalMatch(anchor, row.english_gloss)
       ) {
@@ -715,13 +919,14 @@ function generationHintEvidenceFamilies(lang, term, anchor, provenance) {
   return [...families].sort();
 }
 
-function findSupplementalTargetTerms(anchor, lang) {
+function findSupplementalTargetTerms(anchor, lang, boundCandidateKey) {
   if (!findSupplementalByEnglish || !new Set(["pt-BR", "zh", "ja"]).has(lang)) return [];
   const rows = anchorCandidates(anchor).flatMap((candidate) =>
     findSupplementalByEnglish.all(normalizeTerm(candidate), lang)
   );
   const seen = new Set();
   return rows.filter((row) => {
+    if (!supplementalRowMatchesCandidate(row, boundCandidateKey)) return false;
     if (!supplementalFamilyIsEligible(row.source_family, row.source_key)) return false;
     if (!lexicalMatch(anchor, row.english_gloss)) return false;
     const key = `${row.source_key}\u0000${normalizeTerm(row.term)}\u0000${row.concept_id}`;
@@ -769,7 +974,7 @@ function alignedOmwTargetTerms(row, anchor) {
   };
 }
 
-function findForwardTargetTerms(anchor, lang) {
+function findForwardTargetTerms(anchor, lang, boundCandidateKey = null) {
   const allowedSources = FORWARD_SOURCES[lang];
   if (!allowedSources) return [];
   const results = [];
@@ -778,7 +983,7 @@ function findForwardTargetTerms(anchor, lang) {
       if (!allowedSources.has(row.source_key)) continue;
       const raw = safeJson(row.raw_json);
       const terms = unique([...asStrings(raw.translations), ...splitTerms(row.gloss)]).filter((term) =>
-        targetTermHasReverseSupport(lang, term, anchor)
+        targetTermHasReverseSupport(lang, term, anchor, boundCandidateKey)
       );
       if (terms.length) results.push({ source: row.source_key, terms });
     }
@@ -786,7 +991,84 @@ function findForwardTargetTerms(anchor, lang) {
   return results;
 }
 
-function targetTermHasReverseSupport(lang, term, anchor) {
+function buildReverseGlossTargetIndex(sourceKeys, lang) {
+  const index = new Map();
+  const keys = Array.isArray(sourceKeys) ? sourceKeys : [sourceKeys];
+  if (!keys.length) return index;
+  const rows = db.prepare(`
+    SELECT ds.source_key, se.word, ss.gloss
+    FROM source_entries se
+    JOIN dictionary_sources ds ON ds.id = se.source_id
+    JOIN source_senses ss ON ss.source_entry_id = se.id
+    WHERE ds.source_key IN (${keys.map(() => '?').join(', ')}) AND se.lang = ?
+    ORDER BY se.id, ss.id
+  `).all(...keys, lang);
+  for (const row of rows) {
+    const term = String(row.word || "").trim();
+    if (!term) continue;
+    const glossParts = unique([row.gloss, ...splitTerms(row.gloss)]);
+    for (const key of unique(glossParts.flatMap(conservativeGlossKeys))) {
+      if (!index.has(key)) index.set(key, []);
+      const terms = index.get(key);
+      const maximumTerms = lang === "zh" ? 64 : 12;
+      if (!terms.some((item) => normalizeTerm(item.term) === normalizeTerm(term))) {
+        terms.push({ source: row.source_key, term });
+        if (lang === "zh") {
+          terms.sort((left, right) => {
+            const mainlandDifference =
+              mainlandChineseTermPriority(left.term) - mainlandChineseTermPriority(right.term);
+            if (mainlandDifference) return mainlandDifference;
+            const frequencyDifference =
+              canonicalTermFrequency(lang, left.term) - canonicalTermFrequency(lang, right.term);
+            if (frequencyDifference) return frequencyDifference;
+            return left.term.localeCompare(right.term, "zh-CN");
+          });
+        }
+        if (terms.length > maximumTerms) terms.length = maximumTerms;
+      }
+    }
+  }
+  return index;
+}
+
+function findReverseGlossTargetTerms(anchor, lang) {
+  const index = reverseGlossTargetIndexes.get(lang);
+  if (!index) return [];
+  const seen = new Set();
+  const rows = [];
+  const anchorParts = unique(anchorCandidates(anchor));
+  const anchorPriorityByVariant = new Map();
+  for (const [anchorIndex, anchorPart] of anchorParts.entries()) {
+    const variantKey = canonicalEnglishSpellingVariant(anchorPart);
+    if (!anchorPriorityByVariant.has(variantKey)) {
+      anchorPriorityByVariant.set(variantKey, anchorIndex);
+    }
+    const anchorPriority = anchorPriorityByVariant.get(variantKey);
+    for (const key of conservativeGlossKeys(anchorPart)) {
+      for (const row of index.get(key) || []) {
+      const identity = `${row.source}\u0000${normalizeTerm(row.term)}`;
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+        rows.push({ ...row, anchor_priority: anchorPriority });
+      }
+    }
+  }
+  return rows;
+}
+
+function conservativeGlossKeys(value) {
+  const text = String(value || "").trim();
+  if (!text || text.length > 100 || /[.!?;]\s*$/u.test(text)) return [];
+  const candidates = [text];
+  const withoutTrailingQualifier = text.replace(/\s+\([^()]*(?:\([^()]*\)[^()]*)*\)\s*$/u, "").trim();
+  if (withoutTrailingQualifier && withoutTrailingQualifier !== text) candidates.push(withoutTrailingQualifier);
+  for (const candidate of [...candidates]) {
+    if (/^to\s+\S/iu.test(candidate)) candidates.push(candidate.replace(/^to\s+/iu, ""));
+  }
+  return unique(candidates.map(normalizeText).filter((item) => item && !STOPWORDS.has(item)));
+}
+
+function targetTermHasReverseSupport(lang, term, anchor, boundCandidateKey = null) {
   const rows = lookupVariants(lang, term).flatMap((variant) => findSenses.all(normalizeTerm(variant), lang));
   const dictionaryEvidence = rows.flatMap((row) => extractEvidence(row, lang, anchor));
   const strong = dictionaryEvidence.filter((item) => item.strength === "strong");
@@ -797,7 +1079,7 @@ function targetTermHasReverseSupport(lang, term, anchor) {
   );
   const matches = [
     ...strongMatches,
-    ...supplementalEvidenceForTerm(lang, term, anchor).filter((item) => item.matches_anchor)
+    ...supplementalEvidenceForTerm(lang, term, anchor, boundCandidateKey).filter((item) => item.matches_anchor)
   ];
   const glosses = new Set(strong.map((item) => normalizeText(item.english_gloss)).filter(Boolean));
   const matchingGlosses = new Set(strongMatches.map((item) => normalizeText(item.english_gloss)).filter(Boolean));
@@ -810,7 +1092,7 @@ function targetTermHasReverseSupport(lang, term, anchor) {
   );
 }
 
-function explainAlignedOmwTerms(alignedOmw, anchor, sourceLang) {
+function explainAlignedOmwTerms(alignedOmw, anchor, sourceLang, boundCandidateKey) {
   const checks = {};
   for (const lang of ["pt-BR", "zh", "ja"]) {
     if (lang === sourceLang) continue;
@@ -823,7 +1105,7 @@ function explainAlignedOmwTerms(alignedOmw, anchor, sourceLang) {
         .filter((item) => item.strength === "strong");
       return {
         term,
-        supported: targetTermHasReverseSupport(lang, term, anchor),
+        supported: targetTermHasReverseSupport(lang, term, anchor, boundCandidateKey),
         strong_evidence: strong.slice(0, 12)
       };
     });
@@ -831,13 +1113,35 @@ function explainAlignedOmwTerms(alignedOmw, anchor, sourceLang) {
   return checks;
 }
 
-function supplementalEvidenceForTerm(lang, term, anchor) {
+function alignedOmwHintTerms(alignedOmw, lang, anchor, boundCandidateKey) {
+  if (alignedOmw.ambiguous || alignedOmw.synsets.length !== 1) return [];
+  const candidates = unique(alignedOmw.terms?.[lang] || []).map((term) => {
+    const rows = lookupVariants(lang, term).flatMap((variant) =>
+      findSenses.all(normalizeTerm(variant), lang)
+    );
+    const strongEvidence = rows
+      .flatMap((row) => extractEvidence(row, lang, anchor))
+      .filter((item) => item.strength === "strong");
+    return {
+      term,
+      exactReverse: targetTermHasReverseSupport(lang, term, anchor, boundCandidateKey),
+      hasIndependentDictionaryEntry: strongEvidence.length > 0
+    };
+  });
+  return candidates
+    .filter((item) => item.exactReverse || item.hasIndependentDictionaryEntry)
+    .sort((left, right) => Number(right.exactReverse) - Number(left.exactReverse))
+    .map((item) => item.term);
+}
+
+function supplementalEvidenceForTerm(lang, term, anchor, boundCandidateKey = null) {
   if (!findSupplementalByTerm) return [];
   const seen = new Set();
   const evidence = [];
   for (const row of lookupVariants(lang, term).flatMap((variant) =>
     findSupplementalByTerm.all(normalizeTerm(variant), lang)
   )) {
+    if (!supplementalRowMatchesCandidate(row, boundCandidateKey)) continue;
     if (!supplementalFamilyIsEligible(row.source_family, row.source_key)) continue;
     const key = `${row.source_key}\u0000${normalizeText(row.english_gloss)}\u0000${row.concept_id}`;
     if (seen.has(key)) continue;
@@ -845,14 +1149,23 @@ function supplementalEvidenceForTerm(lang, term, anchor) {
     evidence.push({
       source: row.source_key,
       source_family: row.source_family,
+      concept_id: row.concept_id || null,
       english_gloss: row.english_gloss,
       matches_anchor: lexicalMatch(anchor, row.english_gloss),
-      strength: supplementalFamilyIsStrong(lang, row.source_family)
+      strength: supplementalFamilyIsStrong(lang, row.source_family, row.source_key)
         ? "strong"
         : "weak"
     });
   }
   return evidence;
+}
+
+function supplementalRowMatchesCandidate(row, boundCandidateKey) {
+  const match = /^(?:candidate:|dicionario-aberto-definition:)(.+)$/u.exec(
+    String(row?.concept_id || "").trim()
+  );
+  if (!match) return true;
+  return Boolean(boundCandidateKey) && match[1] === boundCandidateKey;
 }
 
 function supplementalFamilyIsEligible(value, sourceKey) {
@@ -861,9 +1174,10 @@ function supplementalFamilyIsEligible(value, sourceKey) {
     !blockedSupplementalSourceKeys.has(sourceKey);
 }
 
-function supplementalFamilyIsStrong(lang, family) {
+function supplementalFamilyIsStrong(lang, family, sourceKey) {
   const normalizedFamily = String(family || "").trim().toLowerCase();
   return (
+    strongSupplementalSourceKeys.has(String(sourceKey || "").trim()) ||
     strongSupplementalFamilies.has(normalizedFamily) ||
     strongSupplementalFamiliesByLang.get(lang)?.has(normalizedFamily) === true
   );

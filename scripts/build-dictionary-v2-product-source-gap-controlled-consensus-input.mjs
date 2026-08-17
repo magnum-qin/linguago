@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const LANGS = ['en', 'pt-BR', 'zh', 'ja']
+const KANA_RE = /[\u3040-\u30ff]/u
 const args = parseArgs(process.argv.slice(2))
 const reviewPath = path.resolve(required(args.review, 'review'))
 const outPath = path.resolve(required(args.out, 'out'))
@@ -118,7 +119,7 @@ function inspect(row) {
   if (riskFlags.length && !(allowResolvedRiskFlags && riskFlags.every(isResolvedRiskFlag))) {
     return reject('source_review_has_risk_flags')
   }
-  if (!row?.sense_alignment || row.sense_alignment.status !== 'aligned') return reject('sense_not_aligned')
+  if (!hasLockedSourceSense(row)) return reject('sense_not_aligned')
   if (!Number.isInteger(Number(row.first_sense_id))) return reject('missing_source_sense_id')
   if (evidenceValidatedKeys && !evidenceValidatedKeys.has(candidateKey(row))) {
     return reject('suggested_terms_not_reverse_evidence_supported')
@@ -129,6 +130,9 @@ function inspect(row) {
     const gate = finalGate.get(key)
     if (!gate) return reject('not_accepted_by_final_gate')
     if (!generationOutputIsComplete(gate.generation, row)) return reject('final_generation_incomplete')
+    if (generatedLocalizationHasScriptMismatch(gate.generation)) {
+      return reject('final_generation_localization_script_mismatch')
+    }
     return acceptedRow(row)
   }
 
@@ -171,6 +175,38 @@ function inspect(row) {
   }
 
   return acceptedRow(row)
+}
+
+function generatedLocalizationHasScriptMismatch(generation) {
+  const zh = generation?.output?.localizations?.zh
+  return KANA_RE.test(cleanText(zh?.term)) || KANA_RE.test(cleanText(zh?.definition))
+}
+
+function hasLockedSourceSense(row) {
+  if (row?.sense_alignment?.status === 'aligned') return true
+
+  const selection = row?.daily_sense_selection
+  const firstSenseId = Number(row?.first_sense_id)
+  const selectedAlternative = (selection?.alternatives || []).find(
+    (alternative) => Number(alternative?.id) === firstSenseId
+  )
+  const sourceConsensus = row?.source_review_consensus
+  const consensusLocked =
+    sourceConsensus?.qwen?.approved === true &&
+    sourceConsensus?.gemma?.approved === true &&
+    sourceConsensus?.preferred_term_agreement === true &&
+    Number(row?.reverse_evidence_prefilter?.target_coverage_count || 0) >= 3
+  return (
+    selection?.policy === 'native_dictionary_then_daily_semantics' &&
+    selection?.requires_independent_source_review === true &&
+    Number.isInteger(firstSenseId) &&
+    selectedAlternative?.blocked_reason == null &&
+    (
+      ['cc-cedict', 'jmdict', 'kaikki-zh'].includes(String(selectedAlternative?.source || '')) ||
+      consensusLocked
+    ) &&
+    String(row?.candidate_key || '') === `${Number(row?.source_entry_id)}:${firstSenseId}`
+  )
 }
 
 function isResolvedRiskFlag(value) {
@@ -260,8 +296,13 @@ function loadFinalGate() {
     throw new Error('Final consensus report permits automatic promotion')
   }
 
+  const generationRows = Array.isArray(generation.generated)
+    ? generation.generated
+    : Array.isArray(generation.replayed)
+      ? generation.replayed
+      : []
   const generationByKey = new Map(
-    (generation.generated || [])
+    generationRows
       .filter((row) => row?.valid === true)
       .map((row) => [candidateKey(row), row])
       .filter(([key]) => key)

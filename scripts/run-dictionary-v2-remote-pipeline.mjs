@@ -1,0 +1,884 @@
+#!/usr/bin/env node
+
+import './lib/load-local-env.mjs';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
+
+const args = parseArgs(process.argv.slice(2));
+const pipelineMode = String(args['pipeline-mode'] || 'legacy').trim().toLowerCase();
+if (!['legacy', 'simplified'].includes(pipelineMode)) {
+  throw new Error(`Invalid --pipeline-mode: ${pipelineMode}`);
+}
+const batchPath = requiredPath(args.batch, 'batch');
+const runId = String(args['run-id'] || path.basename(batchPath, '.json')).replace(/[^a-zA-Z0-9._-]/gu, '-');
+const runDir = path.resolve(args['run-dir'] || path.join('runs', runId));
+const sourceRunDir = args['source-run-dir'] ? requiredPath(args['source-run-dir'], 'source-run-dir') : null;
+const resume = args.resume !== 'false';
+const qwenEndpoints = String(
+  args['qwen-endpoints'] || 'http://127.0.0.1:11441,http://127.0.0.1:11448,http://127.0.0.1:11447'
+);
+const gemmaEndpoints = String(
+  args['gemma-endpoints'] || 'http://127.0.0.1:11442,http://127.0.0.1:11445,http://127.0.0.1:11446'
+);
+const qwenVariants = String(
+  args['qwen-variants'] || '11441=UD-Q4_K_XL,11448=UD-IQ4_NL,11447=UD-IQ4_NL'
+);
+const gemmaVariants = String(
+  args['gemma-variants'] || '11442=UD-Q4_K_XL,11445=UD-Q4_K_XL,11446=UD-Q4_K_XL'
+);
+const qwenModel = String(args['qwen-model'] || 'unsloth/Qwen3.6-35B-A3B-MTP-GGUF');
+const gemmaModel = String(args['gemma-model'] || 'unsloth/gemma-4-31B-it-qat-GGUF');
+const elasticModelSwap = args['elastic-model-swap'] !== 'false';
+const elasticEndpoints = String(
+  args['elastic-endpoints'] || 'http://127.0.0.1:11442,http://127.0.0.1:11445'
+);
+const elasticQwenVariants = String(
+  args['elastic-qwen-variants'] || '11442=UD-Q4_K_XL,11445=UD-Q4_K_XL'
+);
+const elasticMinimumItems = Math.max(1, Number.parseInt(args['elastic-minimum-items'] || '20', 10));
+const batchItemCount = reportItemCount(batchPath);
+const sourceQwenPool = qwenPoolForWork(batchItemCount);
+const gemmaConcurrency = csvValues(gemmaEndpoints).length;
+const generationTarget = Math.max(1, Number.parseInt(args['generation-target'] || '20', 10));
+const stopAfterSourceScreen = args['stop-after-source-screen'] === 'true';
+const supplementalSourceDb = args['supplemental-source-db']
+  ? requiredPath(args['supplemental-source-db'], 'supplemental-source-db')
+  : null;
+const token = process.env.UNSLOTH_API_KEY;
+
+if (!token) throw new Error('UNSLOTH_API_KEY is not set in the remote process environment');
+
+fs.mkdirSync(runDir, { recursive: true });
+const manifestPath = path.join(runDir, 'manifest.json');
+const inputFingerprint = sha256File(batchPath);
+const manifest = loadManifest();
+if (manifest.input_fingerprint && manifest.input_fingerprint !== inputFingerprint) {
+  throw new Error('Batch fingerprint changed; use a new --run-id instead of resuming this run');
+}
+manifest.input = relative(batchPath);
+manifest.input_fingerprint = inputFingerprint;
+manifest.run_id = runId;
+manifest.started_at ||= new Date().toISOString();
+manifest.status = 'running';
+manifest.models = { qwen: qwenModel, gemma: gemmaModel };
+manifest.pipeline_mode = pipelineMode;
+manifest.endpoints = {
+  qwen: csvValues(qwenEndpoints),
+  gemma: csvValues(gemmaEndpoints),
+  elastic: csvValues(elasticEndpoints),
+  source_qwen: csvValues(sourceQwenPool.endpoints)
+};
+manifest.endpoint_variants = {
+  qwen: sourceQwenPool.variants,
+  gemma: gemmaVariants
+};
+manifest.elastic_model_swap = elasticModelSwap;
+manifest.elastic_minimum_items = elasticMinimumItems;
+manifest.input_items = batchItemCount;
+manifest.supplemental_source_db = supplementalSourceDb ? relative(supplementalSourceDb) : null;
+manifest.stages ||= {};
+writeManifest();
+
+const files = {
+  qwenReview: sourceOutput('01-qwen-source-review.json'),
+  qwenApproved: sourceOutput('01-qwen-source-review-approved.json'),
+  qwenRejected: sourceOutput('01-qwen-source-review-rejected.json'),
+  locked: sourceOutput('02-qwen-terms-locked.json'),
+  gemmaReview: sourceOutput('03-gemma-source-review.json'),
+  gemmaApproved: sourceOutput('03-gemma-source-review-approved.json'),
+  gemmaRejected: sourceOutput('03-gemma-source-review-rejected.json'),
+  consensus: sourceOutput('04-source-consensus.json'),
+  consensusReverse: sourceOutput('04b-source-consensus-reverse-evidence.json'),
+  consensusSupported: sourceOutput('04b-source-consensus-reverse-supported.json'),
+  semanticPreview: output('04c-semantic-preview.json'),
+  semanticReview: output('04d-semantic-preview-gemma.json'),
+  semanticAccepted: output('04d-semantic-preview-gemma-accepted.json'),
+  semanticRepairInput: output('04d2-semantic-correction-retry.json'),
+  semanticRepairGeneration: output('04d3-semantic-repair-generation.json'),
+  semanticRepairCheckpoint: output('04d3-semantic-repair-generation.pipeline.checkpoint.json'),
+  semanticRepairReverse: output('04d4-semantic-repair-reverse.json'),
+  semanticRepairReverseSupported: output('04d4-semantic-repair-reverse-supported.json'),
+  semanticRepairFinal: output('04d5-semantic-repair-final-gemma.json'),
+  semanticRepairAccepted: output('04d5-semantic-repair-final-gemma-accepted.json'),
+  semanticSelected: output('04e-semantic-approved-candidates.json'),
+  generationReady: output('04f-generation-ready-candidates.json'),
+  generation: output('05-qwen-generation.json'),
+  generationCheckpoint: output('05-qwen-generation.checkpoint.json'),
+  reverse: output('06-reverse-evidence.json'),
+  reverseSupported: output('06-reverse-evidence-supported.json'),
+  finalGemma: output('07-final-gemma.json'),
+  finalAccepted: output('07-final-gemma-accepted.json'),
+  repairInput: output('08-structured-correction-retry.json'),
+  repairGeneration: output('09-qwen-repair-generation.json'),
+  repairCheckpoint: output('09-qwen-repair-generation.checkpoint.json'),
+  repairReverse: output('10-repair-reverse-evidence.json'),
+  repairReverseSupported: output('10-repair-reverse-evidence-supported.json'),
+  repairFinalGemma: output('11-repair-final-gemma.json'),
+  repairFinalAccepted: output('11-repair-final-gemma-accepted.json'),
+  summary: output('summary.json')
+};
+
+try {
+  if (pipelineMode === 'simplified') {
+    await runSimplifiedPipeline();
+  } else {
+  if (!sourceRunDir) {
+  await stage('qwen_source_review', 'scripts/review-dictionary-v2-product-source-gap-candidates-unsloth.mjs', [
+    '--report', batchPath,
+    '--out', files.qwenReview,
+    '--approved-out', files.qwenApproved,
+    '--rejected-out', files.qwenRejected,
+    '--endpoints', sourceQwenPool.endpoints,
+    '--endpoint-gguf-variants', sourceQwenPool.variants,
+    '--model', qwenModel,
+    '--limit', '1000000',
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '2',
+    '--resume', String(resume),
+    '--max-seq-length', '1024',
+    '--max-tokens', '650',
+    '--speculative-type', 'mtp',
+    '--prompt-mode', 'nano-per-language',
+    '--require-hint-semantic-alignment', 'true',
+    '--require-definition-contract', 'true',
+    '--stream', 'true',
+    '--prewarm', 'true',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.qwenReview, files.qwenApproved]);
+
+  await stage('lock_terms', 'scripts/lock-dictionary-v2-source-review-proposal-terms.mjs', [
+    '--report', files.qwenApproved,
+    '--out', files.locked
+  ], [files.locked]);
+
+  await stage('gemma_source_review', 'scripts/review-dictionary-v2-product-source-gap-candidates-unsloth.mjs', [
+    '--report', files.locked,
+    '--out', files.gemmaReview,
+    '--approved-out', files.gemmaApproved,
+    '--rejected-out', files.gemmaRejected,
+    '--endpoints', gemmaEndpoints,
+    '--endpoint-gguf-variants', gemmaVariants,
+    '--model', gemmaModel,
+    '--limit', '1000000',
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '2',
+    '--resume', String(resume),
+    '--max-seq-length', '3072',
+    '--max-tokens', '650',
+    '--speculative-type', 'off',
+    '--prompt-mode', 'locked-contract',
+    '--response-format', 'json-object',
+    '--require-hint-semantic-alignment', 'true',
+    '--require-definition-contract', 'true',
+    '--stream', 'true',
+    '--prewarm', 'true',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.gemmaReview, files.gemmaApproved]);
+
+  await stage('source_consensus', 'scripts/intersect-dictionary-v2-source-reviews.mjs', [
+    '--primary', files.qwenReview,
+    '--reviewer', files.gemmaReview,
+    '--selected', files.locked,
+    '--out', files.consensus
+  ], [files.consensus]);
+
+  await stage('source_consensus_reverse_evidence', 'scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs', [
+    '--report', files.consensus,
+    '--out', files.consensusReverse,
+    '--supported-report', files.consensusSupported,
+    '--input-mode', 'reviewed',
+    '--require-source-reverse-evidence', 'true',
+    '--evidence-family-policy', 'wiktionary',
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+  ], [files.consensusReverse, files.consensusSupported]);
+  } else {
+    for (const filePath of [files.qwenReview, files.gemmaReview, files.consensus, files.consensusReverse, files.consensusSupported]) {
+      if (!fs.existsSync(filePath)) throw new Error(`Source replay report missing: ${filePath}`);
+    }
+    manifest.source_run_dir = relative(sourceRunDir);
+    manifest.stages.source_replay = {
+      status: 'complete',
+      completed_at: new Date().toISOString(),
+      outputs: [files.qwenReview, files.gemmaReview, files.consensus, files.consensusReverse, files.consensusSupported]
+        .map((filePath) => ({ path: relative(filePath), sha256: sha256File(filePath) }))
+    };
+    writeManifest();
+  }
+
+  if (stopAfterSourceScreen) {
+    const sourceSummary = buildSourceScreenSummary(files);
+    fs.writeFileSync(files.summary, `${JSON.stringify(sourceSummary, null, 2)}\n`, 'utf8');
+    manifest.status = 'complete';
+    manifest.completed_at = new Date().toISOString();
+    manifest.stop_after_source_screen = true;
+    manifest.summary = sourceSummary.summary;
+    writeManifest();
+    console.log(JSON.stringify(sourceSummary, null, 2));
+    process.exit(0);
+  }
+
+  await stage('build_semantic_preview', 'scripts/build-dictionary-v2-source-gap-semantic-preview.mjs', [
+    '--report', files.consensusSupported,
+    '--out', files.semanticPreview
+  ], [files.semanticPreview]);
+
+  if (reportHasRows(files.consensusSupported)) await stage('semantic_preview_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
+    '--generation', files.semanticPreview,
+    '--evidence', files.consensusReverse,
+    '--out', files.semanticReview,
+    '--accepted-out', files.semanticAccepted,
+    '--endpoints', gemmaEndpoints,
+    '--endpoint-gguf-variants', gemmaVariants,
+    '--model', gemmaModel,
+    '--generation-model', qwenModel,
+    '--only-supported', 'true',
+    '--limit', '1000000',
+    '--concurrency', String(gemmaConcurrency),
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '2',
+    '--max-seq-length', '2048',
+    '--max-tokens', '420',
+    '--prompt-mode', 'full',
+    '--resume', String(resume),
+    '--stream', 'true',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.semanticReview, files.semanticAccepted]);
+  else skipConsensusStage('semantic_preview_gemma', files.semanticReview, files.semanticAccepted);
+
+  await stage('build_semantic_correction_retry', 'scripts/build-dictionary-v2-product-source-gap-structured-correction-retry.mjs', [
+    '--report', files.consensusSupported,
+    '--consensus', files.semanticReview,
+    '--generation', files.semanticPreview,
+    '--out', files.semanticRepairInput
+  ], [files.semanticRepairInput]);
+
+  const semanticRepairQwenPool = qwenPoolForWork(reportItemCount(files.semanticRepairInput));
+  await stage('qwen_semantic_repair_generation', 'scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs', [
+    '--report', files.semanticRepairInput,
+    '--out', files.semanticRepairGeneration,
+    '--checkpoint', files.semanticRepairCheckpoint,
+    '--endpoints', semanticRepairQwenPool.endpoints,
+    '--endpoint-gguf-variants', semanticRepairQwenPool.variants,
+    '--model', qwenModel,
+    '--limit', '1000000',
+    '--concurrency', String(semanticRepairQwenPool.concurrency),
+    '--batch-size', '1',
+    '--chunk-size', '50',
+    '--max-attempts', '2',
+    '--circuit-breaker-failures', '2',
+    '--max-seq-length', '2048',
+    '--max-tokens', '1600',
+    '--speculative-type', 'mtp',
+    '--prompt-mode', 'compact',
+    '--stream-response', 'true',
+    '--disable-thinking', 'true',
+    '--enforce-reviewed-preferred-terms', 'true',
+    '--deterministic-readings', 'true',
+    '--deterministic-pronunciations', 'true',
+    '--prewarm', 'true',
+    '--resume', String(resume),
+    '--dry-run', 'true',
+    '--apply', 'false',
+    '--log-generated', 'true'
+  ], [files.semanticRepairGeneration]);
+
+  await stage('semantic_repair_reverse_evidence', 'scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs', [
+    '--report', files.semanticRepairGeneration,
+    '--out', files.semanticRepairReverse,
+    '--supported-report', files.semanticRepairReverseSupported,
+    '--require-source-reverse-evidence', 'true',
+    '--evidence-family-policy', 'wiktionary',
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+  ], [files.semanticRepairReverse, files.semanticRepairReverseSupported]);
+
+  if (reportHasRows(files.semanticRepairReverseSupported)) await stage('semantic_repair_final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
+    '--generation', files.semanticRepairGeneration,
+    '--evidence', files.semanticRepairReverse,
+    '--out', files.semanticRepairFinal,
+    '--accepted-out', files.semanticRepairAccepted,
+    '--endpoints', gemmaEndpoints,
+    '--endpoint-gguf-variants', gemmaVariants,
+    '--model', gemmaModel,
+    '--generation-model', qwenModel,
+    '--only-supported', 'true',
+    '--limit', '1000000',
+    '--concurrency', String(gemmaConcurrency),
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '2',
+    '--max-seq-length', '2048',
+    '--max-tokens', '650',
+    '--prompt-mode', 'full',
+    '--resume', String(resume),
+    '--stream', 'true',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.semanticRepairFinal, files.semanticRepairAccepted]);
+  else skipConsensusStage('semantic_repair_final_gemma', files.semanticRepairFinal, files.semanticRepairAccepted);
+
+  await stage('select_semantic_approved_candidates', 'scripts/select-dictionary-v2-source-gap-candidates-by-review.mjs', [
+    '--report', files.consensusSupported,
+    '--review', files.semanticReview,
+    '--accepted-only', 'true',
+    '--out', files.semanticSelected
+  ], [files.semanticSelected]);
+
+  await stage('jmdict_generation_preflight', 'scripts/filter-dictionary-v2-source-gap-jmdict-generation-preflight.mjs', [
+    '--report', files.semanticSelected,
+    '--out', files.generationReady
+  ], [files.generationReady]);
+
+  const generationWorkItems = Math.min(reportItemCount(files.generationReady), generationTarget);
+  const generationQwenPool = qwenPoolForWork(generationWorkItems);
+  await stage('qwen_generation', 'scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs', [
+    '--report', files.generationReady,
+    '--out', files.generation,
+    '--checkpoint', files.generationCheckpoint,
+    '--endpoints', generationQwenPool.endpoints,
+    '--endpoint-gguf-variants', generationQwenPool.variants,
+    '--model', qwenModel,
+    '--limit', String(generationTarget),
+    '--concurrency', String(generationQwenPool.concurrency),
+    '--batch-size', '1',
+    '--chunk-size', '50',
+    '--max-attempts', '2',
+    '--circuit-breaker-failures', '2',
+    '--max-seq-length', '2048',
+    '--max-tokens', '1600',
+    '--speculative-type', 'mtp',
+    '--prompt-mode', 'compact',
+    '--stream-response', 'true',
+    '--disable-thinking', 'true',
+    '--enforce-reviewed-preferred-terms', 'true',
+    '--deterministic-readings', 'true',
+    '--deterministic-pronunciations', 'true',
+    '--prewarm', 'true',
+    '--resume', String(resume),
+    '--dry-run', 'true',
+    '--apply', 'false',
+    '--log-generated', 'true'
+  ], [files.generation]);
+
+  await stage('reverse_evidence', 'scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs', [
+    '--report', files.generation,
+    '--out', files.reverse,
+    '--supported-report', files.reverseSupported,
+    '--require-source-reverse-evidence', 'true',
+    '--evidence-family-policy', 'wiktionary',
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+  ], [files.reverse, files.reverseSupported]);
+
+  if (reportHasRows(files.reverseSupported)) await stage('final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
+    '--generation', files.generation,
+    '--evidence', files.reverse,
+    '--out', files.finalGemma,
+    '--accepted-out', files.finalAccepted,
+    '--endpoints', gemmaEndpoints,
+    '--endpoint-gguf-variants', gemmaVariants,
+    '--model', gemmaModel,
+    '--generation-model', qwenModel,
+    '--only-supported', 'true',
+    '--limit', '1000000',
+    '--concurrency', String(gemmaConcurrency),
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '2',
+    '--max-seq-length', '2048',
+    '--max-tokens', '650',
+    '--prompt-mode', 'full',
+    '--resume', String(resume),
+    '--stream', 'true',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.finalGemma, files.finalAccepted]);
+  else skipConsensusStage('final_gemma', files.finalGemma, files.finalAccepted);
+
+  if (reportHasRows(files.generation)) await stage('build_structured_correction_retry', 'scripts/build-dictionary-v2-product-source-gap-structured-correction-retry.mjs', [
+    '--report', files.consensusSupported,
+    '--consensus', files.finalGemma,
+    '--generation', files.generation,
+    '--out', files.repairInput
+  ], [files.repairInput]);
+  else skipConsensusStage('build_structured_correction_retry', files.repairInput);
+
+  const repairQwenPool = qwenPoolForWork(reportItemCount(files.repairInput));
+  await stage('qwen_repair_generation', 'scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs', [
+    '--report', files.repairInput,
+    '--out', files.repairGeneration,
+    '--checkpoint', files.repairCheckpoint,
+    '--endpoints', repairQwenPool.endpoints,
+    '--endpoint-gguf-variants', repairQwenPool.variants,
+    '--model', qwenModel,
+    '--limit', '1000000',
+    '--concurrency', String(repairQwenPool.concurrency),
+    '--batch-size', '1',
+    '--chunk-size', '50',
+    '--max-attempts', '2',
+    '--circuit-breaker-failures', '2',
+    '--max-seq-length', '2048',
+    '--max-tokens', '1600',
+    '--speculative-type', 'mtp',
+    '--prompt-mode', 'compact',
+    '--stream-response', 'true',
+    '--disable-thinking', 'true',
+    '--enforce-reviewed-preferred-terms', 'true',
+    '--deterministic-readings', 'true',
+    '--deterministic-pronunciations', 'true',
+    '--prewarm', 'true',
+    '--resume', String(resume),
+    '--dry-run', 'true',
+    '--apply', 'false',
+    '--log-generated', 'true'
+  ], [files.repairGeneration]);
+
+  await stage('repair_reverse_evidence', 'scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs', [
+    '--report', files.repairGeneration,
+    '--out', files.repairReverse,
+    '--supported-report', files.repairReverseSupported,
+    '--require-source-reverse-evidence', 'true',
+    '--evidence-family-policy', 'wiktionary',
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+  ], [files.repairReverse, files.repairReverseSupported]);
+
+  if (reportHasRows(files.repairReverseSupported)) await stage('repair_final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
+    '--generation', files.repairGeneration,
+    '--evidence', files.repairReverse,
+    '--out', files.repairFinalGemma,
+    '--accepted-out', files.repairFinalAccepted,
+    '--endpoints', gemmaEndpoints,
+    '--endpoint-gguf-variants', gemmaVariants,
+    '--model', gemmaModel,
+    '--generation-model', qwenModel,
+    '--only-supported', 'true',
+    '--limit', '1000000',
+    '--concurrency', String(gemmaConcurrency),
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '2',
+    '--max-seq-length', '2048',
+    '--max-tokens', '420',
+    '--prompt-mode', 'full',
+    '--resume', String(resume),
+    '--stream', 'true',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.repairFinalGemma, files.repairFinalAccepted]);
+  else skipConsensusStage('repair_final_gemma', files.repairFinalGemma, files.repairFinalAccepted);
+
+  const summary = buildSummary(files);
+  fs.writeFileSync(files.summary, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+  manifest.status = 'complete';
+  manifest.completed_at = new Date().toISOString();
+  manifest.summary = summary.summary;
+  writeManifest();
+  console.log(JSON.stringify(summary, null, 2));
+  }
+} catch (error) {
+  manifest.status = 'failed';
+  manifest.failed_at = new Date().toISOString();
+  manifest.error = String(error?.message || error);
+  writeManifest();
+  throw error;
+} finally {
+  await restoreElasticReviewers();
+}
+
+async function runSimplifiedPipeline() {
+  await stage('gemma_source_review', 'scripts/review-dictionary-v2-product-source-gap-candidates-unsloth.mjs', [
+    '--report', batchPath,
+    '--out', files.gemmaReview,
+    '--approved-out', files.gemmaApproved,
+    '--rejected-out', files.gemmaRejected,
+    '--endpoints', gemmaEndpoints,
+    '--endpoint-gguf-variants', gemmaVariants,
+    '--model', gemmaModel,
+    '--limit', '1000000',
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '4',
+    '--resume', String(resume),
+    '--retry-decisions', 'manual_review',
+    '--max-seq-length', '3072',
+    '--max-tokens', '900',
+    '--speculative-type', 'off',
+    '--prompt-mode', 'full',
+    '--response-format', 'json-object',
+    '--require-daily-primary', 'true',
+    '--require-definition-contract', 'true',
+    '--stream', 'false',
+    '--prewarm', 'true',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.gemmaReview, files.gemmaApproved, files.gemmaRejected]);
+
+  const generationItems = Math.min(reportItemCount(files.gemmaApproved), generationTarget);
+  const generationPool = qwenPoolForWork(generationItems);
+  await stage('qwen_generation', 'scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs', [
+    '--report', files.gemmaApproved,
+    '--out', files.generation,
+    '--checkpoint', files.generationCheckpoint,
+    '--endpoints', generationPool.endpoints,
+    '--endpoint-gguf-variants', generationPool.variants,
+    '--model', qwenModel,
+    '--limit', String(generationTarget),
+    '--concurrency', String(generationPool.concurrency),
+    '--batch-size', '1',
+    '--chunk-size', '50',
+    '--max-attempts', '2',
+    '--circuit-breaker-failures', '2',
+    '--max-seq-length', '2048',
+    '--max-tokens', '1600',
+    '--speculative-type', 'mtp',
+    '--prompt-mode', 'compact',
+    '--stream-response', 'true',
+    '--disable-thinking', 'true',
+    '--require-evidence-verdict', 'false',
+    '--enforce-reviewed-preferred-terms', 'false',
+    '--enforce-generation-hint-terms', 'false',
+    '--deterministic-readings', 'true',
+    '--deterministic-pronunciations', 'true',
+    '--prewarm', 'true',
+    '--resume', String(resume),
+    '--dry-run', 'true',
+    '--apply', 'false',
+    '--publishable', 'false',
+    '--log-generated', 'true'
+  ], [files.generation, files.generationCheckpoint]);
+
+  await stage('reverse_evidence', 'scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs', [
+    '--report', files.generation,
+    '--out', files.reverse,
+    '--supported-report', files.reverseSupported,
+    '--input-mode', 'generated',
+    '--require-source-reverse-evidence', 'true',
+    '--evidence-family-policy', 'wiktionary',
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+  ], [files.reverse, files.reverseSupported]);
+
+  if (reportHasRows(files.generation)) await stage('final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
+    '--generation', files.generation,
+    '--evidence', files.reverse,
+    '--out', files.finalGemma,
+    '--accepted-out', files.finalAccepted,
+    '--endpoints', gemmaEndpoints,
+    '--endpoint-gguf-variants', gemmaVariants,
+    '--model', gemmaModel,
+    '--generation-model', qwenModel,
+    '--only-supported', 'true',
+    '--limit', '1000000',
+    '--concurrency', String(gemmaConcurrency),
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '2',
+    '--max-seq-length', '3072',
+    '--max-tokens', '650',
+    '--prompt-mode', 'full',
+    '--resume', String(resume),
+    '--retry-decisions', 'manual_review',
+    '--stream', 'false',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.finalGemma, files.finalAccepted]);
+  else skipConsensusStage('final_gemma', files.finalGemma, files.finalAccepted);
+
+  const gemmaSource = JSON.parse(fs.readFileSync(files.gemmaReview, 'utf8'));
+  const generation = JSON.parse(fs.readFileSync(files.generation, 'utf8'));
+  const reverse = JSON.parse(fs.readFileSync(files.reverse, 'utf8'));
+  const finalReview = JSON.parse(fs.readFileSync(files.finalGemma, 'utf8'));
+  const summary = {
+    ok: true,
+    run_id: runId,
+    input_fingerprint: inputFingerprint,
+    pipeline_mode: 'simplified',
+    summary: {
+      input: Number(gemmaSource?.summary?.reviewed || 0),
+      gemma_source_approved: Number(gemmaSource?.summary?.approved || 0),
+      generated_valid: Number(generation?.stats?.accepted || 0),
+      reverse_supported: Number(reverse?.summary?.decisions?.supported || 0),
+      reverse_manual_review: Number(reverse?.summary?.decisions?.manual_review || 0),
+      final_accepted: Number(finalReview?.summary?.consensus_accepted || 0),
+      final_rejected: Number(finalReview?.summary?.rejected || 0),
+      automatic_database_writes: 0
+    },
+    reports: {
+      gemmaSourceReview: relative(files.gemmaReview),
+      gemmaSourceApproved: relative(files.gemmaApproved),
+      generation: relative(files.generation),
+      reverse: relative(files.reverse),
+      finalGemma: relative(files.finalGemma),
+      finalAccepted: relative(files.finalAccepted),
+      summary: relative(files.summary)
+    }
+  };
+  fs.writeFileSync(files.summary, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+  manifest.status = 'complete';
+  manifest.completed_at = new Date().toISOString();
+  manifest.summary = summary.summary;
+  writeManifest();
+  console.log(JSON.stringify(summary, null, 2));
+}
+
+async function stage(name, script, stageArgs, expectedOutputs) {
+  const existing = manifest.stages[name];
+  if (resume && existing?.status === 'complete' && outputsMatch(existing.outputs, expectedOutputs)) {
+    console.log(`[resume] ${name}`);
+    return;
+  }
+  const logPath = output(`${name}.log`);
+  manifest.stages[name] = {
+    status: 'running',
+    started_at: new Date().toISOString(),
+    script,
+    args: redactArgs(stageArgs),
+    log: relative(logPath)
+  };
+  writeManifest();
+  const exitCode = await runNode(script, stageArgs, logPath);
+  if (exitCode !== 0) {
+    manifest.stages[name] = { ...manifest.stages[name], status: 'failed', exit_code: exitCode };
+    writeManifest();
+    throw new Error(`Stage ${name} failed with exit code ${exitCode}`);
+  }
+  for (const filePath of expectedOutputs) {
+    if (!fs.existsSync(filePath)) throw new Error(`Stage ${name} did not produce ${filePath}`);
+  }
+  manifest.stages[name] = {
+    ...manifest.stages[name],
+    status: 'complete',
+    exit_code: 0,
+    completed_at: new Date().toISOString(),
+    outputs: expectedOutputs.map((filePath) => ({ path: relative(filePath), sha256: sha256File(filePath) }))
+  };
+  writeManifest();
+}
+
+function runNode(script, stageArgs, logPath) {
+  return new Promise((resolve, reject) => {
+    const log = fs.createWriteStream(logPath, { flags: 'a' });
+    const child = spawn(process.execPath, [script, ...stageArgs], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    child.stdout.on('data', (chunk) => { process.stdout.write(chunk); log.write(chunk); });
+    child.stderr.on('data', (chunk) => { process.stderr.write(chunk); log.write(chunk); });
+    child.on('error', reject);
+    child.on('close', (code) => { log.end(); resolve(Number(code)); });
+  });
+}
+
+function csvValues(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function mergeCsv(...values) {
+  return [...new Set(values.flatMap(csvValues))].join(',');
+}
+
+function qwenPoolForWork(itemCount) {
+  const useElastic = elasticModelSwap && itemCount >= elasticMinimumItems;
+  const endpoints = useElastic ? mergeCsv(qwenEndpoints, elasticEndpoints) : qwenEndpoints;
+  const variants = useElastic ? mergeCsv(qwenVariants, elasticQwenVariants) : qwenVariants;
+  return { endpoints, variants, concurrency: csvValues(endpoints).length, use_elastic: useElastic, item_count: itemCount };
+}
+
+function reportItemCount(filePath) {
+  const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  for (const key of ['selected', 'candidates', 'aligned', 'generated', 'replayed', 'reviews', 'supported']) {
+    if (Array.isArray(report[key])) return report[key].length;
+  }
+  return Number(report.selected_count || report.summary?.selected || report.summary?.input || 0);
+}
+
+async function restoreElasticReviewers() {
+  if (!elasticModelSwap) return;
+  const reviewerEndpoints = new Set(csvValues(gemmaEndpoints));
+  const targets = csvValues(elasticEndpoints).filter((endpoint) => reviewerEndpoints.has(endpoint));
+  if (!targets.length) return;
+  const variants = parseVariantCsv(gemmaVariants);
+  const startedAt = new Date().toISOString();
+  const results = await Promise.all(
+    targets.map((endpoint) => ensureUnslothModel({
+      endpoint,
+      token,
+      model: gemmaModel,
+      variant: variants.get(endpointPort(endpoint)) || null,
+      maxSeqLength: 3072,
+      speculativeType: 'off',
+      unloadBeforeLoad: true,
+      loadTimeoutMs: 300_000
+    }))
+  );
+  manifest.stages.restore_elastic_reviewers = {
+    status: results.every((row) => row.ok) ? 'complete' : 'degraded',
+    started_at: startedAt,
+    completed_at: new Date().toISOString(),
+    results
+  };
+  writeManifest();
+}
+
+function parseVariantCsv(value) {
+  return new Map(csvValues(value).map((item) => {
+    const separator = item.indexOf('=');
+    return separator > 0 ? [item.slice(0, separator), item.slice(separator + 1)] : [item, ''];
+  }));
+}
+
+function endpointPort(endpoint) {
+  return new URL(endpoint).port;
+}
+
+function buildSummary(paths) {
+  const read = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const qwen = read(paths.qwenReview);
+  const gemma = read(paths.gemmaReview);
+  const consensus = read(paths.consensus);
+  const consensusReverse = read(paths.consensusReverse);
+  const semanticReview = read(paths.semanticReview);
+  const semanticRepairInput = read(paths.semanticRepairInput);
+  const semanticRepairGeneration = read(paths.semanticRepairGeneration);
+  const semanticRepairFinal = read(paths.semanticRepairFinal);
+  const generationReady = read(paths.generationReady);
+  const generation = read(paths.generation);
+  const reverse = read(paths.reverse);
+  const final = read(paths.finalGemma);
+  const repairInput = read(paths.repairInput);
+  const repairGeneration = read(paths.repairGeneration);
+  const repairFinal = read(paths.repairFinalGemma);
+  const initialAccepted = Number(final?.summary?.consensus_accepted || 0);
+  const repairAccepted = Number(repairFinal?.summary?.consensus_accepted || 0);
+  const semanticRepairAccepted = Number(semanticRepairFinal?.summary?.consensus_accepted || 0);
+  return {
+    ok: true,
+    run_id: runId,
+    input_fingerprint: inputFingerprint,
+    summary: {
+      input: Number(qwen?.summary?.reviewed || 0),
+      qwen_source_approved: Number(qwen?.summary?.approved || 0),
+      gemma_source_approved: Number(gemma?.summary?.approved || 0),
+      source_consensus: Number(consensus?.summary?.agreed || 0),
+      source_consensus_reverse_supported: Number(consensusReverse?.summary?.decisions?.supported || 0),
+      semantic_preview_accepted: Number(semanticReview?.summary?.consensus_accepted || 0),
+      semantic_repair_selected: Number(semanticRepairInput?.summary?.selected || 0),
+      semantic_repair_generated_valid: Number(semanticRepairGeneration?.stats?.accepted || 0),
+      semantic_repair_final_accepted: semanticRepairAccepted,
+      generation_preflight_ready: Number(generationReady?.selected_count || 0),
+      generation_preflight_rejected: Number(generationReady?.jmdict_preflight_summary?.rejected || 0),
+      generation_target: generationTarget,
+      generated_valid: Number(generation?.stats?.accepted || 0),
+      reverse_supported: Number(reverse?.summary?.decisions?.supported || 0),
+      final_accepted: Number(final?.summary?.consensus_accepted || 0),
+      repair_selected: Number(repairInput?.summary?.selected || 0),
+      repair_generated_valid: Number(repairGeneration?.stats?.accepted || 0),
+      repair_final_accepted: repairAccepted,
+      total_final_accepted: initialAccepted + repairAccepted + semanticRepairAccepted,
+      automatic_database_writes: 0
+    },
+    reports: Object.fromEntries(Object.entries(paths).map(([key, filePath]) => [key, relative(filePath)]))
+  };
+}
+
+function buildSourceScreenSummary(paths) {
+  const read = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const qwen = read(paths.qwenReview);
+  const gemma = read(paths.gemmaReview);
+  const consensus = read(paths.consensus);
+  const reverse = read(paths.consensusReverse);
+  return {
+    ok: true,
+    run_id: runId,
+    input_fingerprint: inputFingerprint,
+    source_screen_only: true,
+    summary: {
+      input: Number(qwen?.summary?.reviewed || 0),
+      qwen_source_approved: Number(qwen?.summary?.approved || 0),
+      gemma_source_approved: Number(gemma?.summary?.approved || 0),
+      source_consensus: Number(consensus?.summary?.agreed || 0),
+      source_consensus_reverse_supported: Number(reverse?.summary?.decisions?.supported || 0),
+      automatic_database_writes: 0
+    },
+    reports: {
+      qwenReview: relative(paths.qwenReview),
+      gemmaReview: relative(paths.gemmaReview),
+      consensus: relative(paths.consensus),
+      consensusReverse: relative(paths.consensusReverse),
+      consensusSupported: relative(paths.consensusSupported),
+      summary: relative(paths.summary)
+    }
+  };
+}
+
+function reportHasRows(filePath) {
+  const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  return ['selected', 'candidates', 'rows', 'reviews', 'generated', 'validations']
+    .some((key) => Array.isArray(report?.[key]) && report[key].length > 0);
+}
+
+function skipConsensusStage(name, outPath, acceptedPath) {
+  const empty = {
+    ok: true,
+    skipped: true,
+    reason: 'no_supported_candidates',
+    summary: {
+      targeted: 0,
+      valid: 0,
+      accepted: 0,
+      rejected: 0,
+      manual_review: 0,
+      consensus_accepted: 0,
+      failed: 0
+    },
+    reviews: []
+  };
+  fs.writeFileSync(outPath, `${JSON.stringify(empty, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(acceptedPath, `${JSON.stringify(empty, null, 2)}\n`, 'utf8');
+  manifest.stages[name] = {
+    status: 'skipped',
+    reason: empty.reason,
+    completed_at: new Date().toISOString(),
+    outputs: [outPath, acceptedPath].map((filePath) => ({ path: relative(filePath), sha256: sha256File(filePath) }))
+  };
+  writeManifest();
+}
+
+function outputsMatch(recorded, expected) {
+  if (!Array.isArray(recorded) || recorded.length !== expected.length) return false;
+  return expected.every((filePath) => {
+    const item = recorded.find((row) => path.resolve(row.path) === path.resolve(filePath));
+    return item && fs.existsSync(filePath) && item.sha256 === sha256File(filePath);
+  });
+}
+
+function loadManifest() {
+  if (!fs.existsSync(manifestPath)) return {};
+  return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+}
+
+function writeManifest() {
+  const temporary = `${manifestPath}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+  fs.rmSync(manifestPath, { force: true });
+  fs.renameSync(temporary, manifestPath);
+}
+
+function output(name) { return path.join(runDir, name); }
+function sourceOutput(name) { return path.join(sourceRunDir || runDir, name); }
+function relative(filePath) { return path.relative(process.cwd(), filePath); }
+function sha256File(filePath) { return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex'); }
+function redactArgs(values) { return values.map((value) => /sk-[a-z0-9]/iu.test(String(value)) ? '<redacted>' : value); }
+
+function requiredPath(value, name) {
+  if (!value) throw new Error(`Missing --${name}`);
+  const filePath = path.resolve(value);
+  if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
+  return filePath;
+}
+
+function parseArgs(argv) {
+  const parsed = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (!token.startsWith('--')) continue;
+    const key = token.slice(2);
+    const next = argv[index + 1];
+    parsed[key] = next && !next.startsWith('--') ? argv[++index] : 'true';
+  }
+  return parsed;
+}

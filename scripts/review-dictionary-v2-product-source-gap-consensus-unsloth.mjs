@@ -1,6 +1,8 @@
+import './lib/load-local-env.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const generationPath = requiredPath(args.generation, 'generation');
@@ -10,10 +12,14 @@ const acceptedOutPath = path.resolve(
   args['accepted-out'] || outPath.replace(/\.json$/u, '-accepted.json')
 );
 const token = args.token || process.env.UNSLOTH_API_KEY;
-const endpoint = String(args.endpoint || '').replace(/\/$/u, '');
+const endpoints = String(args.endpoints || args.endpoint || '')
+  .split(',')
+  .map((value) => value.trim().replace(/\/$/u, ''))
+  .filter(Boolean);
 const model = String(args.model || 'unsloth/gemma-4-31B-it-qat-GGUF');
 const generationModel = String(args['generation-model'] || '');
 const variant = args['gguf-variant'] ? String(args['gguf-variant']) : null;
+const endpointVariants = parseEndpointVariants(args['endpoint-gguf-variants']);
 const confidenceThreshold = boundedNumber(args['confidence-threshold'], 0.9, 0, 1);
 const timeoutMs = boundedInteger(args['timeout-ms'], 180_000, 1_000);
 const loadTimeoutMs = boundedInteger(args['load-timeout-ms'], 300_000, 1_000);
@@ -22,8 +28,20 @@ const maxAttempts = boundedInteger(args['max-attempts'], 2, 1);
 const maxSeqLength = boundedInteger(args['max-seq-length'], 2048, 512);
 const limit = boundedInteger(args.limit, 10, 1);
 const forceReload = args['force-reload'] === 'true';
+const unloadBeforeLoad = args['unload-before-load'] === 'true';
 const resume = args.resume === 'true';
 const recheckRejected = args['recheck-rejected'] === 'true';
+const retryDecisionsOnResume = new Set(
+  String(args['retry-decisions'] || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+for (const decision of retryDecisionsOnResume) {
+  if (!['accept', 'reject', 'manual_review'].includes(decision)) {
+    throw new Error(`Invalid --retry-decisions value: ${decision}`);
+  }
+}
 const includeSupported = args['include-supported'] === 'true';
 const onlySupported = args['only-supported'] === 'true';
 const chatPath = normalizeChatPath(args['chat-path'] || '/v1/chat/completions');
@@ -43,7 +61,7 @@ if (includeSupported && onlySupported) {
 }
 
 if (!token) throw new Error('Missing --token or UNSLOTH_API_KEY');
-if (!endpoint) throw new Error('Missing --endpoint');
+if (!endpoints.length) throw new Error('Missing --endpoint or --endpoints');
 if (!generationModel) throw new Error('Missing --generation-model');
 if (normalizedFamily(model) === normalizedFamily(generationModel)) {
   throw new Error('Reviewer and generation model must be from different model families');
@@ -86,6 +104,7 @@ const resumedReviews =
     ? (readJson(outPath).reviews || []).filter(
         (row) =>
           row?.valid === true &&
+          !retryDecisionsOnResume.has(row?.decision) &&
           (!recheckRejected || row?.consensus_accepted === true) &&
           targetIds.has(sourceSenseKey(row.source_entry_id, row.source_sense_id))
       )
@@ -98,19 +117,24 @@ const pendingTargets = targets.filter(
     !completedIds.has(sourceSenseKey(target.evidence.source_entry_id, target.evidence.source_sense_id))
 );
 
-const prewarm = pendingTargets.length ? await loadReviewerModel() : { ok: true, skipped: true };
-if (!prewarm.ok) throw new Error(`Reviewer model load failed: ${prewarm.error}`);
+const prewarm = pendingTargets.length
+  ? await Promise.all(endpoints.map((reviewEndpoint) => loadReviewerModel(reviewEndpoint)))
+  : endpoints.map((reviewEndpoint) => ({ endpoint: reviewEndpoint, ok: true, skipped: true }));
+if (prewarm.every((row) => !row.ok)) {
+  throw new Error(`Reviewer model load failed on every endpoint: ${prewarm.map((row) => `${row.endpoint}=${row.error}`).join('; ')}`);
+}
+const activeEndpoints = prewarm.filter((row) => row.ok).map((row) => row.endpoint);
 
 const reviews = [...resumedReviews];
 let nextPendingIndex = 0;
 let completedSinceCheckpoint = 0;
 let lastCheckpointAt = Date.now();
 await Promise.all(
-  Array.from({ length: Math.min(concurrency, Math.max(1, pendingTargets.length)) }, async () => {
+  Array.from({ length: Math.min(concurrency, activeEndpoints.length, Math.max(1, pendingTargets.length)) }, (_, workerIndex) => async () => {
     while (true) {
       const pendingIndex = nextPendingIndex++;
       if (pendingIndex >= pendingTargets.length) return;
-      const review = await reviewWithRetry(pendingTargets[pendingIndex]);
+      const review = await reviewWithRetry(pendingTargets[pendingIndex], workerIndex);
       reviews.push(review);
       completedSinceCheckpoint++;
       console.log(
@@ -126,7 +150,7 @@ await Promise.all(
         lastCheckpointAt = Date.now();
       }
     }
-  })
+  }).map((worker) => worker())
 );
 writeReports();
 
@@ -144,13 +168,17 @@ console.log(
   )
 );
 
-async function reviewWithRetry(target) {
+async function reviewWithRetry(target, startEndpointIndex) {
   let lastError = null;
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+  const endpointAttempts = [];
+  const attemptLimit = Math.max(maxAttempts, activeEndpoints.length);
+  for (let attempt = 1; attempt <= attemptLimit; attempt += 1) {
+    const reviewEndpoint = activeEndpoints[(startEndpointIndex + attempt - 1) % activeEndpoints.length];
     try {
-      return await reviewTarget(target, attempt, lastError);
+      return await reviewTarget(target, reviewEndpoint, attempt, lastError);
     } catch (error) {
       lastError = errorMessage(error);
+      endpointAttempts.push({ endpoint: reviewEndpoint, attempt, error: lastError });
     }
   }
   return {
@@ -158,21 +186,25 @@ async function reviewWithRetry(target) {
     source_sense_id: Number(target.evidence.source_sense_id),
     word: target.generation.word,
     anchor: target.evidence.anchor,
-    valid: false,
-    decision: null,
-    confidence: null,
+    valid: true,
+    decision: 'manual_review',
+    confidence: 0,
     consensus_accepted: false,
+    reason: 'All healthy reviewer endpoints returned invalid or failed responses.',
+    corrections: [],
+    endpoint_attempts: endpointAttempts,
     error: lastError
   };
 }
 
-async function reviewTarget(target, attempt, previousError) {
+async function reviewTarget(target, reviewEndpoint, attempt, previousError) {
   if (promptMode === 'nano-per-language') {
-    return reviewTargetPerLanguage(target, attempt, previousError);
+    return reviewTargetPerLanguage(target, reviewEndpoint, attempt, previousError);
   }
   const started = performance.now();
   const payload = compactPayload(target);
   const response = await postChat(
+    reviewEndpoint,
     chatPath,
     {
       model,
@@ -181,6 +213,7 @@ async function reviewTarget(target, attempt, previousError) {
       max_tokens: maxTokens,
       enable_thinking: false,
       reasoning_effort: 'none',
+      response_format: { type: 'json_object' },
       messages:
         promptMode === 'nano'
           ? [{ role: 'user', content: buildNanoPrompt(payload, previousError) }]
@@ -200,6 +233,7 @@ async function reviewTarget(target, attempt, previousError) {
   const content = String(response?.choices?.[0]?.message?.content || '');
   const parsed = normalizeReview(parseJson(content));
   validateReview(parsed);
+  validateDeterministicCorrectionPolicy(parsed, payload);
   const corrections = Array.isArray(parsed.corrections)
     ? parsed.corrections.map(normalizeCorrection).filter(Boolean)
     : [];
@@ -220,7 +254,7 @@ async function reviewTarget(target, attempt, previousError) {
     reason: String(parsed.reason).trim(),
     corrections,
     consensus_accepted: consensusAccepted,
-    endpoint,
+    endpoint: reviewEndpoint,
     model,
     attempt,
     seconds: roundSeconds(performance.now() - started),
@@ -228,12 +262,13 @@ async function reviewTarget(target, attempt, previousError) {
   };
 }
 
-async function reviewTargetPerLanguage(target, attempt, previousError) {
+async function reviewTargetPerLanguage(target, reviewEndpoint, attempt, previousError) {
   const started = performance.now();
   const payload = compactPayload(target);
   const languageReviews = [];
   for (const [lang, localization] of Object.entries(payload.generated_localizations || {})) {
     const response = await postChat(
+      reviewEndpoint,
       chatPath,
       {
         model,
@@ -241,6 +276,7 @@ async function reviewTargetPerLanguage(target, attempt, previousError) {
         temperature: 0,
         max_tokens: maxTokens,
         enable_thinking: false,
+        response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: buildPerLanguagePrompt(payload, lang, localization, previousError) }]
       },
       timeoutMs
@@ -272,7 +308,7 @@ async function reviewTargetPerLanguage(target, attempt, previousError) {
     corrections: [],
     language_reviews: languageReviews,
     consensus_accepted: decision === 'accept' && confidence >= confidenceThreshold,
-    endpoint,
+    endpoint: reviewEndpoint,
     model,
     attempt,
     seconds: roundSeconds(performance.now() - started),
@@ -356,6 +392,7 @@ function buildPrompt(payload, previousError) {
       ? `Closely proofread the ${languageFocus} localization word by word for grammar, particles, syntax, and native dictionary style. Return a structured correction for every defect found.`
       : '',
     'Use reject for a wrong term, wrong sense, or misleading definition.',
+    'A reading or pronunciation with a pronunciation_source or reading_source beginning with deterministic: was supplied by a dictionary or deterministic language tool. Treat it as authoritative and never reject or correct it from model memory. Review only pronunciations without a deterministic source.',
     'Use manual_review when evidence is insufficient or polysemy cannot be resolved.',
     'Every correction must use the exact structured fields above. Never put the wrong current term in replacement.',
     'Use replacement=null when no single safe replacement is justified. An accepted result must have an empty corrections array.',
@@ -418,41 +455,20 @@ function normalizeReview(value) {
   };
 }
 
-async function loadReviewerModel() {
-  const started = performance.now();
-  try {
-    const status = await getJson('/v1/status', 30_000);
-    const sameModel =
-      status?.active_model === model &&
-      (!variant || status?.gguf_variant === variant) &&
-      (!status?.context_length || Number(status.context_length) === maxSeqLength);
-    if (!sameModel || forceReload) {
-      const body = {
-        model_path: model,
-        max_seq_length: maxSeqLength,
-        load_in_4bit: false,
-        speculative_type: 'off'
-      };
-      if (variant) body.gguf_variant = variant;
-      await postJson('/v1/load', body, loadTimeoutMs);
-    }
-    return {
-      ok: true,
-      skipped: sameModel && !forceReload,
-      seconds: roundSeconds(performance.now() - started),
-      model,
-      variant
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      skipped: false,
-      seconds: roundSeconds(performance.now() - started),
-      model,
-      variant,
-      error: errorMessage(error)
-    };
-  }
+async function loadReviewerModel(reviewEndpoint) {
+  const endpointVariant = endpointVariants[endpointPort(reviewEndpoint)] || variant;
+  return ensureUnslothModel({
+    endpoint: reviewEndpoint,
+    token,
+    model,
+    variant: endpointVariant,
+    maxSeqLength,
+    speculativeType: 'off',
+    loadTimeoutMs,
+    forceReload,
+    unloadBeforeLoad,
+    loadOptions: { n_parallel: 1, cache_type_kv: 'q8_0' }
+  });
 }
 
 function buildOutput() {
@@ -462,6 +478,12 @@ function buildOutput() {
       (targetOrder.get(sourceSenseKey(right.source_entry_id, right.source_sense_id)) ?? Number.MAX_SAFE_INTEGER)
   );
   const valid = orderedReviews.filter((row) => row.valid);
+  const endpointCounts = Object.fromEntries(
+    activeEndpoints.map((endpoint) => [
+      endpoint,
+      orderedReviews.filter((row) => row.endpoint === endpoint).length
+    ])
+  );
   return {
     ok: orderedReviews.every((row) => row.valid),
     generated_at: new Date().toISOString(),
@@ -470,6 +492,7 @@ function buildOutput() {
     policy: {
       generation_model: generationModel,
       reviewer_model: model,
+      endpoints,
       independent_model_families: true,
       confidence_threshold: confidenceThreshold,
       chat_path: chatPath,
@@ -479,6 +502,7 @@ function buildOutput() {
       concurrency,
       checkpoint_every: checkpointEvery,
       checkpoint_interval_ms: checkpointIntervalMs,
+      retry_decisions: [...retryDecisionsOnResume],
       automatic_promotion: false
     },
     prewarm,
@@ -489,7 +513,9 @@ function buildOutput() {
       rejected: valid.filter((row) => row.decision === 'reject').length,
       manual_review: valid.filter((row) => row.decision === 'manual_review').length,
       consensus_accepted: valid.filter((row) => row.consensus_accepted).length,
-      failed: orderedReviews.filter((row) => !row.valid).length
+      failed: orderedReviews.filter((row) => !row.valid).length,
+      active_endpoints: activeEndpoints.length,
+      endpoint_counts: endpointCounts
     },
     reviews: orderedReviews
   };
@@ -513,8 +539,8 @@ function writeJsonAtomically(filePath, value) {
   fs.renameSync(temporaryPath, filePath);
 }
 
-async function postJson(pathName, body, timeout) {
-  const response = await fetch(`${endpoint}${pathName}`, {
+async function postJson(reviewEndpoint, pathName, body, timeout) {
+  const response = await fetch(`${reviewEndpoint}${pathName}`, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -529,8 +555,8 @@ async function postJson(pathName, body, timeout) {
   }
 }
 
-async function postChat(pathName, body, timeout) {
-  const response = await fetch(`${endpoint}${pathName}`, {
+async function postChat(reviewEndpoint, pathName, body, timeout) {
+  const response = await fetch(`${reviewEndpoint}${pathName}`, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -581,8 +607,8 @@ async function readChatCompletionStream(response, bodyTimeoutMs) {
   }
 }
 
-async function getJson(pathName, timeout) {
-  const response = await fetch(`${endpoint}${pathName}`, {
+async function getJson(reviewEndpoint, pathName, timeout) {
+  const response = await fetch(`${reviewEndpoint}${pathName}`, {
     headers: { authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(timeout)
   });
@@ -614,6 +640,23 @@ function validateReview(parsed) {
     throw new Error('rejected_without_corrections');
   }
   for (const correction of parsed.corrections) validateCorrection(correction);
+}
+
+function validateDeterministicCorrectionPolicy(parsed, payload) {
+  for (const correction of parsed?.corrections || []) {
+    if (!['reading', 'pronunciation'].includes(correction?.field)) continue;
+    const localization = payload?.generated_localizations?.[correction.language];
+    const source = String(
+      correction.field === 'reading'
+        ? localization?.reading_source || ''
+        : localization?.pronunciation_source || ''
+    );
+    if (source.startsWith('deterministic:')) {
+      throw new Error(
+        `reviewer_overrode_authoritative_${correction.field}:${correction.language}:${source}`
+      );
+    }
+  }
 }
 
 function validateCorrection(value) {
@@ -676,6 +719,24 @@ function normalizeChatPath(value) {
     throw new Error(`Invalid --chat-path: ${value}`);
   }
   return normalized;
+}
+
+function parseEndpointVariants(value) {
+  const parsed = {};
+  for (const item of String(value || '').split(',').map((part) => part.trim()).filter(Boolean)) {
+    const separator = item.indexOf('=');
+    if (separator < 1) throw new Error(`Invalid --endpoint-gguf-variants item: ${item}`);
+    parsed[item.slice(0, separator).trim()] = item.slice(separator + 1).trim();
+  }
+  return parsed;
+}
+
+function endpointPort(value) {
+  try {
+    return new URL(value).port;
+  } catch {
+    return value;
+  }
 }
 
 function readJson(filePath) {

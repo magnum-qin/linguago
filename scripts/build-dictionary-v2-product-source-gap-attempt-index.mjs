@@ -48,9 +48,10 @@ for (const entry of fs.readdirSync(logsDir, { withFileTypes: true })) {
   }
 
   if (Array.isArray(report.reviews)) {
+    const rejectEvidence = classifyReviewRejectReport(report);
     for (const item of report.reviews) {
       if (item?.valid === true && item?.decision === 'reject') {
-        addAttempt(item, entry.name, 'review_reject');
+        addAttempt(item, entry.name, rejectEvidence);
       }
       if (item?.valid === false && item?.source_entry_id) {
         addAttempt(item, entry.name, 'review_failure_after_retries');
@@ -74,7 +75,12 @@ const selected = [...attempts.values()]
     source_sense_id: item.source_sense_id,
     attempts: item.files.size,
     files: [...item.files].sort(),
-    evidence: [...item.evidence].sort()
+    evidence: [...item.evidence].sort(),
+    evidence_files: Object.fromEntries(
+      [...item.evidenceFiles.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([label, files]) => [label, [...files].sort()])
+    )
   }));
 const output = {
   ok: parseFailures.length === 0,
@@ -86,7 +92,7 @@ const output = {
       'top_level_generated_rows',
       'already_linked_complete_source_gap_rows',
       'attempted_generation_checkpoint_items',
-      'valid_remote_review_rejections'
+      'valid_remote_review_rejections_by_stage'
     ],
     excludes: [
       'review_accept_rows',
@@ -121,15 +127,39 @@ function addAttempt(item, file, evidence) {
     source_entry_id: sourceEntryId,
     source_sense_id: sourceSenseId,
     files: new Set(),
-    evidence: new Set()
+    evidence: new Set(),
+    evidenceFiles: new Map()
   };
   current.files.add(file);
   current.evidence.add(evidence);
+  const evidenceFiles = current.evidenceFiles.get(evidence) || new Set();
+  evidenceFiles.add(file);
+  current.evidenceFiles.set(evidence, evidenceFiles);
   attempts.set(attemptKey, current);
 }
 
 function isGenerationCheckpoint(value) {
   return Boolean(value?.items && typeof value.items === 'object' && value?.config?.model);
+}
+
+function classifyReviewRejectReport(report) {
+  if (
+    report?.generation_report ||
+    (report?.policy?.generation_model && report?.policy?.reviewer_model)
+  ) {
+    return 'generation_quality_reject';
+  }
+  const reviews = Array.isArray(report?.reviews) ? report.reviews : [];
+  const sourceReviewShape =
+    report?.report &&
+    report?.model &&
+    reviews.some(
+      (row) =>
+        Object.hasOwn(row || {}, 'gloss_key') &&
+        Object.hasOwn(row || {}, 'english_anchor') &&
+        Object.hasOwn(row || {}, 'approved')
+    );
+  return sourceReviewShape ? 'source_review_reject' : 'other_review_reject';
 }
 
 function checkpointItemWasAttempted(item) {

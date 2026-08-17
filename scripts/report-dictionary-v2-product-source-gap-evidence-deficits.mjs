@@ -56,6 +56,26 @@ const sourceConflicts = rejected
       (row.evidence?.nonmatching_evidence || []).map((item) => item.english_gloss)
     )
   }));
+const sourceNearUnlock = rejected
+  .filter((row) =>
+    row.source_lang === 'ja' &&
+    row.evidence?.anchor &&
+    ![
+      'missing_english_anchor',
+      'capitalized_proper_or_named_english_anchor',
+      'insufficient_independent_target_evidence',
+      'existing_localization_does_not_round_trip'
+    ].includes(row.reason)
+  )
+  .map((row) => ({
+    candidate_key: row.candidate_key,
+    word: row.word,
+    source_lang: row.source_lang,
+    anchor: row.evidence.anchor,
+    reason: row.reason,
+    matching_sources: row.evidence?.matching_sources || [],
+    matching_source_families: row.evidence?.matching_source_families || []
+  }));
 const insufficientTargets = rejected
   .filter((row) => row.reason === 'insufficient_independent_target_evidence')
   .flatMap((row) => {
@@ -85,6 +105,7 @@ const summary = {
     sourceConflicts,
     (row) => String(row.matching_source_families.length)
   ),
+  source_near_unlock_by_reason: countBy(sourceNearUnlock, (row) => row.reason),
   roundtrip_failures_by_target_lang: countBy(roundTripFailures, (row) => row.target_lang),
   roundtrip_failures_by_best_family_count: countBy(
     roundTripFailures,
@@ -118,6 +139,7 @@ const output = {
   summary,
   supplemental_inventory: supplementalInventory,
   source_conflicts: sourceConflicts,
+  source_near_unlock: sourceNearUnlock,
   roundtrip_failures: roundTripFailures,
   insufficient_targets: insufficientTargets
 };

@@ -51,6 +51,9 @@ const checkpointSourceBySense = checkpointPath ? loadCheckpointSourceBySense(che
 const checkpointProductSenseBySourceSense = checkpointPath
   ? loadCheckpointProductSenseBySourceSense(checkpointPath)
   : new Map();
+const productSenseBySourceSense = checkpointProductSenseBySourceSense.size
+  ? checkpointProductSenseBySourceSense
+  : loadProductSenseBySourceSense(dbPath);
 const reportGlossBySource = reportPath ? loadReportGlosses(reportPath) : new Map();
 const reportSourceSenseIds = reportPath ? loadReportSourceSenseIds(reportPath) : [];
 if (restrictToReport && !reportSourceSenseIds.length) {
@@ -60,7 +63,7 @@ const semanticApprovals = semanticReviewPath
   ? loadSemanticApprovals(
       semanticReviewPath,
       semanticReviewConfidence,
-      checkpointProductSenseBySourceSense
+      productSenseBySourceSense
     )
   : new Map();
 const reverseEvidenceApprovals = reverseEvidencePath ? loadReverseEvidenceApprovals(reverseEvidencePath) : null;
@@ -268,9 +271,10 @@ function checkpointItems(checkpoint) {
 
 function loadReportGlosses(filePath) {
   const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  const rows = report?.selected || report?.residuals || [];
+  const generatedRows = Array.isArray(report?.generated) ? report.generated : [];
+  const rows = report?.selected || report?.residuals || generatedRows;
   const generatedGlosses = new Map(
-    (report?.generated || [])
+    generatedRows
       .filter(
         (row) =>
           row?.valid === true &&
@@ -279,22 +283,30 @@ function loadReportGlosses(filePath) {
       )
       .map((row) => [Number(row.source_entry_id), String(row.output.gloss_key).trim()])
   );
-  return new Map(
-    rows.map((row) => [
-      Number(row.source_entry_id),
-      generatedGlosses.get(Number(row.source_entry_id)) ||
-        String(row.first_gloss_key || row.gloss_key || row.first_gloss_preview || row.gloss_preview || '').trim()
-    ])
-  );
+  return new Map(rows.map((row) => {
+    const sourceEntryId = Number(row.source_entry_id);
+    return [
+      sourceEntryId,
+      generatedGlosses.get(sourceEntryId) ||
+        String(
+          row?.output?.gloss_key ||
+          row.first_gloss_key ||
+          row.gloss_key ||
+          row.first_gloss_preview ||
+          row.gloss_preview ||
+          ''
+        ).trim()
+    ];
+  }));
 }
 
 function loadReportSourceSenseIds(filePath) {
   const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  const rows = report?.selected || report?.residuals || [];
+  const rows = report?.selected || report?.residuals || report?.generated || [];
   return [
     ...new Set(
       rows
-        .map((row) => Number(row?.first_sense_id ?? row?.source_sense_id))
+        .map((row) => Number(row?.first_sense_id ?? row?.source_sense_id ?? row?.output?.source_sense_id))
         .filter(Number.isInteger)
     )
   ];
@@ -340,6 +352,24 @@ function loadSemanticApprovals(filePath, confidenceThreshold, productSenseBySour
   return approvals;
 }
 
+function loadProductSenseBySourceSense(filePath) {
+  const lookupDb = new Database(filePath, { readonly: true, fileMustExist: true });
+  lookupDb.pragma('query_only = ON');
+  const rows = lookupDb.prepare(`
+    SELECT pssl.source_entry_id, pssl.source_sense_id, pssl.product_sense_id
+    FROM product_sense_source_links pssl
+    WHERE pssl.source_entry_id IS NOT NULL
+      AND pssl.source_sense_id IS NOT NULL
+  `).all();
+  lookupDb.close();
+  return new Map(
+    rows.map((row) => [
+      `${Number(row.source_entry_id)}:${Number(row.source_sense_id)}`,
+      Number(row.product_sense_id)
+    ])
+  );
+}
+
 function loadReverseEvidenceApprovals(filePath) {
   const review = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   const approvals = (review.validations || [])
@@ -380,7 +410,9 @@ function validateCandidate(candidate) {
   const locMap = Object.fromEntries(localizations.map((loc) => [loc.lang, loc]));
   const errors = [];
 
-  if (!['draft_single_source', 'accepted'].includes(candidate.entry_status)) {
+  // Promoting one reviewed sense can temporarily leave the shared entry in
+  // needs_review while independently reviewed sibling drafts remain pending.
+  if (!['draft_single_source', 'needs_review', 'accepted'].includes(candidate.entry_status)) {
     errors.push('entry_not_promotable');
   }
   if (candidate.sense_status !== 'draft_single_source') errors.push('sense_not_draft_single_source');

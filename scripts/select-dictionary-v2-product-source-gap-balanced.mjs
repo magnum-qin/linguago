@@ -30,6 +30,7 @@ for (const excludeReport of excludeReports) {
 }
 const uniqueEntry = args['unique-entry'] === 'true'
 const excludeByEntry = args['exclude-by-entry'] === 'true'
+const requiredTermRegion = String(args['require-term-region'] || '').trim()
 const seenCandidateKeys = new Set()
 const rows = (report.selected ?? []).filter((row) => {
   const key = candidateKey(row)
@@ -37,7 +38,10 @@ const rows = (report.selected ?? []).filter((row) => {
   seenCandidateKeys.add(key)
   return (
     !excludedCandidateKeys.has(key) &&
-    (!excludeByEntry || !excludedEntryIds.has(String(row.source_entry_id)))
+    (!excludeByEntry || !excludedEntryIds.has(String(row.source_entry_id))) &&
+    (!requiredTermRegion || (row.target_term_repairs || []).some((repair) =>
+      (repair.term_regions || []).includes(requiredTermRegion)
+    ))
   )
 })
 const targets = new Map(String(args.targets).split(',').map((item) => {
@@ -70,6 +74,7 @@ const output = {
     unique_entry: uniqueEntry,
     exclude_all: excludeAll,
     exclude_by_entry: excludeByEntry,
+    required_term_region: requiredTermRegion || null,
     exclude_reports: excludeReports.map((value) => path.resolve(value)),
     excluded_entry_count: excludedEntryIds.size,
     excluded_candidate_count: excludedCandidateKeys.size,

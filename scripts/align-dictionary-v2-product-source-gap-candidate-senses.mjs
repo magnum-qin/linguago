@@ -19,6 +19,7 @@ const requireUniqueBest = args['require-unique-best'] !== 'false';
 const expandAmbiguousBest = args['expand-ambiguous-best'] === 'true';
 const expandAllEligible = args['expand-all-eligible'] === 'true';
 const preferCurrentSense = args['prefer-current-sense'] === 'true';
+const excludeProductLinkedDrafts = args['exclude-product-linked-drafts'] !== 'false';
 
 if (!fs.existsSync(reportPath)) throw new Error(`Coverage report not found: ${reportPath}`);
 if (!fs.existsSync(sourceDbPath)) throw new Error(`Source DB not found: ${sourceDbPath}`);
@@ -32,13 +33,19 @@ const db = new Database(sourceDbPath, { readonly: true, fileMustExist: true });
 const productDb = new Database(productDbPath, { readonly: true, fileMustExist: true });
 productDb.pragma('query_only = ON');
 const findAcceptedProductLink = productDb.prepare(`
-  SELECT ps.id AS product_sense_id
+  SELECT ps.id AS product_sense_id, ps.status AS product_sense_status
   FROM product_sense_source_links pssl
   JOIN product_senses ps ON ps.id = pssl.product_sense_id
-  JOIN product_entries pe ON pe.id = ps.product_entry_id
   WHERE pssl.source_sense_id = ?
     AND ps.status = 'accepted'
-    AND pe.status = 'accepted'
+  LIMIT 1
+`);
+const findDraftProductLink = productDb.prepare(`
+  SELECT ps.id AS product_sense_id, ps.status AS product_sense_status
+  FROM product_sense_source_links pssl
+  JOIN product_senses ps ON ps.id = pssl.product_sense_id
+  WHERE pssl.source_sense_id = ?
+    AND ps.status = 'draft_single_source'
   LIMIT 1
 `);
 const loadSenses = db.prepare(`
@@ -117,6 +124,7 @@ const common = {
     prefer_current_sense: preferCurrentSense,
     complete_senses_are_excluded: maxLangs < 4,
     accepted_product_linked_senses_are_excluded: true,
+    draft_product_linked_senses_are_excluded: excludeProductLinkedDrafts,
     parallel_bilingual_senses_are_not_merged: true
   },
   summary
@@ -139,7 +147,11 @@ console.log(
 function alignCandidate(candidate) {
   const senses = loadSenses.all(candidate.source_entry_id).map((sense) => inspectSense(candidate, sense));
   const eligible = senses.filter(
-    (sense) => sense.source_term_exact && sense.clean_lang_count >= minLangs && !sense.accepted_product_link
+    (sense) =>
+      sense.source_term_exact &&
+      sense.clean_lang_count >= minLangs &&
+      !sense.accepted_product_link &&
+      (!excludeProductLinkedDrafts || !sense.draft_product_link)
   );
   if (!eligible.length) {
     if (
@@ -148,6 +160,14 @@ function alignCandidate(candidate) {
       )
     ) {
       return rejectedResult('already_linked_product_sense', candidate, senses);
+    }
+    if (
+      excludeProductLinkedDrafts &&
+      senses.some(
+        (sense) => sense.source_term_exact && sense.clean_lang_count >= minLangs && sense.draft_product_link
+      )
+    ) {
+      return rejectedResult('already_linked_draft_product_sense', candidate, senses);
     }
     return rejectedResult('no_eligible_sense', candidate, senses);
   }
@@ -261,9 +281,12 @@ function inspectSense(candidate, sense) {
   const sourceTerms = localizations
     .filter((row) => row.lang === candidate.source_lang)
     .flatMap((row) => splitTerms(row.term));
+  const acceptedProductLink = findAcceptedProductLink.get(sense.id);
+  const draftProductLink = excludeProductLinkedDrafts ? findDraftProductLink.get(sense.id) : null;
   return {
     ...sense,
-    accepted_product_link: findAcceptedProductLink.get(sense.id)?.product_sense_id || null,
+    accepted_product_link: acceptedProductLink?.product_sense_id || null,
+    draft_product_link: draftProductLink?.product_sense_id || null,
     confidence: Number(sense.confidence || 0),
     clean_lang_count: cleanLangs.length,
     clean_langs: cleanLangs.sort(),
@@ -294,7 +317,8 @@ function compactSenseScore(sense) {
     clean_langs: sense.clean_langs,
     clean_lang_count: sense.clean_lang_count,
     source_term_exact: sense.source_term_exact,
-    accepted_product_link: sense.accepted_product_link || null
+    accepted_product_link: sense.accepted_product_link || null,
+    draft_product_link: sense.draft_product_link || null
   };
 }
 

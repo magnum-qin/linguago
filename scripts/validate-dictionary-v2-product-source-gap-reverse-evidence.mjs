@@ -1,6 +1,8 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import * as OpenCC from "opencc-js";
+import { canonicalEnglishSpellingVariant } from "./lib/source-gap-lexical-contract.mjs";
 
 const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
 const DEFAULT_SUPPLEMENTAL_SOURCE_DB =
@@ -8,6 +10,8 @@ const DEFAULT_SUPPLEMENTAL_SOURCE_DB =
 const DEFAULT_REPORT =
   "logs/product-source-gap-v83-two-lang-evidence-validation-tier-c-smoke-20-v2-dry-run.json";
 const TARGET_LANGS = ["en", "pt-BR", "zh", "ja"];
+const traditionalToSimplified = OpenCC.Converter({ from: "tw", to: "cn" });
+const simplifiedToTraditional = OpenCC.Converter({ from: "cn", to: "tw" });
 const HTML_ENTITY_RE = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#x[0-9a-fA-F]{1,6});/u;
 const REPLACEMENT_CHAR_RE = /[\uFFFD]/u;
 const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
@@ -52,7 +56,7 @@ const evidenceFamilyPolicy = args["evidence-family-policy"] || "wiktionary";
 if (!new Set(["wiktionary", "legacy"]).has(evidenceFamilyPolicy)) {
   throw new Error(`Invalid --evidence-family-policy: ${evidenceFamilyPolicy}`);
 }
-if (!new Set(["generated", "reviewed", "reviewed-suggested", "aligned", "product"]).has(inputMode)) {
+if (!new Set(["generated", "reviewed", "reviewed-suggested", "hints", "aligned", "product"]).has(inputMode)) {
   throw new Error(`Invalid --input-mode: ${inputMode}`);
 }
 
@@ -71,6 +75,8 @@ const generated =
     ? reviewedCandidates.map(reviewedCandidateToGenerated).filter(Boolean)
     : inputMode === "reviewed-suggested"
       ? reviewedCandidates.map(reviewedSuggestedCandidateToGenerated).filter(Boolean)
+    : inputMode === "hints"
+      ? reviewedCandidates.map(hintedCandidateToGenerated).filter(Boolean)
     : inputMode === "aligned"
       ? reviewedCandidates.map(alignedCandidateToGenerated).filter(Boolean)
     : Array.isArray(report.generated)
@@ -83,7 +89,7 @@ if (inputMode === "generated" && !generated.length && Number(report?.stats?.gene
     "Generation report contains only previews. Re-run the dry-run with --log-generated true before reverse validation."
   );
 }
-if ((inputMode === "reviewed" || inputMode === "reviewed-suggested") && !generated.length && reviewedCandidates.length) {
+if ((inputMode === "reviewed" || inputMode === "reviewed-suggested" || inputMode === "hints") && !generated.length && reviewedCandidates.length) {
   throw new Error("Reviewed candidate report has no approved candidate_evidence_review.preferred_terms rows.");
 }
 if (inputMode === "aligned" && !generated.length && reviewedCandidates.length) {
@@ -186,7 +192,7 @@ const supportedIds = new Set(
     .map((item) => sourceSenseKey(item.source_entry_id, item.source_sense_id))
 );
 const supportedReport =
-  inputMode === "reviewed" || inputMode === "reviewed-suggested" || inputMode === "aligned"
+  inputMode === "reviewed" || inputMode === "reviewed-suggested" || inputMode === "hints" || inputMode === "aligned"
     ? {
         ...report,
         generated_at: new Date().toISOString(),
@@ -273,6 +279,31 @@ function reviewedSuggestedCandidateToGenerated(row) {
       localizations: Object.fromEntries(
         TARGET_LANGS.map((lang) => [lang, { term: String(suggestedTerms[lang]).trim() }])
       )
+    }
+  };
+}
+
+function hintedCandidateToGenerated(row) {
+  const hints = row?.generation_hints;
+  if (!hints || typeof hints !== "object") return null;
+  const terms = Object.fromEntries(
+    TARGET_LANGS.map((lang) => {
+      const values = Array.isArray(hints?.[lang]?.terms) ? hints[lang].terms : [];
+      return [lang, String(values[0] || "").trim()];
+    })
+  );
+  if (!TARGET_LANGS.every((lang) => terms[lang])) return null;
+  return {
+    source_entry_id: row.source_entry_id,
+    word: row.word,
+    source_lang: row.source_lang,
+    valid: true,
+    output: {
+      gloss_key: terms.en || row.gloss_key || row.gloss_preview || row.word,
+      primary_lang: row.source_lang,
+      source_word: row.word,
+      source_sense_id: row.first_sense_id ?? null,
+      localizations: Object.fromEntries(TARGET_LANGS.map((lang) => [lang, { term: terms[lang] }]))
     }
   };
 }
@@ -751,6 +782,10 @@ function splitTerms(value) {
 function termLookupVariants(lang, value) {
   const term = String(value || '').normalize('NFKC').trim();
   const variants = new Set([term]);
+  if (lang === 'zh') {
+    variants.add(traditionalToSimplified(term));
+    variants.add(simplifiedToTraditional(term));
+  }
   if (lang === 'ja') {
     if (term.endsWith('する') && term.length > 2) variants.add(term.slice(0, -2));
     if (term.endsWith('な') && term.length > 1) variants.add(term.slice(0, -1));
@@ -780,7 +815,7 @@ function normalizeTerm(value) {
 }
 
 function normalizeText(value) {
-  return normalizeTerm(value).normalize("NFKD").replace(/[\u0300-\u036f]/gu, "");
+  return canonicalEnglishSpellingVariant(value);
 }
 
 function safeJson(value) {

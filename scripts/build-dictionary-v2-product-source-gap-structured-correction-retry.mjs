@@ -6,14 +6,28 @@ const args = parseArgs(process.argv.slice(2));
 const reportPath = requiredPath(args.report, 'report');
 const consensusPath = requiredPath(args.consensus, 'consensus');
 const outPath = requiredPath(args.out, 'out');
+const generationPath = args.generation ? path.resolve(args.generation) : null;
+const allowedCorrectionFields = new Set(
+  String(args['correction-fields'] || 'term,definition,reading,pronunciation')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
 const report = readJson(reportPath);
 const consensus = readJson(consensusPath);
+const generation = generationPath ? readJson(generationPath) : null;
 
 if (consensus?.policy?.independent_model_families !== true) {
   throw new Error('Consensus report does not certify independent model families');
 }
 
 const candidates = new Map((report.selected || []).map((row) => [candidateKey(row), row]));
+const generatedEntries = new Map(
+  (generation?.generated || [])
+    .filter((row) => row?.valid === true && row?.output?.localizations)
+    .map((row) => [candidateKey(row), row.output])
+    .filter(([key]) => key)
+);
 const selected = [];
 const rejected = [];
 
@@ -26,12 +40,12 @@ for (const review of consensus.reviews || []) {
     continue;
   }
   const corrections = Array.isArray(review.corrections) ? review.corrections : [];
-  const inspected = inspectCorrections(candidate, corrections);
+  const inspected = inspectCorrections(candidate, corrections, generatedEntries.get(key));
   if (!inspected.ok) {
     rejected.push(rejection(review, inspected.reason));
     continue;
   }
-  selected.push(applyCorrections(candidate, review, inspected.corrections));
+  selected.push(applyCorrections(candidate, review, inspected.corrections, generatedEntries.get(key)));
 }
 
 const output = {
@@ -41,6 +55,8 @@ const output = {
   consensus_report: relative(consensusPath),
   policy: {
     structured_replacements_only: true,
+    allowed_correction_fields: [...allowedCorrectionFields],
+    generated_terms_immutable: Boolean(generationPath),
     source_term_drift_forbidden: true,
     ambiguous_replacements_forbidden: true,
     replacement_is_not_publication_evidence: true,
@@ -65,8 +81,9 @@ fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify({ ok: true, out: relative(outPath), summary: output.summary }, null, 2));
 
-function inspectCorrections(candidate, corrections) {
+function inspectCorrections(candidate, corrections, generatedEntry) {
   if (!corrections.length) return { ok: false, reason: 'missing_structured_correction' };
+  if (generationPath && !generatedEntry) return { ok: false, reason: 'missing_generated_entry' };
   const accepted = [];
   for (const correction of corrections) {
     if (!correction || typeof correction !== 'object' || Array.isArray(correction)) {
@@ -74,6 +91,7 @@ function inspectCorrections(candidate, corrections) {
     }
     const language = String(correction.language || '');
     const field = String(correction.field || '');
+    if (!allowedCorrectionFields.has(field)) return { ok: false, reason: `excluded_${field}_correction` };
     const replacement = typeof correction.replacement === 'string'
       ? correction.replacement.trim()
       : '';
@@ -101,7 +119,7 @@ function inspectCorrections(candidate, corrections) {
   return { ok: true, corrections: accepted };
 }
 
-function applyCorrections(candidate, review, corrections) {
+function applyCorrections(candidate, review, corrections, generatedEntry) {
   const next = structuredClone(candidate);
   next.latest_errors = ['structured_consensus_correction_retry'];
   next.latest_quality_review_reason = review.reason || null;
@@ -119,6 +137,20 @@ function applyCorrections(candidate, review, corrections) {
     ...(next.candidate_evidence_review.definition_contract || {})
   };
   next.generation_hints = { ...(next.generation_hints || {}) };
+
+  if (generatedEntry?.localizations) {
+    for (const lang of LANGS) {
+      const term = String(generatedEntry.localizations?.[lang]?.term || '').trim();
+      if (!term) continue;
+      next.candidate_evidence_review.preferred_terms[lang] = term;
+      next.generation_hints[lang] = {
+        ...(next.generation_hints[lang] || {}),
+        terms: [term],
+        provenance: 'immutable:reverse-supported-generation',
+        evidence_families: next.generation_hints?.[lang]?.evidence_families || []
+      };
+    }
+  }
 
   for (const correction of corrections) {
     if (correction.field === 'term') {
@@ -139,6 +171,9 @@ function applyCorrections(candidate, review, corrections) {
     consensus_report: relative(consensusPath),
     reviewer_model: consensus.policy.reviewer_model,
     corrections,
+    immutable_terms: generatedEntry?.localizations
+      ? Object.fromEntries(LANGS.map((lang) => [lang, generatedEntry.localizations?.[lang]?.term]).filter(([, value]) => value))
+      : null,
     publication_evidence: false,
     requires_reverse_evidence: true,
     requires_new_consensus: true

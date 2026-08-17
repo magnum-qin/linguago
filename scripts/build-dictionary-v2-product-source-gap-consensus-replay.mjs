@@ -49,6 +49,12 @@ if (generated.length !== acceptedKeys.size) {
 const output = {
   ...generation,
   generated_at: new Date().toISOString(),
+  selection_policy: {
+    lane: 'controlled_model_consensus',
+    automatic_promotion: false,
+    final_generation_evidence_consensus_gate: true,
+    require_independent_no_correction_consensus: true
+  },
   derived_from: {
     generation: path.relative(process.cwd(), generationPath),
     consensus: path.relative(process.cwd(), consensusPath),

@@ -1,3 +1,4 @@
+import './lib/load-local-env.mjs';
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -6,6 +7,12 @@ import zlib from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { pinyin } from 'pinyin-pro';
 import * as OpenCC from 'opencc-js';
+import { definitionContractLanguageLooksRight } from './lib/source-review-contract.mjs';
+import {
+  normalizeJapaneseKanaReading,
+  selectCanonicalJapaneseReading,
+  transparentJapaneseCompoundReadings
+} from './lib/japanese-reading-contract.mjs';
 
 const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
@@ -23,6 +30,9 @@ const REPLACEMENT_CHAR_RE = /[\uFFFD]/u;
 const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
 const JAPANESE_MOJIBAKE_RE = /[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u;
 const traditionalToSimplified = OpenCC.Converter({ from: 'tw', to: 'cn' });
+const MAINLAND_VARIANT_REPLACEMENTS = new Map([
+  ['擡', '抬']
+]);
 const MANUAL_RESIDUAL_SOURCE_ENTRY_IDS = new Set([2512756, 2482999, 2734525, 2607307, 2639444, 2399378, 2649794]);
 const FUNCTION_GLOSSES = new Set([
   'a',
@@ -172,6 +182,7 @@ const appliedLocalizationNeedsReview = publishable ? 0 : 1;
 const outPath = path.resolve(
   args.out || `logs/product-source-gap-unsloth-${apply ? 'apply' : 'dry-run'}-20260622.json`
 );
+const eligibleReportPath = args['eligible-report'] ? path.resolve(args['eligible-report']) : null;
 
 if (!fs.existsSync(dbPath)) throw new Error(`Product DB not found: ${dbPath}`);
 if (!fs.existsSync(reportPath)) throw new Error(`Gap report not found: ${reportPath}`);
@@ -283,6 +294,14 @@ const existingLinkedDraftOrCompleteSense = eligibilityDb.prepare(`
     AND ps.status IN ('accepted', 'draft_single_source')
   LIMIT 1
 `);
+const acceptedSemanticSenseIndex = buildAcceptedSemanticSenseIndex(
+  eligibilityDb.prepare(`
+    SELECT pl.product_sense_id, pl.lang, pl.term
+    FROM product_localizations pl
+    JOIN product_senses ps ON ps.id = pl.product_sense_id
+    WHERE ps.status IN ('accepted', 'draft_single_source')
+  `).all()
+);
 const rejectedBeforeGeneration = [];
 const selected = [];
 for (const row of allRows) {
@@ -378,6 +397,35 @@ if (selectOnly) {
     ),
     'utf8'
   );
+  if (eligibleReportPath) {
+    fs.mkdirSync(path.dirname(eligibleReportPath), { recursive: true });
+    fs.writeFileSync(
+      eligibleReportPath,
+      `${JSON.stringify(
+        {
+          ok: true,
+          generated_at: new Date().toISOString(),
+          source_report: path.relative(process.cwd(), reportPath),
+          product_db: path.relative(process.cwd(), dbPath),
+          policy: {
+            product_eligibility_prefiltered: true,
+            automatic_publication: false
+          },
+          summary: {
+            input: allRows.length,
+            selected: selected.length,
+            skipped: rejectedBeforeGeneration.length,
+            skipped_by_reason: countBy(rejectedBeforeGeneration.map((row) => row.reason))
+          },
+          selected_count: selected.length,
+          selected
+        },
+        null,
+        2
+      )}\n`,
+      'utf8'
+    );
+  }
   console.log(JSON.stringify({ ok: true, out: path.relative(process.cwd(), outPath), stats }, null, 2));
   process.exit(0);
 }
@@ -569,14 +617,14 @@ function writeRunOutput({ partial }) {
 function replayGeneratedReport() {
   const replay = JSON.parse(fs.readFileSync(replayReportPath, 'utf8'));
   if (!Array.isArray(replay.generated)) throw new Error('Replay report must contain a generated array.');
-  const rowsById = new Map(selected.map((row) => [String(row.source_entry_id), row]));
+  const rowsByCandidateKey = new Map(selected.map((row) => [replayCandidateKey(row), row]));
   const controlledDraftIds = controlledConsensusDraftWrite
-    ? validateControlledConsensusReplay(replay, rowsById)
+    ? validateControlledConsensusReplay(replay, rowsByCandidateKey)
     : new Set();
   const replayed = [];
   for (const item of replay.generated) {
     if ((!item?.valid && !replayInvalidOutputs) || !item?.output) continue;
-    const row = rowsById.get(String(item.source_entry_id));
+    const row = rowsByCandidateKey.get(replayCandidateKey(item));
     if (!row) continue;
     const output = normalizeGeneratedOutput(row, item.output);
     const errors = validateOutput(row, output).errors;
@@ -654,7 +702,7 @@ function replayGeneratedReport() {
   );
 }
 
-function validateControlledConsensusReplay(replay, rowsById) {
+function validateControlledConsensusReplay(replay, rowsByCandidateKey) {
   if (replay?.derived_from?.consensus === undefined) {
     throw new Error('Controlled consensus replay must identify its consensus report');
   }
@@ -691,7 +739,7 @@ function validateControlledConsensusReplay(replay, rowsById) {
   for (const item of replay.generated) {
     const sourceEntryId = String(item?.source_entry_id);
     const sourceSenseId = Number(item?.source_sense_id ?? item?.output?.source_sense_id);
-    const row = rowsById.get(sourceEntryId);
+    const row = rowsByCandidateKey.get(replayCandidateKey(item));
     const rowLevelControlledProvenance =
       row?.candidate_review_provenance?.kind === 'controlled_model_consensus';
     if (!rowLevelControlledProvenance && !reportLevelControlledProvenance) {
@@ -709,6 +757,17 @@ function validateControlledConsensusReplay(replay, rowsById) {
     allowedIds.add(sourceEntryId);
   }
   return allowedIds;
+}
+
+function replayCandidateKey(value) {
+  const sourceEntryId = Number(value?.source_entry_id);
+  const sourceSenseId = Number(
+    value?.source_sense_id ?? value?.output?.source_sense_id ?? value?.first_sense_id
+  );
+  if (!Number.isInteger(sourceEntryId) || !Number.isInteger(sourceSenseId)) {
+    throw new Error(`Replay candidate lacks exact source identity: ${JSON.stringify(value)}`);
+  }
+  return `${sourceEntryId}:${sourceSenseId}`;
 }
 
 function loadReplaySourceEntryIds(file) {
@@ -1028,6 +1087,8 @@ async function generateOneBatch(rows, endpoint, workerIndex) {
       const seconds = secondsSince(started);
       const items = rows.map((row, index) => {
         const output = normalizeGeneratedOutput(row, outputs[index]);
+        applyReviewedDefinitionContracts(row, output);
+        applyStructuredFieldCorrections(row, output);
         const validation = validateOutput(row, output);
         return generatedItem(
           row,
@@ -1103,7 +1164,7 @@ async function generateOneBatch(rows, endpoint, workerIndex) {
         );
       }
       const retryableValidationFailure =
-        promptMode === 'micro' &&
+        ['micro', 'compact'].includes(promptMode) &&
         items.length === 1 &&
         !items[0].valid &&
         (!items[0].errors.includes('source_evidence_mismatch') ||
@@ -1780,6 +1841,12 @@ function compactReviewedSuggestedTerms(row) {
     .join(' ; ');
 }
 
+function compactJapaneseGenerationContract(row) {
+  const contract = row?.generation_contract;
+  if (!nonEmpty(contract?.ja_term) || !nonEmpty(contract?.ja_reading)) return '';
+  return `term=${String(contract.ja_term).trim()}|reading=${String(contract.ja_reading).trim()}`;
+}
+
 function compactSourceEvidence(row) {
   const localizations = Array.isArray(row?.first_sense_localizations) ? row.first_sense_localizations : [];
   return localizations
@@ -1922,6 +1989,7 @@ function buildCompactPrompt(row) {
   const generationHints = enforceGenerationHintTerms ? compactGenerationHints(row) : '';
   const definitionContract = compactDefinitionContract(row);
   const suggestedTerms = compactReviewedSuggestedTerms(row);
+  const japaneseContract = compactJapaneseGenerationContract(row);
   const lines = [
     'Return one JSON object for a multilingual dictionary entry.',
     `Headword: ${row.word}`,
@@ -1930,6 +1998,7 @@ function buildCompactPrompt(row) {
     generationHints ? `Verified exact terms: ${generationHints}` : '',
     preferredTerms ? `Reviewed preferred terms: ${preferredTerms}` : '',
     suggestedTerms ? `Semantic term constraints: ${suggestedTerms}` : '',
+    japaneseContract ? `Required JA term and reading: ${japaneseContract}` : '',
     definitionContract ? `Required definition contract: ${definitionContract}` : '',
     'Top-level keys: headword, normalized_key, primary_lang, frequency_rank, part_of_speech, gloss_key, source_evidence_valid, source_evidence_reason, localizations.',
     'Set source_evidence_valid=true only when Meaning is a real sense of the source-language headword; otherwise set false and explain source_evidence_reason.',
@@ -1943,9 +2012,13 @@ function buildCompactPrompt(row) {
     preferredTerms
       ? 'Use every Reviewed preferred term exactly in its matching localization term field.'
       : '',
+    japaneseContract
+      ? 'Copy the Required JA term and reading exactly into localizations.ja.term and localizations.ja.reading.'
+      : '',
     definitionContract
       ? 'Every localization definition must preserve its matching Required definition contract exactly in meaning, scope, domain, and grammatical role.'
       : '',
+    'All four terms must preserve the same grammatical category and concept type as the source sense. Never change noun to adjective, quality to doctrine, genus to plant, instrument to procedure, chemical group to material, or one colour/pigment to a related colour.',
     'If source language is zh or ja, en.term and pt-BR.term must be translated dictionary terms in English and Portuguese, not hanzi, kana, pinyin, or the original source spelling.',
     'If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.',
     "Use one coherent dictionary sense only. WikDict/OMW evidence can contain homographs from unrelated languages; never mix unrelated senses such as Portuguese verb forms with English area unit 'are'.",
@@ -1994,11 +2067,25 @@ function buildCompactBatchPrompt(rows) {
     const preferredTerms = enforceReviewedPreferredTerms ? compactReviewedPreferredTerms(row) : '';
     const definitionContract = compactDefinitionContract(row);
     const suggestedTerms = compactReviewedSuggestedTerms(row);
+    const japaneseContract = compactJapaneseGenerationContract(row);
+    const retryErrors = Array.isArray(row.latest_errors) && row.latest_errors.length
+      ? row.latest_errors.join(',')
+      : '';
+    const expectedJaReadings = Array.isArray(row.latest_ja_expected_readings)
+      ? row.latest_ja_expected_readings.join('|')
+      : '';
+    const expectedZhReadings = Array.isArray(row.latest_zh_expected_readings)
+      ? row.latest_zh_expected_readings.join('|')
+      : '';
     return (
       `- source_entry_id=${row.source_entry_id}; headword=${row.word}; source_lang=${row.source_lang}; meaning=${gloss}` +
       (preferredTerms ? `; reviewed_preferred_terms=${preferredTerms}` : '') +
       (definitionContract ? `; definition_contract=${definitionContract}` : '') +
-      (suggestedTerms ? `; semantic_term_suggestions=${suggestedTerms}` : '')
+      (suggestedTerms ? `; semantic_term_suggestions=${suggestedTerms}` : '') +
+      (japaneseContract ? `; required_ja_contract=${japaneseContract}` : '') +
+      (retryErrors ? `; previous_validation_errors=${retryErrors}` : '') +
+      (expectedJaReadings ? `; required_ja_reading=${expectedJaReadings}` : '') +
+      (expectedZhReadings ? `; required_zh_reading=${expectedZhReadings}` : '')
     );
   });
   const lines = [
@@ -2010,6 +2097,7 @@ function buildCompactBatchPrompt(rows) {
     'zh and ja fields: term, reading, reading_system, definition.',
     'Use exact headword as the source-language term. Use Simplified Chinese for zh. Use kana for ja reading. Use IPA for en and pt-BR.',
     'When reviewed_preferred_terms are present, copy every listed term exactly into its matching localization term field.',
+    'When required_ja_contract is present, copy its term and reading exactly into the Japanese localization.',
     'When definition_contract is present, each localization definition must preserve its matching contract meaning and must not add, remove, broaden, or narrow any sense, domain, participant, or grammatical role.',
     'semantic_term_suggestions were proposed by an independent semantic pre-review. Prefer them when natural, but correct them if needed; they are not binding dictionary evidence.',
     'Before setting source_evidence_valid=true, verify that every reviewed preferred term denotes the same exact semantic scope and grammatical concept as the source headword. If any term changes action/object, process/state, person/profession, material/object, or broad/narrow scope, set source_evidence_valid=false and explain the conflict.',
@@ -2050,10 +2138,43 @@ function reviewedDefinitionContract(row, lang) {
   const englishAnchor = String(row?.candidate_evidence_review?.english_anchor || '').trim();
   if (lang !== 'en' && englishAnchor && normalize(value) === normalize(englishAnchor)) return '';
 
-  // Latin-script English placeholders cannot be distinguished reliably from
-  // Portuguese here. Let generation localize the reviewed English anchor.
-  if (lang === 'pt-BR') return '';
   return value;
+}
+
+function applyReviewedDefinitionContracts(row, output) {
+  if (!output?.localizations) return output;
+  for (const lang of LANGS) {
+    const definition = reviewedDefinitionContract(row, lang);
+    if (!definition || !output.localizations[lang]) continue;
+    output.localizations[lang] = {
+      ...output.localizations[lang],
+      definition,
+      definition_source: row?.structured_correction_retry
+        ? 'deterministic:structured-correction'
+        : 'deterministic:reviewed-definition-contract'
+    };
+  }
+  return output;
+}
+
+function applyStructuredFieldCorrections(row, output) {
+  if (!output?.localizations) return output;
+  const corrections = row?.structured_correction_retry?.corrections;
+  if (!Array.isArray(corrections)) return output;
+  for (const correction of corrections) {
+    const lang = correction?.language;
+    const field = correction?.field;
+    const replacement = String(correction?.replacement || '').trim();
+    if (!LANGS.includes(lang) || !['definition', 'reading', 'pronunciation'].includes(field)) continue;
+    if (!replacement || !output.localizations?.[lang]) continue;
+    output.localizations = { ...output.localizations };
+    output.localizations[lang] = {
+      ...output.localizations[lang],
+      [field]: replacement,
+      [`${field}_source`]: 'deterministic:structured-correction'
+    };
+  }
+  return output;
 }
 
 function residualPromptRules(row = null) {
@@ -2127,9 +2248,11 @@ function validateOutput(row, output) {
     }
     const jaLoc = output.localizations?.ja;
     if (jaLoc?.term && jaLoc?.reading) {
-      const jaReadingValidation = validateJapaneseReading(jaLoc.term, jaLoc.reading, row.source_lang === 'ja');
-      if (jaReadingValidation === 'unknown') errors.push('ja_term_not_in_jmdict');
-      if (jaReadingValidation === 'mismatch') errors.push('ja_reading_mismatch');
+      if (!matchesTrustedGenerationContractReading(row, jaLoc)) {
+        const jaReadingValidation = validateJapaneseReading(jaLoc.term, jaLoc.reading, row.source_lang === 'ja');
+        if (jaReadingValidation === 'unknown') errors.push('ja_term_not_in_jmdict');
+        if (jaReadingValidation === 'mismatch') errors.push('ja_reading_mismatch');
+      }
     }
   }
   const sourceTerm = output.localizations?.[row.source_lang]?.term;
@@ -2215,12 +2338,12 @@ function normalizeGeneratedOutput(row, output) {
       ...originalZhLoc,
       ...(row.source_lang === 'zh'
         ? {}
-        : { term: traditionalToSimplified(String(originalZhLoc.term || '').trim()) }),
-      definition: traditionalToSimplified(String(originalZhLoc.definition || '').trim())
+        : { term: toMainlandSimplified(String(originalZhLoc.term || '').trim()) }),
+      definition: toMainlandSimplified(String(originalZhLoc.definition || '').trim())
     };
   }
   const zhLoc = normalized.localizations.zh;
-  if (row.source_lang !== 'zh' && zhLoc && typeof zhLoc === 'object' && /[\p{Script=Han}]/u.test(String(zhLoc.term || ''))) {
+  if (zhLoc && typeof zhLoc === 'object' && /[\p{Script=Han}]/u.test(String(zhLoc.term || ''))) {
     const deterministicReading = expectedChineseReadings(zhLoc.term)[0];
     if (deterministicReading) {
       normalized.localizations = { ...normalized.localizations };
@@ -2259,9 +2382,55 @@ function normalizeGeneratedOutput(row, output) {
         : {})
     };
   }
+  applyGenerationContractReading(row, normalized);
   applyUniqueJmdictReading(normalized);
   applyDeterministicPronunciations(normalized);
   return normalized;
+}
+
+function toMainlandSimplified(value) {
+  let normalized = traditionalToSimplified(String(value || ''));
+  for (const [variant, standard] of MAINLAND_VARIANT_REPLACEMENTS) {
+    normalized = normalized.replaceAll(variant, standard);
+  }
+  return normalized;
+}
+
+function applyGenerationContractReading(row, output) {
+  if (!deterministicReadings) return;
+  const contract = row?.generation_contract;
+  const jaLoc = output.localizations?.ja;
+  if (
+    !contract ||
+    !jaLoc ||
+    !nonEmpty(contract.ja_term) ||
+    !nonEmpty(contract.ja_reading) ||
+    normalize(jaLoc.term) !== normalize(contract.ja_term)
+  ) {
+    return;
+  }
+  output.localizations = { ...output.localizations };
+  output.localizations.ja = {
+    ...jaLoc,
+    reading: String(contract.ja_reading).trim(),
+    reading_system: 'kana',
+    reading_source: String(contract.ja_reading_source || 'deterministic:generation-contract')
+  };
+}
+
+function matchesTrustedGenerationContractReading(row, localization) {
+  const contract = row?.generation_contract;
+  const trustedSources = new Set([
+    'deterministic:kaikki-exact-term-anchor-sense',
+    'deterministic:japan-moj-legal-term-suru',
+    'deterministic:ndla-subject-heading',
+    'deterministic:japan-official-reading-evidence'
+  ]);
+  if (!contract || !trustedSources.has(contract.ja_reading_source)) {
+    return false;
+  }
+  return normalize(localization?.term) === normalize(contract.ja_term) &&
+    normalizeJapaneseReading(localization?.reading) === normalizeJapaneseReading(contract.ja_reading);
 }
 
 function applyUniqueJmdictReading(output) {
@@ -2269,15 +2438,17 @@ function applyUniqueJmdictReading(output) {
   const jaLoc = output.localizations?.ja;
   if (!jaLoc || typeof jaLoc !== 'object' || !nonEmpty(jaLoc.term)) return;
   const readings = lookupJapaneseReadings(String(jaLoc.term).trim());
-  if (!readings || readings.size !== 1) return;
-  const [reading] = readings;
+  if (!readings?.size) return;
+  const reading = selectCanonicalJapaneseReading(jaLoc.reading, readings);
   if (!reading || normalizeJapaneseReading(jaLoc.reading) === normalizeJapaneseReading(reading)) return;
   output.localizations = { ...output.localizations };
   output.localizations.ja = {
     ...jaLoc,
     reading,
     reading_system: 'kana',
-    reading_source: 'deterministic:jmdict-unique'
+    reading_source: readings.size === 1
+      ? 'deterministic:jmdict-unique'
+      : 'deterministic:jmdict-primary'
   };
 }
 
@@ -2359,7 +2530,7 @@ function applyDeterministicPronunciations(output) {
   if (findEcdictPronunciation && en?.term) {
     const row = findEcdictPronunciation.get(normalize(en.term));
     const raw = safeJsonObject(row?.raw_json);
-    const phonetic = String(raw.phonetic || '').trim();
+    const phonetic = normalizeEcdictPhonetic(raw.phonetic, en.term);
     if (phonetic && phonetic.length <= 80 && hasIpaSignal(phonetic)) {
       output.localizations = { ...output.localizations };
       output.localizations.en = {
@@ -2398,6 +2569,21 @@ function safeJsonObject(value) {
 
 function hasIpaSignal(value) {
   return /[\u0250-\u02AF\u1D00-\u1D7F\u1D80-\u1DBF]/u.test(String(value || ''));
+}
+
+function normalizeEcdictPhonetic(value, term) {
+  let phonetic = String(value || '').normalize('NFKC').trim();
+  if (!phonetic) return '';
+  phonetic = phonetic
+    .replace(/^\/|\/$/gu, '')
+    .replace(/^\./u, 'ˌ')
+    .replace(/[,']/gu, (mark) => mark === ',' ? 'ˌ' : 'ˈ')
+    .replace(/ә/gu, 'ə')
+    .replace(/:/gu, 'ː')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!/\s/u.test(String(term || '').trim())) phonetic = phonetic.replace(/\s+/gu, '');
+  return phonetic ? `/${phonetic}/` : '';
 }
 
 function chineseReadingMatches(term, reading) {
@@ -2452,6 +2638,11 @@ function lookupJapaneseReadings(term) {
   }
   const compositionalReadings = VERIFIED_JAPANESE_COMPOSITIONAL_READINGS.get(term);
   if (compositionalReadings?.size) return compositionalReadings;
+  const transparentCompoundReadings = transparentJapaneseCompoundReadings(
+    term,
+    (prefix) => getJmdictReadingMap().get(prefix)
+  );
+  if (transparentCompoundReadings?.size) return transparentCompoundReadings;
   for (const [suffix, suffixReading] of JMDICT_COMPOSITIONAL_SUFFIX_READINGS) {
     if (!term.endsWith(suffix) || term.length <= suffix.length) continue;
     const baseReadings = getJmdictReadingMap().get(term.slice(0, -suffix.length));
@@ -2529,10 +2720,7 @@ function normalizeReading(value) {
 }
 
 function normalizeJapaneseReading(value) {
-  return String(value || '')
-    .normalize('NFKC')
-    .replace(/[\s・.]+/gu, '')
-    .replace(/[ァ-ヶ]/gu, (character) => String.fromCodePoint(character.codePointAt(0) - 0x60));
+  return normalizeJapaneseKanaReading(value);
 }
 
 function decodeXml(value) {
@@ -2662,7 +2850,7 @@ function applyOutputs(items, stats) {
   const writes = [];
 
   const statements = {
-    getEntry: db.prepare('SELECT id, headword, primary_lang FROM product_entries WHERE group_key = ?'),
+    getEntry: db.prepare('SELECT id, headword, primary_lang, status FROM product_entries WHERE group_key = ?'),
     insertEntry: db.prepare(`
       INSERT INTO product_entries
         (headword, normalized_key, primary_lang, frequency_rank, group_key, group_method, status, source_count, lang_count, created_at)
@@ -2726,14 +2914,23 @@ function applyOutputs(items, stats) {
       if (
         existingEntry &&
         (existingEntry.primary_lang !== item.primary_lang ||
-          normalize(existingEntry.headword) !== normalize(item.headword))
+          normalize(existingEntry.headword) !== normalize(item.headword) ||
+          !['accepted', 'draft_single_source'].includes(existingEntry.status))
       ) {
         // Romanized normalized keys can collide for distinct CJK homophones
         // (for example Japanese 祈とう and 気筒 both becoming "kitou").
-        // Keep the legacy key when the headword matches, otherwise use the
-        // stable source entry id to prevent cross-headword sense attachment.
+        // Keep the legacy key only when the headword and lifecycle are safe.
+        // A historical needs-review entry must not make a newly reviewed sense
+        // unpromotable, so isolate it with the stable source entry id as well.
         groupKey = `${baseGroupKey}:source-${item.source_entry_id}`;
         existingEntry = statements.getEntry.get(groupKey);
+        if (
+          existingEntry &&
+          !['accepted', 'draft_single_source'].includes(existingEntry.status)
+        ) {
+          groupKey = `${groupKey}:sense-${item.source_sense_id}`;
+          existingEntry = statements.getEntry.get(groupKey);
+        }
       }
       let entryId = existingEntry?.id;
       if (entryId) {
@@ -2838,6 +3035,8 @@ function candidateEligibility(row) {
   }
   if (glossKey && existingCompleteSense.get(groupKey, glossKey))
     return { ok: false, reason: 'already_complete_source_gap' };
+  if (findAcceptedSemanticDuplicate(row, acceptedSemanticSenseIndex))
+    return { ok: false, reason: 'already_complete_semantic_duplicate' };
   if (row.repairable_from_same_entry) return { ok: false, reason: 'deterministic_repair_available' };
   if (row.entry_level_four_lang_available) return { ok: false, reason: 'entry_level_four_lang_available' };
   if (!Boolean(glossKey)) return { ok: false, reason: 'missing_gloss' };
@@ -2874,6 +3073,46 @@ function findEquivalentSenseId(rows, item) {
     if (!best || exactMatches > best.exactMatches) best = { senseId, exactMatches };
   }
   return best?.senseId || null;
+}
+
+function buildAcceptedSemanticSenseIndex(rows) {
+  const bySense = new Map();
+  for (const row of rows) {
+    if (!bySense.has(row.product_sense_id)) bySense.set(row.product_sense_id, new Map());
+    const byLang = bySense.get(row.product_sense_id);
+    if (!byLang.has(row.lang)) byLang.set(row.lang, new Set());
+    byLang.get(row.lang).add(normalizeLocalizationText(row.term));
+  }
+  const byTerm = new Map();
+  for (const [senseId, byLang] of bySense) {
+    for (const [lang, terms] of byLang) {
+      for (const term of terms) {
+        const key = `${lang}:${term}`;
+        if (!byTerm.has(key)) byTerm.set(key, []);
+        byTerm.get(key).push({ senseId, byLang });
+      }
+    }
+  }
+  return byTerm;
+}
+
+function findAcceptedSemanticDuplicate(row, index) {
+  const sourceLang = row?.source_lang;
+  const sourceTerm = normalizeLocalizationText(row?.word);
+  if (!sourceLang || !sourceTerm) return null;
+  const candidates = index.get(`${sourceLang}:${sourceTerm}`) || [];
+  for (const candidate of candidates) {
+    let otherLanguageMatches = 0;
+    for (const [lang, hint] of Object.entries(row?.generation_hints || {})) {
+      if (lang === sourceLang) continue;
+      const existing = candidate.byLang.get(lang);
+      if (!existing) continue;
+      const terms = Array.isArray(hint?.terms) ? hint.terms : [];
+      if (terms.some((term) => existing.has(normalizeLocalizationText(term)))) otherLanguageMatches += 1;
+    }
+    if (otherLanguageMatches >= 2) return candidate.senseId;
+  }
+  return null;
 }
 
 function riskReason(row) {
@@ -2967,12 +3206,7 @@ function termLanguageLooksRight(value, lang) {
 }
 
 function definitionLanguageLooksRight(value, lang) {
-  const text = String(value || '');
-  if (lang === 'zh') return /[\u3400-\u9fff]/u.test(text);
-  if (lang === 'ja') return /[\u3040-\u30ff\u3400-\u9fff]/u.test(text);
-  if (lang === 'pt-BR') return /[\p{Script=Latin}]/u.test(text);
-  if (lang === 'en') return /[A-Za-z]/u.test(text);
-  return false;
+  return definitionContractLanguageLooksRight(value, lang);
 }
 
 function definitionTooThin(definition, lang, term) {
@@ -2997,6 +3231,19 @@ function firstGlossToken(value) {
 
 function englishGlossTermSet(row) {
   const terms = new Set();
+  for (const reviewedTerm of [
+    row?.candidate_evidence_review?.preferred_terms?.en,
+    row?.candidate_evidence_review?.suggested_terms?.en
+  ]) {
+    for (const term of String(reviewedTerm || '').split(';')) {
+      const token = firstGlossToken(term);
+      if (token) terms.add(normalize(token));
+    }
+  }
+  for (const reviewedTerm of row?.generation_hints?.en?.terms || []) {
+    const token = firstGlossToken(reviewedTerm);
+    if (token) terms.add(normalize(token));
+  }
   const reviewedAnchor = String(row?.candidate_evidence_review?.english_anchor || '').trim();
   if (reviewedAnchor) {
     for (const term of reviewedAnchor.split(';')) {
@@ -3064,6 +3311,28 @@ function sourceMeaningAnchors(row) {
 }
 
 function termsShareContentToken(leftValues, rightValues) {
+  const phrases = (values) =>
+    values
+      .map((value) =>
+        String(value || '')
+          .toLocaleLowerCase()
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/gu, '')
+          .replace(/[^a-z]+/gu, ' ')
+          .trim()
+      )
+      .filter(Boolean);
+  const leftPhrases = phrases(leftValues);
+  const rightPhrases = phrases(rightValues);
+  if (
+    leftPhrases.some((left) =>
+      rightPhrases.some(
+        (right) => left === right || (left.length >= 4 && right.length >= 4 && (left.includes(right) || right.includes(left)))
+      )
+    )
+  ) {
+    return true;
+  }
   const tokens = (values) =>
     values.flatMap((value) =>
       String(value || '')
@@ -3235,7 +3504,7 @@ function endpointChangeIsCompatible(previousConfig, nextConfig) {
 }
 
 function updateCheckpoint(state, generatedItems, writes, runStats, committedChunks, totalChunks) {
-  if (!checkpointPath || !state || dryRun) return;
+  if (!checkpointPath || !state) return;
   const writesBySource = new Map(writes.map((item) => [checkpointCandidateKey(item), item]));
   for (const item of generatedItems) {
     const itemKey = checkpointCandidateKey(item);

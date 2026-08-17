@@ -1,0 +1,103 @@
+{
+  "targeted_review": {
+    "model": "unsloth/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF",
+    "endpoints": [
+      "http://100.99.99.99:11445"
+    ],
+    "gguf_variants": {
+      "11445": "UD-Q4_K_XL"
+    },
+    "max_seq_length": 2048,
+    "speculative_type": "off",
+    "concurrency": 1,
+    "confidence_threshold": 0.8,
+    "policy": {
+      "advisory_only": true,
+      "runs_after_qwen": true,
+      "route_only": [
+        "qwen_invalid",
+        "qwen_manual_review",
+        "pt-BR_reject",
+        "regional_variant_risk",
+        "missing_field_retry"
+      ],
+      "may_reject_before_qwen": false,
+      "promotion_evidence": false,
+      "fail_open_on_invalid_or_transport_error": true,
+      "accepted_output_requires_gemma_agreement": true
+    }
+  },
+  "generation": {
+    "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+    "endpoints": [
+      "http://100.99.99.99:11441",
+      "http://100.99.99.99:11448",
+      "http://100.99.99.99:11447"
+    ],
+    "gguf_variants": {
+      "11441": "UD-Q4_K_XL",
+      "11448": "UD-IQ4_NL",
+      "11447": "UD-IQ4_NL"
+    },
+    "max_seq_length": 2048,
+    "speculative_type": "mtp",
+    "concurrency": 3
+  },
+  "review": {
+    "model": "unsloth/gemma-4-31B-it-qat-GGUF",
+    "endpoints": [
+      "http://100.99.99.99:11442",
+      "http://100.99.99.99:11445",
+      "http://100.99.99.99:11446"
+    ],
+    "gguf_variants": {
+      "11442": "UD-Q4_K_XL",
+      "11445": "UD-Q4_K_XL",
+      "11446": "UD-Q4_K_XL"
+    },
+    "max_seq_length": 3072,
+    "speculative_type": "off",
+    "concurrency": 3
+  },
+  "elastic_pool": {
+    "endpoints": [
+      "http://100.99.99.99:11442",
+      "http://100.99.99.99:11445"
+    ],
+    "qwen_gguf_variants": {
+      "11442": "UD-Q4_K_XL",
+      "11445": "UD-Q4_K_XL"
+    },
+    "role_priority": [
+      "review",
+      "generation",
+      "targeted_review"
+    ],
+    "switch_policy": {
+      "allow_studio_model_swap": true,
+      "explicit_unload_before_load": true,
+      "only_installed_models": true,
+      "minimum_residency_seconds": 300,
+      "switch_when_pending_items_at_least": 20,
+      "never_run_two_model_processes": true
+    },
+    "runtime_policy": {
+      "shared_work_queue": true,
+      "use_only_successfully_prewarmed_endpoints": true,
+      "retry_errors_across_all_healthy_endpoints": true,
+      "record_endpoint_task_counts": true
+    }
+  },
+  "shared": {
+    "cache_type_kv": "q8_0",
+    "parallel_slots_per_node": 1,
+    "max_attempts": 2,
+    "pipeline_order": [
+      "qwen_source_review",
+      "nemotron_targeted_review",
+      "qwen_generation",
+      "deterministic_reverse_evidence",
+      "gemma_final_consensus"
+    ]
+  }
+}
