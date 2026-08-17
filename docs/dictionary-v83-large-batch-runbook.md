@@ -1,5 +1,16 @@
 # Dictionary v83 Large-Batch Runbook
 
+## v107 completed batch and next-run rule
+
+The first frozen-profile run completed 5,000 fresh candidates and promoted 968
+replay-safe senses after isolated validation. All blocking audits are zero. The
+43 replay semantic mismatches and four unmatched rows are residuals, not
+candidates for validator bypass.
+
+Build the next cohort fresh against v105, v106, v107, and the current product
+DB. Keep the same model, prompt, and evidence profile. D1 deployment remains
+batched at 5,000-10,000 accumulated publishable senses; v107 alone stays local.
+
 ## Frozen production entrypoint after v106
 
 Use the versioned profile instead of manually copying model arguments:

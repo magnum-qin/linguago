@@ -1,5 +1,18 @@
 # LinguaGo Project Overview For AI
 
+## Current local dictionary after v107 (2026-08-17)
+
+The v107 5,000-candidate run completed through the frozen v106 profile. Its
+funnel was `5000 -> 3790 source-approved -> 3374 generated-valid -> 1131
+reverse-supported -> 1020 final-consensus`; exact replay left 968 deterministic
+promotions. Local publishable counts are `entries=36062`, `senses=42372`, and
+`sense_localizations=169488`. All blockers and `flagged_senses` are zero.
+
+This is a local increment, not an online release. D1 and Worker remain v106
+because 968 new publishable senses do not meet the 5,000-10,000 deployment
+interval. The 43 replay semantic mismatches and four unmatched rows remain
+unpublished; do not weaken validation to increase yield.
+
 ## Active follow-up after v106
 
 The v106 post-release audit examined all 732 newly promoted senses. Twelve
@@ -13,9 +26,9 @@ Production behavior is now frozen in
 `config/dictionary-v2-production-v106.json` and invoked by
 `scripts/run-dictionary-v2-production-profile.mjs`. Residual dispositions are
 versioned in `config/dictionary-overrides/v106-residual-dispositions.json`.
-The next 5,000-row no-write run is v107, selected from an expanded daily-general
-pool after excluding all 7,000 v105/v106 source entries. Its language mix is
-2,062 Chinese, 1,371 Japanese, 1,238 English, and 329 Brazilian Portuguese.
+The completed v107 cohort was selected from an expanded daily-general pool
+after excluding all 7,000 v105/v106 source entries. Its language mix was 2,062
+Chinese, 1,371 Japanese, 1,238 English, and 329 Brazilian Portuguese.
 
 ## Current production dictionary (v106, 2026-08-17)
 

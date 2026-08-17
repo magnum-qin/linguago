@@ -2,6 +2,20 @@
 
 This pipeline builds a fast four-language word dictionary for the translation PWA.
 
+## v107 5,000-candidate production result (2026-08-17)
+
+The frozen entrypoint completed a fresh 5,000-candidate no-write run: `5,000
+input -> 3,790 source approvals -> 3,374 valid generations -> 1,131
+reverse-supported -> 1,020 final Gemma accepts`. Controlled replay removed five
+proper-like rows, promoted 968, and kept 43 term/gloss mismatches plus four
+unmatched rows unpublished.
+
+The 968 rows passed isolated replay, promotion, fast audit, published-risk,
+native export, and full in-memory import before exact main-DB replay. The local
+publishable package has 36,062 entries, 42,372 senses, and 169,488
+localizations. Deployment waits until audited increments total at least 5,000
+publishable senses.
+
 ## v106 post-release audit and frozen profile
 
 The complete v106 increment audit found 13 deterministic repairs among 732

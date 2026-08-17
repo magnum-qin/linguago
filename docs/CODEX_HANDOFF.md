@@ -1,5 +1,20 @@
 # Codex Handoff
 
+## 2026-08-17 v107 production-968 local promotion
+
+- The frozen v106 profile processed a fresh 5,000-row cohort: `5,000 input ->
+  3,790 source approvals -> 3,374 valid generations -> 1,131 reverse-supported
+  -> 1,020 final no-correction accepts`.
+- Controlled replay excluded five proper-like rows and promoted 968. Forty-three
+  `en_term_gloss_mismatch` rows and four unmatched rows remain unpublished.
+- Isolated and main-DB fast, published-risk, native export, and full in-memory
+  audits passed. The publishable package has `entries=36,062`, `senses=42,372`,
+  and `sense_localizations=169,488`; all blockers and `flagged_senses` are zero.
+- The pre-write backup is
+  `C:\Users\qhz00\AppData\Local\Temp\linguago-before-v107-production-20260817-202330.db`.
+- D1 and Worker remain on v106 because this 968-sense increment is below the
+  frozen 5,000-10,000-sense deployment interval.
+
 ## 2026-08-17 v106 post-release quality pass and v107 start
 
 - A rule-based audit covered all 732 v106 promoted senses, stratified as
