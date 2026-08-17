@@ -78,7 +78,13 @@ const insertProvenance = out.prepare('INSERT INTO reviewed_definition_provenance
 out.transaction(() => {
   insertSource.run(sourceKey, 'dicionario-aberto', 'pt-BR', 'Dicionario Aberto TEI definitions; dual-model reviewed subset', 'CC-BY-SA-2.5-PT', JSON.stringify(metadata));
   for (const row of accepted) {
-    const conceptId = `dicionario-aberto-definition:${row.candidate.candidate_key}`;
+    const boundCandidateKey = String(
+      row.candidate.bound_candidate_key || row.candidate.candidate_key || ""
+    ).trim();
+    if (!/^\d+:\d+$/u.test(boundCandidateKey)) {
+      throw new Error(`Invalid bound candidate key: ${boundCandidateKey}`);
+    }
+    const conceptId = `candidate:${boundCandidateKey}`;
     const selectedDefinitions = row.definitionOrders.map((order) => row.candidate.dicionario_aberto_definitions[order - 1]).filter(Boolean);
     insertEvidence.run(sourceKey, 'dicionario-aberto', 'pt-BR', row.candidate.term, normalize(row.candidate.term), row.candidate.english_anchor, normalize(row.candidate.english_anchor), conceptId);
     insertProvenance.run(row.candidate.candidate_key, conceptId, JSON.stringify(row.definitionOrders), JSON.stringify(selectedDefinitions), qwenSha, gemmaSha);

@@ -85,12 +85,13 @@ db.exec(`
 `);
 
 const csvSha256 = sha256File(csvPath);
-const sourceKey = `ecdict-official-${csvSha256.slice(0, 12)}`;
+const inputSha256 = sha256File(inputPath);
+const sourceKey = `ecdict-official-${csvSha256.slice(0, 12)}-${inputSha256.slice(0, 12)}`;
 const metadata = {
   repository: 'https://github.com/skywind3000/ECDICT',
   artifact_url: 'https://raw.githubusercontent.com/skywind3000/ECDICT/master/ecdict.csv',
   csv_sha256: csvSha256,
-  input_sha256: sha256File(inputPath),
+  input_sha256: inputSha256,
   candidate_mode: candidateMode,
   candidate_bound: true,
   match_policy: candidateMode === 'validation_report'

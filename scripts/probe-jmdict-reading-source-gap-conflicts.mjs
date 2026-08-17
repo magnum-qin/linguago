@@ -12,15 +12,26 @@ const jmdictPath = requiredPath(args.jmdict || 'data/raw/JMdict_e.gz');
 const outPath = path.resolve(args.out || 'logs/product-source-gap-jmdict-reading-conflicts.json');
 const evidenceOutPath = args['evidence-out'] ? path.resolve(args['evidence-out']) : null;
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-const sourceConflicts = (report.source_conflicts || [])
+const pool = String(args.pool || 'source-conflicts');
+const reportRows = pool === 'source-near-unlock'
+  ? report.source_near_unlock
+  : pool === 'near-unlock'
+    ? report.near_unlock
+    : pool === 'selected'
+      ? report.selected
+      : report.source_conflicts;
+if (!Array.isArray(reportRows)) {
+  throw new Error(`Report does not contain the requested ${pool} pool`);
+}
+const sourceConflicts = reportRows
   .filter((row) => row.source_lang === 'ja');
-const candidatesByReading = new Map();
+const candidatesByTerm = new Map();
 
 for (const row of sourceConflicts) {
-  const reading = normalizeJapanese(row.word);
-  if (!reading) continue;
-  if (!candidatesByReading.has(reading)) candidatesByReading.set(reading, []);
-  candidatesByReading.get(reading).push({
+  const term = normalizeJapanese(row.word);
+  if (!term) continue;
+  if (!candidatesByTerm.has(term)) candidatesByTerm.set(term, []);
+  candidatesByTerm.get(term).push({
     ...row,
     anchor_terms: splitAnchor(row.anchor)
   });
@@ -72,7 +83,8 @@ const output = {
   generated_at: new Date().toISOString(),
   policy: {
     source_language: 'ja',
-    exact_jmdict_reading: true,
+    input_pool: pool,
+    exact_jmdict_term_or_reading: true,
     reading_restrictions_respected: true,
     exact_semicolon_anchor_gloss: true,
     unique_jmdict_entry_required: true,
@@ -126,22 +138,30 @@ function writeEvidenceDb(filePath, rows) {
       PRIMARY KEY(candidate_key, concept_id)
     );
   `);
-  const sourceKey = `jmdict-reading-alias-${sha256File(jmdictPath).slice(0, 12)}`;
+  const sourceSha256 = sha256File(jmdictPath);
+  const reportSha256 = sha256File(reportPath);
+  const policyVersion = 'term-reading-sense-v2';
+  const sourceKeyHash = crypto.createHash('sha256')
+    .update(`${sourceSha256}:${reportSha256}:${policyVersion}`)
+    .digest('hex')
+    .slice(0, 12);
+  const sourceKey = `jmdict-term-reading-${sourceKeyHash}`;
   const metadata = {
     production_publishable: true,
     candidate_bound: true,
     source_url: 'https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project',
     source_file: relative(jmdictPath),
-    source_sha256: sha256File(jmdictPath),
-    report_sha256: sha256File(reportPath),
-    extraction_policy: 'exact JMdict reading with reading/sense restrictions and exact semicolon-split English gloss',
+    source_sha256: sourceSha256,
+    report_sha256: reportSha256,
+    policy_version: policyVersion,
+    extraction_policy: 'exact JMdict written term or reading with reading/sense restrictions and exact semicolon-split English gloss',
     generated_at: new Date().toISOString()
   };
   db.prepare('INSERT INTO evidence_sources VALUES (?, ?, ?, ?, ?, ?)').run(
     sourceKey,
     'jmdict',
     'ja',
-    'JMdict reading aliases bound to exact English sense glosses',
+    'JMdict written terms and reading aliases bound to exact English sense glosses',
     'CC BY-SA 4.0',
     JSON.stringify(metadata)
   );
@@ -189,16 +209,19 @@ function inspectEntry(entry) {
   const entrySequence = decodeXml(firstMatch(entry, /<ent_seq>([\s\S]*?)<\/ent_seq>/u));
   const writtenTerms = [...entry.matchAll(/<keb>([\s\S]*?)<\/keb>/gu)]
     .map((match) => decodeXml(match[1]).trim());
-  const applicableWrittenByReading = new Map();
+  const readings = [];
   for (const readingMatch of entry.matchAll(/<r_ele>([\s\S]*?)<\/r_ele>/gu)) {
     const block = readingMatch[1];
     const reading = normalizeJapanese(decodeXml(firstMatch(block, /<reb>([\s\S]*?)<\/reb>/u)));
-    if (!candidatesByReading.has(reading)) continue;
     const restrictions = [...block.matchAll(/<re_restr>([\s\S]*?)<\/re_restr>/gu)]
       .map((match) => decodeXml(match[1]).trim());
-    applicableWrittenByReading.set(reading, restrictions.length ? restrictions : writtenTerms);
+    readings.push({ reading, written: restrictions.length ? restrictions : writtenTerms });
   }
-  if (!applicableWrittenByReading.size) return;
+  const entryCandidateTerms = unique([
+    ...writtenTerms.map(normalizeJapanese),
+    ...readings.map((item) => item.reading)
+  ]).filter((term) => candidatesByTerm.has(term));
+  if (!entryCandidateTerms.length) return;
 
   let senseOrder = 0;
   for (const senseMatch of entry.matchAll(/<sense>([\s\S]*?)<\/sense>/gu)) {
@@ -213,13 +236,22 @@ function inspectEntry(entry) {
       .filter(Boolean);
     const normalizedGlosses = new Map(glosses.map((gloss) => [normalizeEnglish(gloss), gloss]));
 
-    for (const [reading, applicableWritten] of applicableWrittenByReading) {
-      if (senseReadingRestrictions.length && !senseReadingRestrictions.includes(reading)) continue;
-      if (
-        senseWrittenRestrictions.length &&
-        !senseWrittenRestrictions.some((term) => applicableWritten.includes(term))
-      ) continue;
-      for (const candidate of candidatesByReading.get(reading) || []) {
+    for (const candidateTerm of entryCandidateTerms) {
+      let matchingReadings = readings.filter((item) =>
+        item.reading === candidateTerm || item.written.some((term) => normalizeJapanese(term) === candidateTerm)
+      );
+      if (!matchingReadings.length) continue;
+      if (senseReadingRestrictions.length) {
+        matchingReadings = matchingReadings.filter((item) => senseReadingRestrictions.includes(item.reading));
+      }
+      if (senseWrittenRestrictions.length) {
+        matchingReadings = matchingReadings.filter((item) =>
+          item.written.some((term) => senseWrittenRestrictions.includes(term))
+        );
+      }
+      if (!matchingReadings.length) continue;
+      const applicableWritten = unique(matchingReadings.flatMap((item) => item.written));
+      for (const candidate of candidatesByTerm.get(candidateTerm) || []) {
         const matchedGlosses = candidate.anchor_terms
           .map((anchor) => normalizedGlosses.get(normalizeEnglish(anchor)))
           .filter(Boolean);
@@ -228,6 +260,8 @@ function inspectEntry(entry) {
         matchesByKey.get(candidate.candidate_key).push({
           entry_sequence: entrySequence,
           sense_order: senseOrder,
+          matched_term: candidateTerm,
+          readings: unique(matchingReadings.map((item) => item.reading)),
           reading: candidate.word,
           written_terms: applicableWritten,
           matched_glosses: unique(matchedGlosses),

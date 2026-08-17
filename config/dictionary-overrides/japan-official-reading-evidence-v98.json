@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "updated_at": "2026-08-15",
+  "policy": {
+    "scope": "Exact candidate-bound Japanese reading evidence from Japanese public institutions",
+    "automatic_expansion": false,
+    "model_agreement_is_evidence": false
+  },
+  "entries": [
+    {
+      "source_entry_id": 2047088,
+      "source_sense_id": 2047088,
+      "source_word": "catabolismo",
+      "english_anchor": "catabolism",
+      "ja_term": "異化作用",
+      "primary_reading": "いかさよう",
+      "reading_variants": ["いかさよう"],
+      "authority": "Japan International Cooperation Agency",
+      "source_title": "Practical Livestock Terminology, Japanese-Spanish and Spanish-Japanese, 5th edition",
+      "source_url": "https://openjicareport.jica.go.jp/pdf/11836707.pdf",
+      "evidence_text": "いかさよう 異化作用、分解作用 catabolismo",
+      "match_rule": "exact_japanese_term_and_portuguese_anchor"
+    },
+    {
+      "source_entry_id": 1925038,
+      "source_sense_id": 1925038,
+      "source_word": "耳朶",
+      "english_anchor": "ear lobe",
+      "ja_term": "耳朶",
+      "primary_reading": "みみたぶ",
+      "reading_variants": ["みみたぶ", "じだ"],
+      "authority": "Ministry of Health, Labour and Welfare, Japan",
+      "source_title": "ICD-11 All Index Terms Japanese translation proposal",
+      "source_url": "https://www.mhlw.go.jp/content/10701000/001657569.pdf",
+      "evidence_text": "Earlobe / 耳朶 / みみたぶ",
+      "match_rule": "exact_japanese_term_and_english_anchor"
+    },
+    {
+      "source_entry_id": 2061457,
+      "source_sense_id": 2381997,
+      "source_word": "filiforme",
+      "english_anchor": "filiform",
+      "ja_term": "糸状",
+      "primary_reading": "しじょう",
+      "reading_variants": ["しじょう", "いとじょう"],
+      "authority": "Ministry of the Environment, Japan",
+      "source_title": "Setouchi Net: life cycle of nori",
+      "source_url": "https://www.env.go.jp/water/heisa/heisa_net/setouchiNet/seto/g1/g1chapter1/ikimono/nori.html",
+      "evidence_text": "糸状体（しじょうたい）",
+      "match_rule": "exact_compound_stem_reading_and_filiform_anchor"
+    },
+    {
+      "source_entry_id": 1932228,
+      "source_sense_id": 1932228,
+      "source_word": "雌蕊",
+      "english_anchor": "pistil",
+      "ja_term": "雌蕊",
+      "primary_reading": "めしべ",
+      "reading_variants": ["めしべ", "しずい"],
+      "authority": "National Agriculture and Food Research Organization, Japan",
+      "source_title": "Pollinator survey manual",
+      "source_url": "https://www.naro.go.jp/publicity_report/publication/files/pollinator_survey.pdf",
+      "evidence_text": "雌しべ/雌蕊（めしべ・しずい）",
+      "match_rule": "exact_japanese_term_and_english_anchor_with_official_variants"
+    }
+  ]
+}
