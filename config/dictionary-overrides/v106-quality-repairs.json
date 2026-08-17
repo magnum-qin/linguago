@@ -1,0 +1,106 @@
+[
+  {
+    "target": { "sense_id": 43611 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "thereby", "pronunciation": "/ˈðɛəbaɪ/", "pronunciation_system": "IPA", "definition": "by that means or as a result" }
+    }
+  },
+  {
+    "target": { "sense_id": 43620 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "variant", "pronunciation": "/ˈvɛəriənt/", "pronunciation_system": "IPA", "definition": "a version of something that differs slightly from others" }
+    }
+  },
+  {
+    "target": { "sense_id": 43678 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "wary", "pronunciation": "/ˈwɛəri/", "pronunciation_system": "IPA", "definition": "cautious and alert to possible danger" }
+    }
+  },
+  {
+    "target": { "sense_id": 43704 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "bearer", "pronunciation": "/ˈbɛərə/", "pronunciation_system": "IPA", "definition": "a person who carries something" }
+    }
+  },
+  {
+    "target": { "sense_id": 43753 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "share", "pronunciation": "/ʃɛə/", "pronunciation_system": "IPA", "definition": "to share the use of something" }
+    }
+  },
+  {
+    "target": { "sense_id": 43806 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "mayor", "pronunciation": "/ˈmɛə/", "pronunciation_system": "IPA", "definition": "the head of a town's administration" }
+    }
+  },
+  {
+    "target": { "sense_id": 43807 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "aircraft", "pronunciation": "/ˈɛəkræft/", "pronunciation_system": "IPA", "definition": "any vehicle capable of flight" }
+    }
+  },
+  {
+    "target": { "sense_id": 43840 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "share", "pronunciation": "/ʃɛə/", "pronunciation_system": "IPA", "definition": "the portion of something that is allocated to a person" }
+    }
+  },
+  {
+    "target": { "sense_id": 43922 },
+    "source": "manual:v106-mainland-zh-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "zh": { "term": "回复", "reading": "huí fù", "reading_system": "pinyin", "definition": "回答或回复信息" }
+    }
+  },
+  {
+    "target": { "sense_id": 43930 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "hairstyle", "pronunciation": "/ˈhɛəstaɪl/", "pronunciation_system": "IPA", "definition": "the way in which a person's hair is cut or arranged" }
+    }
+  },
+  {
+    "target": { "sense_id": 44022 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "wear", "pronunciation": "/wɛə/", "pronunciation_system": "IPA", "definition": "to wear an accessory" }
+    }
+  },
+  {
+    "target": { "sense_id": 44027 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "haircut", "pronunciation": "/ˈhɛəkʌt/", "pronunciation_system": "IPA", "definition": "the act of cutting one's hair" }
+    }
+  },
+  {
+    "target": { "sense_id": 44141 },
+    "source": "manual:v106-quality-audit-20260817",
+    "confidence": 0.98,
+    "localizations": {
+      "en": { "term": "variable", "pronunciation": "/ˈvɛəriəbl/", "pronunciation_system": "IPA", "definition": "a factor that can change" }
+    }
+  }
+]

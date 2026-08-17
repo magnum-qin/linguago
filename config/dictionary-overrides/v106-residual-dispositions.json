@@ -1,0 +1,93 @@
+{
+  "version": "v106-residuals-20260817",
+  "counts": {
+    "replay_validation_rejects": 28,
+    "promotion_semantic_drift_rejects": 35,
+    "replay_unmatched": 9
+  },
+  "retry_with_mainland_form": {
+    "计画": "计划",
+    "连络": "联络"
+  },
+  "retry_with_pt_br_form": {
+    "camião": "caminhão"
+  },
+  "manual_or_exclude_proper_names": [
+    "拉萨",
+    "チューリッヒ",
+    "バンクーバー",
+    "サウジアラビア",
+    "苏黎世",
+    "Antártica",
+    "tesla"
+  ],
+  "manual_low_priority_sensitive": [
+    "buceta",
+    "cachorra",
+    "マンコ",
+    "gringo"
+  ],
+  "locked_term_validator_retry": [
+    "亲生",
+    "共识",
+    "増大",
+    "残留",
+    "現行",
+    "サビ",
+    "志望",
+    "兰花",
+    "敬佩",
+    "延误",
+    "称职",
+    "反倒",
+    "劲儿",
+    "不景气",
+    "相近",
+    "侍者",
+    "老母",
+    "庆贺",
+    "工钱",
+    "缩减",
+    "执意",
+    "就労",
+    "バカンス",
+    "音色",
+    "ocular",
+    "vaginal",
+    "Analgésicos",
+    "Cafés",
+    "suspense",
+    "Pistolas",
+    "nirvana",
+    "empresas",
+    "irregular",
+    "racial",
+    "coca",
+    "saga",
+    "rancor",
+    "renal",
+    "bipolar",
+    "hangar",
+    "temperado",
+    "lactose",
+    "メジャー",
+    "アボカド",
+    "プラント",
+    "赠送",
+    "枯燥",
+    "抨击",
+    "国语"
+  ],
+  "replay_mapping_retry": [
+    "rigor",
+    "infernal",
+    "surreal",
+    "wat",
+    "glamour",
+    "semifinal",
+    "medicinal",
+    "mustang",
+    "territorial"
+  ],
+  "policy": "No residual is publishable without a fresh locked-term retry, deterministic replay validation, and promotion audit."
+}

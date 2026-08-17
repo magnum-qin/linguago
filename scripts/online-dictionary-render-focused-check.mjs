@@ -194,7 +194,7 @@ async function checkRenderedTerm(page, item, viewportName, ordinal) {
 }
 
 async function collectTabTexts(page) {
-  const tabs = page.locator('[role="tab"], .v-tab');
+  const tabs = page.locator('[role="tab"], .v-tab, .custom-tab-btn');
   const count = await tabs.count();
   const states = [];
   for (let i = 0; i < count; i++) {

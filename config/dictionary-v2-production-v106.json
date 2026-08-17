@@ -1,0 +1,27 @@
+{
+  "version": "v106-frozen-20260817",
+  "description": "Frozen six-node simplified source-gap production profile qualified by the v105 2k pressure run and v106 5k production run.",
+  "runner": {
+    "pipeline-mode": "simplified",
+    "qwen-endpoints": "http://100.99.99.99:11441,http://100.99.99.99:11448,http://100.99.99.99:11447",
+    "qwen-variants": "11441=UD-Q4_K_XL,11448=UD-IQ4_NL,11447=UD-IQ4_NL,11442=UD-Q4_K_XL,11445=UD-Q4_K_XL",
+    "qwen-model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+    "gemma-endpoints": "http://100.99.99.99:11442,http://100.99.99.99:11445,http://100.99.99.99:11446,http://100.99.99.99:11448,http://100.99.99.99:11447",
+    "gemma-variants": "11442=UD-Q4_K_XL,11445=UD-Q4_K_XL,11446=UD-Q4_K_XL,11448=UD-Q4_K_XL,11447=UD-Q4_K_XL",
+    "gemma-model": "unsloth/gemma-4-31B-it-qat-GGUF",
+    "elastic-model-swap": "true",
+    "elastic-endpoints": "http://100.99.99.99:11442,http://100.99.99.99:11445,http://100.99.99.99:11446",
+    "elastic-qwen-variants": "11442=UD-Q4_K_XL,11445=UD-Q4_K_XL,11446=UD-Q4_K_XL",
+    "elastic-minimum-items": "20",
+    "generation-target": "1000000",
+    "supplemental-source-db": ".tmp/combined/v100-tufs-evidence-v10.db",
+    "resume": "true"
+  },
+  "publication_gates": {
+    "automatic_database_writes": 0,
+    "final_review_only_supported": true,
+    "controlled_replay_required": true,
+    "isolated_database_required": true,
+    "blocking_audit_counters_must_be_zero": true
+  }
+}

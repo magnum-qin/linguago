@@ -4,16 +4,25 @@ import path from 'node:path';
 
 const url = process.env.PWA_URL || 'https://translation-pwa.qhzggzh-linguago.workers.dev';
 const outDir = path.resolve('output/playwright/online-ui-smoke');
+const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const terms = [
-  { term: 'hello', expectProvider: 'dictionary', expectText: ['hello', '/həˈloʊ/', '你好'] },
-  { term: '\u4f60\u597d', expectProvider: 'dictionary', expectText: ['hello', 'nǐ hǎo', '你好'] },
-  { term: 'appearance', expectProvider: 'dictionary', expectText: ['appearance', '/əˈpɪərəns/', '样子'] },
+  { term: 'hello', expectProvider: 'dictionary', expectText: ['hello', '/həˈloʊ/', '您好'] },
+  { term: '\u4f60\u597d', expectProvider: 'dictionary', expectText: ['hello', '/həˈloʊ/', '你好'] },
+  { term: 'appearance', expectProvider: 'dictionary', expectText: ['appearance', '/əˈpɪərəns/', 'The way that someone or something looks.'] },
   { term: 'notindictionarywordxyz', expectProvider: 'ai-or-error', expectText: [] }
 ];
 
 await fs.mkdir(outDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const launchOptions = { headless: true };
+try {
+  await fs.access(edgePath);
+  launchOptions.executablePath = edgePath;
+} catch {
+  // Fall back to Playwright Chromium when Edge is unavailable.
+}
+
+const browser = await chromium.launch(launchOptions);
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 2,
@@ -75,6 +84,20 @@ try {
 
 console.log(JSON.stringify(report, null, 2));
 
+const failures = report.terms.flatMap((item) => {
+  const errors = [];
+  if (item.error) errors.push(item.error);
+  if (!item.provider_ok) errors.push(`unexpected provider ${item.state.provider}`);
+  if (item.state.hasHorizontalOverflow) errors.push('mobile page has horizontal overflow');
+  errors.push(...item.missing_expected_text.map((value) => `missing visible text ${value}`));
+  return errors.map((error) => `${item.term}: ${error}`);
+});
+if (report.desktop?.hasHorizontalOverflow) failures.push('desktop page has horizontal overflow');
+if (failures.length > 0) {
+  console.error(`Online UI smoke failed:\n${failures.join('\n')}`);
+  process.exit(1);
+}
+
 async function runTerm(page, test, ordinal) {
   await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
   const start = Date.now();
@@ -129,7 +152,7 @@ async function submitTerm(page, term, timeout = 35000) {
 }
 
 async function collectTabStates(page) {
-  const tabs = page.locator('[role="tab"], .v-tab');
+  const tabs = page.locator('[role="tab"], .v-tab, .custom-tab-btn');
   const count = await tabs.count();
   const states = [];
   for (let i = 0; i < count; i++) {
@@ -147,7 +170,7 @@ async function collectState(page) {
   return page.evaluate(() => {
     const bodyText = document.body.innerText;
     const resultCards = Array.from(document.querySelectorAll("section div[class*='rounded']"));
-    const tabs = Array.from(document.querySelectorAll('[role="tab"], .v-tab')).map((node) => node.textContent?.trim());
+    const tabs = Array.from(document.querySelectorAll('[role="tab"], .v-tab, .custom-tab-btn')).map((node) => node.textContent?.trim());
     const lines = bodyText
       .split(/\n/g)
       .map((line) => line.trim())

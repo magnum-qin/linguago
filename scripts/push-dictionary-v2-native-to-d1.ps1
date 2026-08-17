@@ -10,7 +10,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$manifestPath = Join-Path $root (Join-Path $OutDir "manifest.json")
+$resolvedOutDir = if ([System.IO.Path]::IsPathRooted($OutDir)) {
+  $OutDir
+} else {
+  Join-Path $root $OutDir
+}
+$manifestPath = Join-Path $resolvedOutDir "manifest.json"
 
 function Resolve-ManifestPath {
   param([string]$PathValue)

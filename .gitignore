@@ -42,4 +42,5 @@ __pycache__/
 .pnpm-store/
 backups/
 logs/
+runs/
 /1

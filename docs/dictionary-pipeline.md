@@ -2,6 +2,119 @@
 
 This pipeline builds a fast four-language word dictionary for the translation PWA.
 
+## v106 post-release audit and frozen profile
+
+The complete v106 increment audit found 13 deterministic repairs among 732
+promoted senses: 12 Cyrillic-`є` IPA transcription errors and one Taiwan-form
+Chinese localization. The replayable corrections are stored in
+`config/dictionary-overrides/v106-quality-repairs.json`. Residual unpublished
+rows are classified in `config/dictionary-overrides/v106-residual-dispositions.json`.
+
+Run future scale batches through `config/dictionary-v2-production-v106.json`
+and `scripts/run-dictionary-v2-production-profile.mjs`. The wrapper has a
+`--print-command true` validation mode and otherwise delegates to the existing
+checkpointed remote pipeline. The model run remains no-write; controlled
+replay, isolated validation, promotion, export audit, D1 backup, and deployment
+are separate mandatory stages.
+
+## v106 5,000-candidate production result (2026-08-17)
+
+The deployed v106 increment contains 732 newly promoted senses. Production
+counts are `entries=35094`, `senses=41404`,
+`sense_localizations=165616`, `examples=3030`, and
+`example_localizations=11898`; cache is `v106-production732-35094`.
+
+The final qualified sequence was:
+
+1. v105 pressure qualification: `2,000` input, `1,555` source-approved,
+   `1,415` valid generations, `296` reverse-supported, `257` final Gemma
+   accepts, and `254` promoted.
+2. v106 production: `5,000` input, `3,604` Gemma source approvals, `3,077`
+   valid Qwen generations, `950` reverse-supported, and `827` final Gemma
+   accepts, with no model/network infrastructure failures.
+3. Controlled replay: exclude 23 deterministic Latin proper-name, brand,
+   geography, or astronomical records; replay 804, insert 767 drafts, and
+   promote 732. Rejected/skipped rows remain outside publication.
+4. Export/import: full native D1 audit passed with 21 chunks and all blocking
+   counters at zero. The duplicate-localization warning remains non-blocking.
+
+Operational rules learned from this run:
+
+- Final Gemma review uses `--only-supported true`. Do not substitute
+  `--include-supported true`, which includes unsupported generated records.
+- Proper-name filtering is deterministic and limited to Latin `en`/`pt-BR`
+  source rows with direct definition/POS evidence; broad token heuristics cause
+  false positives.
+- Model acceptance is only an input to controlled replay. Replay and promotion
+  validators remain mandatory publication gates.
+- Store large reports, checkpoints, DB copies, backups, and exports under
+  `%TEMP%` on C. D is space constrained.
+- Absolute export directories are supported by
+  `push-dictionary-v2-native-to-d1.ps1`; resolve them before joining filenames.
+
+## v100 semantic-evidence result (2026-08-17)
+
+The deployed v100 increment contains 29 new entries/senses. Production counts
+are `entries=33606`, `senses=39916`, and
+`sense_localizations=159664`; cache is `v100-semantic29-33606`.
+
+For this release, ECDICT and EJDict were exported again against all 6,409 daily
+candidates and merged into `.tmp/combined/v99-daily-evidence-v9.db`. The strict
+selector found 152 supported rows, but only 56 were fresh after current-product
+and attempt exclusions. The semantic selector retained the same independent
+family and reverse-evidence requirements and exposed 85 fresh rows whose main
+uncertainty was lexical alignment rather than missing evidence.
+
+The full no-write funnel was `85 input -> 71 Qwen source approvals -> 56 dual
+source consensus -> 47 source reverse-supported -> 35 semantic previews -> 33
+generation-ready/valid/reverse-supported -> 29 final Gemma accepts`. The 29
+records then passed isolated replay and idempotency, promote dry-run/apply,
+fast and published-risk audits, main replay, native export, and full in-memory
+import. Remote D1 counts and mobile/desktop rendering match the manifest.
+
+Operational conclusion: the generation and review pipeline is healthy, but
+the next 500/2,000/5,000 stages are evidence-capacity limited. Reclassifying
+existing evidence families without new source rows does not solve this. Add
+independent lexical coverage, bind it to exact candidate entry/sense IDs, audit
+family provenance, then rebuild the fresh strict and semantic pools before
+making more LLM calls.
+
+## v99 strict daily-gap result (2026-08-17)
+
+The deployed v99 increment contains 84 new entries/senses. Production counts
+are `entries=33577`, `senses=39887`, and
+`sense_localizations=159548`; cache is `v99-daily-strict84-33577`.
+
+The latest daily pool had 6,409 apparently eligible rows, but only 137 had two
+independent source families and complete target-language evidence. Fresh-entry
+exclusion left 131; Qwen source review, Gemma source consensus, deterministic
+reverse evidence, semantic preview, Qwen generation, and final Gemma review
+accepted 84. All six endpoints participated without infrastructure failures.
+
+Run strict evidence prefiltering before selecting a scale cohort. A raw
+500-row attempt produced 20/20 immediate source-review rejections because the
+rows lacked locked pt-BR and Japanese terms. Model throughput cannot repair
+missing publication evidence. Keep the remaining 562 manual and 5,710
+unsupported rows out of production until new independent evidence is ingested
+or correctly bound.
+
+Operational CLI details: language quotas use `lang=count`, not `lang:count`.
+For a full D1 audit, generate the native export and its manifest before running
+the import audit.
+
+## v98 production result (2026-08-16)
+
+The daily-first lane is deployed. Exactly 5,000 candidates were generated,
+4,737 passed the structural contract, and 1,206 passed strict reverse evidence,
+independent Gemma no-correction review, isolated replay, deterministic promote,
+and all export audits. Production counts are `entries=33493`, `senses=39803`,
+and `sense_localizations=159212`; cache is `v98-daily5000-33493`.
+
+Keep the Chinese-script pre-promotion check enabled. It was added after `じゃが`
+produced a Chinese definition containing Japanese kana. Online UI checks must
+use `.custom-tab-btn` for the four language buttons and must fail, rather than
+only report, missing expected text, provider mismatches, or horizontal overflow.
+
 ## Current Flow
 
 1. Download public source dictionaries into `data/raw`.
@@ -3590,3 +3703,436 @@ Use Node `fetch`, UTF-8 bytes, or Unicode escapes for non-ASCII API checks.
 The Worker resolves canonical keys, entry forms, and localized terms with
 three small sequential indexed queries before aggregating an entry. The
 focused API suite locks this behavior with `ja-protractor-form-lookup`.
+
+Core Unsloth pipeline scripts also load the ignored project-root `.env.local`
+through `scripts/lib/load-local-env.mjs`. This makes the key available across
+new shells and Codex tasks even when their parent process did not inherit the
+Windows user environment. An explicit process-level `UNSLOTH_API_KEY` still
+takes precedence, so temporary key rotation remains possible without editing
+the file. Never print the token or pass it as a CLI argument.
+
+## Large-batch replay identity and 500-row gate (2026-08-13)
+
+All generation, reverse-evidence, consensus, replay, checkpoint, and promote
+joins must use `source_entry_id:source_sense_id`. Entry-only replay is invalid
+because one headword can contribute several independently reviewed senses.
+The supplement replay path now enforces this exact identity and throws when a
+source sense is missing.
+
+The current 500-row qualification funnel is:
+
+- Qwen generation valid: `464/500` (92.8%), endpoint failures `0`;
+- deterministic reverse evidence: `454/500` (90.8%);
+- independent Gemma no-correction consensus: `400/454`;
+- final promoted: `400/500` (80.0%).
+
+Gemma `nano` review can emit only `{"corrections":[]}` for some rows. Do not
+infer acceptance. Resume only invalid rows with `prompt-mode=full`,
+`max-tokens=320`, and `max-seq-length=2048`. The 500-row gate then reached zero
+failed reviews. Process large multilingual JSON with Node UTF-8 reads rather
+than Windows PowerShell 5 `ConvertFrom-Json`.
+### v95 supplemental evidence exhaustion follow-up (2026-08-13)
+
+After the local 500-row gate and the final 11-row strict batch, the product DB
+contains 37,742 publishable senses. No D1 release was made in this phase; the
+online baseline remains v94.
+
+The all-history attempt index now contains 39,591 exact entry/sense attempts.
+Rebuilding the strict v95 pool against that index leaves one fresh candidate
+(`giroscópio`), which is not enough for another LLM batch.
+
+JMdict coverage was rechecked with an extractor that respects written forms,
+readings, `re_restr`, `stagk`, and `stagr`, and requires an exact English sense
+anchor. The complete 459-row Japanese near-unlock bucket produced 189
+candidate matches and 166 unique lexical-evidence rows. Declaring official
+JMdict as a strong Japanese supplemental family increased the strict pool only
+from 1,278 to 1,281 rows. Most matches still lack independent round-trip
+evidence for every target language, so JMdict alone does not unlock scale.
+
+Two negative capacity checks are also intentional results:
+
+- The 364 Chinese near-unlock rows had no exact CC-CEDICT headword matches.
+- The 310 Portuguese near-unlock rows had no exact FreeDict por-eng headword
+  matches.
+
+Do not replace these checks with fuzzy substring matching. A source term merely
+occurring inside a longer dictionary headword is not independent evidence for
+the candidate sense. The next safe expansion requires a new independent
+lexicon with better modern/inflected-form coverage, or a reviewed semantic
+alignment stage whose outputs remain candidate-bound and auditable.
+
+#### UniMorph to FreeDict morphology bridge
+
+The official UniMorph Portuguese dataset (303,996 rows, 211,091 distinct
+forms, CC BY-SA 3.0) was tested strictly as a morphology bridge, not as a new
+lexical-evidence family. Of 310 Portuguese near-unlock rows, 21 mapped to a
+lemma and eight lemmas existed in FreeDict por-eng. Qwen review on nodes 147,
+56, and 47 accepted two `diferenciado` source senses and rejected six semantic
+or homograph mismatches. A deterministic adjudicator then retained only the
+risk-free participle chain `diferenciado -> diferenciar -> differentiate ->
+differentiated`; the second sense carried an elegant-vs-distinct scope risk.
+
+Appending that one candidate-bound FreeDict row did not increase the strict
+pool. The source side gained two independent families, but its existing OMW
+target terms still failed: Chinese `区别的` did not reverse to
+`differentiated`, and Japanese `分化型` had no strong reverse evidence. This
+proves that the next useful lane is target-term repair, not more source-side
+generation. Start with the 737 target deficits that already have one observed
+family (`zh=511`, `ja=226`), ask the model for bounded alternatives, then admit
+only alternatives independently found in CC-CEDICT/JMdict and matching the
+same English anchor.
+
+#### Target-term repair qualification result
+
+The first 20-row bounded suggestion run returned valid JSON for every row on
+nodes 147, 56, and 47; node 155 was excluded. Deterministic validation retained
+12 replacement terms after target-script checks and strong-family filtering.
+The repaired report increased the strict pool by one candidate only:
+Portuguese `caracterizacao`, with Japanese `描写` replacing the unrelated
+`制立`. That candidate was already present in the exact historical attempt
+index, so history subtraction still leaves only `giroscopio` as fresh.
+
+This result validates the repair mechanism but not production capacity. Before
+another remote generation run, select a larger bounded cohort from the 511
+Chinese and 226 Japanese one-family deficits, validate proposed terms against
+current dictionary data, rebuild the strict pool, and subtract the complete
+`source_entry_id:source_sense_id` history. Do not generate merely because a
+model suggestion parsed successfully.
+
+The follow-up 100-row capacity check (`zh=50`, `ja=50`) produced 100 valid
+model responses and zero endpoint failures on nodes 147, 56, and 47. The first
+lightweight validation retained 39 candidates. Requiring two strong reverse
+families on the same proposed term reduced that precheck to 29 candidates, but
+the authoritative prefilter, which also checks polysemy and dictionary
+conflicts, still accepted only one repair. The overall strict pool did not grow
+beyond 1,282 and history subtraction still left only `giroscopio`.
+
+`report-dictionary-v2-product-target-deficit-intersections.mjs` now separates
+single one-family gaps from candidates that also need another target language.
+There are 577 nominal single one-family gaps, but a focused 20-row replay still
+unlocked only `caracterizacao`. Treat the lightweight suggestion validator as
+a cost-saving precheck only; every repair must be rebuilt by the authoritative
+prefilter. Do not spend more remote generation on this lane until a genuinely
+independent lexicon or a stricter prefilter-backed selector shows recoverable
+capacity.
+
+#### Independent Gemma target-term review on node 155
+
+A6000-155 was restored and loaded with
+`unsloth/gemma-4-31B-it-qat-GGUF / UD-Q4_K_XL`, context 2,048, without
+speculative decoding. `review-dictionary-v2-product-target-terms-unsloth.mjs`
+then reviewed the 29 candidates that passed the lightweight two-family
+precheck. All requests and JSON responses were valid, and Gemma accepted all
+29 candidates (31 terms) at confidence 0.90-1.00.
+
+Treat this as proof that node 155 is usable, not as lexical evidence. The
+review prompt measures semantic naturalness and is less selective than the
+authoritative deterministic prefilter, which still admits only one repair.
+Model consensus must not create an evidence family or bypass dictionary
+conflict, source-direction, polysemy, or round-trip gates.
+
+#### ConceptNet as a discovery layer, not evidence
+
+The official ConceptNet 5.7 assertions snapshot is processed locally with
+`probe-conceptnet-source-gap-zero-family.mjs`; the script streams the gzip and
+does not create a large decompressed intermediate. ConceptNet is an aggregator,
+so its edges inherit provenance from sources such as Wiktionary, WordNet,
+JMdict, and DBpedia. Count those underlying families, never `conceptnet` or a
+`/s/process/*` URI, as independent evidence.
+
+For the current zero-family deficits, exact English-anchor synonym edges found
+target-term suggestions for 2,055 candidates but added zero new source
+families. The deterministic workflow is:
+
+1. build discovery-only suggestions with
+   `build-conceptnet-target-term-suggestions.mjs`;
+2. validate proposed terms against local lexical databases;
+3. apply repairs only to an isolated coverage report;
+4. rerun the authoritative strict prefilter and exact history subtraction;
+5. run dual-model source review, generation dry-run, reverse-evidence
+   validation, and independent no-correction consensus;
+6. write no draft unless the bounded cohort clears the production threshold.
+
+The first run increased the strict pool from 1,281 to 1,331 and left 23 fresh
+rows after history subtraction. Its 20-row bounded gate ended with 11 fully
+supported, consensus-accepted generations (55%). This validates the recovery
+mechanism but blocks large-scale expansion. No database or deployment state
+changed.
+
+#### Frozen pre-generation quality gates
+
+After source consensus, the production runner must build a locked four-language
+semantic preview, run independent Gemma full-contract review, retain only
+no-correction accepts, and apply the deterministic JMdict generation preflight
+before Qwen generation. The relevant scripts are
+`build-dictionary-v2-source-gap-semantic-preview.mjs`,
+`select-dictionary-v2-source-gap-candidates-by-review.mjs --accepted-only true`,
+and `filter-dictionary-v2-source-gap-jmdict-generation-preflight.mjs`.
+
+Do not remove these gates to increase volume. On the 1,690-row strict stress
+pool this sequence produced `254/255` valid Qwen generations and `237/254`
+final safe accepts, with zero endpoint or JSON failures. The remote report set
+is `v97-strict1690-semantic-jmdict-integrated`.
+
+For controlled writes, build a consensus-filtered replay with
+`build-dictionary-v2-product-source-gap-consensus-replay.mjs`, then run
+`supplement-dictionary-v2-product-source-gaps-unsloth.mjs` with
+`--replay-report`, `--controlled-consensus-draft-write true`, and
+`--publishable false`. Use this order:
+
+1. replay initial final-Gemma accepts as draft;
+2. deterministic promote the initial lane;
+3. replay reverse-supported structured repairs as draft;
+4. deterministic promote the repair lane;
+5. run fast audit and published-risk audit.
+
+Applying both draft lanes before the first promote can leave a shared entry in
+`needs_review` and make repair promotion correctly fail
+`entry_not_promotable`. Repeated replay must match zero rows and write zero
+senses.
+
+The 1,690-row run validates sustained orchestration, checkpoint recovery, and
+quality rates, but not 500 fresh writes: 388 JMdict-ready rows already had
+accepted/draft links, leaving 255 new generation attempts. Rebuild a truly
+fresh strict pool from additional independent Chinese/Japanese lexical evidence
+before the 500-new-sense write gate. Do not reuse historical retries to inflate
+the count.
+
+## Risk-routed source-gap pipeline
+
+The product contract remains simple: one entry contains pronunciation groups,
+each pronunciation group contains senses, and every sense has `en`, `pt-BR`,
+`zh`, and `ja` localizations with the appropriate reading or pronunciation,
+definition, and examples. Pipeline complexity is an offline publication
+control and must not leak into the query response shape.
+
+Run `dict:v2:coverage:route-source-gap` before remote model work. The router
+writes compatible `fast` and `strict` candidate reports. A candidate enters the
+fast lane only when it has one source sense, no sense realignment, no single-CJK
+character ambiguity, complete reverse coverage, and at least two independent
+strong lexical families for every non-source language. Word2word corpus hints
+do not count as a strong family, and Kaikki/WikDict count once as Wiktionary.
+
+The strict lane keeps the full Qwen source review, locked-term Gemma review,
+independent reverse evidence, semantic preview, generation preflight, Qwen
+generation, reverse evidence, and final Gemma review. The fast lane may skip
+the two source-review model calls only after a representative validation batch
+shows zero final false accepts; deterministic reading/pronunciation checks,
+reverse evidence, final Gemma review, draft-only writes, promote, and release
+audits remain mandatory.
+
+The first v98 5,000-candidate routing test produced `fast=0` and `strict=5000`.
+This agrees with the full run: only 99 candidates survived all model and
+evidence gates, and deterministic promotion accepted 90. The immediate
+bottleneck is independent lexical evidence in the candidate pool, not model
+transport or four-language JSON generation.
+
+## CedPane public-domain Chinese evidence
+
+CedPane's `PD-English-Definitions.tsv` is an independent editorial Chinese-
+English source distributed under a PDDL/Unlicense public-domain dedication. Do
+not use the main `cedpane.tsv` names collection for the ordinary high-value
+source-gap queue. The ordinary-definitions file must be downloaded from the
+official `ssb22/CedPane` repository and retained outside Git under
+`.tmp/cedpane/`.
+
+Run the bounded probe and export with:
+
+```powershell
+npm.cmd run dict:v2:coverage:probe-cedpane -- `
+  --report logs/product-source-gap-v98-evidence-acquisition-near-unlock1000.json `
+  --source .tmp/cedpane/PD-English-Definitions.tsv
+
+npm.cmd run dict:v2:coverage:export-cedpane -- `
+  --report logs/product-source-gap-v98-cedpane-near-unlock-probe.json `
+  --out .tmp/cedpane/cedpane-pd-definitions-evidence.db
+```
+
+The probe requires an exact Chinese term after traditional-to-simplified
+normalization and at least `0.67` content-token coverage in both directions
+between the candidate English anchor and the source gloss. Raw traditional
+forms remain in provenance, but generated Chinese terms use simplified forms
+to preserve the Mainland-first policy. The exported source metadata records
+the upstream and report hashes, extraction rule, license, and final reverse-
+evidence requirement.
+
+The initial 2026-08-15 probe used overlap divided by the smaller token set. It
+covered `192/600` Chinese target deficits but incorrectly treated a partial
+match such as `Maltese` against `Maltese dog` as complete. That report is
+diagnostic only. Bidirectional `0.67` coverage reduced the authoritative result
+to `141/600`, 99 unique terms (151 candidate-bound evidence rows after the
+binding repair), and a strict pool of `2,012`
+before the proper-name fix.
+
+A first fresh 20-row Qwen source review was structurally stable (`20/20` valid,
+zero transport failures) but approved only `14/20`. Gemma independently
+approved all 14 locked Qwen accepts. The six Qwen rejections exposed real
+target-term problems such as wrong POS or wrong Chinese/Japanese sense, so this
+source must stay in the strict lane. Do not expand the remaining 31 fresh rows
+or treat CedPane as a fast-lane source until candidate term selection reaches
+the normal source-review threshold.
+
+The six rejected target terms were sent through the existing bounded repair
+path. The first attempt exposed an old utility bug: both Qwen and Gemma used
+their output budget without returning JSON because the request omitted
+`enable_thinking=false`. `suggest-dictionary-v2-product-target-terms-unsloth.mjs`
+now disables reasoning, defaults to 320 output tokens, and records truncated
+raw content on parse failure. The corrected Gemma run returned `6/6` valid
+JSON responses. Deterministic two-family validation retained only two repairs:
+`あたら -> 呜呼` and `entonação -> 语调`. The other four remain manual review;
+LLM suggestions alone are not evidence. Even with both repairs, the bounded
+cohort reaches at most `16/20`, so it still cannot unlock expansion.
+
+The capitalized-anchor filter also previously missed names containing lowercase
+connectors, such as `Saint Kitts and Nevis`. It now permits common connectors
+inside the pattern while requiring every other token to be title-cased. The
+final strict report contains 1,989 rows; the named-country regression is
+`unsupported/capitalized_proper_or_named_english_anchor`, and the `Maltese dog`
+false positive is no longer supported.
+
+After excluding complete history and the first 20 reviewed source entries, a
+second fresh cohort approved `17/20`. Only five additional unseen entries
+remained after excluding both reviewed cohorts, and Qwen approved `4/5`.
+Therefore the corrected fresh sample is `21/25` (84%), with `25/25` valid JSON
+and zero transport failures. The source is useful but remains below the 90%
+expansion gate. Do not recycle historical entries to manufacture a third
+20-row cohort; acquire another independent source or improve sense/POS-bound
+target selection first.
+
+The lexical evidence rules are covered by a committed regression check:
+
+```powershell
+npm.cmd run check:source-gap-lexical-contract
+```
+
+It locks the bidirectional phrase-coverage behavior (`Maltese` must not satisfy
+`Maltese dog`) and proper-name detection with lowercase connectors (`Saint
+Kitts and Nevis`). Run it whenever the source-gap prefilter or a supplemental
+lexical probe changes.
+
+The first CedPane evidence export incorrectly stored candidate IDs only in its
+provenance table while giving `lexical_evidence.concept_id` a reusable CedPane
+hash. The main prefilter binds supplemental rows only when that field is
+`candidate:<entry>:<sense>`, so terms could leak across aligned senses sharing
+an English anchor. The corrected exporter writes candidate-bound concept IDs
+and fails if any exported row is unbound. Rebuilding the strict pool removed
+23 leaked rows (`1,989 -> 1,966`), including the `lantejoula` false match.
+
+Because all remaining candidate-bound CedPane rows had already been reviewed,
+there was no honest fresh CedPane cohort after this repair. The earlier
+`21/25` result is therefore diagnostic rather than an expansion gate result.
+A separate fresh 20-row sample from the complete strict-v4 pool returned valid
+JSON for all rows but only `8 accept / 10 reject / 2 manual_review`. Rejections
+were primarily cross-language sense collisions (`rotary`, `mould`, `mate`) plus
+regional or grammatical mismatch. Keep semantic source review mandatory; do
+not send this pool directly to generation or Gemma final review.
+
+The eight Qwen accepts were independently source-reviewed by Gemma: six passed,
+one was rejected (`買物`, noun-versus-verb Chinese mismatch), and one remained
+manual (`永い`, thin Chinese definition contract). Qwen then generated complete
+four-language records for all six consensus candidates in about 29 seconds;
+all six passed deterministic reverse evidence. Final full-record Gemma review
+accepted only four and rejected `prevalência` (general prevalence mixed with
+medical prevalence/dominance) and `automação` (automation mixed with
+mechanization). The authoritative funnel is therefore `20 -> 8 -> 6 -> 6 -> 4`
+(20% final yield), with zero database writes. Infrastructure is healthy, but
+the current candidate pool is not suitable for large-scale generation.
+
+### Shared-concept lexical-equivalence gate (2026-08-15)
+
+`select-dictionary-v2-source-gap-shared-concept.mjs` can isolate candidates
+whose target languages share one locked OMW or Wikidata concept. This is a
+useful recall filter, not sufficient publication evidence: a co-synset term
+may be conceptually related without being a lexical translation.
+
+The `キロリットル` regression exposed this distinction. OMW proposed
+Portuguese `metro cubico`, which denotes an equivalent volume but does not
+translate the lexical unit name. WikDict provides the exact Portuguese term
+`quilolitro`. The reverse-gloss index now expands compound English anchors
+such as `kiloliter; kilolitre; cubic meter; cubic metre` and prioritizes terms
+matching the earliest English sense before comparing evidence-family counts.
+
+After that repair the preferred hint is `quilolitro`, but it has only the
+Wiktionary source family in the current evidence database. The strict
+independent-target gate therefore rejects the candidate before any LLM call.
+Do not fall back to `metro cubico`, count Kaikki and WikDict separately, or
+relax the two-family rule merely to complete a four-language record.
+
+The follow-up target-evidence path resolved this candidate without relaxing
+the gate. `probe-dicionario-aberto-target-terms.mjs` looked up the preferred
+Portuguese generation hint in the licensed Dicionario Aberto XML and found
+`quilolitro: Medida de mil litros.` Qwen (`0.95`) and Gemma (`1.0`)
+independently approved the same definition. The exporter now writes
+`candidate:<entry>:<sense>` concept IDs; legacy
+`dicionario-aberto-definition:<entry>:<sense>` IDs are also interpreted as
+candidate-bound during migration so they cannot leak across candidates.
+
+The first full replay still failed correctly because Chinese was locked to
+`立方米`, an equivalent volume rather than the lexical unit name. The reverse
+target index now includes WikDict Chinese, merges British and American
+`litre/liter` and `metre/meter` spelling variants into one lexical priority,
+and prefers the mainland term `千升` over legacy or Taiwan-oriented forms
+`公秉`, `千公升`, `竏`, and `千竔`. The corrected four-language lock is
+`kiloliter / quilolitro / 千升 / キロリットル`.
+
+The final no-write pipeline passed every stage: Qwen source review, Gemma
+source review, deterministic source reverse evidence, semantic preview Gemma,
+Qwen complete generation, deterministic generated-record reverse evidence,
+and final Gemma (`1/1` throughout the accepted path). No product DB rows were
+written. This validates the acquisition method, not a broad expansion gate;
+apply it to a fresh bounded cohort before scaling.
+### Mainland Chinese target-term ranking (v98)
+
+Reverse-gloss indexes must not keep the first Chinese terms encountered in
+source-row order. That favored rare, historical, or Taiwan-oriented forms and
+could hide a common mainland term before generation-hint ranking ran. Chinese
+reverse-gloss buckets now retain up to 64 terms, ordered by the narrow regional
+unit rule and the minimum `entries.frequency_rank` across simplified and
+traditional lookup variants. Lexical-anchor priority still runs first, so a
+frequent related concept cannot replace the requested lexical translation.
+
+The v13 full rerun covered 1,966 candidates and selected 1,475. It changed
+`敏い / clever` from the rare `㑇` hint to `聪明`, `机灵`, and related forms,
+which restored independent reverse evidence and made that candidate supported.
+It also kept `花俏` ahead of less common gaudy synonyms. The Dicionario Aberto
+target batch improved Portuguese evidence for 11 rows, but unlocked none by
+itself because most still lacked a second independent Chinese family. Do not
+count this as a model failure or lower the two-family gate; acquire evidence
+for the modern Chinese term instead.
+
+Caching canonical term frequency reduced the same full prefilter from about
+149.6 seconds to 27.0 seconds. Candidate-bound evidence audit passed with 1,966
+validations, 1,398 bound rows, and zero violations. No product database row was
+written by this experiment.
+
+### v98 current-code scale readiness
+
+Three bounded low-ambiguity runs established a minimum 20-record generated
+sample: 60 raw candidates produced 25 generation-ready records, 23 valid
+generations, 23 reverse-supported records, and 21 final no-correction accepts.
+The measured rates were 92.0% generation validity, 100% reverse support, 91.3%
+final acceptance, and zero infrastructure failures. The reproducible evaluator
+is `npm run dict:v2:remote-scale-readiness`; it deliberately reports raw
+candidate-to-generation yield separately from generation quality.
+
+The current-code pressure run `v98-mainland-pressure489-v15` then processed 489
+unique candidate entries through three Qwen workers and three Gemma workers.
+It produced 149 generation-ready records, 147 valid generations, 147
+reverse-supported records, and 142 final accepts including one bounded repair.
+That is 98.7% generation validity and 96.6% final acceptance with zero
+infrastructure failures and zero database writes. The run passed every scale
+readiness gate.
+
+The earlier isolated 2,000-record qualification remains present and audited:
+1,619 records were promoted in the isolated database, all blocking audit
+counters were zero, and native export/import matched. Together with the new
+489-record current-code regression, this is sufficient to start large-batch
+generation. Do not interpret it as 5,000-record source capacity: rebuilding the
+34,216 aligned gaps with current v8 evidence yields only 1,523 strict
+candidates. Additional dictionary evidence is required beyond that capacity.
+
+Candidate-bound evidence subsets are additive. Never use `--replace-family`
+when merging a new CedPane or pivot batch unless the new database is a complete
+replacement for every prior candidate-bound subset in that family. Replacing
+the family temporarily dropped the strict pool from 1,475 to 1,405; incremental
+merge restored prior evidence and raised it to 1,497.
