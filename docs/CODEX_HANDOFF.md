@@ -1,5 +1,42 @@
 # Codex Handoff
 
+## 2026-08-18 v109 production-937 local promotion
+
+- The frozen v106 production profile completed a fresh 5,000-row v109 cohort:
+  `5,000 input -> 3,916 Gemma source approvals -> 3,410 valid Qwen generations
+  -> 1,074 reverse-supported -> 972 final no-correction accepts`.
+- Controlled replay excluded one proper-like row. Of the remaining 971 rows,
+  exact current-state replay matched 968 and deterministically accepted 937;
+  31 `en_term_gloss_mismatch` rows and three unmatched rows remain unpublished.
+- Isolated validation inserted 936 entries, reused one entry, promoted 937
+  senses, and promoted 3,748 four-language localizations. The same counts were
+  then reproduced on the main product DB.
+- TypeScript, fast audit, published-risk, native export, and full in-memory
+  import audit all pass. The local publishable package now has `entries=38,061`,
+  `senses=44,371`, and `sense_localizations=177,484`; all blocking counters and
+  `flagged_senses` are zero.
+- The pre-write backup is
+  `C:\Users\qhz00\AppData\Local\Temp\linguago-before-v109-production-20260818-230047.db`,
+  SHA-256
+  `088AE1E10F7F36A9F0150C4B1622D21329CA8E30A78A97E8904DF32EBF9B6D90`.
+- The v107-v109 local increment is 2,967 publishable senses (`968 + 1,062 +
+  937`). D1 and Worker therefore remain on v106 until the frozen 5,000-10,000
+  sense release interval is reached.
+
+## 2026-08-18 v108 production-1062 local promotion
+
+- The v108 5,000-row run produced `3,568` Gemma source approvals, `3,050`
+  valid Qwen generations, `1,197` reverse-supported rows, and `1,083` final
+  no-correction accepts.
+- Controlled replay excluded five proper-like rows. Exact replay matched 1,076
+  and deterministically accepted 1,062; 14 validator rejects and two unmatched
+  rows remain unpublished.
+- Isolated and main-DB replay/promotion both inserted or reused 1,062 senses and
+  4,248 localizations. Fast, published-risk, native export, and full in-memory
+  audits passed with every blocking counter at zero.
+- The pre-write backup is
+  `C:\Users\qhz00\AppData\Local\Temp\linguago-before-v108-production-20260818-001404.db`.
+
 ## 2026-08-17 v107 production-968 local promotion
 
 - The frozen v106 profile processed a fresh 5,000-row cohort: `5,000 input ->

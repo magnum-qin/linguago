@@ -1,17 +1,23 @@
 # LinguaGo Project Overview For AI
 
-## Current local dictionary after v107 (2026-08-17)
+## Current local dictionary after v109 (2026-08-18)
 
-The v107 5,000-candidate run completed through the frozen v106 profile. Its
-funnel was `5000 -> 3790 source-approved -> 3374 generated-valid -> 1131
-reverse-supported -> 1020 final-consensus`; exact replay left 968 deterministic
-promotions. Local publishable counts are `entries=36062`, `senses=42372`, and
-`sense_localizations=169488`. All blockers and `flagged_senses` are zero.
+The frozen v106 profile has completed three local production cohorts after the
+live v106 release. Deterministic promotion added 968 senses in v107, 1,062 in
+v108, and 937 in v109, for a cumulative local increment of 2,967 publishable
+senses. Current local publishable counts are `entries=38061`, `senses=44371`,
+and `sense_localizations=177484`. All blockers and `flagged_senses` are zero.
 
-This is a local increment, not an online release. D1 and Worker remain v106
-because 968 new publishable senses do not meet the 5,000-10,000 deployment
-interval. The 43 replay semantic mismatches and four unmatched rows remain
-unpublished; do not weaken validation to increase yield.
+The v109 funnel was `5000 -> 3916 source-approved -> 3410 generated-valid ->
+1074 reverse-supported -> 972 final-consensus -> 937 deterministic promotions`.
+One proper-like row, 31 replay semantic mismatches, and three unmatched rows
+remain unpublished. The isolated DB and main DB produced identical replay and
+promotion counts, and TypeScript, fast audit, published-risk, native export,
+and full in-memory import audit all pass.
+
+This remains a local increment, not an online release. D1 and Worker stay on
+v106 until the frozen 5,000-10,000-sense deployment interval is reached. Do not
+weaken source review, reverse evidence, or replay validation to increase yield.
 
 ## Active follow-up after v106
 
