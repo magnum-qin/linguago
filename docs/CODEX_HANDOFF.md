@@ -1,5 +1,52 @@
 # Codex Handoff
 
+## 2026-08-19 v114 production-5012 release
+
+- The accumulated v107-v114 release crossed the frozen deployment interval
+  with 5,012 new publishable senses: `968 + 1,062 + 937 + 830 + 498 + 281 +
+  360 + 76`. Production now uses cache `v114-production5012-40105`, Worker
+  Version ID `5e2abcf9-603f-4514-b5ed-e09feb35d458`, and D1
+  `published_at=2026-08-19T03:26:57.444Z`.
+- Live `/health`, remote D1, and the export manifest agree exactly:
+  `entries=40,105`, `senses=46,416`, `sense_localizations=185,664`,
+  `examples=3,030`, and `example_localizations=11,898`. The native package is
+  `outputs/d1-v2-product-native-export-v114-production5012`.
+- The final production cohorts used the frozen v106 profile and performed no
+  automatic database writes. Their remote funnels and deterministic promotions
+  were: v110 `5,000 -> 3,798 -> 3,232 -> 943 -> 857 -> 830`; v111
+  `3,469 -> 2,418 -> 1,959 -> 571 -> 512 -> 498`; v112
+  `3,073 -> 1,416 -> 984 -> 356 -> 297 -> 281`; v113
+  `3,488 -> 2,117 -> 1,895 -> 428 -> 374 -> 360`; and v114
+  `800 -> 586 -> 503 -> 98 -> 78 -> 76`. The columns after input are Gemma
+  source approval, valid Qwen generation, deterministic reverse support,
+  no-correction Gemma acceptance, and deterministic promotion.
+- Every cohort was replayed into an isolated database before the identical
+  controlled replay was applied to main. TypeScript, fast audit,
+  published-risk, native export, and full in-memory import all pass. Release
+  blockers remain zero: no bad localization counts, duplicate sense orders,
+  orphans, mojibake, HTML artifacts, or published-risk flags.
+- Main-DB backups immediately before the last two writes are
+  `C:\Users\qhz00\AppData\Local\Temp\linguago-before-v113-production-20260819-113827.db`
+  (SHA-256 `A4504305B942FED2BF14098674FD5EFBD9863FA98D07BD2386D513BB69E14B44`)
+  and
+  `C:\Users\qhz00\AppData\Local\Temp\linguago-before-v114-production-20260819-122606.db`
+  (SHA-256 `2195D95DAA91296C8E81348F1B506522030CE8564D54C9231A25924053DD20F1`).
+  The released product DB SHA-256 is
+  `BB5BB8E52AF5BD662B6B3D81315562FDB224EC08A15243D67A2338F9123BD700`.
+- The remote pre-release D1 backup is
+  `C:\Users\qhz00\AppData\Local\Temp\linguago-dictionary-before-v114-20260819-122754.sql`
+  (145,016,009 bytes), SHA-256
+  `591AC0E1CB372924E9D4D81F522FBE1BDFA1AD93672F880496DBBDD7040DC2FC`.
+- Full online dictionary regression, focused API checks, and Edge-based mobile
+  and desktop render checks pass. Core polyphone queries (`中`, `杆`), Chinese,
+  Japanese, English, and Portuguese spot checks all resolve through D1 with no
+  horizontal overflow.
+- Operational lesson: a model's source approval or final acceptance is not
+  publication permission. Keep the source-family, reverse-evidence, controlled
+  replay, and deterministic promotion gates frozen. The v113 strict pool also
+  contained many proper names and inflected forms; filter them before remote
+  review rather than weakening validators after generation.
+
 ## 2026-08-18 v109 production-937 local promotion
 
 - The frozen v106 production profile completed a fresh 5,000-row v109 cohort:

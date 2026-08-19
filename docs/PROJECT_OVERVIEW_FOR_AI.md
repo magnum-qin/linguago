@@ -1,44 +1,46 @@
 # LinguaGo Project Overview For AI
 
-## Current local dictionary after v109 (2026-08-18)
+## Current production dictionary (v114, 2026-08-19)
 
-The frozen v106 profile has completed three local production cohorts after the
-live v106 release. Deterministic promotion added 968 senses in v107, 1,062 in
-v108, and 937 in v109, for a cumulative local increment of 2,967 publishable
-senses. Current local publishable counts are `entries=38061`, `senses=44371`,
-and `sense_localizations=177484`. All blockers and `flagged_senses` are zero.
+The accumulated v107-v114 production run is now live. It added 5,012
+publishable senses over v106 and reached the frozen deployment interval without
+relaxing source review, reverse evidence, controlled replay, or deterministic
+promotion. Production contains `entries=40105`, `senses=46416`,
+`sense_localizations=185664`, `examples=3030`, and
+`example_localizations=11898`.
 
-The v109 funnel was `5000 -> 3916 source-approved -> 3410 generated-valid ->
-1074 reverse-supported -> 972 final-consensus -> 937 deterministic promotions`.
-One proper-like row, 31 replay semantic mismatches, and three unmatched rows
-remain unpublished. The isolated DB and main DB produced identical replay and
-promotion counts, and TypeScript, fast audit, published-risk, native export,
-and full in-memory import audit all pass.
+The live cache is `v114-production5012-40105`, Worker Version ID is
+`5e2abcf9-603f-4514-b5ed-e09feb35d458`, and D1 `published_at` is
+`2026-08-19T03:26:57.444Z`. Remote D1, `/health`, and the native export manifest
+match exactly. TypeScript, fast audit, published-risk, full native
+export/import, complete online regression, focused API checks, and mobile plus
+desktop render checks all pass.
 
-This remains a local increment, not an online release. D1 and Worker stay on
-v106 until the frozen 5,000-10,000-sense deployment interval is reached. Do not
-weaken source review, reverse evidence, or replay validation to increase yield.
+The final v110-v114 cohorts promoted 830, 498, 281, 360, and 76 senses. Remote
+model acceptance was always treated as a candidate signal: every accepted row
+was reconstructed by controlled replay and passed local deterministic promotion
+in an isolated DB before the same operation touched main. Keep this invariant
+for the next production cycle.
 
-## Active follow-up after v106
+## Active follow-up after v114
 
-The v106 post-release audit examined all 732 newly promoted senses. Twelve
-English IPA values used Cyrillic `є` where IPA `ɛ` was intended, and the
-Chinese localization for `回覆` used a Taiwan form. The 13 real issues were
-repaired with `config/dictionary-overrides/v106-quality-repairs.json`; `抬高`
-was an OpenCC false positive and was deliberately left unchanged. Fast and
-published-risk audits remain clean.
+Start the next cycle from the live v114 counts, rebuild the historical attempt
+index, and regenerate the strict source-gap pool. The v113 ranked pool contained
+many Latin proper names and low-value English inflections, so candidate hygiene
+must run before remote source review. Do not compensate for a weak pool by
+relaxing the independent-source or reverse-evidence requirements.
 
-Production behavior is now frozen in
-`config/dictionary-v2-production-v106.json` and invoked by
-`scripts/run-dictionary-v2-production-profile.mjs`. Residual dispositions are
-versioned in `config/dictionary-overrides/v106-residual-dispositions.json`.
-The completed v107 cohort was selected from an expanded daily-general pool
-after excluding all 7,000 v105/v106 source entries. Its language mix was 2,062
-Chinese, 1,371 Japanese, 1,238 English, and 329 Brazilian Portuguese.
+Production behavior remains frozen in
+`config/dictionary-v2-production-v106.json` and is invoked by
+`scripts/run-dictionary-v2-production-profile.mjs`. Model output must remain a
+no-write artifact until controlled replay, isolated deterministic promotion,
+fast/published-risk/full audits, and an accumulated 5,000-10,000 publishable
+sense interval justify the next D1 release. Keep large runs, checkpoints,
+exports, and backups under `%TEMP%` where possible.
 
-## Current production dictionary (v106, 2026-08-17)
+## Previous production dictionary (v106, 2026-08-17)
 
-The live baseline is v106 production-732: cache
+The historical v106 baseline used cache
 `v106-production732-35094`, Worker Version ID
 `c4378e54-747d-4461-87ed-d199a78b8dd3`, and D1
 `published_at=2026-08-17T06:20:05.490Z`. Production contains `35,094` entries,
@@ -59,9 +61,9 @@ and reverse-unsupported candidates. Review or improve their evidence rather
 than bypassing validators. Final Gemma review must use `--only-supported true`.
 For large artifacts use `%TEMP%` on C, not the nearly full D drive.
 
-## Current production dictionary (v100, 2026-08-17)
+## Previous production dictionary (v100, 2026-08-17)
 
-The live baseline is v100 semantic evidence: cache
+The historical v100 baseline used cache
 `v100-semantic29-33606`, Worker Version ID
 `42f73122-6acb-4657-b8d8-45bbcd99955f`, `33,606` entries, `39,916`
 publishable senses, `159,664` four-language sense localizations, `3,030`
