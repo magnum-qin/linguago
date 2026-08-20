@@ -8,6 +8,8 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$ExpectedCacheVersion,
   [string]$WorkerName = 'translation-pwa',
+  [string]$DatabaseName = 'linguago-dictionary',
+  [string]$ExpectedAccountId = '3ebbb03df81b809142eec47c07ef6801',
   [object]$Execute = $false
 )
 
@@ -110,6 +112,16 @@ try {
   Set-Location $ReleaseDir
   $Wrangler = Join-Path $ReleaseDir 'node_modules\.bin\wrangler.cmd'
 
+  $env:CLOUDFLARE_API_TOKEN = [Environment]::GetEnvironmentVariable('CLOUDFLARE_API_TOKEN', 'User')
+  $env:CLOUDFLARE_ACCOUNT_ID = [Environment]::GetEnvironmentVariable('CLOUDFLARE_ACCOUNT_ID', 'User')
+  $env:NODE_OPTIONS = '--dns-result-order=ipv4first'
+  if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)) {
+    throw 'CLOUDFLARE_API_TOKEN is not configured in the Worker release user environment'
+  }
+  if ($env:CLOUDFLARE_ACCOUNT_ID -ne $ExpectedAccountId) {
+    throw "Cloudflare account mismatch: expected=$ExpectedAccountId configured=$($env:CLOUDFLARE_ACCOUNT_ID)"
+  }
+
   Invoke-Checked 'npm ci' { & npm.cmd ci --no-audit --no-fund }
   Invoke-Checked 'TypeScript check' { & npm.cmd run check }
   Invoke-Checked 'Worker build' { & npm.cmd run build }
@@ -120,6 +132,17 @@ try {
   $WhoAmIOk = $LASTEXITCODE -eq 0
   $ErrorActionPreference = $PreviousPreference
   if (-not $WhoAmIOk) { throw "Cloudflare authentication failed: $($WhoAmI -join ' ')" }
+
+  $D1ListRaw = @(& $Wrangler d1 list --json 2>&1)
+  if ($LASTEXITCODE -ne 0) { throw "Cannot list production D1 databases: $($D1ListRaw -join ' ')" }
+  try {
+    $D1Databases = @(($D1ListRaw -join "`n") | ConvertFrom-Json)
+  } catch {
+    throw "Cloudflare D1 list returned invalid JSON: $($_.Exception.Message)"
+  }
+  if (@($D1Databases | Where-Object { $_.name -eq $DatabaseName }).Count -eq 0) {
+    throw "Production D1 is not visible before Worker deployment: $DatabaseName"
+  }
 
   $BeforeRaw = @(& $Wrangler deployments list --name $WorkerName --json 2>&1)
   if ($LASTEXITCODE -ne 0) { throw "Cannot capture current Worker deployment: $($BeforeRaw -join ' ')" }
