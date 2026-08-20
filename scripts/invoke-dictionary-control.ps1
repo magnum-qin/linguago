@@ -31,6 +31,13 @@ function Invoke-RemoteScript([string]$Script, [string[]]$Arguments = @()) {
   if ($LASTEXITCODE -ne 0) { throw "Remote action failed: $Script exit=$LASTEXITCODE" }
 }
 
+function Invoke-RemotePowerShell([string]$Script) {
+  $Encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Script))
+  & ssh.exe -o BatchMode=yes -o ConnectTimeout=10 $HostAlias `
+    powershell.exe -NoProfile -EncodedCommand $Encoded
+  if ($LASTEXITCODE -ne 0) { throw "Remote PowerShell command failed with exit=$LASTEXITCODE" }
+}
+
 switch ($Action) {
   'verify' {
     Invoke-RemoteScript 'verify-remote-dictionary-runner.ps1'
@@ -106,9 +113,7 @@ switch ($Action) {
     if ($LASTEXITCODE -ne 0) { throw 'git archive failed' }
     $Hash = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash
     $RemoteArchive = "$RemoteRoot\incoming\linguago-worker-$ResolvedCommit.zip"
-    & ssh.exe -o BatchMode=yes -o ConnectTimeout=10 $HostAlias powershell.exe -NoProfile -Command `
-      "New-Item -ItemType Directory -Path '$RemoteRoot\incoming' -Force | Out-Null"
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to create remote incoming directory' }
+    Invoke-RemotePowerShell "New-Item -ItemType Directory -Path '$RemoteRoot\incoming' -Force | Out-Null"
     & scp.exe $Archive "${HostAlias}:D:/linguago-runner/incoming/linguago-worker-$ResolvedCommit.zip"
     if ($LASTEXITCODE -ne 0) { throw 'Failed to upload Worker source archive' }
     Invoke-RemoteScript 'stage-remote-worker-source.ps1' @(
