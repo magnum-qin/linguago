@@ -1,6 +1,34 @@
 # LinguaGo Project Overview For AI
 
-## Current production dictionary (v123, 2026-08-20)
+## Current production dictionary (v124, 2026-08-20)
+
+The jump-host release plane is now live end to end. The guarded controller
+committed the 11 accepted `v124-remote-generated-candidate100` senses to the
+main product DB, the hash-locked D1 gate captured a Time Travel bookmark and
+imported all 24 native SQL chunks, and the immutable Worker archive was
+deployed only after its commit, archive SHA-256, cache version, Cloudflare
+account, and D1 visibility were verified.
+
+Production contains `entries=40793`, `senses=47105`,
+`sense_localizations=188420`, `examples=3030`, and
+`example_localizations=11898`. The live cache is
+`v124-remote11-40793`, Worker Version ID is
+`d2ad5c08-4ca8-4c85-8462-ce76d1faeea2`, and D1 `published_at` is
+`2026-08-20T08:04:07.407Z`. General and focused online API regressions and the
+mobile/desktop focused render suite all pass; every rendered case resolved
+through D1 and reported no horizontal overflow.
+
+The main DB SHA-256 is
+`D97F300A4E17E70D0ED06916B15807CC472EE3B5D6C70BD4DD1D9886526D954C`.
+The database rollback copy is
+`D:\linguago-runner\backups\v124-remote-generated-candidate100-main-before-commit-20260820-154026.db`.
+The D1 pre-release Time Travel bookmark is recorded in
+`D:\linguago-runner\runs\v124-remote-generated-candidate100\cloudflare-d1-before-release-bookmark.json`.
+The deployed immutable source commit is
+`fcd314af03d950bf6555c067ac234b8dbcfb5e5e` with archive SHA-256
+`FC1EDB31991B567F7511AF27DFB47BDFC3723E3C3E67DDF0CD729243ED79D6B3`.
+
+### Previous production dictionary (v123, 2026-08-20)
 
 The first frozen 5,000-candidate production run is live. The offline pipeline
 reviewed 5,000 candidates, retained 832 with deterministic reverse evidence,
@@ -39,21 +67,21 @@ senses, and 188,420 sense localizations and hashes to
 The retained rollback DB is
 `D:\linguago-runner\backups\v124-remote-generated-candidate100-main-before-commit-20260820-154026.db`.
 Exact replay, promotion, published-risk, and full export/import audits passed.
-Production D1 and the Worker remain on v123 until the Cloudflare account issue
-below is corrected. Do not give `agy` authority over writes or deployment;
-deterministic release artifacts remain authoritative.
+The same counts and hash are now published as v124. Do not give `agy` authority
+over writes or deployment; deterministic release artifacts remain authoritative.
 
 The remote D1 gate is implemented separately by
 `release-remote-dictionary-d1.ps1`. Its `Execute=false` rehearsal regenerated
 24 native SQL chunks and passed full import audit for 40,793 entries and 47,105
 senses without contacting Cloudflare. A scoped non-interactive token was then
-installed successfully, but it belongs to Cloudflare account
-`1fe446be160662c15527a4f536e5901a`; the production D1 configuration belongs to
-account `3ebbb03df81b809142eec47c07ef6801`. Consequently `wrangler d1 list`
-returns an empty list and the execute attempt stopped before the Time Travel
-bookmark or any D1 write. A token created under the production account is still
-required. The prepared Worker cache version is `v124-remote11-40793`; do not
-deploy it before D1 counts match the v124 manifest.
+installed successfully, but the first token belonged to Cloudflare account
+`1fe446be160662c15527a4f536e5901a`; the production D1 belongs to account
+`3ebbb03df81b809142eec47c07ef6801`. In that failed state `wrangler whoami`
+succeeded while `wrangler d1 list --json` returned `[]`. The corrected token
+exposed D1 UUID `ee613260-5c1f-4bb5-8959-c54118174e0e`; with
+`NODE_OPTIONS=--dns-result-order=ipv4first`, the bookmark, D1 import, Worker
+deployment, and online checks completed successfully. Treat both account match
+and D1 visibility as mandatory preflight checks; `whoami` alone is insufficient.
 
 The v123 run used Gemma review dynamically across `11444-11448`; Qwen complete
 record generation used `11447/11448`. A sandboxed first attempt reported

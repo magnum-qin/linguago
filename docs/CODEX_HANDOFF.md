@@ -1,5 +1,37 @@
 # Codex Handoff
 
+## 2026-08-20 v124 production release
+
+- v124 is live. Production contains `entries=40793`, `senses=47105`,
+  `sense_localizations=188420`, `examples=3030`, and
+  `example_localizations=11898`; all blocking audits and published-risk are
+  zero.
+- Live cache: `v124-remote11-40793`. Worker Version ID:
+  `d2ad5c08-4ca8-4c85-8462-ce76d1faeea2`. D1 `published_at`:
+  `2026-08-20T08:04:07.407Z`.
+- The main product DB SHA-256 is
+  `D97F300A4E17E70D0ED06916B15807CC472EE3B5D6C70BD4DD1D9886526D954C`.
+  Its rollback copy is
+  `D:\linguago-runner\backups\v124-remote-generated-candidate100-main-before-commit-20260820-154026.db`.
+- Before D1 import, the release gate captured a Time Travel bookmark in
+  `D:\linguago-runner\runs\v124-remote-generated-candidate100\cloudflare-d1-before-release-bookmark.json`.
+  The D1 release report in the same run records `ok=true`, `execute=true`, and
+  `d1_pushed=true`; all 24 SQL chunks and remote counts matched the manifest.
+- Worker source commit `fcd314af03d950bf6555c067ac234b8dbcfb5e5e`
+  was staged as an immutable archive with SHA-256
+  `FC1EDB31991B567F7511AF27DFB47BDFC3723E3C3E67DDF0CD729243ED79D6B3`.
+  `D:\linguago-deploy\last-worker-release.json` records `deployed=true`,
+  `online_checks_passed=true`, no rollback attempt, and previous Worker Version
+  ID `999818a7-cd16-464c-8b7a-e8048f439b28`.
+- General online dictionary regression, focused API regression, and focused
+  mobile/desktop render regression all pass. Rendered entries resolve through
+  D1 with four language tabs and no horizontal overflow.
+- Cloudflare production account is `3ebbb03df81b809142eec47c07ef6801a`;
+  production D1 UUID is `ee613260-5c1f-4bb5-8959-c54118174e0e`. The jump host
+  requires `NODE_OPTIONS=--dns-result-order=ipv4first`. A prior token for account
+  `1fe446be160662c15527a4f536e5901a` made `whoami` pass but returned an empty D1
+  list. Always verify expected account and visible D1 before a write.
+
 ## 2026-08-20 v124 jump-host migration qualification
 
 - Candidate selection is now reproducible on `ts-win-jump`, not merely model
@@ -22,15 +54,14 @@
   and contains 40,793 entries, 47,105 senses, and 188,420 localizations. The
   rollback DB is
   `D:\linguago-runner\backups\v124-remote-generated-candidate100-main-before-commit-20260820-154026.db`.
-  D1 and Worker are still unchanged.
+  These committed counts were subsequently released to D1 and the Worker as
+  described above.
 - Important Windows lesson: PowerShell 5.1 JSON readers must use explicit
   UTF-8. `Get-Content` can decode Node-generated Chinese/Japanese JSON through
   the legacy code page and cause false mojibake/parse failures.
-- Remaining migration work is a guarded main-database write/release controller:
-  require expected input hashes, a pre-write backup, a successful isolated
-  validation artifact, post-write audits, and rollback on failure. Cloudflare
-  credentials must be configured and verified separately before remote D1
-  publication is enabled.
+- The guarded main-database and release controllers are now operational. Keep
+  requiring expected hashes, pre-write backups, isolated validation artifacts,
+  post-write audits, Cloudflare account/D1 preflight, and rollback targets.
 - `publish-remote-dictionary-controlled-run.ps1` now implements that guarded
   database controller. Its first v124 rehearsal passed with `commit=false`, 11
   inserted/promoted senses, zero risk flags, and `main_replaced=false`. It does
@@ -38,12 +69,12 @@
 - `agy` remains optional and read-only. Desktop OAuth was not visible in the
   SSH/Scheduled Task context, so deterministic manifests, checkpoints, and
   audits remain authoritative.
-- Cloudflare remote release is currently blocked by account selection, not
+- The initial Cloudflare remote release was blocked by account selection, not
   token parsing or runner code. The installed API token authenticates account
   `1fe446be160662c15527a4f536e5901a`, while production D1 belongs to
   `3ebbb03df81b809142eec47c07ef6801`. `whoami` succeeds but `d1 list` is empty;
-  the formal release stopped before bookmark capture or D1 writes. Install a
-  scoped user-level token created under the production account and keep
+  that attempt stopped before bookmark capture or D1 writes. A scoped token for
+  the production account fixed the issue; keep
   `NODE_OPTIONS=--dns-result-order=ipv4first` on the jump host.
 - `release-remote-dictionary-d1.ps1` now implements the hash-locked D1 gate.
   Its v124 `Execute=false` rehearsal generated 24 native SQL chunks and passed

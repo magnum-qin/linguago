@@ -346,7 +346,19 @@ passed with `execute=false` and `deployed=false`. This negative test is
 intentional evidence that uncommitted frontend/Worker changes cannot leak into
 a remote release.
 
-Actual D1 push and Worker deploy remain blocked until a scoped
-`CLOUDFLARE_API_TOKEN` is installed in the jump-host Scheduled Task user
-environment. Do not store that token in Git, the runner manifest, or a command
-line recorded in logs.
+The v124 formal release used staged commit
+`fcd314af03d950bf6555c067ac234b8dbcfb5e5e` and archive SHA-256
+`FC1EDB31991B567F7511AF27DFB47BDFC3723E3C3E67DDF0CD729243ED79D6B3`.
+The D1 gate captured a Time Travel bookmark, imported all 24 SQL chunks, and
+verified the production counts. Worker deployment then published cache
+`v124-remote11-40793` as Version ID
+`d2ad5c08-4ca8-4c85-8462-ce76d1faeea2`; general API, focused API, and focused
+mobile/desktop render checks passed. The final Worker report is
+`D:\linguago-deploy\last-worker-release.json`.
+
+Use a scoped `CLOUDFLARE_API_TOKEN` from production account
+`3ebbb03df81b809142eec47c07ef6801a`, keep
+`NODE_OPTIONS=--dns-result-order=ipv4first`, and require D1 UUID
+`ee613260-5c1f-4bb5-8959-c54118174e0e` to be visible before any write. A token
+for another account can make `wrangler whoami` succeed while `d1 list` is empty.
+Do not store tokens in Git, runner manifests, command lines, or logs.
