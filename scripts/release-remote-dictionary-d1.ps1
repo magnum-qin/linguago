@@ -7,6 +7,7 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$ExpectedDbSha256,
   [string]$DatabaseName = 'linguago-dictionary',
+  [string]$ExpectedAccountId = '3ebbb03df81b809142eec47c07ef6801',
   [object]$Execute = $false
 )
 
@@ -125,6 +126,26 @@ try {
     $WhoAmIOk = $LASTEXITCODE -eq 0
     $ErrorActionPreference = $PreviousPreference
     if (-not $WhoAmIOk) { throw "Cloudflare authentication failed: $($WhoAmI -join ' ')" }
+
+    $ConfiguredAccountId = [Environment]::GetEnvironmentVariable('CLOUDFLARE_ACCOUNT_ID', 'User')
+    if ($ConfiguredAccountId -ne $ExpectedAccountId) {
+      throw "Cloudflare account mismatch: expected=$ExpectedAccountId configured=$ConfiguredAccountId"
+    }
+
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $D1ListLines = @(& $Wrangler d1 list --json 2>&1)
+    $D1ListOk = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $PreviousPreference
+    if (-not $D1ListOk) { throw "Cloudflare D1 list failed: $($D1ListLines -join ' ')" }
+    try {
+      $D1Databases = @(($D1ListLines -join "`n") | ConvertFrom-Json)
+    } catch {
+      throw "Cloudflare D1 list returned invalid JSON: $($_.Exception.Message)"
+    }
+    if (@($D1Databases | Where-Object { $_.name -eq $DatabaseName }).Count -eq 0) {
+      throw "Cloudflare D1 database is not visible in account ${ExpectedAccountId}: $DatabaseName"
+    }
 
     $BookmarkPath = Join-Path $RunDir 'cloudflare-d1-before-release-bookmark.json'
     $Bookmark = @(& $Wrangler d1 time-travel info $DatabaseName --json 2>&1)
