@@ -21,9 +21,10 @@ const candidates = candidateMode === 'validation_report'
 const byAnchor = new Map();
 
 for (const candidate of candidates) {
-  const anchor = normalizeEnglish(candidate.english_anchor);
-  if (!byAnchor.has(anchor)) byAnchor.set(anchor, []);
-  byAnchor.get(anchor).push(candidate);
+  for (const anchor of conservativeEnglishAnchors(candidate.english_anchor)) {
+    if (!byAnchor.has(anchor)) byAnchor.set(anchor, []);
+    byAnchor.get(anchor).push({ ...candidate, lookup_anchor: anchor });
+  }
 }
 
 const matched = [];
@@ -47,9 +48,14 @@ await new Promise((resolve, reject) => {
             candidate_key: candidate.candidate_key,
             term,
             normalized_key: normalizeTerm(term),
-            english_gloss: candidate.english_anchor,
+            english_gloss: candidate.lookup_anchor,
             english_normalized_key: word,
-            concept_id: `ecdict:${word}:${sha256(term).slice(0, 12)}`,
+            // Validation-report exports are sense-bound. Keeping the candidate
+            // key in concept_id prevents evidence for one homographic sense
+            // from being reused by another candidate with the same anchor.
+            concept_id: candidateMode === 'validation_report'
+              ? `candidate:${candidate.candidate_key}`
+              : `ecdict:${word}:${sha256(term).slice(0, 12)}`,
             translation
           });
         }
@@ -94,8 +100,11 @@ const metadata = {
   input_sha256: inputSha256,
   candidate_mode: candidateMode,
   candidate_bound: true,
+  evidence_strength: candidateMode === 'validation_report'
+    ? 'exact_reciprocal_candidate_bound'
+    : 'term_substring_probe',
   match_policy: candidateMode === 'validation_report'
-    ? 'conservative Chinese segments from the ECDICT translation field; downstream reverse evidence remains mandatory'
+    ? 'exact conservative English anchor variant plus conservative Chinese segments from the ECDICT translation field; downstream reverse evidence remains mandatory'
     : 'exact Chinese substring in the ECDICT translation field; minimum two characters',
   production_publishable: true
 };
@@ -124,6 +133,16 @@ console.log(JSON.stringify({ ok: integrity === 'ok', integrity, out: path.relati
 
 function normalizeEnglish(value) {
   return String(value || '').normalize('NFKC').trim().toLocaleLowerCase('en').replace(/\s+/gu, ' ');
+}
+function conservativeEnglishAnchors(value) {
+  const normalized = normalizeEnglish(value);
+  if (!normalized) return [];
+  const anchors = new Set([normalized]);
+  for (const part of normalized.split(/[;|]/u)) {
+    const term = part.trim().replace(/^to\s+/u, '');
+    if (term && term.length <= 80) anchors.add(term);
+  }
+  return [...anchors];
 }
 function normalizeTerm(value) {
   return String(value || '').normalize('NFKC').trim().toLocaleLowerCase('en').replace(/\s+/gu, ' ');

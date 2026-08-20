@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 const args = parseArgs(process.argv.slice(2));
-const profilePath = path.resolve(args.profile || 'config/dictionary-v2-production-v106.json');
+const profilePath = path.resolve(args.profile || 'config/dictionary-v2-production-v115.json');
 if (!fs.existsSync(profilePath)) throw new Error(`Profile not found: ${profilePath}`);
 
 const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));

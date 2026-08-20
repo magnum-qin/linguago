@@ -53,6 +53,18 @@ const includeInvalid = args["include-invalid"] === "true";
 const inputMode = args["input-mode"] || "generated";
 const requireSourceReverseEvidence = args["require-source-reverse-evidence"] === "true";
 const evidenceFamilyPolicy = args["evidence-family-policy"] || "wiktionary";
+const allowedReviewedSupplementalSourceKeys = new Set(
+  String(args["reviewed-supplemental-source-keys"] || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+const allowedCandidateBoundRoundtripSourceKeys = new Set(
+  String(args["candidate-bound-source-roundtrip-keys"] || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
 if (!new Set(["wiktionary", "legacy"]).has(evidenceFamilyPolicy)) {
   throw new Error(`Invalid --evidence-family-policy: ${evidenceFamilyPolicy}`);
 }
@@ -106,6 +118,8 @@ const supplementalDb = supplementalSourceDbPath
 supplementalDb?.pragma("query_only = ON");
 const blockedSupplementalSourceKeys = new Set();
 const blockedSupplementalFamilies = new Set(["panlex-unmapped"]);
+const reviewedSupplementalSourceKeys = new Set();
+const candidateBoundRoundtripSourceKeys = new Set();
 if (
   supplementalDb?.prepare(
     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'evidence_sources'"
@@ -123,6 +137,23 @@ if (
     if (!familyStatus.has(family)) familyStatus.set(family, []);
     familyStatus.get(family).push(productionPublishable);
     if (!productionPublishable) blockedSupplementalSourceKeys.add(row.source_key);
+    if (
+      productionPublishable &&
+      metadata.reviewed_subset === true &&
+      metadata.candidate_bound === true &&
+      /independent_.+_and_.+confidence/iu.test(String(metadata.semantic_review || "")) &&
+      allowedReviewedSupplementalSourceKeys.has(row.source_key)
+    ) {
+      reviewedSupplementalSourceKeys.add(row.source_key);
+    }
+    if (
+      productionPublishable &&
+      metadata.candidate_bound === true &&
+      metadata.evidence_strength === "exact_reciprocal_candidate_bound" &&
+      allowedCandidateBoundRoundtripSourceKeys.has(row.source_key)
+    ) {
+      candidateBoundRoundtripSourceKeys.add(row.source_key);
+    }
   }
   for (const [family, statuses] of familyStatus) {
     if (family && statuses.length && statuses.every((status) => !status)) {
@@ -173,6 +204,8 @@ const output = {
     evidence_family_policy: evidenceFamilyPolicy,
     blocked_supplemental_source_keys: [...blockedSupplementalSourceKeys].sort(),
     blocked_supplemental_families: [...blockedSupplementalFamilies].sort(),
+    reviewed_supplemental_source_keys: [...reviewedSupplementalSourceKeys].sort(),
+    candidate_bound_source_roundtrip_keys: [...candidateBoundRoundtripSourceKeys].sort(),
     strong_source_minimum: 1,
     ambiguous_match_ratio: 0.34,
     decisions: ["supported", "unsupported", "manual_review"]
@@ -356,7 +389,15 @@ function validateGeneratedRow(row) {
   for (const lang of TARGET_LANGS) {
     const term = String(output.localizations?.[lang]?.term || "").trim();
     if (row.partial_localizations === true && !term) continue;
-    languages[lang] = validateLocalization({ anchor, anchors, lang, term, sourceLang, sourceWord });
+    languages[lang] = validateLocalization({
+      anchor,
+      anchors,
+      lang,
+      term,
+      sourceLang,
+      sourceWord,
+      boundCandidateKey: `${Number(row.source_entry_id)}:${Number(output.source_sense_id)}`
+    });
   }
 
   const targetDecisions = Object.entries(languages)
@@ -468,7 +509,15 @@ function loadProductRows(filePath) {
   );
 }
 
-function validateLocalization({ anchor, anchors = [anchor], lang, term, sourceLang, sourceWord }) {
+function validateLocalization({
+  anchor,
+  anchors = [anchor],
+  lang,
+  term,
+  sourceLang,
+  sourceWord,
+  boundCandidateKey
+}) {
   if (!term) return decision("unsupported", "missing_term");
   if (
     !requireSourceReverseEvidence &&
@@ -486,6 +535,7 @@ function validateLocalization({ anchor, anchors = [anchor], lang, term, sourceLa
     ? termLookupVariants(lang, term).flatMap((value) =>
         findSupplementalReverse.all(normalizeTerm(value), lang)
       ).filter((row) => supplementalFamilyIsEligible(row.source_family, row.source_key))
+       .filter((row) => supplementalRowMatchesCandidate(row, boundCandidateKey))
     : [];
   const reverseEvidence = [
     ...reverseRows.flatMap((row) => extractReverseEvidence(row, lang, anchors)),
@@ -495,7 +545,11 @@ function validateLocalization({ anchor, anchors = [anchor], lang, term, sourceLa
       english_gloss: row.english_gloss,
       concept_id: row.concept_id,
       matches_anchor: lexicalMatchAny(anchors, row.english_gloss),
-      strength: "weak"
+      strength:
+        reviewedSupplementalSourceKeys.has(row.source_key) ||
+        candidateBoundRoundtripSourceKeys.has(row.source_key)
+          ? "strong"
+          : "weak"
     }))
   ];
   const strongEvidence = reverseEvidence.filter((item) => item.strength === "strong");
@@ -582,6 +636,14 @@ function supplementalFamilyIsEligible(value, sourceKey) {
   const family = String(value || "").trim().toLowerCase();
   return !blockedSupplementalFamilies.has(family) &&
     !blockedSupplementalSourceKeys.has(sourceKey);
+}
+
+function supplementalRowMatchesCandidate(row, boundCandidateKey) {
+  const match = /^(?:candidate:|dicionario-aberto-definition:)(.+)$/u.exec(
+    String(row?.concept_id || "").trim()
+  );
+  if (!match) return true;
+  return Boolean(boundCandidateKey) && match[1] === boundCandidateKey;
 }
 
 function isIndependentStrongFamily(family) {

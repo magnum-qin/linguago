@@ -22,6 +22,9 @@ db.pragma('busy_timeout = 30000');
 const hasPublicationBlocks = Boolean(
   db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'product_sense_publication_blocks'").get()
 );
+const hasSenseVerification = Boolean(
+  db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'product_sense_verification'").get()
+);
 const publicationBlockWhere = hasPublicationBlocks
   ? `AND NOT EXISTS (
     SELECT 1
@@ -70,7 +73,7 @@ fs.writeFileSync(
     'CREATE TABLE v2_entries (id INTEGER PRIMARY KEY, word TEXT NOT NULL, normalized_key TEXT NOT NULL, source_lang TEXT NOT NULL, script_variant TEXT, frequency_rank INTEGER, status TEXT NOT NULL);',
     'CREATE TABLE v2_entry_forms (id INTEGER PRIMARY KEY, entry_id INTEGER NOT NULL, lang TEXT NOT NULL, form TEXT NOT NULL, form_type TEXT NOT NULL, normalized_form TEXT NOT NULL, source TEXT, confidence REAL);',
     'CREATE TABLE v2_pronunciation_groups (id INTEGER PRIMARY KEY, entry_id INTEGER NOT NULL, lang TEXT NOT NULL, reading TEXT NOT NULL, reading_key TEXT NOT NULL, reading_system TEXT NOT NULL, display_order INTEGER NOT NULL, source TEXT, confidence REAL);',
-    'CREATE TABLE v2_senses (id INTEGER PRIMARY KEY, entry_id INTEGER NOT NULL, pronunciation_group_id INTEGER, sense_order INTEGER NOT NULL, part_of_speech TEXT, domain TEXT, register_label TEXT, gloss_key TEXT NOT NULL, source TEXT, confidence REAL);',
+    "CREATE TABLE v2_senses (id INTEGER PRIMARY KEY, entry_id INTEGER NOT NULL, pronunciation_group_id INTEGER, sense_order INTEGER NOT NULL, part_of_speech TEXT, domain TEXT, register_label TEXT, gloss_key TEXT NOT NULL, source TEXT, confidence REAL, verification_level TEXT NOT NULL DEFAULT 'verified', review_model TEXT, evidence_families_json TEXT NOT NULL DEFAULT '[]');",
     'CREATE TABLE v2_sense_localizations (id INTEGER PRIMARY KEY, sense_id INTEGER NOT NULL, lang TEXT NOT NULL, term TEXT NOT NULL, normalized_term TEXT, reading TEXT, reading_system TEXT, pronunciation TEXT, pronunciation_system TEXT, definition TEXT NOT NULL, usage_note TEXT, source TEXT, confidence REAL);',
     'CREATE TABLE v2_examples (id INTEGER PRIMARY KEY, sense_id INTEGER NOT NULL, example_order INTEGER NOT NULL, source_lang TEXT NOT NULL, source_text TEXT NOT NULL, source_reading TEXT, difficulty TEXT, register_label TEXT, source TEXT, confidence REAL);',
     'CREATE TABLE v2_example_localizations (id INTEGER PRIMARY KEY, example_id INTEGER NOT NULL, lang TEXT NOT NULL, text TEXT NOT NULL, reading TEXT, source TEXT, confidence REAL);',
@@ -209,6 +212,9 @@ for (const row of db
       s.part_of_speech,
       s.gloss_key,
       s.confidence,
+      ${hasSenseVerification ? "COALESCE(v.verification_level, 'verified')" : "'verified'"} AS verification_level,
+      ${hasSenseVerification ? 'v.review_model' : 'NULL'} AS review_model,
+      ${hasSenseVerification ? "COALESCE(v.evidence_families_json, '[]')" : "'[]'"} AS evidence_families_json,
       e.primary_lang,
       src.reading AS source_reading,
       src.reading_system AS source_reading_system,
@@ -227,6 +233,7 @@ for (const row of db
       ON zh.product_sense_id = s.id
       AND zh.lang = 'zh'
       AND zh.needs_review = 0
+    ${hasSenseVerification ? 'LEFT JOIN product_sense_verification v ON v.product_sense_id = s.id' : ''}
     WHERE ${completeSenseWhere}
       ${entryLimit}
     ORDER BY s.product_entry_id, publish_sense_order, s.id
@@ -245,7 +252,7 @@ for (const row of db
     confidence: row.confidence
   });
   append(
-    `INSERT INTO v2_senses (id, entry_id, pronunciation_group_id, sense_order, part_of_speech, domain, register_label, gloss_key, source, confidence) VALUES (${n(row.id)}, ${n(row.product_entry_id)}, ${n(pronunciationGroup?.id)}, ${n(row.publish_sense_order)}, ${q(cleanPartOfSpeech(row.part_of_speech))}, NULL, NULL, ${q(row.gloss_key)}, 'product-layer', ${n(row.confidence)});\n`
+    `INSERT INTO v2_senses (id, entry_id, pronunciation_group_id, sense_order, part_of_speech, domain, register_label, gloss_key, source, confidence, verification_level, review_model, evidence_families_json) VALUES (${n(row.id)}, ${n(row.product_entry_id)}, ${n(pronunciationGroup?.id)}, ${n(row.publish_sense_order)}, ${q(cleanPartOfSpeech(row.part_of_speech))}, NULL, NULL, ${q(row.gloss_key)}, 'product-layer', ${n(row.confidence)}, ${q(row.verification_level)}, ${q(row.review_model)}, ${q(row.evidence_families_json)});\n`
   );
   stats.senses++;
 }

@@ -22,7 +22,13 @@ const accepted = [];
 for (const qwenReview of qwen.reviews || []) {
   const gemmaReview = gemmaReviews.get(qwenReview.candidate_key);
   const candidate = candidates.get(qwenReview.candidate_key);
-  if (!candidate || !qwenReview.approved || !gemmaReview?.approved) continue;
+  if (
+    !candidate ||
+    !qwenReview.approved ||
+    !gemmaReview?.approved ||
+    (qwenReview.risk_flags || []).length > 0 ||
+    (gemmaReview.risk_flags || []).length > 0
+  ) continue;
   const definitionOrders = (qwenReview.supporting_definition_orders || [])
     .filter((order) => (gemmaReview.supporting_definition_orders || []).includes(order));
   if (!definitionOrders.length) continue;
@@ -61,12 +67,13 @@ const metadata = {
   production_publishable: true,
   research_only: false,
   reviewed_subset: true,
+  candidate_bound: true,
   exact_normalized_headword: true,
   part_of_speech_bound_when_available: true,
   source_resource: probe.source_resource,
   source_url: probe.source_url,
   source_license: probe.license,
-  semantic_review: 'independent_qwen_and_gemma_confidence_gte_0.9_with_definition_order_intersection',
+  semantic_review: 'independent_qwen_and_gemma_confidence_gte_0.9_no_risk_flags_with_definition_order_intersection',
   probe_sha256: sha256(fs.readFileSync(probePath)),
   qwen_review_sha256: qwenSha,
   gemma_review_sha256: gemmaSha,

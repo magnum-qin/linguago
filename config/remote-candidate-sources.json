@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "baseline": "v123",
+  "files": [
+    {
+      "role": "authoritative_pool",
+      "path": "data\\candidates\\v123-authoritative-pool.json",
+      "bytes": 51575832,
+      "sha256": "1DF4C0818AA8D56032A72E8C8DC5990E8CE4B9EE92E44D7F34ADB27885356B1A"
+    },
+    {
+      "role": "attempted_source_history",
+      "path": "data\\candidates\\v123-attempted-source-history.json",
+      "bytes": 28497028,
+      "sha256": "CFFACC2E20111DB3AA42EC06535F6D35520879FC63401DD32D0F777D4AA14595"
+    }
+  ]
+}

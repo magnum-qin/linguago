@@ -11,6 +11,7 @@ export async function ensureUnslothModel(options) {
     loadTimeoutMs = 300_000,
     forceReload = false,
     unloadBeforeLoad = false,
+    requireInstalled = process.env.UNSLOTH_REQUIRE_INSTALLED_MODEL === '1',
     loadOptions = {}
   } = options;
   const started = performance.now();
@@ -23,6 +24,13 @@ export async function ensureUnslothModel(options) {
       (!statusBefore?.speculative_type || statusBefore.speculative_type === speculativeType);
     if (sameModel && !forceReload) {
       return result(true, 'reuse', statusBefore, statusBefore);
+    }
+
+    if (requireInstalled) {
+      const localModels = await requestJson(endpoint, token, '/api/models/local', { timeoutMs: 60_000 });
+      if (!localModelIds(localModels).has(model)) {
+        throw new Error(`production_model_not_installed:${model}`);
+      }
     }
 
     let unloaded = false;
@@ -79,6 +87,17 @@ export async function ensureUnslothModel(options) {
       n_cpu_moe: statusAfter?.n_cpu_moe ?? null
     };
   }
+}
+
+function localModelIds(payload) {
+  const rows = Array.isArray(payload?.models)
+    ? payload.models
+    : Array.isArray(payload?.data?.models)
+      ? payload.data.models
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : [];
+  return new Set(rows.map((row) => String(row?.id || row?.model_id || '')).filter(Boolean));
 }
 
 async function waitUntilUnloaded(endpoint, token, previousModel, timeoutMs) {

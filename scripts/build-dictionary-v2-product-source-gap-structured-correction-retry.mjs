@@ -8,7 +8,7 @@ const consensusPath = requiredPath(args.consensus, 'consensus');
 const outPath = requiredPath(args.out, 'out');
 const generationPath = args.generation ? path.resolve(args.generation) : null;
 const allowedCorrectionFields = new Set(
-  String(args['correction-fields'] || 'term,definition,reading,pronunciation')
+  String(args['correction-fields'] || 'term,definition,reading,pronunciation,example')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean)
@@ -95,8 +95,11 @@ function inspectCorrections(candidate, corrections, generatedEntry) {
     const replacement = typeof correction.replacement === 'string'
       ? correction.replacement.trim()
       : '';
-    if (!LANGS.includes(language)) return { ok: false, reason: 'non_language_specific_correction' };
-    if (!['term', 'definition', 'reading', 'pronunciation'].includes(field)) {
+    const allLanguageExample = language === 'all' && field === 'example';
+    if (!LANGS.includes(language) && !allLanguageExample) {
+      return { ok: false, reason: 'non_language_specific_correction' };
+    }
+    if (!['term', 'definition', 'reading', 'pronunciation', 'example'].includes(field)) {
       return { ok: false, reason: 'non_field_correction' };
     }
     if (!replacement) return { ok: false, reason: 'missing_safe_replacement' };
@@ -104,7 +107,7 @@ function inspectCorrections(candidate, corrections, generatedEntry) {
     if (current && normalizeTerm(current, language) === normalizeTerm(replacement, language)) {
       return { ok: false, reason: 'no_op_replacement' };
     }
-    if (field !== 'definition' && /\s(?:\/|or)\s|[|;]/iu.test(replacement)) {
+    if (!['definition', 'example'].includes(field) && /\s(?:\/|or)\s|[|;]/iu.test(replacement)) {
       return { ok: false, reason: 'ambiguous_replacement' };
     }
     if (

@@ -497,10 +497,14 @@ function createDatabase(filePath) {
     CREATE TABLE product_examples (
       id INTEGER PRIMARY KEY,
       product_sense_id INTEGER NOT NULL REFERENCES product_senses(id),
+      source_example_id TEXT NOT NULL,
       example_order INTEGER NOT NULL,
       source_lang TEXT NOT NULL,
       source_text TEXT NOT NULL,
-      needs_review INTEGER NOT NULL DEFAULT 0
+      source TEXT,
+      confidence REAL,
+      needs_review INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(product_sense_id, source_example_id)
     );
     CREATE TABLE product_example_localizations (
       id INTEGER PRIMARY KEY,
@@ -508,7 +512,10 @@ function createDatabase(filePath) {
       lang TEXT NOT NULL,
       text TEXT NOT NULL,
       reading TEXT,
-      needs_review INTEGER NOT NULL DEFAULT 0
+      source TEXT,
+      confidence REAL,
+      needs_review INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(product_example_id, lang)
     );
   `);
   db.close();

@@ -7,6 +7,8 @@ import {
 } from "./lib/source-gap-lexical-contract.mjs";
 
 const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
+const DEFAULT_PRODUCT_DB =
+  "data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db";
 const DEFAULT_SUPPLEMENTAL_SOURCE_DB =
   ".tmp/combined/openwn-word2word3-ja-apertium-wikidata-v3-evidence.db";
 const DEFAULT_REPORT = "logs/product-coverage-gaps-clean-high-value.json";
@@ -120,6 +122,8 @@ if (requirePtPronunciation && !fs.existsSync(ptPronunciationDbPath)) {
 
 const reports = reportPaths.map((filePath) => JSON.parse(fs.readFileSync(filePath, "utf8")));
 const report = reports[0];
+const excludeProductLinked = args["exclude-product-linked"] !== "false";
+const productDbPath = path.resolve(args["product-db"] || report.product_db || DEFAULT_PRODUCT_DB);
 const inputCandidatesByKey = new Map();
 for (const sourceReport of reports) {
   for (const row of Array.isArray(sourceReport.selected) ? sourceReport.selected : []) {
@@ -127,7 +131,13 @@ for (const sourceReport of reports) {
     if (!inputCandidatesByKey.has(key)) inputCandidatesByKey.set(key, row);
   }
 }
-const candidates = [...inputCandidatesByKey.values()];
+const productLinkedSourceSenses = excludeProductLinked && fs.existsSync(productDbPath)
+  ? loadProductLinkedSourceSenses(productDbPath)
+  : new Set();
+const candidatesBeforeProductExclusion = [...inputCandidatesByKey.values()];
+const candidates = candidatesBeforeProductExclusion.filter(
+  (row) => !productLinkedSourceSenses.has(candidateKey(row))
+);
 const db = new Database(sourceDbPath, { readonly: true, fileMustExist: true });
 db.pragma("query_only = ON");
 const supplementalDb = supplementalSourceDbPath
@@ -261,6 +271,8 @@ const selected = supported.slice(0, limit).map((item) => ({
   }
 }));
 const summary = {
+  input_rows_before_product_exclusion: candidatesBeforeProductExclusion.length,
+  product_linked_rows_excluded: candidatesBeforeProductExclusion.length - candidates.length,
   input_rows: candidates.length,
   source_supported_rows: validations.filter((item) => item.decision === "supported").length,
   target_qualified_rows: supported.length,
@@ -293,6 +305,8 @@ const summary = {
   supplemental_source_db: supplementalSourceDbPath
     ? path.relative(process.cwd(), supplementalSourceDbPath)
     : null,
+  product_db: fs.existsSync(productDbPath) ? path.relative(process.cwd(), productDbPath) : null,
+  exclude_product_linked: excludeProductLinked,
   exclude_capitalized_anchor: excludeCapitalizedAnchor,
   exclude_ambiguous_omw: excludeAmbiguousOmw,
   lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept,
@@ -522,6 +536,21 @@ function validateCandidate(row) {
   }
   if (strong.length) return result(row, "unsupported", "strong_dictionary_gloss_conflict", details);
   return result(row, "manual_review", "no_strong_reverse_dictionary_evidence", details);
+}
+
+function loadProductLinkedSourceSenses(filePath) {
+  const productDb = new Database(filePath, { readonly: true, fileMustExist: true });
+  productDb.pragma("query_only = ON");
+  const rows = productDb.prepare(`
+    SELECT DISTINCT link.source_entry_id, link.source_sense_id
+    FROM product_sense_source_links link
+    JOIN product_senses sense ON sense.id = link.product_sense_id
+    WHERE link.source_entry_id IS NOT NULL
+      AND link.source_sense_id IS NOT NULL
+      AND sense.status IN ('accepted', 'draft_single_source', 'needs_review')
+  `).all();
+  productDb.close();
+  return new Set(rows.map((row) => `${Number(row.source_entry_id)}:${Number(row.source_sense_id)}`));
 }
 
 function evidenceFamily(source, explicitFamily = null) {
@@ -1073,14 +1102,27 @@ function targetTermHasReverseSupport(lang, term, anchor, boundCandidateKey = nul
   const dictionaryEvidence = rows.flatMap((row) => extractEvidence(row, lang, anchor));
   const strong = dictionaryEvidence.filter((item) => item.strength === "strong");
   const strongMatches = strong.filter((item) => item.matches_anchor);
-  if (!strongMatches.length) return false;
+  const supplementalMatches = supplementalEvidenceForTerm(
+    lang,
+    term,
+    anchor,
+    boundCandidateKey
+  ).filter((item) =>
+    item.strength === "strong" &&
+    item.matches_anchor === true &&
+    (
+      reviewedSupplementalSourceKeys.has(item.source) ||
+      candidateBoundRoundtripSourceKeys.has(item.source)
+    )
+  );
+  // A candidate-bound dictionary definition can fill a previously empty target
+  // lane only when it either passed the dual-model review contract or was
+  // exported as an exact reciprocal candidate-bound dictionary row. Both paths
+  // require an explicit source-key allowlist and strong classification.
+  if (!strongMatches.length) return supplementalMatches.length > 0;
   const omwMatches = dictionaryEvidence.filter(
     (item) => evidenceFamily(item.source, item.source_family) === "omw" && item.matches_anchor
   );
-  const matches = [
-    ...strongMatches,
-    ...supplementalEvidenceForTerm(lang, term, anchor, boundCandidateKey).filter((item) => item.matches_anchor)
-  ];
   const glosses = new Set(strong.map((item) => normalizeText(item.english_gloss)).filter(Boolean));
   const matchingGlosses = new Set(strongMatches.map((item) => normalizeText(item.english_gloss)).filter(Boolean));
   // An exact strong-dictionary match plus the same OMW lexical match is two

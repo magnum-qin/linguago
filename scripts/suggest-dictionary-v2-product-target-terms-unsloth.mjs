@@ -107,7 +107,12 @@ function writeOutput(final) {
 }
 
 function prompt(row) {
-  const language = row.target_lang === 'zh' ? 'Simplified Chinese' : 'Japanese';
+  const language = {
+    zh: 'Simplified Chinese',
+    ja: 'Japanese',
+    'pt-BR': 'modern Brazilian Portuguese'
+  }[row.target_lang];
+  if (!language) throw new Error(`Unsupported target language: ${row.target_lang}`);
   return `Dictionary target-term repair. Source word=${JSON.stringify(row.word)} source language=${row.source_lang}; exact English sense=${JSON.stringify(row.english_anchor)}; POS=${row.part_of_speech || 'unknown'}. Propose up to 5 natural modern standalone ${language} dictionary headwords expressing exactly this sense and grammatical role. Existing terms ${JSON.stringify(row.existing_terms)} have only one evidence family; include them only if truly exact. No definitions, romanization, explanations, rare calques, broader/narrower senses, or another POS. JSON only {"terms":[""],"reason":"under 12 words"}.`;
 }
 function parseJson(value) { const text = String(value).trim().replace(/^```(?:json)?\s*/iu, '').replace(/\s*```$/u, ''); const start = text.indexOf('{'); const end = text.lastIndexOf('}'); if (start < 0 || end < start) throw new Error('json_object_missing'); return JSON.parse(text.slice(start, end + 1)); }

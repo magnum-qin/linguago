@@ -28,7 +28,9 @@ const candidates = (source.review_candidates || []).slice(offset, offset + limit
 const fingerprint = sha256(JSON.stringify(candidates));
 const existing = resume && fs.existsSync(outPath) ? JSON.parse(fs.readFileSync(outPath, 'utf8')) : null;
 if (existing && existing.input_fingerprint !== fingerprint) throw new Error('Resume fingerprint mismatch');
-const reviews = Array.isArray(existing?.reviews) ? existing.reviews : [];
+const reviews = Array.isArray(existing?.reviews)
+  ? existing.reviews.filter((row) => row?.valid === true)
+  : [];
 const completed = new Set(reviews.map((row) => row.candidate_key));
 const prewarm = await loadModel();
 

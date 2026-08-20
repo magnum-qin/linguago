@@ -1,0 +1,36 @@
+{
+  "version": "v117-reviewed-target-acquisition-20260819",
+  "description": "Controlled production profile for candidates unlocked by candidate-bound, dual-model-reviewed target dictionary evidence.",
+  "runner": {
+    "pipeline-mode": "simplified",
+    "production-prefilter": "true",
+    "source-sense-alignment": "false",
+    "reverse-evidence-prefilter": "true",
+    "reverse-evidence-min-target-langs": "2",
+    "reverse-evidence-prefilter-limit": "500",
+    "enforce-generation-hint-terms": "true",
+    "allow-model-download": "false",
+    "qwen-endpoints": "http://100.99.99.99:11447,http://100.99.99.99:11448",
+    "qwen-variants": "11447=UD-IQ4_NL,11448=UD-IQ4_NL",
+    "qwen-model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+    "gemma-endpoints": "http://100.99.99.99:11444",
+    "gemma-variants": "11444=UD-Q4_K_XL",
+    "gemma-model": "unsloth/gemma-4-31B-it-qat-GGUF",
+    "elastic-model-swap": "false",
+    "elastic-endpoints": "http://100.99.99.99:11444",
+    "elastic-qwen-variants": "11444=UD-Q4_K_XL",
+    "elastic-minimum-items": "20",
+    "generation-target": "4",
+    "supplemental-source-db": ".tmp/combined/v116-dicionario-acquisition-evidence-v11.db",
+    "strong-supplemental-source-keys": "dicionario-aberto-definitions-reviewed-312bb320dd47",
+    "reviewed-supplemental-source-keys": "dicionario-aberto-definitions-reviewed-312bb320dd47",
+    "resume": "true"
+  },
+  "publication_gates": {
+    "automatic_database_writes": 0,
+    "final_review_only_supported": true,
+    "controlled_replay_required": true,
+    "isolated_database_required": true,
+    "blocking_audit_counters_must_be_zero": true
+  }
+}

@@ -9,6 +9,9 @@ const reportPath = requiredPath(args.report, "report");
 const validationReportPath = args["validation-report"]
   ? requiredPath(args["validation-report"], "validation-report")
   : null;
+const suggestionsPath = args.suggestions
+  ? requiredPath(args.suggestions, "suggestions")
+  : null;
 const outPath = path.resolve(args.out || "logs/product-source-gap-dicionario-aberto-target-probe.json");
 const targetLang = String(args["target-lang"] || "pt-BR");
 if (targetLang !== "pt-BR") throw new Error("Only --target-lang pt-BR is supported");
@@ -21,11 +24,19 @@ const validationRows = validationReportPath
       .map((row) => ({ ...sourceRows.get(candidateKey(row)), ...row }))
   : [];
 const inputCandidates = validationReportPath ? validationRows : (report.selected || []);
-const candidates = inputCandidates.flatMap((candidate) => {
-  const preferredTerm = String(candidate.generation_hints?.[targetLang]?.terms?.[0] || "").trim();
-  if (!preferredTerm || candidate.source_lang === targetLang) return [];
-  return [{ candidate, preferredTerm }];
-});
+const suggestions = suggestionsPath
+  ? (JSON.parse(fs.readFileSync(suggestionsPath, "utf8")).suggestions || [])
+      .filter((row) => row.valid === true && row.target_lang === targetLang)
+  : [];
+const candidates = suggestionsPath
+  ? suggestions.flatMap((candidate) =>
+      unique(candidate.terms || []).map((preferredTerm) => ({ candidate, preferredTerm }))
+    )
+  : inputCandidates.flatMap((candidate) => {
+      const preferredTerm = String(candidate.generation_hints?.[targetLang]?.terms?.[0] || "").trim();
+      if (!preferredTerm || candidate.source_lang === targetLang) return [];
+      return [{ candidate, preferredTerm }];
+    });
 const candidatesByTerm = new Map();
 for (const row of candidates) {
   const key = normalize(row.preferredTerm);
@@ -68,6 +79,8 @@ for (const filePath of fs.readdirSync(xmlDir)
 
 const reviewCandidates = [];
 for (const { candidate, preferredTerm } of candidates) {
+  const anchor = englishAnchor(candidate);
+  if (!anchor) continue;
   const expectedPos = normalizePos(candidate.part_of_speech);
   const definitions = [];
   for (const entry of dictionaryEntries.get(normalize(preferredTerm)) || []) {
@@ -78,7 +91,9 @@ for (const { candidate, preferredTerm } of candidates) {
   }
   if (!definitions.length) continue;
   reviewCandidates.push({
-    candidate_key: candidateKey(candidate),
+    candidate_key: suggestionsPath
+      ? `${candidateKey(candidate)}::pt-BR:${sha256(normalize(preferredTerm)).slice(0, 12)}`
+      : candidateKey(candidate),
     bound_candidate_key: candidateKey(candidate),
     source_entry_id: candidate.source_entry_id,
     source_sense_id: candidate.first_sense_id ?? candidate.source_sense_id,
@@ -87,7 +102,7 @@ for (const { candidate, preferredTerm } of candidates) {
     term: preferredTerm,
     normalized_key: normalize(preferredTerm),
     part_of_speech: candidate.part_of_speech,
-    english_anchor: englishAnchor(candidate),
+    english_anchor: anchor,
     frequency_rank: candidate.frequency_rank,
     hint_provenance: candidate.generation_hints?.[targetLang]?.provenance || null,
     dicionario_aberto_definitions: definitions.slice(0, 12)
@@ -103,6 +118,8 @@ const output = {
   source_report_sha256: sha256(fs.readFileSync(reportPath)),
   validation_report: validationReportPath ? path.relative(process.cwd(), validationReportPath) : null,
   validation_report_sha256: validationReportPath ? sha256(fs.readFileSync(validationReportPath)) : null,
+  suggestions_report: suggestionsPath ? path.relative(process.cwd(), suggestionsPath) : null,
+  suggestions_report_sha256: suggestionsPath ? sha256(fs.readFileSync(suggestionsPath)) : null,
   source_resource: "Dicionario Aberto TEI XML",
   source_url: "https://dicionario-aberto.net/recursos",
   license: "CC-BY-SA-2.5-PT",
@@ -132,7 +149,7 @@ function candidateKey(row) {
 }
 function englishAnchor(row) {
   const english = (row.first_sense_localizations || []).find((item) => item?.lang === "en");
-  return String(english?.term || row.gloss_key || row.gloss_preview || "").trim();
+  return String(row.english_anchor || english?.term || row.gloss_key || row.gloss_preview || "").trim();
 }
 function usefulDefinition(value) { const v = String(value || "").trim(); return v.length >= 3 && v.length <= 1200; }
 function normalizePos(value) {
@@ -152,6 +169,7 @@ function flattenText(value) {
 function text(value) { return flattenText(value); }
 function asArray(value) { return Array.isArray(value) ? value : value == null ? [] : [value]; }
 function normalize(value) { return String(value || "").normalize("NFKC").trim().toLocaleLowerCase("pt-BR").replace(/\s+/gu, " "); }
+function unique(values) { return [...new Set(values.map((value) => String(value).trim()).filter(Boolean))]; }
 function sha256(value) { return crypto.createHash("sha256").update(value).digest("hex"); }
 function requiredPath(value, name) { if (!value) throw new Error(`Missing --${name}`); const result = path.resolve(value); if (!fs.existsSync(result)) throw new Error(`File not found: ${result}`); return result; }
 function parseArgs(argv) { const out = {}; for (let i = 0; i < argv.length; i += 1) { if (!argv[i].startsWith("--")) continue; const key = argv[i].slice(2); const next = argv[i + 1]; out[key] = next && !next.startsWith("--") ? argv[++i] : true; } return out; }

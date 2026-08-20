@@ -14,11 +14,20 @@ const report = JSON.parse(fs.readFileSync(suggestionsPath, 'utf8'));
 const sourceDb = new Database(sourceDbPath, { readonly: true, fileMustExist: true });
 const supplementalDb = new Database(supplementalPath, { readonly: true, fileMustExist: true });
 const minTermFamilies = Number(args['min-term-families'] || 2);
+const allowedZhFamilies = new Set(
+  String(
+    args['allowed-zh-families'] ||
+      'cc-cedict,wiktionary,openhownet,cedpane-pd-definitions'
+  )
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+);
 const findSenses = sourceDb.prepare(`SELECT ds.source_key, se.word, ss.gloss, ss.raw_json
   FROM source_entries se JOIN dictionary_sources ds ON ds.id=se.source_id
   JOIN source_senses ss ON ss.source_entry_id=se.id
   WHERE se.normalized_key=? AND se.lang=? ORDER BY ds.source_key,ss.sense_order,ss.id`);
-const findSupplemental = supplementalDb.prepare(`SELECT source_key,source_family,term,english_gloss
+const findSupplemental = supplementalDb.prepare(`SELECT source_key,source_family,term,english_gloss,concept_id
   FROM lexical_evidence WHERE normalized_key=? AND lang=? ORDER BY source_key,english_gloss`);
 const reverseSourcesByLang = {
   zh: new Set(['cc-cedict', 'wikdict-zh-en', 'kaikki-zh']),
@@ -40,6 +49,7 @@ const output = {
     exact_or_inflectional_anchor_match: true,
     new_independent_family_required: true,
     minimum_same_term_families: minTermFamilies,
+    allowed_zh_families: [...allowedZhFamilies].sort(),
     llm_is_not_evidence: true
   },
   summary: { input: validations.length, accepted_candidates: validations.filter((row) => row.decision === 'accept').length, rejected_candidates: validations.filter((row) => row.decision === 'reject').length, accepted_terms: validations.reduce((sum, row) => sum + row.accepted_terms.length, 0) },
@@ -62,12 +72,13 @@ function validateTerm(row, term) {
       }
     }
     for (const item of findSupplemental.all(normalizeTerm(variant), row.target_lang)) {
+      if (!supplementalRowMatchesCandidate(item, row.bound_candidate_key || row.candidate_key)) continue;
       if (lexicalMatch(row.english_anchor, item.english_gloss)) evidence.push({ source: item.source_key, family: item.source_family, gloss: item.english_gloss });
     }
   }
   const families = unique(evidence.map((item) => item.family));
   const allowedFamilies = row.target_lang === 'zh'
-    ? new Set(['cc-cedict', 'wiktionary', 'openhownet', 'cedpane-pd-definitions'])
+    ? allowedZhFamilies
     : new Set(['jmdict', 'wiktionary', 'ejdict']);
   const newFamilies = families.filter((value) =>
     allowedFamilies.has(value) && !(row.observed_families || []).includes(value)
@@ -83,6 +94,13 @@ function validateTerm(row, term) {
       ? 'same_term_independent_families_below_threshold'
       : null
   };
+}
+function supplementalRowMatchesCandidate(row, candidateKey) {
+  const match = /^(?:candidate:|dicionario-aberto-definition:)(.+)$/u.exec(
+    String(row?.concept_id || '').trim()
+  );
+  if (!match) return true;
+  return Boolean(candidateKey) && match[1] === String(candidateKey);
 }
 function targetScriptMatches(lang, term) {
   const value = String(term || '');

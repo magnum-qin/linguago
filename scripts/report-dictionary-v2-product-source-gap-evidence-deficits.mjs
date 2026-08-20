@@ -93,6 +93,27 @@ const insufficientTargets = rejected
       }));
   });
 
+const targetCoverageShortfalls = validations
+  .filter((row) =>
+    row.decision === 'supported' &&
+    Number(row.target_coverage_count || 0) < 2
+  )
+  .flatMap((row) => {
+    const hints = row.generation_hints || {};
+    return ['pt-BR', 'zh', 'ja']
+      .filter((lang) => lang !== row.source_lang)
+      .filter((lang) => !(hints[lang]?.terms || []).length)
+      .map((lang) => ({
+        candidate_key: row.candidate_key,
+        word: row.word,
+        source_lang: row.source_lang,
+        target_lang: lang,
+        target_coverage_count: Number(row.target_coverage_count || 0),
+        terms: hints[lang]?.terms || [],
+        observed_families: hints[lang]?.evidence_families || []
+      }));
+  });
+
 const summary = {
   input_reports: reportPaths.length,
   input_validations: validations.length,
@@ -124,8 +145,16 @@ summary.insufficient_targets_by_lang_and_family_count = countBy(
 summary.insufficient_targets_by_observed_family = countValues(
   insufficientTargets.flatMap((row) => row.observed_families)
 );
+summary.target_coverage_shortfalls_by_lang = countBy(
+  targetCoverageShortfalls,
+  (row) => row.target_lang
+);
+summary.target_coverage_shortfalls_by_lang_and_family_count = countBy(
+  targetCoverageShortfalls,
+  (row) => `${row.target_lang}:${row.observed_families.length}`
+);
 summary.evidence_acquisition_priority = buildEvidenceAcquisitionPriority(
-  insufficientTargets,
+  [...insufficientTargets, ...targetCoverageShortfalls],
   roundTripFailures
 );
 const supplementalInventory = supplementalDbPath
@@ -141,7 +170,8 @@ const output = {
   source_conflicts: sourceConflicts,
   source_near_unlock: sourceNearUnlock,
   roundtrip_failures: roundTripFailures,
-  insufficient_targets: insufficientTargets
+  insufficient_targets: insufficientTargets,
+  target_coverage_shortfalls: targetCoverageShortfalls
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });

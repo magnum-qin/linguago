@@ -104,6 +104,9 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
               'domain', s.domain,
               'register_label', s.register_label,
               'gloss_key', s.gloss_key,
+              'verification_level', s.verification_level,
+              'review_model', s.review_model,
+              'evidence_families', json(s.evidence_families_json),
               'pronunciation_group', CASE WHEN s.pronunciation_group_id IS NOT NULL THEN json_object(
                 'id', s.pronunciation_group_id,
                 'lang', s.group_lang,
@@ -623,10 +626,20 @@ function normalizeV2Sense(sense: Record<string, unknown>, index: number): V2Word
     pronunciation_group: normalizeV2PronunciationGroup(sense.pronunciation_group),
     domain: normalizeStringOrText(sense.domain),
     register_label: normalizeStringOrText(sense.register_label),
+    verification_level: sense.verification_level === 'ai_reviewed' ? 'ai_reviewed' : 'verified',
+    review_model: normalizeStringOrText(sense.review_model),
+    evidence_families: normalizeStringArray(sense.evidence_families),
     definitions,
     localizations,
     examples
   };
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  const parsed = parseJsonValue(value);
+  return Array.isArray(parsed)
+    ? [...new Set(parsed.map((item) => normalizeStringOrText(item)).filter(Boolean))]
+    : [];
 }
 
 function normalizeV2PronunciationGroup(value: unknown): WordSense['pronunciation_group'] {

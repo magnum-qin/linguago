@@ -1,0 +1,36 @@
+{
+  "version": "v119-reviewed-pt-acquisition-20260819",
+  "description": "Controlled no-write production profile after completing the remaining Dicionario Aberto pt-BR acquisition cohort.",
+  "runner": {
+    "pipeline-mode": "simplified",
+    "production-prefilter": "true",
+    "source-sense-alignment": "false",
+    "reverse-evidence-prefilter": "true",
+    "reverse-evidence-min-target-langs": "2",
+    "reverse-evidence-prefilter-limit": "500",
+    "enforce-generation-hint-terms": "true",
+    "allow-model-download": "false",
+    "qwen-endpoints": "http://100.99.99.99:11447,http://100.99.99.99:11448",
+    "qwen-variants": "11447=UD-IQ4_NL,11448=UD-IQ4_NL",
+    "qwen-model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+    "gemma-endpoints": "http://100.99.99.99:11444",
+    "gemma-variants": "11444=UD-Q4_K_XL",
+    "gemma-model": "unsloth/gemma-4-31B-it-qat-GGUF",
+    "elastic-model-swap": "false",
+    "elastic-endpoints": "http://100.99.99.99:11444",
+    "elastic-qwen-variants": "11444=UD-Q4_K_XL",
+    "elastic-minimum-items": "20",
+    "generation-target": "13",
+    "supplemental-source-db": ".tmp/combined/v119-dicionario-acquisition-evidence-v13.db",
+    "strong-supplemental-source-keys": "dicionario-aberto-definitions-reviewed-312bb320dd47,dicionario-aberto-definitions-reviewed-b51719719566,dicionario-aberto-definitions-reviewed-a4ba68ce5dc5",
+    "reviewed-supplemental-source-keys": "dicionario-aberto-definitions-reviewed-312bb320dd47,dicionario-aberto-definitions-reviewed-b51719719566,dicionario-aberto-definitions-reviewed-a4ba68ce5dc5",
+    "resume": "true"
+  },
+  "publication_gates": {
+    "automatic_database_writes": 0,
+    "final_review_only_supported": true,
+    "controlled_replay_required": true,
+    "isolated_database_required": true,
+    "blocking_audit_counters_must_be_zero": true
+  }
+}

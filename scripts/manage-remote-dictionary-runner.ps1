@@ -6,6 +6,14 @@ param(
   [int]$GenerationTarget = 20,
   [string]$SupplementalSourceDb = '',
   [string]$SourceRunDir = '',
+  [ValidateSet('legacy', 'simplified')]
+  [string]$PipelineMode = 'simplified',
+  [object]$ProductionPrefilter = $true,
+  [object]$RequireAuthoritativeSourceSense = $true,
+  [object]$DailyPrimarySenseSelection = $false,
+  [object]$ReverseEvidencePrefilter = $false,
+  [object]$EnforceGenerationHintTerms = $false,
+  [object]$AllowModelDownload = $false,
   [string]$QwenEndpoints = 'http://127.0.0.1:11441,http://127.0.0.1:11448,http://127.0.0.1:11447',
   [string]$QwenVariants = '11441=UD-Q4_K_XL,11448=UD-IQ4_NL,11447=UD-IQ4_NL',
   [string]$GemmaEndpoints = 'http://127.0.0.1:11442,http://127.0.0.1:11445,http://127.0.0.1:11446',
@@ -13,35 +21,79 @@ param(
   [string]$ElasticEndpoints = 'http://127.0.0.1:11442,http://127.0.0.1:11445',
   [string]$ElasticQwenVariants = '11442=UD-Q4_K_XL,11445=UD-Q4_K_XL',
   [int]$ElasticMinimumItems = 20,
-  [bool]$ElasticModelSwap = $true
+  [object]$ElasticModelSwap = $true
 )
 
 $ErrorActionPreference = 'Stop'
+
+function ConvertTo-RunnerBoolean([object]$Value, [string]$Name) {
+  if ($Value -is [bool]) { return $Value }
+  $Text = ([string]$Value).Trim().ToLowerInvariant()
+  if ($Text -in @('true', '1', 'yes', 'on')) { return $true }
+  if ($Text -in @('false', '0', 'no', 'off')) { return $false }
+  throw "$Name must be true/false or 1/0"
+}
+
+$ProductionPrefilter = ConvertTo-RunnerBoolean $ProductionPrefilter 'ProductionPrefilter'
+$RequireAuthoritativeSourceSense = ConvertTo-RunnerBoolean $RequireAuthoritativeSourceSense 'RequireAuthoritativeSourceSense'
+$DailyPrimarySenseSelection = ConvertTo-RunnerBoolean $DailyPrimarySenseSelection 'DailyPrimarySenseSelection'
+$ReverseEvidencePrefilter = ConvertTo-RunnerBoolean $ReverseEvidencePrefilter 'ReverseEvidencePrefilter'
+$EnforceGenerationHintTerms = ConvertTo-RunnerBoolean $EnforceGenerationHintTerms 'EnforceGenerationHintTerms'
+$AllowModelDownload = ConvertTo-RunnerBoolean $AllowModelDownload 'AllowModelDownload'
+$ElasticModelSwap = ConvertTo-RunnerBoolean $ElasticModelSwap 'ElasticModelSwap'
+
 $Root = 'D:\linguago-runner'
 $RunDir = Join-Path $Root (Join-Path 'runs' $RunId)
 $ControllerPath = Join-Path $RunDir 'controller.json'
 $ManifestPath = Join-Path $RunDir 'manifest.json'
+$StateDir = Join-Path $Root 'state'
+$GlobalControllerPath = Join-Path $StateDir 'remote-pipeline-controller.json'
+$GlobalLockPath = Join-Path $StateDir 'remote-pipeline.lock.json'
+$ScheduledTaskName = 'Linguago Remote Dictionary Pipeline'
 
 function Read-JsonFile([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { return $null }
-  return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+  return [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8) | ConvertFrom-Json
 }
 
 function Get-RunnerProcess {
   $Controller = Read-JsonFile $ControllerPath
+  if ($Controller -and $Controller.pid) {
+    $Process = Get-CimInstance Win32_Process -Filter "ProcessId=$($Controller.pid)" -ErrorAction SilentlyContinue
+    $CommandLine = [string]$Process.CommandLine
+    if ($Process -and $CommandLine -like "*$RunId*") {
+      return Get-Process -Id $Controller.pid -ErrorAction SilentlyContinue
+    }
+  }
+  $NodeProcess = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.CommandLine -like '*run-dictionary-v2-remote-pipeline.mjs*' -and
+      $_.CommandLine -like "*$RunId*"
+    } |
+    Select-Object -First 1
+  if ($NodeProcess) { return Get-Process -Id $NodeProcess.ProcessId -ErrorAction SilentlyContinue }
+  return $null
+}
+
+function Get-GlobalRunnerProcess {
+  $Controller = Read-JsonFile $GlobalControllerPath
   if (-not $Controller -or -not $Controller.pid) { return $null }
   $Process = Get-CimInstance Win32_Process -Filter "ProcessId=$($Controller.pid)" -ErrorAction SilentlyContinue
-  if (-not $Process) { return $null }
+  if (-not $Process) {
+    Remove-Item -LiteralPath $GlobalControllerPath -Force -ErrorAction SilentlyContinue
+    return $null
+  }
   $CommandLine = [string]$Process.CommandLine
   if (
-    $CommandLine -notlike '*run-dictionary-v2-remote-pipeline.mjs*' -or
-    $CommandLine -notlike "*$RunId*"
+    $CommandLine -notlike '*run-dictionary-v2-remote-pipeline.mjs*' -and
+    $CommandLine -notlike '*manage-remote-dictionary-runner.ps1*'
   ) { return $null }
-  return Get-Process -Id $Controller.pid -ErrorAction SilentlyContinue
+  return $Process
 }
 
 if ($Action -eq 'status') {
   $Process = Get-RunnerProcess
+  $GlobalProcess = Get-GlobalRunnerProcess
   $Manifest = Read-JsonFile $ManifestPath
   [pscustomobject]@{
     RunId = $RunId
@@ -50,6 +102,10 @@ if ($Action -eq 'status') {
     ManifestStatus = if ($Manifest) { $Manifest.status } else { 'not_started' }
     CurrentStages = if ($Manifest) { $Manifest.stages } else { $null }
     Summary = if ($Manifest) { $Manifest.summary } else { $null }
+    GlobalRunner = if ($GlobalProcess) {
+      [pscustomobject]@{ Pid = $GlobalProcess.ProcessId; CommandLine = $GlobalProcess.CommandLine }
+    } else { $null }
+    Lock = Read-JsonFile $GlobalLockPath
   } | ConvertTo-Json -Depth 8
   exit 0
 }
@@ -59,12 +115,24 @@ if ($Action -eq 'stop') {
   if ($Process) {
     & taskkill.exe /PID $Process.Id /T /F | Out-Null
     Write-Output "stopped pid=$($Process.Id)"
+    Remove-Item -LiteralPath $GlobalControllerPath -Force -ErrorAction SilentlyContinue
   } else {
     Write-Output 'not running'
   }
+  Stop-ScheduledTask -TaskName $ScheduledTaskName -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $GlobalLockPath -Force -ErrorAction SilentlyContinue
   exit 0
 }
 
+New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
+$ExistingLock = Read-JsonFile $GlobalLockPath
+if ($Action -eq 'start' -and $ExistingLock) {
+  throw "Another dictionary pipeline is reserved or running: $($ExistingLock.run_id)"
+}
+if ($Action -eq 'run' -and $ExistingLock -and $ExistingLock.run_id -ne $RunId) {
+  throw "Another dictionary pipeline is reserved or running: $($ExistingLock.run_id)"
+}
+if (Get-GlobalRunnerProcess) { throw 'Another dictionary pipeline is already running on this host' }
 if (Get-RunnerProcess) { throw "Runner $RunId is already running" }
 $Key = [Environment]::GetEnvironmentVariable('UNSLOTH_API_KEY', 'User')
 if ([string]::IsNullOrWhiteSpace($Key)) { throw 'User UNSLOTH_API_KEY is missing' }
@@ -84,6 +152,13 @@ $Arguments = @(
   '--batch', $BatchPath,
   '--run-id', $RunId,
   '--run-dir', $RunDir,
+  '--pipeline-mode', $PipelineMode,
+  '--production-prefilter', $ProductionPrefilter.ToString().ToLowerInvariant(),
+  '--require-authoritative-source-sense', $RequireAuthoritativeSourceSense.ToString().ToLowerInvariant(),
+  '--daily-primary-sense-selection', $DailyPrimarySenseSelection.ToString().ToLowerInvariant(),
+  '--reverse-evidence-prefilter', $ReverseEvidencePrefilter.ToString().ToLowerInvariant(),
+  '--enforce-generation-hint-terms', $EnforceGenerationHintTerms.ToString().ToLowerInvariant(),
+  '--allow-model-download', $AllowModelDownload.ToString().ToLowerInvariant(),
   '--resume', 'true',
   '--generation-target', $GenerationTarget,
   '--qwen-endpoints', $QwenEndpoints,
@@ -113,6 +188,14 @@ if (-not [string]::IsNullOrWhiteSpace($SupplementalSourceDb)) {
   $Arguments += @('--supplemental-source-db', $ResolvedSupplementalSourceDb)
 }
 if ($Action -eq 'run') {
+  if (-not $ExistingLock) {
+    @{
+      run_id = $RunId
+      reserved_at = [DateTime]::UtcNow.ToString('o')
+      owner_pid = $PID
+      mode = 'foreground'
+    } | ConvertTo-Json | Set-Content -LiteralPath $GlobalLockPath -Encoding UTF8
+  }
   @{
     pid = $PID
     run_id = $RunId
@@ -120,22 +203,58 @@ if ($Action -eq 'run') {
     mode = 'foreground'
     started_at = [DateTime]::UtcNow.ToString('o')
   } | ConvertTo-Json | Set-Content -LiteralPath $ControllerPath -Encoding UTF8
+  Copy-Item -LiteralPath $ControllerPath -Destination $GlobalControllerPath -Force
   try {
     Set-Location -LiteralPath $Root
     & node.exe @Arguments
     exit $LASTEXITCODE
   } finally {
     Remove-Item -LiteralPath $ControllerPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $GlobalControllerPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $GlobalLockPath -Force -ErrorAction SilentlyContinue
   }
 }
-$Process = Start-Process -FilePath 'node.exe' -ArgumentList $Arguments -WorkingDirectory $Root `
-  -WindowStyle Hidden -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr -PassThru
+$LaunchPath = Join-Path $RunDir 'launch.json'
+$Launch = [ordered]@{
+  Action = 'run'
+  Batch = $Batch
+  RunId = $RunId
+  GenerationTarget = $GenerationTarget
+  SupplementalSourceDb = $SupplementalSourceDb
+  SourceRunDir = $SourceRunDir
+  PipelineMode = $PipelineMode
+  ProductionPrefilter = $ProductionPrefilter
+  RequireAuthoritativeSourceSense = $RequireAuthoritativeSourceSense
+  DailyPrimarySenseSelection = $DailyPrimarySenseSelection
+  ReverseEvidencePrefilter = $ReverseEvidencePrefilter
+  EnforceGenerationHintTerms = $EnforceGenerationHintTerms
+  AllowModelDownload = $AllowModelDownload
+  QwenEndpoints = $QwenEndpoints
+  QwenVariants = $QwenVariants
+  GemmaEndpoints = $GemmaEndpoints
+  GemmaVariants = $GemmaVariants
+  ElasticEndpoints = $ElasticEndpoints
+  ElasticQwenVariants = $ElasticQwenVariants
+  ElasticMinimumItems = $ElasticMinimumItems
+  ElasticModelSwap = $ElasticModelSwap
+}
+$Launch | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $LaunchPath -Encoding UTF8
 @{
-  pid = $Process.Id
   run_id = $RunId
-  batch = $BatchPath
-  started_at = [DateTime]::UtcNow.ToString('o')
-  stdout = $Stdout
-  stderr = $Stderr
-} | ConvertTo-Json | Set-Content -LiteralPath $ControllerPath -Encoding UTF8
-Write-Output "started pid=$($Process.Id) run_id=$RunId"
+  reserved_at = [DateTime]::UtcNow.ToString('o')
+  launch = $LaunchPath
+  mode = 'scheduled-task'
+} | ConvertTo-Json | Set-Content -LiteralPath $GlobalLockPath -Encoding UTF8
+
+try {
+  $TaskScript = Join-Path $Root 'scripts\run-remote-dictionary-runner-job.ps1'
+  $TaskArguments = "-NoProfile -ExecutionPolicy Bypass -File `"$TaskScript`" -Config `"$LaunchPath`""
+  $TaskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $TaskArguments -WorkingDirectory $Root
+  $TaskTrigger = New-ScheduledTaskTrigger -Once -At ([DateTime]::Now.AddDays(1))
+  Register-ScheduledTask -TaskName $ScheduledTaskName -Action $TaskAction -Trigger $TaskTrigger -Force | Out-Null
+  Start-ScheduledTask -TaskName $ScheduledTaskName
+} catch {
+  Remove-Item -LiteralPath $GlobalLockPath -Force -ErrorAction SilentlyContinue
+  throw
+}
+Write-Output "started scheduled_task=$ScheduledTaskName run_id=$RunId"

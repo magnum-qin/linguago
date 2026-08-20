@@ -68,6 +68,9 @@ export interface WordSense {
   definitions: Record<DisplayLanguageCode, string>;
   domain?: string;
   register_label?: string;
+  verification_level?: 'verified' | 'ai_reviewed';
+  review_model?: string;
+  evidence_families?: string[];
   localizations?: Partial<
     Record<
       DisplayLanguageCode,

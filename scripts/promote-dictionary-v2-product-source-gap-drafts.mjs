@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as OpenCC from 'opencc-js';
@@ -23,6 +24,17 @@ const restrictToReport = args['restrict-to-report'] === 'true';
 const semanticReviewPath = args['semantic-review'] ? path.resolve(args['semantic-review']) : null;
 const reverseEvidencePath = args['reverse-evidence'] ? path.resolve(args['reverse-evidence']) : null;
 const semanticReviewConfidence = boundedConfidence(args['semantic-review-confidence'], 0.9);
+const verificationLevel = String(args['verification-level'] || 'verified').trim();
+const requireExamples = args['require-examples'] === 'true';
+if (!['verified', 'ai_reviewed'].includes(verificationLevel)) {
+  throw new Error(`Invalid --verification-level: ${verificationLevel}`);
+}
+if (verificationLevel === 'ai_reviewed' && !semanticReviewPath) {
+  throw new Error('--verification-level ai_reviewed requires --semantic-review');
+}
+const reviewModel = String(args['review-model'] || (verificationLevel === 'ai_reviewed' ? 'gemma-independent-review' : '')).trim() || null;
+const evidenceFamilies = [...new Set(String(args['evidence-families'] || '')
+  .split(',').map((value) => value.trim()).filter(Boolean))].sort();
 const semanticReviewExcludedSenseIds = new Set(
   String(args['semantic-review-exclude-sense-ids'] || '')
     .split(',')
@@ -84,6 +96,7 @@ const reportClause = restrictToReport
 const db = new Database(dbPath);
 db.pragma('foreign_keys = ON');
 db.pragma('busy_timeout = 30000');
+if (apply) ensureVerificationSchema(db);
 
 const candidateSourceSenseIds = db.prepare(`
   SELECT source_sense_id
@@ -191,6 +204,10 @@ const stats = {
   reverse_evidence: reverseEvidencePath ? path.relative(process.cwd(), reverseEvidencePath) : null,
   reverse_evidence_approvals_loaded: reverseEvidenceApprovals?.size || 0,
   semantic_review_confidence: semanticReviewConfidence,
+  verification_level: verificationLevel,
+  require_examples: requireExamples,
+  review_model: reviewModel,
+  evidence_families: evidenceFamilies,
   semantic_review_excluded_sense_ids: [...semanticReviewExcludedSenseIds],
   semantic_approvals_loaded: semanticApprovals.size,
   checkpoint_sense_ids: checkpointSenseIds.length,
@@ -477,6 +494,7 @@ function validateCandidate(candidate) {
   if (semanticDrift) errors.push(semanticDrift);
 
   const examples = exampleStmt.all(candidate.sense_id);
+  if (requireExamples && examples.length === 0) errors.push('missing_required_example');
   const checkedExamples = [];
   for (const example of examples) {
     const exampleLocalizations = exampleLocalizationStmt.all(example.id);
@@ -556,6 +574,25 @@ function applyPromotions(items, stats) {
         )
     WHERE id = @entry_id
   `);
+  const upsertVerification = db.prepare(`
+    INSERT INTO product_sense_verification
+      (product_sense_id, verification_level, confidence, review_model,
+       review_report_sha256, evidence_families_json, reviewed_at, updated_at)
+    VALUES
+      (@product_sense_id, @verification_level, @confidence, @review_model,
+       @review_report_sha256, @evidence_families_json, @reviewed_at, CURRENT_TIMESTAMP)
+    ON CONFLICT(product_sense_id) DO UPDATE SET
+      verification_level = excluded.verification_level,
+      confidence = excluded.confidence,
+      review_model = excluded.review_model,
+      review_report_sha256 = excluded.review_report_sha256,
+      evidence_families_json = excluded.evidence_families_json,
+      reviewed_at = excluded.reviewed_at,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+  const reviewReportSha256 = semanticReviewPath
+    ? crypto.createHash('sha256').update(fs.readFileSync(semanticReviewPath)).digest('hex')
+    : null;
 
   db.transaction(() => {
     const touchedEntries = new Set();
@@ -567,6 +604,15 @@ function applyPromotions(items, stats) {
         sense_id: item.candidate.sense_id,
         gloss_key: item.candidate.effective_gloss_key
       }).changes;
+      upsertVerification.run({
+        product_sense_id: item.candidate.sense_id,
+        verification_level: verificationLevel,
+        confidence: verificationLevel === 'verified' ? Math.max(Number(item.candidate.confidence || 0), 0.9) : semanticReviewConfidence,
+        review_model: reviewModel,
+        review_report_sha256: reviewReportSha256,
+        evidence_families_json: JSON.stringify(evidenceFamilies),
+        reviewed_at: new Date().toISOString()
+      });
       touchedEntries.add(item.candidate.entry_id);
     }
     for (const entryId of touchedEntries) {
@@ -582,6 +628,29 @@ function applyPromotions(items, stats) {
       stats.entries_refreshed++;
     }
   })();
+}
+
+function ensureVerificationSchema(database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS product_sense_verification (
+      product_sense_id INTEGER PRIMARY KEY REFERENCES product_senses(id) ON DELETE CASCADE,
+      verification_level TEXT NOT NULL CHECK (verification_level IN ('verified', 'ai_reviewed')),
+      confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+      review_model TEXT,
+      review_report_sha256 TEXT,
+      evidence_families_json TEXT NOT NULL DEFAULT '[]',
+      reviewed_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_product_sense_verification_level
+      ON product_sense_verification(verification_level, product_sense_id);
+    INSERT OR IGNORE INTO product_sense_verification
+      (product_sense_id, verification_level, confidence, review_model,
+       review_report_sha256, evidence_families_json, reviewed_at)
+    SELECT id, 'verified', MAX(0, MIN(1, confidence)), NULL, NULL, '[]', CURRENT_TIMESTAMP
+    FROM product_senses
+    WHERE status = 'accepted';
+  `);
 }
 
 function renumberEntry(entryId, entrySensesStmt, setSenseOrderStmt) {

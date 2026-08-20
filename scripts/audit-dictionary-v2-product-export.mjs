@@ -336,6 +336,22 @@ function buildAudit(database, exportManifest) {
         )
       `
     ),
+    verification: {
+      verified: scalar(database, "SELECT COUNT(*) AS n FROM v2_senses WHERE verification_level='verified'"),
+      ai_reviewed: scalar(database, "SELECT COUNT(*) AS n FROM v2_senses WHERE verification_level='ai_reviewed'"),
+      invalid_levels: scalar(
+        database,
+        "SELECT COUNT(*) AS n FROM v2_senses WHERE verification_level NOT IN ('verified', 'ai_reviewed')"
+      ),
+      ai_reviewed_missing_model: scalar(
+        database,
+        "SELECT COUNT(*) AS n FROM v2_senses WHERE verification_level='ai_reviewed' AND NULLIF(TRIM(review_model), '') IS NULL"
+      ),
+      invalid_evidence_families_json: scalar(
+        database,
+        "SELECT COUNT(*) AS n FROM v2_senses WHERE json_valid(evidence_families_json)=0 OR json_type(evidence_families_json)!='array'"
+      )
+    },
     empty_required: {
       empty_words: scalar(database, `SELECT COUNT(*) AS n FROM v2_entries WHERE COALESCE(word, '') = ''`),
       empty_entry_forms: scalar(database, `SELECT COUNT(*) AS n FROM v2_entry_forms WHERE COALESCE(form, '') = ''`),
@@ -719,6 +735,7 @@ function lookupSample(database, term) {
     .prepare(
       `
       SELECT s.id, s.sense_order, s.part_of_speech, s.gloss_key,
+        s.verification_level, s.review_model, s.evidence_families_json,
         g.lang AS pronunciation_group_lang,
         g.reading AS pronunciation_group_reading,
         g.reading_key AS pronunciation_group_reading_key,
@@ -833,6 +850,10 @@ function isAuditOk(audit) {
     audit.count_mismatches.length === 0 &&
     audit.bad_sense_localization_counts === 0 &&
     audit.duplicate_sense_orders === 0 &&
+    audit.verification.invalid_levels === 0 &&
+    audit.verification.ai_reviewed_missing_model === 0 &&
+    audit.verification.invalid_evidence_families_json === 0 &&
+    audit.verification.verified + audit.verification.ai_reviewed === audit.counts.senses &&
     Object.values(audit.empty_required).every((value) => value === 0) &&
     Object.values(audit.orphans).every((value) => value === 0) &&
     audit.lookup_integrity.non_source_reading_forms === 0 &&

@@ -1,4 +1,55 @@
 const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
+const DECISIONS = new Set(['accept', 'reject', 'manual_review']);
+
+export function validateSourceReviewEnvelope(review) {
+  if (!review || typeof review !== 'object' || Array.isArray(review)) return ['not_object'];
+
+  const errors = [];
+  if (!DECISIONS.has(review.decision)) errors.push('invalid_decision');
+  if (typeof review.confidence !== 'number' || review.confidence < 0 || review.confidence > 1) {
+    errors.push('invalid_confidence');
+  }
+
+  // Rejected and manual rows are terminal review outcomes, not malformed model
+  // responses. They may intentionally omit terms and an English anchor.
+  if (review.decision === 'accept') {
+    if (typeof review.english_anchor !== 'string' || !/[a-z]/iu.test(review.english_anchor)) {
+      errors.push('invalid_english_anchor');
+    }
+    if (!review.preferred_terms || typeof review.preferred_terms !== 'object' || Array.isArray(review.preferred_terms)) {
+      errors.push('invalid_preferred_terms');
+    } else {
+      for (const lang of LANGS) {
+        const value = review.preferred_terms[lang];
+        if (value !== null && (typeof value !== 'string' || !value.trim())) {
+          errors.push(`invalid_preferred_term_${lang}`);
+        }
+      }
+    }
+  } else {
+    if (review.english_anchor !== null && review.english_anchor !== undefined && typeof review.english_anchor !== 'string') {
+      errors.push('invalid_english_anchor');
+    }
+    if (
+      review.preferred_terms !== null &&
+      review.preferred_terms !== undefined &&
+      (typeof review.preferred_terms !== 'object' || Array.isArray(review.preferred_terms))
+    ) {
+      errors.push('invalid_preferred_terms');
+    }
+  }
+
+  if (typeof review.reason !== 'string' || !review.reason.trim()) errors.push('missing_reason');
+  if (!Array.isArray(review.evidence) || !review.evidence.length) errors.push('missing_evidence');
+  if (
+    review.risk_flags !== null &&
+    review.risk_flags !== undefined &&
+    !Array.isArray(review.risk_flags)
+  ) {
+    errors.push('invalid_risk_flags');
+  }
+  return errors;
+}
 
 export function validateDefinitionContract(definitionContract, preferredTerms) {
   const errors = [];

@@ -338,6 +338,7 @@ function compactPayload(target) {
     source_word: output.source_word || target.generation.word,
     english_anchor: output.gloss_key || target.evidence.anchor,
     generated_localizations: output.localizations,
+    generated_example: output.example || null,
     deterministic_decision: target.evidence.decision,
     deterministic_concerns: concerns,
     source_review: target.evidence.source_review || null
@@ -385,8 +386,9 @@ function buildPrompt(payload, previousError) {
   return [
     'Review this proposed dictionary sense independently.',
     'Return exactly:',
-    '{"decision":"accept|reject|manual_review","confidence":0.0,"reason":"brief reason","corrections":[{"language":"en|pt-BR|zh|ja|all","field":"term|definition|reading|pronunciation|sense","current":"wrong value or summary","replacement":"safe replacement or null","issue":"brief error"}]}',
+    '{"decision":"accept|reject|manual_review","confidence":0.0,"reason":"brief reason","corrections":[{"language":"en|pt-BR|zh|ja|all","field":"term|definition|reading|pronunciation|example|sense","current":"wrong value or summary","replacement":"safe replacement or null","issue":"brief error"}]}',
     'Use accept only when every EN/PT-BR/ZH/JA term and definition expresses the same source sense.',
+    'When generated_example is present, accept only if its Simplified Chinese source sentence and all four localized sentences naturally demonstrate the exact same sense.',
     'Each definition must also be a complete, grammatical, natural sentence or dictionary-style phrase in its own language. Reject malformed syntax, missing particles, and unnatural wording even when the intended sense is recoverable.',
     languageFocus
       ? `Closely proofread the ${languageFocus} localization word by word for grammar, particles, syntax, and native dictionary style. Return a structured correction for every defect found.`
@@ -437,7 +439,16 @@ function buildPerLanguagePrompt(payload, lang, localization, previousError) {
 }
 
 function normalizeReview(value) {
-  if (!promptMode.startsWith('nano') || !value || typeof value !== 'object') return value;
+  if (!value || typeof value !== 'object') return value;
+  if (!promptMode.startsWith('nano')) {
+    // Some otherwise valid structured responses omit the empty array on an
+    // acceptance. This normalization is safe only for accept: negative
+    // decisions still require explicit, actionable corrections below.
+    if (value.decision === 'accept' && value.corrections === undefined) {
+      return { ...value, corrections: [] };
+    }
+    return value;
+  }
   const decisions = {
     A: 'accept',
     ACCEPT: 'accept',
@@ -666,7 +677,7 @@ function validateCorrection(value) {
   if (!['en', 'pt-BR', 'zh', 'ja', 'all'].includes(value.language)) {
     throw new Error('invalid_correction_language');
   }
-  if (!['term', 'definition', 'reading', 'pronunciation', 'sense'].includes(value.field)) {
+  if (!['term', 'definition', 'reading', 'pronunciation', 'example', 'sense'].includes(value.field)) {
     throw new Error('invalid_correction_field');
   }
   if (typeof value.current !== 'string' || !value.current.trim()) {

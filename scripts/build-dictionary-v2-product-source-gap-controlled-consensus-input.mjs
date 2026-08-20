@@ -19,7 +19,9 @@ const minTargetHintFamilies = boundedInteger(args['min-target-hint-families'], 0
 const excludedSourceEntryIds = new Set(
   String(args['exclude-source-entry-ids'] || '')
     .split(',')
-    .map((value) => Number(value.trim()))
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(Number)
     .filter(Number.isInteger)
 )
 const finalGenerationPath = optionalPath(args.generation)

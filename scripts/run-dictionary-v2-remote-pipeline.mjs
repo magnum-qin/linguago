@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { performance } from 'node:perf_hooks';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 
 const args = parseArgs(process.argv.slice(2));
@@ -44,9 +45,45 @@ const sourceQwenPool = qwenPoolForWork(batchItemCount);
 const gemmaConcurrency = csvValues(gemmaEndpoints).length;
 const generationTarget = Math.max(1, Number.parseInt(args['generation-target'] || '20', 10));
 const stopAfterSourceScreen = args['stop-after-source-screen'] === 'true';
+const productionPrefilter = args['production-prefilter'] !== 'false';
+const requireAuthoritativeSourceSense =
+  args['require-authoritative-source-sense'] !== undefined
+    ? args['require-authoritative-source-sense'] !== 'false'
+    : pipelineMode === 'simplified';
+const dailyPrimarySenseSelection =
+  args['daily-primary-sense-selection'] !== undefined
+    ? args['daily-primary-sense-selection'] !== 'false'
+    : pipelineMode === 'simplified';
+const sourceSenseAlignment = args['source-sense-alignment'] === 'true';
+const reverseEvidencePrefilter = args['reverse-evidence-prefilter'] === 'true';
+const reverseEvidenceMinimumTargetLanguages = Math.max(
+  0,
+  Number.parseInt(args['reverse-evidence-min-target-langs'] || '2', 10)
+);
+const reverseEvidencePrefilterLimit = Math.max(
+  1,
+  Number.parseInt(args['reverse-evidence-prefilter-limit'] || '1000000', 10)
+);
+const enforceGenerationHintTerms = args['enforce-generation-hint-terms'] === 'true';
+const strongSupplementalSourceKeys = String(args['strong-supplemental-source-keys'] || '').trim();
+const reviewedSupplementalSourceKeys = String(args['reviewed-supplemental-source-keys'] || '').trim();
+const candidateBoundSourceRoundtripKeys = String(
+  args['candidate-bound-source-roundtrip-keys'] || ''
+).trim();
+const allowModelDownload = args['allow-model-download'] === 'true';
 const supplementalSourceDb = args['supplemental-source-db']
   ? requiredPath(args['supplemental-source-db'], 'supplemental-source-db')
   : null;
+const reviewedSupplementalArgs = reviewedSupplementalSourceKeys
+  ? ['--reviewed-supplemental-source-keys', reviewedSupplementalSourceKeys]
+  : [];
+const candidateBoundSupplementalArgs = candidateBoundSourceRoundtripKeys
+  ? ['--candidate-bound-source-roundtrip-keys', candidateBoundSourceRoundtripKeys]
+  : [];
+const supplementalValidationArgs = [
+  ...reviewedSupplementalArgs,
+  ...candidateBoundSupplementalArgs
+];
 const token = process.env.UNSLOTH_API_KEY;
 
 if (!token) throw new Error('UNSLOTH_API_KEY is not set in the remote process environment');
@@ -77,6 +114,17 @@ manifest.endpoint_variants = {
 };
 manifest.elastic_model_swap = elasticModelSwap;
 manifest.elastic_minimum_items = elasticMinimumItems;
+manifest.allow_model_download = allowModelDownload;
+manifest.require_authoritative_source_sense = requireAuthoritativeSourceSense;
+manifest.reverse_evidence_prefilter = reverseEvidencePrefilter;
+manifest.daily_primary_sense_selection = dailyPrimarySenseSelection;
+manifest.source_sense_alignment = sourceSenseAlignment;
+manifest.reverse_evidence_min_target_langs = reverseEvidenceMinimumTargetLanguages;
+manifest.reverse_evidence_prefilter_limit = reverseEvidencePrefilterLimit;
+manifest.enforce_generation_hint_terms = enforceGenerationHintTerms;
+manifest.strong_supplemental_source_keys = strongSupplementalSourceKeys;
+manifest.reviewed_supplemental_source_keys = reviewedSupplementalSourceKeys;
+manifest.candidate_bound_source_roundtrip_keys = candidateBoundSourceRoundtripKeys;
 manifest.input_items = batchItemCount;
 manifest.supplemental_source_db = supplementalSourceDb ? relative(supplementalSourceDb) : null;
 manifest.stages ||= {};
@@ -120,6 +168,14 @@ const files = {
   repairFinalAccepted: output('11-repair-final-gemma-accepted.json'),
   summary: output('summary.json')
 };
+files.productionFiltered = output('00-production-prefilter.json');
+files.productionRejected = output('00-production-prefilter-rejected.json');
+files.dailyPrimary = output('00a-daily-primary-senses.json');
+files.dailyPrimaryRejected = output('00a-daily-primary-senses-rejected.json');
+files.senseAligned = output('00b-source-sense-aligned.json');
+files.senseAlignmentRejected = output('00b-source-sense-alignment-rejected.json');
+files.reverseEvidenceFiltered = output('00c-reverse-evidence-prefilter.json');
+files.reverseEvidenceFilterDetails = output('00c-reverse-evidence-prefilter-details.json');
 
 try {
   if (pipelineMode === 'simplified') {
@@ -192,7 +248,8 @@ try {
     '--input-mode', 'reviewed',
     '--require-source-reverse-evidence', 'true',
     '--evidence-family-policy', 'wiktionary',
-    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
+    ...supplementalValidationArgs
   ], [files.consensusReverse, files.consensusSupported]);
   } else {
     for (const filePath of [files.qwenReview, files.gemmaReview, files.consensus, files.consensusReverse, files.consensusSupported]) {
@@ -291,7 +348,8 @@ try {
     '--supported-report', files.semanticRepairReverseSupported,
     '--require-source-reverse-evidence', 'true',
     '--evidence-family-policy', 'wiktionary',
-    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
+    ...supplementalValidationArgs
   ], [files.semanticRepairReverse, files.semanticRepairReverseSupported]);
 
   if (reportHasRows(files.semanticRepairReverseSupported)) await stage('semantic_repair_final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
@@ -366,7 +424,8 @@ try {
     '--supported-report', files.reverseSupported,
     '--require-source-reverse-evidence', 'true',
     '--evidence-family-policy', 'wiktionary',
-    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
+    ...supplementalValidationArgs
   ], [files.reverse, files.reverseSupported]);
 
   if (reportHasRows(files.reverseSupported)) await stage('final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
@@ -436,7 +495,8 @@ try {
     '--supported-report', files.repairReverseSupported,
     '--require-source-reverse-evidence', 'true',
     '--evidence-family-policy', 'wiktionary',
-    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
+    ...supplementalValidationArgs
   ], [files.repairReverse, files.repairReverseSupported]);
 
   if (reportHasRows(files.repairReverseSupported)) await stage('repair_final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
@@ -481,8 +541,141 @@ try {
 }
 
 async function runSimplifiedPipeline() {
+  let sourceReviewInput = batchPath;
+  if (productionPrefilter) {
+    await stage('production_prefilter', 'scripts/filter-dictionary-v2-production-batch.mjs', [
+      '--report', batchPath,
+      '--out', files.productionFiltered,
+      '--rejected-out', files.productionRejected,
+      '--enabled', 'true',
+      '--require-authoritative-source-sense', String(requireAuthoritativeSourceSense),
+      '--allow-english-omw-source', args['allow-english-omw-source'] || 'false'
+    ], [files.productionFiltered, files.productionRejected]);
+    sourceReviewInput = files.productionFiltered;
+  }
+
+  if (dailyPrimarySenseSelection) {
+    await stage(
+      'daily_primary_sense_selection',
+      'scripts/select-dictionary-v2-product-daily-primary-senses.mjs',
+      [
+        '--report', sourceReviewInput,
+        '--source-db', args['source-db'] || 'data/processed/linguago_v2_full.db',
+        '--product-db', args['product-db'] || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db',
+        '--out', files.dailyPrimary,
+        '--rejected-out', files.dailyPrimaryRejected,
+        '--min-score', args['daily-primary-min-score'] || '2500'
+      ],
+      [files.dailyPrimary, files.dailyPrimaryRejected]
+    );
+    sourceReviewInput = files.dailyPrimary;
+  }
+
+  if (sourceSenseAlignment) {
+    await stage(
+      'source_sense_alignment',
+      'scripts/align-dictionary-v2-product-source-gap-candidate-senses.mjs',
+      [
+        '--report', sourceReviewInput,
+        '--out', files.senseAligned,
+        '--rejected-out', files.senseAlignmentRejected,
+        '--min-langs', '2',
+        '--max-langs', '3',
+        '--prefer-current-sense', 'true'
+      ],
+      [files.senseAligned, files.senseAlignmentRejected]
+    );
+    sourceReviewInput = files.senseAligned;
+  }
+
+  if (reverseEvidencePrefilter) {
+    if (!supplementalSourceDb) {
+      throw new Error('--reverse-evidence-prefilter requires --supplemental-source-db');
+    }
+    await stage(
+      'reverse_evidence_prefilter',
+      'scripts/prefilter-dictionary-v2-product-source-gap-reverse-evidence.mjs',
+      [
+        '--report', sourceReviewInput,
+        '--out', files.reverseEvidenceFiltered,
+        '--evidence-out', files.reverseEvidenceFilterDetails,
+        '--supplemental-source-db', supplementalSourceDb,
+        '--limit', String(reverseEvidencePrefilterLimit),
+        '--min-sources', '2',
+        '--min-source-families', '2',
+        '--min-target-langs', String(reverseEvidenceMinimumTargetLanguages),
+        ...(strongSupplementalSourceKeys
+          ? ['--strong-supplemental-source-keys', strongSupplementalSourceKeys]
+          : []),
+        ...(reviewedSupplementalSourceKeys
+          ? [
+              '--allow-reviewed-supplemental-source-roundtrip', 'true',
+              '--reviewed-supplemental-source-keys', reviewedSupplementalSourceKeys
+            ]
+          : []),
+        ...(candidateBoundSourceRoundtripKeys
+          ? ['--candidate-bound-source-roundtrip-keys', candidateBoundSourceRoundtripKeys]
+          : [])
+      ],
+      [files.reverseEvidenceFiltered, files.reverseEvidenceFilterDetails]
+    );
+    sourceReviewInput = files.reverseEvidenceFiltered;
+  }
+
+  if (reportItemCount(sourceReviewInput) === 0) {
+    const summary = {
+      ok: true,
+      run_id: runId,
+      input_fingerprint: inputFingerprint,
+      pipeline_mode: 'simplified',
+      capacity_exhausted: true,
+      summary: {
+        input: batchItemCount,
+        production_prefilter_selected: productionPrefilter
+          ? reportItemCount(files.productionFiltered)
+          : batchItemCount,
+        production_prefilter_rejected: productionPrefilter
+          ? Math.max(0, batchItemCount - reportItemCount(files.productionFiltered))
+          : 0,
+        daily_primary_selected: dailyPrimarySenseSelection ? reportItemCount(files.dailyPrimary) : null,
+        source_sense_aligned: sourceSenseAlignment ? reportItemCount(files.senseAligned) : null,
+        reverse_evidence_prefilter_selected: reverseEvidencePrefilter
+          ? reportItemCount(files.reverseEvidenceFiltered)
+          : null,
+        source_reviewed: 0,
+        gemma_source_approved: 0,
+        generated_valid: 0,
+        reverse_supported: 0,
+        reverse_manual_review: 0,
+        final_accepted: 0,
+        final_rejected: 0,
+        automatic_database_writes: 0
+      },
+      reports: {
+        productionFiltered: productionPrefilter ? relative(files.productionFiltered) : null,
+        dailyPrimary: dailyPrimarySenseSelection ? relative(files.dailyPrimary) : null,
+        senseAligned: sourceSenseAlignment ? relative(files.senseAligned) : null,
+        reverseEvidenceFiltered: reverseEvidencePrefilter
+          ? relative(files.reverseEvidenceFiltered)
+          : null,
+        reverseEvidenceFilterDetails: reverseEvidencePrefilter
+          ? relative(files.reverseEvidenceFilterDetails)
+          : null,
+        summary: relative(files.summary)
+      }
+    };
+    fs.writeFileSync(files.summary, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    manifest.status = 'complete';
+    manifest.capacity_exhausted = true;
+    manifest.completed_at = new Date().toISOString();
+    manifest.summary = summary.summary;
+    writeManifest();
+    console.log(JSON.stringify(summary, null, 2));
+    return;
+  }
+
   await stage('gemma_source_review', 'scripts/review-dictionary-v2-product-source-gap-candidates-unsloth.mjs', [
-    '--report', batchPath,
+    '--report', sourceReviewInput,
     '--out', files.gemmaReview,
     '--approved-out', files.gemmaApproved,
     '--rejected-out', files.gemmaRejected,
@@ -506,10 +699,92 @@ async function runSimplifiedPipeline() {
     '--unload-before-load', String(elasticModelSwap)
   ], [files.gemmaReview, files.gemmaApproved, files.gemmaRejected]);
 
-  const generationItems = Math.min(reportItemCount(files.gemmaApproved), generationTarget);
+  await stage(
+    'source_suggested_reverse_evidence',
+    'scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs',
+    [
+      '--report', files.gemmaApproved,
+      '--out', files.consensusReverse,
+      '--supported-report', files.consensusSupported,
+      '--input-mode', 'reviewed-suggested',
+      '--require-source-reverse-evidence', 'true',
+      '--evidence-family-policy', 'wiktionary',
+      ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
+      ...supplementalValidationArgs
+    ],
+    [files.consensusReverse, files.consensusSupported]
+  );
+
+  await stage(
+    'lock_reverse_supported_terms',
+    'scripts/build-dictionary-v2-product-source-gap-controlled-consensus-input.mjs',
+    [
+      '--review', files.consensusSupported,
+      '--out', files.locked,
+      '--confidence-threshold', '0.9',
+      '--bind-evidence-validated-suggestions', 'true',
+      '--allow-unhinted-suggestions', 'true',
+      '--allow-resolved-risk-flags', 'true'
+    ],
+    [files.locked]
+  );
+
+  await stage('build_semantic_preview', 'scripts/build-dictionary-v2-source-gap-semantic-preview.mjs', [
+    '--report', files.locked,
+    '--out', files.semanticPreview
+  ], [files.semanticPreview]);
+
+  if (reportHasRows(files.locked)) await stage(
+    'semantic_preview_gemma',
+    'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs',
+    [
+      '--generation', files.semanticPreview,
+      '--evidence', files.consensusReverse,
+      '--out', files.semanticReview,
+      '--accepted-out', files.semanticAccepted,
+      '--endpoints', gemmaEndpoints,
+      '--endpoint-gguf-variants', gemmaVariants,
+      '--model', gemmaModel,
+      '--generation-model', qwenModel,
+      '--only-supported', 'true',
+      '--limit', '1000000',
+      '--concurrency', String(gemmaConcurrency),
+      '--confidence-threshold', '0.9',
+      '--max-attempts', '2',
+      '--max-seq-length', '2048',
+      '--max-tokens', '420',
+      '--prompt-mode', 'full',
+      '--resume', String(resume),
+      '--stream', 'true',
+      '--unload-before-load', String(elasticModelSwap)
+    ],
+    [files.semanticReview, files.semanticAccepted]
+  );
+  else skipConsensusStage('semantic_preview_gemma', files.semanticReview, files.semanticAccepted);
+
+  await stage(
+    'select_semantic_accepted',
+    'scripts/select-dictionary-v2-source-gap-candidates-by-review.mjs',
+    [
+      '--report', files.locked,
+      '--review', files.semanticReview,
+      '--out', files.semanticSelected,
+      '--accepted-only', 'true'
+    ],
+    [files.semanticSelected]
+  );
+
+  await stage(
+    'jmdict_generation_preflight',
+    'scripts/filter-dictionary-v2-source-gap-jmdict-generation-preflight.mjs',
+    ['--report', files.semanticSelected, '--out', files.generationReady],
+    [files.generationReady]
+  );
+
+  const generationItems = Math.min(reportItemCount(files.generationReady), generationTarget);
   const generationPool = qwenPoolForWork(generationItems);
   await stage('qwen_generation', 'scripts/supplement-dictionary-v2-product-source-gaps-unsloth.mjs', [
-    '--report', files.gemmaApproved,
+    '--report', files.generationReady,
     '--out', files.generation,
     '--checkpoint', files.generationCheckpoint,
     '--endpoints', generationPool.endpoints,
@@ -528,8 +803,8 @@ async function runSimplifiedPipeline() {
     '--stream-response', 'true',
     '--disable-thinking', 'true',
     '--require-evidence-verdict', 'false',
-    '--enforce-reviewed-preferred-terms', 'false',
-    '--enforce-generation-hint-terms', 'false',
+    '--enforce-reviewed-preferred-terms', 'true',
+    '--enforce-generation-hint-terms', String(enforceGenerationHintTerms),
     '--deterministic-readings', 'true',
     '--deterministic-pronunciations', 'true',
     '--prewarm', 'true',
@@ -547,10 +822,11 @@ async function runSimplifiedPipeline() {
     '--input-mode', 'generated',
     '--require-source-reverse-evidence', 'true',
     '--evidence-family-policy', 'wiktionary',
-    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : [])
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
+    ...supplementalValidationArgs
   ], [files.reverse, files.reverseSupported]);
 
-  if (reportHasRows(files.generation)) await stage('final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
+  if (reportHasRows(files.reverseSupported)) await stage('final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
     '--generation', files.generation,
     '--evidence', files.reverse,
     '--out', files.finalGemma,
@@ -584,8 +860,25 @@ async function runSimplifiedPipeline() {
     input_fingerprint: inputFingerprint,
     pipeline_mode: 'simplified',
     summary: {
-      input: Number(gemmaSource?.summary?.reviewed || 0),
+      input: batchItemCount,
+      production_prefilter_selected: productionPrefilter
+        ? reportItemCount(files.productionFiltered)
+        : batchItemCount,
+      production_prefilter_rejected: productionPrefilter
+        ? Math.max(0, batchItemCount - reportItemCount(files.productionFiltered))
+        : 0,
+      daily_primary_selected: dailyPrimarySenseSelection ? reportItemCount(files.dailyPrimary) : null,
+      reverse_evidence_prefilter_selected: reverseEvidencePrefilter
+        ? reportItemCount(files.reverseEvidenceFiltered)
+        : null,
+      source_sense_aligned: sourceSenseAlignment ? reportItemCount(files.senseAligned) : null,
+      source_reviewed: Number(gemmaSource?.summary?.reviewed || 0),
       gemma_source_approved: Number(gemmaSource?.summary?.approved || 0),
+      source_reverse_supported: reportItemCount(files.consensusSupported),
+      semantic_preview_accepted: Number(
+        JSON.parse(fs.readFileSync(files.semanticReview, 'utf8'))?.summary?.consensus_accepted || 0
+      ),
+      jmdict_generation_ready: reportItemCount(files.generationReady),
       generated_valid: Number(generation?.stats?.accepted || 0),
       reverse_supported: Number(reverse?.summary?.decisions?.supported || 0),
       reverse_manual_review: Number(reverse?.summary?.decisions?.manual_review || 0),
@@ -596,6 +889,12 @@ async function runSimplifiedPipeline() {
     reports: {
       gemmaSourceReview: relative(files.gemmaReview),
       gemmaSourceApproved: relative(files.gemmaApproved),
+      sourceSuggestedReverse: relative(files.consensusReverse),
+      sourceSuggestedSupported: relative(files.consensusSupported),
+      semanticPreview: relative(files.semanticPreview),
+      semanticReview: relative(files.semanticReview),
+      semanticSelected: relative(files.semanticSelected),
+      generationReady: relative(files.generationReady),
       generation: relative(files.generation),
       reverse: relative(files.reverse),
       finalGemma: relative(files.finalGemma),
@@ -626,6 +925,7 @@ async function stage(name, script, stageArgs, expectedOutputs) {
     log: relative(logPath)
   };
   writeManifest();
+  const started = performance.now();
   const exitCode = await runNode(script, stageArgs, logPath);
   if (exitCode !== 0) {
     manifest.stages[name] = { ...manifest.stages[name], status: 'failed', exit_code: exitCode };
@@ -640,6 +940,10 @@ async function stage(name, script, stageArgs, expectedOutputs) {
     status: 'complete',
     exit_code: 0,
     completed_at: new Date().toISOString(),
+    duration_seconds: Math.round((performance.now() - started) / 10) / 100,
+    output_item_counts: Object.fromEntries(
+      expectedOutputs.map((filePath) => [relative(filePath), safeReportItemCount(filePath)])
+    ),
     outputs: expectedOutputs.map((filePath) => ({ path: relative(filePath), sha256: sha256File(filePath) }))
   };
   writeManifest();
@@ -650,7 +954,10 @@ function runNode(script, stageArgs, logPath) {
     const log = fs.createWriteStream(logPath, { flags: 'a' });
     const child = spawn(process.execPath, [script, ...stageArgs], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        UNSLOTH_REQUIRE_INSTALLED_MODEL: allowModelDownload ? '0' : '1'
+      },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     child.stdout.on('data', (chunk) => { process.stdout.write(chunk); log.write(chunk); });
@@ -674,16 +981,28 @@ function mergeCsv(...values) {
 function qwenPoolForWork(itemCount) {
   const useElastic = elasticModelSwap && itemCount >= elasticMinimumItems;
   const endpoints = useElastic ? mergeCsv(qwenEndpoints, elasticEndpoints) : qwenEndpoints;
-  const variants = useElastic ? mergeCsv(qwenVariants, elasticQwenVariants) : qwenVariants;
+  const allVariants = useElastic ? mergeCsv(qwenVariants, elasticQwenVariants) : qwenVariants;
+  const variants = variantsForEndpoints(allVariants, endpoints);
   return { endpoints, variants, concurrency: csvValues(endpoints).length, use_elastic: useElastic, item_count: itemCount };
+}
+
+function variantsForEndpoints(variants, endpoints) {
+  const allowedPorts = new Set(csvValues(endpoints).map(endpointPort));
+  return csvValues(variants)
+    .filter((item) => allowedPorts.has(item.split('=', 1)[0]))
+    .join(',');
 }
 
 function reportItemCount(filePath) {
   const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  for (const key of ['selected', 'candidates', 'aligned', 'generated', 'replayed', 'reviews', 'supported']) {
+  for (const key of ['selected', 'candidates', 'aligned', 'generated', 'replayed', 'reviews', 'supported', 'validations', 'rows']) {
     if (Array.isArray(report[key])) return report[key].length;
   }
   return Number(report.selected_count || report.summary?.selected || report.summary?.input || 0);
+}
+
+function safeReportItemCount(filePath) {
+  try { return reportItemCount(filePath); } catch { return null; }
 }
 
 async function restoreElasticReviewers() {
@@ -702,7 +1021,8 @@ async function restoreElasticReviewers() {
       maxSeqLength: 3072,
       speculativeType: 'off',
       unloadBeforeLoad: true,
-      loadTimeoutMs: 300_000
+      loadTimeoutMs: 300_000,
+      requireInstalled: !allowModelDownload
     }))
   );
   manifest.stages.restore_elastic_reviewers = {

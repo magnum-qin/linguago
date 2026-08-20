@@ -4,7 +4,14 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import Database from 'better-sqlite3';
 import * as OpenCC from 'opencc-js';
-import { validateDefinitionContract } from './lib/source-review-contract.mjs';
+import {
+  validateDefinitionContract,
+  validateSourceReviewEnvelope
+} from './lib/source-review-contract.mjs';
+import {
+  matchBlindSourceAnchor,
+  normalizeBlindSenses
+} from './lib/blind-source-anchor.mjs';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 
 const DEFAULT_REPORT = 'logs/product-coverage-gaps-v83-after-tier-b-complete-strict.json';
@@ -61,6 +68,8 @@ const requireSenseAlignment = args['require-sense-alignment'] === 'true';
 const requireHintSemanticAlignment = args['require-hint-semantic-alignment'] === 'true';
 const requireDefinitionContract = args['require-definition-contract'] === 'true';
 const requireDailyPrimary = args['require-daily-primary'] === 'true';
+const blindSourceAnchor = args['blind-source-anchor'] === 'true';
+const blindSemanticMatch = args['blind-semantic-match'] !== 'false';
 const stream = args.stream === 'true';
 const responseFormat = String(args['response-format'] || 'none').trim().toLowerCase();
 const excludeReviewPaths = String(args['exclude-reviews'] || '')
@@ -106,6 +115,12 @@ const allCandidates = (Array.isArray(report.selected) ? report.selected : [])
       : !excludedEntryIds.has(Number(row.source_entry_id))
   );
 if (!allCandidates.length) throw new Error('Coverage report has no selected rows');
+if (blindSourceAnchor) {
+  const nonEnglish = allCandidates.filter((row) => row.source_lang !== 'en');
+  if (nonEnglish.length) {
+    throw new Error(`Blind source-anchor mode accepts only English source candidates; found ${nonEnglish.length} others`);
+  }
+}
 if (requireSenseAlignment) {
   const unaligned = allCandidates.filter(
     (row) =>
@@ -273,6 +288,9 @@ async function reviewWithRetry(row, startEndpointIndex) {
 async function reviewRow(row, endpoint, attempt, previousError) {
   const requestStarted = performance.now();
   const payload = compactPayload(row);
+  if (blindSourceAnchor) {
+    return reviewRowBlindSourceAnchor(payload, row, endpoint, attempt, previousError, requestStarted);
+  }
   if (promptMode === 'nano-per-language') {
     return reviewRowNanoPerLanguage(payload, row, endpoint, attempt, previousError, requestStarted);
   }
@@ -305,7 +323,15 @@ async function reviewRow(row, endpoint, attempt, previousError) {
   const content = String(data?.choices?.[0]?.message?.content || '');
   const parsed = parseJson(content);
   const errors = validateReview(parsed, row);
-  if (errors.length) throw new Error(`invalid_review:${errors.join(',')}; raw=${content.slice(0, 300)}`);
+  const unboundErrors = errors.filter((error) => error.startsWith('missing_evidence_bound_preferred_term_'));
+  const blockingErrors = errors.filter((error) => !error.startsWith('missing_evidence_bound_preferred_term_'));
+  if (blockingErrors.length) {
+    throw new Error(`invalid_review:${blockingErrors.join(',')}; raw=${content.slice(0, 300)}`);
+  }
+  const evidenceBound = unboundErrors.length === 0;
+  const decision = evidenceBound ? parsed.decision : 'manual_review';
+  const confidence = evidenceBound ? parsed.confidence : 0;
+  const unboundLangs = unboundErrors.map((error) => error.slice('missing_evidence_bound_preferred_term_'.length));
   return {
     source_entry_id: Number(row.source_entry_id),
     source_sense_id: Number(row.first_sense_id ?? row.source_sense_id) || null,
@@ -318,16 +344,179 @@ async function reviewRow(row, endpoint, attempt, previousError) {
     seconds: secondsSince(requestStarted),
     usage: data.usage || null,
     valid: true,
-    decision: parsed.decision,
-    confidence: parsed.confidence,
-    approved: parsed.decision === 'accept' && parsed.confidence >= confidenceThreshold,
-    english_anchor: parsed.english_anchor.trim(),
-    reason: parsed.reason,
+    decision,
+    confidence,
+    approved: decision === 'accept' && confidence >= confidenceThreshold,
+    english_anchor:
+      typeof parsed.english_anchor === 'string' && parsed.english_anchor.trim()
+        ? parsed.english_anchor.trim()
+        : null,
+    reason: evidenceBound
+      ? parsed.reason
+      : `Preferred terms lack locked independent evidence: ${unboundLangs.join(', ')}.`,
     evidence: parsed.evidence,
-    risk_flags: parsed.risk_flags,
+    risk_flags: [
+      ...(Array.isArray(parsed.risk_flags) ? parsed.risk_flags : []),
+      ...(evidenceBound ? [] : unboundLangs.map((lang) => `unbound_preferred_term_${lang}`))
+    ],
     preferred_terms: normalizePreferredTerms(parsed.preferred_terms),
     definition_contract: normalizeDefinitionContract(parsed.definition_contract),
     raw_preview: content.slice(0, 800)
+  };
+}
+
+async function reviewRowBlindSourceAnchor(payload, row, endpoint, attempt, previousError, requestStarted) {
+  const input = {
+    headword: payload.headword,
+    source_language: payload.source_language,
+    part_of_speech: payload.part_of_speech
+  };
+  const prompt = `Without seeing any proposed translation or dictionary gloss, list established modern English dictionary senses of this headword. Include common, secondary, regional, and technical senses when genuinely lexicalized. Give concise English anchors and useful synonymous locator terms. Do not guess from another language and do not include proper names unless the lowercase word itself has that lexical sense. Return JSON only: {"senses":[{"anchor":"concise sense label","part_of_speech":"noun|verb|adjective|adverb|other","aliases":["synonym"],"commonness":"common|secondary|regional|technical"}]} Input=${JSON.stringify(input)}${previousError ? ' Previous output was invalid; return complete JSON only.' : ''}`;
+  const data = await postJson(
+    endpoint,
+    '/v1/chat/completions',
+    {
+      model,
+      stream,
+      temperature: 0,
+      max_tokens: Math.max(maxTokens, 520),
+      enable_thinking: false,
+      reasoning_effort: 'none',
+      ...(responseFormat === 'json-object' ? { response_format: { type: 'json_object' } } : {}),
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an English lexicographer. Work independently from candidate translations. Return JSON only.'
+        },
+        { role: 'user', content: prompt }
+      ]
+    },
+    timeoutMs
+  );
+  const content = String(data?.choices?.[0]?.message?.content || '');
+  const parsed = parseJson(content);
+  const senses = normalizeBlindSenses(parsed?.senses);
+  if (!senses.length) throw new Error(`invalid_blind_senses; raw=${content.slice(0, 300)}`);
+  const deterministicMatch = matchBlindSourceAnchor(row, senses);
+  let match = deterministicMatch;
+  let semanticMatch = null;
+  if (blindSemanticMatch && match.candidate_terms.length) {
+    semanticMatch = await matchLockedBlindSenses(
+      match.candidate_terms,
+      senses,
+      endpoint,
+      previousError
+    );
+    if (semanticMatch.matched) {
+      const sense = senses[semanticMatch.match_index];
+      match = {
+        matched: true,
+        reason: 'locked_blind_anchor_semantic_match',
+        candidate_terms: match.candidate_terms,
+        matched_candidate: semanticMatch.candidate_term,
+        matched_alias: sense.anchor,
+        score: semanticMatch.confidence,
+        sense
+      };
+    } else {
+      match = {
+        matched: false,
+        reason: semanticMatch.reason || 'locked_blind_anchor_semantic_mismatch',
+        candidate_terms: deterministicMatch.candidate_terms,
+        best_score: deterministicMatch.score ?? deterministicMatch.best_score ?? 0
+      };
+    }
+  }
+  const decision = match.matched ? 'accept' : 'reject';
+  const confidence = match.matched ? 0.95 : 0.9;
+  const suggestedTerms = Object.fromEntries(
+    ['en', 'pt-BR', 'zh', 'ja'].map((lang) => [
+      lang,
+      lang === row.source_lang
+        ? String(row.word || '').trim() || null
+        : String(row?.generation_hints?.[lang]?.terms?.[0] || '').trim() || null
+    ])
+  );
+  return {
+    source_entry_id: Number(row.source_entry_id),
+    source_sense_id: Number(row.first_sense_id ?? row.source_sense_id) || null,
+    word: row.word,
+    source_lang: row.source_lang,
+    frequency_rank: row.frequency_rank ?? null,
+    gloss_key: row.gloss_key,
+    endpoint,
+    attempt,
+    seconds: secondsSince(requestStarted),
+    usage: data.usage || null,
+    valid: true,
+    decision,
+    confidence,
+    approved: decision === 'accept' && confidence >= confidenceThreshold,
+    english_anchor: match.matched ? match.sense.anchor : null,
+    reason: match.reason,
+    evidence: match.matched
+      ? [`blind anchor alias ${match.matched_alias} matches candidate locator ${match.matched_candidate}`]
+      : ['blind sense inventory has no exact candidate locator'],
+    risk_flags: match.matched ? [] : ['blind_anchor_mismatch'],
+    preferred_terms: normalizePreferredTerms(suggestedTerms),
+    definition_contract: null,
+    blind_source_anchor: {
+      candidate_terms: match.candidate_terms,
+      matched_alias: match.matched_alias || null,
+      score: match.score ?? match.best_score ?? 0,
+      senses
+    },
+    blind_semantic_match: semanticMatch,
+    raw_preview: content.slice(0, 800)
+  };
+}
+
+async function matchLockedBlindSenses(candidateTerms, senses, endpoint, previousError) {
+  const lockedSenses = senses.map((sense, index) => ({
+    index,
+    anchor: sense.anchor,
+    part_of_speech: sense.part_of_speech,
+    aliases: sense.aliases
+  }));
+  const prompt = `The sense inventory below was created without seeing the candidate locator terms and is now immutable. Decide whether any candidate term is itself an established ENGLISH word or phrase expressing exactly one locked sense. A Portuguese, Chinese, Japanese, proper-name-only, malformed, or mixed-language locator must be rejected even when you know its translation. Do not add, broaden, reinterpret, or infer a new sense. Reject broad/narrow, different referent, different grammatical role, or merely related terms. confidence must be at least 0.95 only for exact lexical equivalence. Return JSON only: {"match_index":null,"candidate_term":null,"candidate_language":"en|other|unknown","confidence":0,"reason":"short"} Input=${JSON.stringify({ candidate_terms: candidateTerms, locked_senses: lockedSenses })}${previousError ? ' Return complete JSON only.' : ''}`;
+  const data = await postJson(
+    endpoint,
+    '/v1/chat/completions',
+    {
+      model,
+      stream,
+      temperature: 0,
+      max_tokens: 220,
+      enable_thinking: false,
+      reasoning_effort: 'none',
+      ...(responseFormat === 'json-object' ? { response_format: { type: 'json_object' } } : {}),
+      messages: [
+        {
+          role: 'system',
+          content: 'Compare only against the locked blind sense inventory. Never invent another sense. Return JSON only.'
+        },
+        { role: 'user', content: prompt }
+      ]
+    },
+    timeoutMs
+  );
+  const content = String(data?.choices?.[0]?.message?.content || '');
+  const parsed = parseJson(content);
+  const matchIndex = parsed?.match_index == null ? null : Number(parsed.match_index);
+  const candidateTerm = parsed?.candidate_term == null ? null : String(parsed.candidate_term).trim();
+  const candidateLanguage = String(parsed?.candidate_language || '').trim().toLowerCase();
+  const confidence = Number(parsed?.confidence);
+  const validIndex = Number.isInteger(matchIndex) && matchIndex >= 0 && matchIndex < senses.length;
+  const validCandidate = candidateTerms.includes(String(candidateTerm || '').normalize('NFKC').toLocaleLowerCase('en'));
+  const matched = validIndex && validCandidate && candidateLanguage === 'en' && Number.isFinite(confidence) && confidence >= 0.95;
+  return {
+    matched,
+    match_index: matched ? matchIndex : null,
+    candidate_term: matched ? candidateTerm : null,
+    candidate_language: candidateLanguage || 'unknown',
+    confidence: Number.isFinite(confidence) ? confidence : 0,
+    reason: String(parsed?.reason || '').trim(),
+    raw_preview: content.slice(0, 400)
   };
 }
 
@@ -674,7 +863,8 @@ ${dailyPrimaryRule}
 ${strictHintRules}
 Hints passed reverse-dictionary lookup but may reflect the wrong sense of a polysemous English anchor. Use a hinted preferred term only when it matches the exact gloss.
 Confidence >=0.90 only when safe for four-language generation. Keep reason/evidence under 14 words; at most two risk flags.
-  ${requireDefinitionContract ? 'When accepting, definition_contract must give one short definition written natively in each matching language. Never copy the English gloss into pt-BR, zh, or ja. All four definitions must have identical grammatical role, domain, and semantic breadth; exclude extra senses and factual details not shared by the anchor.\n' : ''}Return JSON only: {"decision":"accept|reject|manual_review","confidence":0.0,"english_anchor":"exact English sense","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"short","evidence":["short"],"risk_flags":[]}
+  ${requireDefinitionContract ? 'When accepting, definition_contract must give one short explanatory definition written natively in each matching language. A definition must never equal or merely repeat its preferred term. Use at least six words in English and Portuguese, eight Chinese characters, and twelve Japanese characters. Never copy the English gloss into pt-BR, zh, or ja. All four definitions must have identical grammatical role, domain, and semantic breadth; exclude extra senses and factual details not shared by the anchor.\n' : ''}For reject/manual_review, english_anchor may be null and all preferred_terms/definition_contract values may be null; do not invent fields merely to satisfy the schema.
+Return JSON only: {"decision":"accept|reject|manual_review","confidence":0.0,"english_anchor":"exact English sense or null","preferred_terms":{"en":null,"pt-BR":null,"zh":null,"ja":null},"definition_contract":{"en":null,"pt-BR":null,"zh":null,"ja":null},"reason":"short","evidence":["short"],"risk_flags":[]}
 ${previousError ? 'Previous output was invalid; return complete JSON only.\n' : ''}Input=${JSON.stringify(payload)}`;
 }
 
@@ -715,21 +905,8 @@ ${JSON.stringify(payload)}`;
 }
 
 function validateReview(parsed, row = null) {
-  const errors = [];
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return ['not_object'];
-  if (!DECISIONS.has(parsed.decision)) errors.push('invalid_decision');
-  if (typeof parsed.confidence !== 'number' || parsed.confidence < 0 || parsed.confidence > 1)
-    errors.push('invalid_confidence');
-  if (typeof parsed.english_anchor !== 'string' || !/[a-z]/iu.test(parsed.english_anchor))
-    errors.push('invalid_english_anchor');
-  if (!parsed.preferred_terms || typeof parsed.preferred_terms !== 'object' || Array.isArray(parsed.preferred_terms)) {
-    errors.push('invalid_preferred_terms');
-  } else {
-    for (const lang of ['en', 'pt-BR', 'zh', 'ja']) {
-      const value = parsed.preferred_terms[lang];
-      if (value !== null && (typeof value !== 'string' || !value.trim())) errors.push(`invalid_preferred_term_${lang}`);
-    }
-  }
+  const errors = validateSourceReviewEnvelope(parsed);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return errors;
   if (requireDefinitionContract && parsed.decision === 'accept') {
     errors.push(...validateDefinitionContract(parsed.definition_contract, parsed.preferred_terms));
   }
@@ -739,9 +916,6 @@ function validateReview(parsed, row = null) {
       if (!String(bound[lang] || '').trim()) errors.push(`missing_evidence_bound_preferred_term_${lang}`);
     }
   }
-  if (typeof parsed.reason !== 'string' || !parsed.reason.trim()) errors.push('missing_reason');
-  if (!Array.isArray(parsed.evidence) || !parsed.evidence.length) errors.push('missing_evidence');
-  if (!Array.isArray(parsed.risk_flags)) errors.push('invalid_risk_flags');
   return errors;
 }
 
@@ -776,6 +950,8 @@ function buildOutput() {
     stream,
     response_format: responseFormat,
     prompt_mode: promptMode,
+    blind_source_anchor: blindSourceAnchor,
+    blind_semantic_match: blindSemanticMatch,
     require_daily_primary: requireDailyPrimary,
     retry_decisions: [...retryDecisionsOnResume],
     prewarm_results: prewarmResults,
@@ -795,19 +971,26 @@ function buildApprovedReport() {
     .filter((row) => approvedReviews.has(candidateKey(row)))
     .map((row) => {
       const review = approvedReviews.get(candidateKey(row));
+      const candidate = blindSourceAnchor ? sanitizeBlindApprovedCandidate(row, review) : row;
+      const reviewedEnglishAnchor = blindSourceAnchor
+        ? candidate.blind_generation_anchor
+        : review.english_anchor;
       return {
-        ...row,
+        ...candidate,
         candidate_evidence_review: {
           decision: review.decision,
           confidence: review.confidence,
-          english_anchor: review.english_anchor,
+          english_anchor: reviewedEnglishAnchor,
           reason: review.reason,
           evidence: review.evidence,
           risk_flags: review.risk_flags,
-          preferred_term_policy: 'source_only_exact',
-          preferred_terms: evidenceBoundPreferredTerms(row, review),
+          preferred_term_policy: blindSourceAnchor ? 'blind_source_anchor_only' : 'source_only_exact',
+          preferred_terms: evidenceBoundPreferredTerms(candidate, review),
           definition_contract: review.definition_contract,
-          suggested_terms: review.preferred_terms
+          suggested_terms: blindSourceAnchor
+            ? { en: String(row.word || '').trim(), 'pt-BR': null, zh: null, ja: null }
+            : review.preferred_terms,
+          ...(blindSourceAnchor ? { blind_source_anchor: review.blind_source_anchor } : {})
         }
       };
     });
@@ -820,6 +1003,36 @@ function buildApprovedReport() {
     confidence_threshold: confidenceThreshold,
     selected_count: selected.length,
     selected
+  };
+}
+
+function sanitizeBlindApprovedCandidate(row, review) {
+  const matchedCandidate = String(review?.blind_semantic_match?.candidate_term || '').trim();
+  const anchor = matchedCandidate || String(review?.english_anchor || '').trim();
+  const sourceWord = String(row?.word || '').trim();
+  return {
+    ...row,
+    original_gloss_key: row.gloss_key,
+    original_gloss_preview: row.gloss_preview,
+    original_first_sense_localizations: row.first_sense_localizations || [],
+    original_generation_hints: row.generation_hints || {},
+    gloss_key: anchor,
+    gloss_preview: anchor,
+    blind_generation_anchor: anchor,
+    blind_inventory_anchor: String(review?.english_anchor || '').trim() || null,
+    first_sense_localizations: [],
+    generation_hints: {
+      en: {
+        terms: [sourceWord],
+        sources: ['blind_source_anchor'],
+        provenance: 'blind_source_anchor'
+      }
+    },
+    blind_generation_policy: {
+      target_hints_removed: true,
+      target_localizations_removed: true,
+      anchor_source: 'blind_model_inventory_then_locked_match'
+    }
   };
 }
 

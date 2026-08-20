@@ -1,5 +1,63 @@
 # LinguaGo Project Overview For AI
 
+## Current production dictionary (v123, 2026-08-20)
+
+The first frozen 5,000-candidate production run is live. The offline pipeline
+reviewed 5,000 candidates, retained 832 with deterministic reverse evidence,
+accepted 749 semantic previews, admitted 632 through the JMdict generation
+preflight, produced 603 structurally valid Qwen records, and retained 584 after
+reverse-evidence validation and independent Gemma no-correction review. All 584
+were replayed as drafts, promoted deterministically, and verified first in an
+isolated database and then in the main product database.
+
+Production contains `entries=40782`, `senses=47094`,
+`sense_localizations=188376`, `examples=3030`, and
+`example_localizations=11898`. The live cache is
+`v123-production584-40782`, Worker Version ID is
+`76658a80-b529-4dd7-9c02-47b7841fb6ce`, and D1 `published_at` is
+`2026-08-19T20:59:32.699Z`. Full export/import audit, published-risk,
+remote-count verification, online API regression, and mobile/desktop rendering
+all pass. The new source-gap records do not yet contain examples; example
+enrichment remains a separate quality pass and must not be claimed as complete.
+
+### Jump-host migration status (v124 qualification)
+
+The production pipeline is now qualified on `100.99.99.99` through candidate
+selection and an isolated release rehearsal. Frozen candidate/history inputs
+are hash-pinned by `config/remote-candidate-sources.json`; local and remote
+100-row selection had identical canonical SHA-256. The remotely generated
+`v124-remote-generated-candidate100` cohort completed the full no-write funnel
+with 11 final accepts. Those 11 were replayed only into an isolated database,
+where exact replay was idempotent, deterministic promotion accepted 11/11,
+published-risk stayed at zero, and native D1 export/full memory import passed
+with all blocking integrity counts at zero.
+
+The main product DB and production D1 were not modified. The main DB SHA-256 is
+still `BBE5BBAC54A7D14113D9198783CCBCEA31978104804676EA39570F09D4D9F569`.
+Before enabling unattended production writes, implement a guarded controller
+that verifies expected hashes and isolated-validation evidence, creates a
+backup, writes/promotes in bounded transactions, reruns audits, and rolls back
+on failure. Remote Cloudflare authentication is a separate requirement for D1
+publication. Do not give `agy` authority over writes or deployment; its desktop
+OAuth is not currently available to the SSH/Scheduled Task context.
+
+The remote D1 gate is implemented separately by
+`release-remote-dictionary-d1.ps1`. Its first `Execute=false` rehearsal against
+the v124 isolated DB regenerated 24 native SQL chunks and passed full import
+audit for 40,793 entries and 47,105 senses without contacting Cloudflare.
+Execute mode is intentionally unavailable until the jump-host Cloudflare OAuth
+is replaced by a scoped non-interactive token; the detected OAuth token is
+expired. Worker source synchronization, cache bump, deployment, and online
+regression are not yet part of this D1 controller.
+
+The v123 run used Gemma review dynamically across `11444-11448`; Qwen complete
+record generation used `11447/11448`. A sandboxed first attempt reported
+`fetch failed` for all endpoints, while the approved network run succeeded with
+zero remote-stage failures. D1 chunk 24 received one transient Cloudflare 502
+and succeeded on the built-in retry. `wrangler d1 export --remote` still fails
+with OAuth error 10000; retain the existing v114 remote SQL backup and the
+write-before-v123 local DB backup until Cloudflare fixes or replaces that path.
+
 ## Current production dictionary (v114, 2026-08-19)
 
 The accumulated v107-v114 production run is now live. It added 5,012
@@ -24,6 +82,127 @@ for the next production cycle.
 
 ## Active follow-up after v114
 
+The latest local cycle is v120; production D1 is still v114. Node 143 is
+reserved by another user and is excluded from
+`config/dictionary-v2-production-v120.json`. Current remote roles are Gemma on
+147/155/224 (`11444/11445/11446`) and Qwen on 56/47 (`11447/11448`). Do not add
+143 back until its owner releases it.
+
+v120 fixed a provenance defect in ECDICT acquisition. Validation-report rows
+must use the exact `candidate:<source_entry_id>:<source_sense_id>` concept ID;
+an `ecdict:<word>:<hash>` ID is not candidate-bound. Exact candidate-bound
+evidence can fill a target lane only when the source DB metadata is
+production-publishable, candidate-bound, exact, and its source key is explicitly
+allowlisted. `test-ecdict-candidate-bound-evidence.mjs` covers this invariant.
+
+The corrected evidence produced a 98-row gate. Gemma approved 66, Qwen generated
+43 structurally valid entries, deterministic reverse evidence supported 17,
+and final Gemma accepted 9. Zero requests failed. Manual inspection held back
+`wacko` for a bad IPA that structural checks missed; controlled replay and
+deterministic promotion added the other eight rows to main. Current local counts
+are `entries=41422`, `senses=47951`, `localizations=191796`, and
+`publishable_senses=46510`. All blocking fast-audit counters and
+`flagged_senses` remain zero.
+
+This run validates the five-node execution path but does not justify a 500-row
+expansion of the same residual. The next optimization target is quality yield:
+strengthen English/Portuguese IPA validation, classify the Qwen contract
+rejects, and convert only defensible reverse-evidence manual reviews into exact
+rules. Do not lower independent-evidence or final no-correction requirements.
+
+The first follow-up fixed one deterministic false-negative class. JMdict does
+not list every productive Japanese integer, so a narrow 1-99 compositional
+reading contract now recognizes forms such as `三十五/さんじゅうご`. Revalidating
+the immutable Qwen report improves structural validity from `43/65` to `61/65`.
+These expressions are nevertheless poor standalone expansion targets, so the
+production prefilter now excludes multi-character pure cardinal numbers while
+retaining single digits; this removes 26 rows from the current 1,934-row pool.
+
+After excluding the tested 98 candidates, a complete 1,834-row residual scan
+found 42 source-supported rows but zero rows with two independently supported
+target languages. It terminated as `capacity_exhausted` before model calls.
+The current exact acquisition backlog is `pt-BR=42`, `ja=28`, `zh=16`, all
+zero-family gaps. Another remote batch cannot unlock this pool; add independent
+lexical evidence in that order and rebuild the deterministic prefilter first.
+
+The follow-up v121 acquisition attempt did not change the product DB. A
+dual-model-reviewed Dicionario Aberto export was tightened to reject any review
+with nonempty risk flags; its three clean candidate-bound rows yielded no final
+accepted entry. FreeDict English-Portuguese and Portuguese-English are both
+Ergane/TravLang and count as one family. Exact probing covered none of the 42
+pt-BR gaps, while inflectional probing covered 11 but exposed unsafe lemma/sense
+drift, so it remains diagnostic only.
+
+The production prefilter now excludes ordinary English `-ed/-ing` forms from
+the general lane even when short source glosses omit an inflection label. A
+fresh replay removes 21 inflected forms plus two productive numbers; only 27
+source-supported residuals remain and none has two qualified target languages.
+Only `ファミレス` is common-tier. Treat this as real evidence-capacity
+exhaustion, not a model failure: rebuild the high-value candidate pool or add a
+modern independent pt-BR source before another remote generation batch.
+
+The v118 reviewed-acquisition cycle confirms that LinguaGo should begin
+evidence-qualified production rather than continue model experimentation. Its
+measured funnel was `9 -> 8 -> 6 -> 2 -> 1` across reverse prefilter, Gemma
+source approval, Qwen generation, deterministic reverse evidence, and final
+Gemma no-correction review. This is a lexical-coverage bottleneck, not a model
+speed or JSON-format bottleneck.
+
+The one accepted `matador` sense passed isolated controlled replay, exact
+idempotency replay, restricted deterministic promotion, TypeScript, fast audit,
+and published-risk before the same fixed artifacts were applied to main. Main
+now contains `46,501` publishable senses and `186,004` publishable sense
+localizations, with all blocking counters and `flagged_senses` at zero. The
+post-write main DB SHA256 is
+`158443604B6186F4872E01D81CECBF77D425E902017D119EA77D3DE141995093`.
+D1 remains v114 until locally accumulated additions reach the normal
+5,000-10,000-sense release interval.
+
+Run two queues in parallel from this point. The production queue may process
+only candidates that already satisfy independent source and target evidence;
+the acquisition queue should add verified pt-BR, zh, and ja dictionary rows,
+then rebuild the reverse prefilter. Do not use model agreement as evidence and
+do not send the unqualified residual pool to a broad 5,000-row LLM run. Keep
+Qwen as the complete four-language generator and Gemma as source/final review;
+additional model benchmarking is lower value than increasing lexical evidence
+coverage.
+
+The v116 evidence-first cycle has now written its first controlled main-DB
+batch without changing production D1. From 19,492 fresh candidates, source
+sense alignment retained 2,563 and deterministic reverse prefiltering produced
+555 candidates. The remote funnel ended with 94 independent no-correction
+accepts and zero infrastructure failures. Exact controlled replay wrote 94
+drafts, repeat replay wrote zero, and deterministic promotion accepted 84.
+Ten promotion rejects remain unpublished. Main publishable counts are now
+`senses=46500` and `sense_localizations=186000`; full export/import and all
+blocking audits pass with `flagged_senses=0`. Continue accumulating locally and
+do not deploy D1 until the next 5,000-10,000-sense release boundary.
+
+Use `config/dictionary-v2-production-v116.json` for the next evidence-first
+gate. It runs source-sense alignment before reverse-evidence selection and caps
+the prefilter at 500 rows. Model experimentation is no longer the main work:
+expand and rank independent lexical evidence, then repeat controlled replay,
+isolated promotion, and audits. Never count Qwen/Gemma agreement as dictionary
+evidence and never promote the ten retained v116 drafts by weakening the
+validator.
+
+The immediate v116 strict pool is exhausted after that batch. A second scan of
+1,934 remaining aligned rows found 89 with source-side support but zero with
+two qualifying target-language evidence lanes. The runner records this as
+`capacity_exhausted` and exits before remote model work. The next scaling task
+is new independent target-language lexical evidence or a separately reviewed
+manual lane, not another model benchmark and not a lower publication gate.
+
+The measured missing target lanes among those 89 rows are `pt-BR=75`, `zh=70`,
+and `ja=47`. The residual has a frequency-rank median of 22,519 and only 10 rows
+within rank 5,000, mostly names, so it is not the next daily-vocabulary
+production pool. FreeDict `eng-zho` and `eng-jpn` do not solve this gap: their
+TEI provenance says WikDict/Wiktionary/DBnary and they must remain in the
+`wiktionary` family. Use `dict:v2:audit:freedict-provenance` for future TEI
+packages; only a verified upstream such as Ergane/TravLang or TU Chemnitz Ding
+may receive its own source-family credit. Do not infer independence from the
+FreeDict distribution name.
+
 Start the next cycle from the live v114 counts, rebuild the historical attempt
 index, and regenerate the strict source-gap pool. The v113 ranked pool contained
 many Latin proper names and low-value English inflections, so candidate hygiene
@@ -32,11 +211,36 @@ relaxing the independent-source or reverse-evidence requirements.
 
 Production behavior remains frozen in
 `config/dictionary-v2-production-v106.json` and is invoked by
-`scripts/run-dictionary-v2-production-profile.mjs`. Model output must remain a
+`scripts/run-dictionary-v2-production-profile.mjs`. The runner now defaults to
+the compatible `config/dictionary-v2-production-v115.json` optimization layer:
+it deterministically defers low-yield proper-name/inflection/gloss-dump rows,
+requires models to be installed before a production stage, records stage
+timings, and filters quantization mappings to active endpoints. Model output
+must remain a
 no-write artifact until controlled replay, isolated deterministic promotion,
 fast/published-risk/full audits, and an accumulated 5,000-10,000 publishable
 sense interval justify the next D1 release. Keep large runs, checkpoints,
 exports, and backups under `%TEMP%` where possible.
+
+The first fresh v115 500-row no-write gate proved that the optimized runner is
+operational but that the remaining daily candidate pool is not economical for
+a 5,000-row expansion. The measured funnel was
+`500 -> 430 prefiltered -> 267 source-approved -> 217 generated -> 30 reverse-supported -> 23 final-accepted`.
+All remote stages had zero infrastructure failures, but final yield was only
+`4.6%`; reverse lexical evidence, not model throughput, is now the limiting
+factor. Rebuild and rank the next pool around independent target-language
+reverse coverage before resuming large production. Preserve the 23 accepted
+rows as no-write artifacts until a later controlled replay batch is large
+enough to justify isolated validation.
+
+The 2026-08-19 RTX 4090-224 speed experiment does not change the frozen model
+roles. Gemma 4 E4B was roughly 8x faster than Gemma 4 31B on the small product
+JSON contract and matched its 76/80 structural score, but it returned
+`manual_review` for all 72 historical locked-evidence source-review rows. It is
+not a safe semantic gate. Do not confuse fast JSON generation with source
+adjudication quality. Optimize candidate filtering and chunk-level pipeline
+overlap before adding another model stage; keep automatic model download out of
+the live request path.
 
 ## Previous production dictionary (v106, 2026-08-17)
 
@@ -1193,6 +1397,41 @@ updated.
   mojibake for `木屑` in PowerShell is display-only and the JSON code points are
   correct.
 
+### Current scale lane: v122 AI-reviewed complete entries (2026-08-19)
+
+The active large-batch lane now has two explicit publication trust levels:
+
+- `verified`: deterministic independent dictionary evidence satisfies the
+  publication contract.
+- `ai_reviewed`: locked local evidence, Qwen generation, and independent Gemma
+  no-correction review agree, but strict four-language reverse dictionary
+  evidence is incomplete. Never describe this level as independently verified.
+
+The v122 isolated pilot generated 90/90 valid complete entries, reached 84/90
+Qwen/Gemma consensus after one bounded repair pass, and retained 83 after the
+pre-write semantic duplicate filter removed `重返`. All 83 contain readings or
+pronunciations, four language localizations, and one Simplified-Chinese source
+example with four localized sentences. All database and full D1 audits pass;
+the production DB, D1, and Worker remain unchanged.
+
+Required pre-replay commands now include:
+
+```powershell
+npm.cmd run dict:v2:coverage:filter-existing-semantic-duplicates -- `
+  --input <final-consensus-replay.json> `
+  --output <deduplicated-replay.json> `
+  --report <dedup-report.json>
+
+npm.cmd run check:worker-dictionary-verification -- `
+  --db <native-d1-export\audit-import.db>
+```
+
+Do not resume model benchmarking. Use Qwen for complete-entry generation and
+Gemma for independent final review. The next gate is a fresh 500-candidate
+isolated run, followed by a 2,000-candidate checkpoint/resume stress run. Only
+after both pass may the frozen pipeline write 5,000-row production batches.
+Keep large runtime artifacts on C: `%TEMP%` while D: remains full.
+
 ### Wikidata Lexeme and NorthEuraLex evidence result
 
 Wikidata Lexeme and NorthEuraLex were evaluated as independent open lexical
@@ -1233,3 +1472,49 @@ lane with 34 evidence-upgraded historical rejects produces a 500-entry scale
 review cohort. Multi-hint and evidence-upgrade lanes cannot pass directly to
 generation or promotion; they require exact term selection, deterministic
 reverse validation, and independent Gemma consensus.
+## Current v117 acquisition status (2026-08-19)
+
+The production pipeline is stable, but independent target-language evidence is
+the current throughput limit. A candidate-bound Dicionario Aberto pilot added
+seven dual-model-reviewed Portuguese evidence rows and unlocked four candidates
+at the prefilter. The complete no-write production run accepted none after the
+final reverse-evidence gate because Chinese evidence was still insufficient.
+This is expected conservative behavior and the product DB was not modified.
+
+Use `config/dictionary-v2-production-v117.json` for reviewed target-acquisition
+batches. Supplemental sources only become strong when their exact source key is
+explicitly supplied and metadata proves a production-publishable,
+candidate-bound, independent Qwen/Gemma-reviewed subset. Never promote a model
+suggestion as lexical evidence. Keep expanding Mainland Chinese and Japanese
+independent sources, then rerun the same controlled no-write pipeline before
+replay and promotion.
+
+## Remote production runner (2026-08-20)
+
+The generation pipeline has a validated jump-host deployment at
+`100.99.99.99`, rooted at `D:\linguago-runner`. It contains the hash-matched
+v123 product DB and evidence DBs. Use
+`scripts/verify-remote-dictionary-runner.ps1` before work and
+`scripts/manage-remote-dictionary-runner.ps1` for start/run/status/stop.
+Background runs are owned by the Scheduled Task
+`Linguago Remote Dictionary Pipeline` and protected by a host-wide lock.
+
+`scripts/watch-remote-dictionary-runner.ps1` is the read-only monitoring entry
+point. Its optional `-UseAgy` analysis is advisory and requires prior Google
+OAuth login on the jump host. Deterministic reports and audits, not an agent,
+control database promotion and release. The 20- and 100-row migration smoke
+tests made no DB writes and validated resume, model calls, empty funnels,
+concurrent-run rejection, and cleanup.
+
+The permanent deployment split is local control plane plus jump-host execution
+plane. Frontend/Worker edits and fixed production commands originate locally;
+the jump host owns model runs, product DB mutation, promotion, D1 publication,
+Worker deployment, and online regression. GPU nodes are inference-only.
+`scripts/invoke-dictionary-control.ps1` is the local whitelist entry point.
+Worker deployments must use a clean, committed, SHA-256-pinned Git archive
+staged under `D:\linguago-deploy\releases`, and the expected cache version must
+match the archived `worker/config.ts`. The remote Worker gate captures a
+rollback version before deployment and rolls back after failed online checks.
+Remote D1/Worker execution is currently credential-blocked until a scoped
+Cloudflare API token is installed in the Scheduled Task user environment; dry
+runs are validated and do not require that token.

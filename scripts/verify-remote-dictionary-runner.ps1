@@ -1,15 +1,19 @@
+param(
+  [string]$Root = 'D:\linguago-runner',
+  [string]$Manifest = 'config\remote-runner-files.json',
+  [int[]]$EndpointPorts = @(11444, 11445, 11446, 11447, 11448),
+  [switch]$SkipEndpoints
+)
+
 $ErrorActionPreference = 'Stop'
-
-$Root = 'D:\linguago-runner'
-$Expected = @{
-  'data\processed\linguago_v2_full.db' = '795B0C2600D9C752FC87AD134AC804BABCBD4EC6294098D1362EE2F274DCF839'
-  'data\processed\linguago_v2_product_top5000_freedict_filtered_candidate.db' = 'D9E67D1D7E03520EDABC8738CFE1DEDB8FAA6B0C2D7F5E7C1E6AF785F3D11A82'
-  '.tmp\combined\openwn-word2word3-ja-apertium-wikidata-v3-evidence.db' = '9116F811F806FD8E1F34E2F75A8E91CBB65AFDDB68B2AE934896EFC74AC3366F'
-  'data\raw\JMdict_e.gz' = 'C2A7A77A003DFA9EAADF126B8DAA23B08C868699C6A2672728E5E46D0754FF8E'
-  'data\processed\kaikki_portuguese_pronunciations.db' = '902BFC1E4AA48EC101D5FDDAEC6B6B79A265C122819ED34991D916EF18DD4124'
+$ManifestPath = Join-Path $Root $Manifest
+if (-not (Test-Path -LiteralPath $ManifestPath)) {
+  throw "Remote runner manifest not found: $ManifestPath"
 }
+$Expected = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 
-$Files = foreach ($RelativePath in $Expected.Keys) {
+$Files = foreach ($Entry in $Expected.files) {
+  $RelativePath = [string]$Entry.path
   $Path = Join-Path $Root $RelativePath
   if (-not (Test-Path -LiteralPath $Path)) {
     [pscustomobject]@{ Path = $RelativePath; Exists = $false; HashMatches = $false; Bytes = 0 }
@@ -19,8 +23,9 @@ $Files = foreach ($RelativePath in $Expected.Keys) {
   [pscustomobject]@{
     Path = $RelativePath
     Exists = $true
-    HashMatches = $Hash -eq $Expected[$RelativePath]
+    HashMatches = $Hash -eq ([string]$Entry.sha256).ToUpperInvariant()
     Bytes = (Get-Item -LiteralPath $Path).Length
+    Hash = $Hash
   }
 }
 
@@ -36,17 +41,21 @@ try {
 }
 
 $KeySet = -not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable('UNSLOTH_API_KEY', 'User'))
-$Endpoints = foreach ($Port in 11447, 11448, 11444) {
+$Endpoints = if ($SkipEndpoints) { @() } else { foreach ($Port in $EndpointPorts) {
   try {
     $null = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/health" -TimeoutSec 10
     [pscustomobject]@{ Port = $Port; Healthy = $true; Error = $null }
   } catch {
     [pscustomobject]@{ Port = $Port; Healthy = $false; Error = $_.Exception.Message }
   }
-}
+} }
 $Result = [pscustomobject]@{
   Ok = (($Files | Where-Object { -not $_.Exists -or -not $_.HashMatches }).Count -eq 0) -and
-    (($Endpoints | Where-Object { -not $_.Healthy }).Count -eq 0)
+    ($SkipEndpoints -or (($Endpoints | Where-Object { -not $_.Healthy }).Count -eq 0)) -and
+    $KeySet
+  CheckedAt = [DateTime]::UtcNow.ToString('o')
+  Root = $Root
+  Manifest = $Manifest
   Node = $NodeVersion
   UnslothKey = if ($KeySet) { 'set' } else { 'missing' }
   Endpoints = @($Endpoints)

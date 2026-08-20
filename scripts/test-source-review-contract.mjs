@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {
   definitionContractLanguageLooksRight,
-  validateDefinitionContract
+  validateDefinitionContract,
+  validateSourceReviewEnvelope
 } from './lib/source-review-contract.mjs';
 
 const terms = {
@@ -78,5 +79,31 @@ const copiedTermErrors = validateDefinitionContract(
 for (const lang of ['en', 'pt-BR', 'zh', 'ja']) {
   assert(copiedTermErrors.includes(`thin_definition_contract_${lang}`));
 }
+
+assert.deepEqual(
+  validateSourceReviewEnvelope({
+    decision: 'reject',
+    confidence: 0.98,
+    english_anchor: null,
+    preferred_terms: { en: null, 'pt-BR': null, zh: null, ja: null },
+    definition_contract: { en: null, 'pt-BR': null, zh: null, ja: null },
+    reason: 'The source sense is a proper name.',
+    evidence: ['Dictionary evidence identifies a surname.'],
+    risk_flags: null
+  }),
+  []
+);
+
+assert(
+  validateSourceReviewEnvelope({
+    decision: 'accept',
+    confidence: 0.98,
+    english_anchor: null,
+    preferred_terms: { en: null, 'pt-BR': null, zh: null, ja: null },
+    reason: 'Accepted.',
+    evidence: ['Evidence.'],
+    risk_flags: []
+  }).includes('invalid_english_anchor')
+);
 
 console.log('source-review contract tests passed');

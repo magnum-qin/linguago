@@ -9,6 +9,8 @@ import { pinyin } from 'pinyin-pro';
 import * as OpenCC from 'opencc-js';
 import { definitionContractLanguageLooksRight } from './lib/source-review-contract.mjs';
 import {
+  compositionalJapanesePhraseReadings,
+  compositionalJapaneseNumberReadings,
   normalizeJapaneseKanaReading,
   selectCanonicalJapaneseReading,
   transparentJapaneseCompoundReadings
@@ -146,6 +148,7 @@ const enforceReviewedPreferredTerms = args['enforce-reviewed-preferred-terms'] =
     : replayReportStats?.enforce_reviewed_preferred_terms !== false
   : args['enforce-reviewed-preferred-terms'] !== 'false';
 const enforceGenerationHintTerms = args['enforce-generation-hint-terms'] === 'true';
+const requireExamples = args['require-examples'] === 'true';
 const qualityReview = args['quality-review'] === 'true';
 const qualityReviewConfidence = Number(args['quality-review-confidence'] || 0.9);
 const qualityReviewMaxTokens = Number(args['quality-review-max-tokens'] || 260);
@@ -494,6 +497,7 @@ const stats = {
   require_evidence_verdict: requireEvidenceVerdict,
   enforce_reviewed_preferred_terms: enforceReviewedPreferredTerms,
   enforce_generation_hint_terms: enforceGenerationHintTerms,
+  require_examples: requireExamples,
   quality_review: qualityReview,
   quality_review_confidence: qualityReviewConfidence,
   quality_review_max_tokens: qualityReviewMaxTokens,
@@ -543,6 +547,8 @@ const stats = {
   senses_reused: 0,
   localizations_upserted: 0,
   source_links_upserted: 0,
+  examples_upserted: 0,
+  example_localizations_upserted: 0,
   chunks_committed: 0,
   endpoint_metrics: {}
 };
@@ -558,6 +564,11 @@ stats.validation_rejected = generated.filter(
   (item) => !item.valid && !item.infrastructure_failure && !item.errors?.includes('source_evidence_mismatch')
 ).length;
 const generationChunks = chunkRows(selected, chunkSize, false);
+if (generationChunks.length === 0) {
+  // An empty, fully filtered batch is a successful checkpointed run, not a
+  // missing-artifact failure for the parent pipeline.
+  updateCheckpoint(checkpoint, [], [], stats, 0, 0);
+}
 for (let chunkIndex = 0; chunkIndex < generationChunks.length; chunkIndex++) {
   const chunk = generationChunks[chunkIndex];
   const pool = await runGenerationPool(chunk);
@@ -672,7 +683,9 @@ function replayGeneratedReport() {
     senses_inserted: 0,
     senses_reused: 0,
     localizations_upserted: 0,
-    source_links_upserted: 0
+    source_links_upserted: 0,
+    examples_upserted: 0,
+    example_localizations_upserted: 0
   };
   const writes = apply && accepted.length && !dryRun ? applyOutputs(accepted, replayStats) : [];
   updateCheckpoint(
@@ -898,7 +911,7 @@ function lockedTargetTerm(row, lang) {
 
 function buildPerLanguageGenerationPrompt(row, lang, term) {
   const readingLabel = lang === 'zh' ? 'pinyin' : lang === 'ja' ? 'kana' : 'IPA';
-  const definitionContract = reviewedDefinitionContract(row, lang);
+  const definitionContract = reviewedDefinitionContract(row, lang, term);
   const languageRule =
     lang === 'zh'
       ? 'Use Simplified Chinese. D must contain at least 8 Chinese characters, explain what T means, and must not equal T.'
@@ -2000,7 +2013,7 @@ function buildCompactPrompt(row) {
     suggestedTerms ? `Semantic term constraints: ${suggestedTerms}` : '',
     japaneseContract ? `Required JA term and reading: ${japaneseContract}` : '',
     definitionContract ? `Required definition contract: ${definitionContract}` : '',
-    'Top-level keys: headword, normalized_key, primary_lang, frequency_rank, part_of_speech, gloss_key, source_evidence_valid, source_evidence_reason, localizations.',
+    `Top-level keys: headword, normalized_key, primary_lang, frequency_rank, part_of_speech, gloss_key, source_evidence_valid, source_evidence_reason, localizations${requireExamples ? ', example' : ''}.`,
     'Set source_evidence_valid=true only when Meaning is a real sense of the source-language headword; otherwise set false and explain source_evidence_reason.',
     'Localizations: en, pt-BR, zh, ja.',
     'en and pt-BR fields: term, pronunciation, pronunciation_system, definition.',
@@ -2023,12 +2036,19 @@ function buildCompactPrompt(row) {
     'If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.',
     "Use one coherent dictionary sense only. WikDict/OMW evidence can contain homographs from unrelated languages; never mix unrelated senses such as Portuguese verb forms with English area unit 'are'.",
     'Definitions must be natural explanations in the same language as the localization; do not copy the English meaning gloss as a definition for other languages.',
-    'For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term.',
+    'Every definition must explain the term rather than repeat it. English and Portuguese definitions require at least 6 words; Chinese requires at least 8 Chinese characters; Japanese requires at least 12 Japanese characters.',
+    'For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term. Never place Chinese text in the Japanese definition.',
     'gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.',
     'Use Simplified Chinese for zh. zh.reading must be pinyin with tone marks or tone numbers, not hanzi.',
     'Use kana for ja reading. ja.reading must contain Japanese kana, not romaji.',
     'Use IPA for en and pt-BR.'
   ];
+  if (requireExamples) {
+    lines.push(
+      'Also return example={"source_lang":"zh","source_text":"简体中文例句","localizations":{"en":"English sentence","pt-BR":"Frase em português brasileiro","zh":"同一个简体中文例句","ja":"日本語の文"}}.',
+      'The example must naturally demonstrate this exact sense. source_text must be Simplified Chinese and equal example.localizations.zh. Every localization must translate the same sentence and use the corresponding localized term naturally.'
+    );
+  }
   if (Array.isArray(row.latest_errors) && row.latest_errors.includes('quality_review_rejected')) {
     const details = Array.isArray(row.latest_quality_review_errors)
       ? row.latest_quality_review_errors.join('; ')
@@ -2106,12 +2126,20 @@ function buildCompactBatchPrompt(rows) {
     'If source language is zh or ja, en.pronunciation and pt-BR.pronunciation must pronounce the translated English/Portuguese term, not the source-language word.',
     "Use one coherent dictionary sense only. WikDict/OMW evidence can contain homographs from unrelated languages; never mix unrelated senses such as Portuguese verb forms with English area unit 'are'.",
     'Definitions must be natural explanations in the same language as the localization; do not copy the English meaning gloss as a definition for other languages.',
-    'For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term.',
+    'Every definition must explain the term rather than repeat it. English and Portuguese definitions require at least 6 words; Chinese requires at least 8 Chinese characters; Japanese requires at least 12 Japanese characters.',
+    'For zh and ja, definition must be a complete Chinese/Japanese explanation, not just the translated term. Never place Chinese text in the Japanese definition.',
     'gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.',
     'zh.reading must be pinyin with tone marks or tone numbers, not hanzi. ja.reading must contain Japanese kana, not romaji.',
     'Inputs:',
     ...inputLines
   ];
+  if (requireExamples) {
+    lines.splice(
+      lines.length - inputLines.length - 1,
+      0,
+      'Each item must also include example={source_lang:"zh",source_text:"简体中文例句",localizations:{en:"",pt-BR:"",zh:"",ja:""}}. The four texts must express the same sentence and exact sense.'
+    );
+  }
   if (residualMode) lines.push(...residualPromptRules());
   return lines.join('\n');
 }
@@ -2119,13 +2147,13 @@ function buildCompactBatchPrompt(rows) {
 function compactDefinitionContract(row) {
   const normalized = Object.fromEntries(
     ['en', 'pt-BR', 'zh', 'ja']
-      .map((lang) => [lang, reviewedDefinitionContract(row, lang)])
+      .map((lang) => [lang, reviewedDefinitionContract(row, lang, lockedTargetTerm(row, lang))])
       .filter(([, value]) => value)
   );
   return Object.keys(normalized).length ? JSON.stringify(normalized) : '';
 }
 
-function reviewedDefinitionContract(row, lang) {
+function reviewedDefinitionContract(row, lang, term = '') {
   const explicitCorrection = row?.structured_correction_retry?.corrections?.find(
     (item) => item?.language === lang && item?.field === 'definition' && nonEmpty(item?.replacement)
   );
@@ -2133,7 +2161,7 @@ function reviewedDefinitionContract(row, lang) {
 
   const value = String(row?.candidate_evidence_review?.definition_contract?.[lang] || '').trim();
   if (!value || /(?:^|\s)(?:en|pt(?:-BR)?|zh|ja)\s*:/iu.test(value)) return '';
-  if (!definitionLanguageLooksRight(value, lang) || definitionTooThin(value, lang, '')) return '';
+  if (!definitionLanguageLooksRight(value, lang) || definitionTooThin(value, lang, term)) return '';
 
   const englishAnchor = String(row?.candidate_evidence_review?.english_anchor || '').trim();
   if (lang !== 'en' && englishAnchor && normalize(value) === normalize(englishAnchor)) return '';
@@ -2144,7 +2172,7 @@ function reviewedDefinitionContract(row, lang) {
 function applyReviewedDefinitionContracts(row, output) {
   if (!output?.localizations) return output;
   for (const lang of LANGS) {
-    const definition = reviewedDefinitionContract(row, lang);
+    const definition = reviewedDefinitionContract(row, lang, output.localizations?.[lang]?.term);
     if (!definition || !output.localizations[lang]) continue;
     output.localizations[lang] = {
       ...output.localizations[lang],
@@ -2291,7 +2319,39 @@ function validateOutput(row, output) {
   }
   const knownMismatch = knownSemanticMismatch(row, output);
   if (knownMismatch) errors.push(knownMismatch);
+  if (requireExamples) validateGeneratedExample(errors, output.example);
   return { errors };
+}
+
+function validateGeneratedExample(errors, example) {
+  if (!example || typeof example !== 'object' || Array.isArray(example)) {
+    errors.push('missing_required_example');
+    return;
+  }
+  if (example.source_lang !== 'zh') errors.push('example_source_lang_not_zh');
+  const sourceText = String(example.source_text || '').trim();
+  if (!sourceText) errors.push('example_missing_source_text');
+  if (sourceText && toMainlandSimplified(sourceText) !== sourceText) {
+    errors.push('example_source_not_simplified');
+  }
+  const localizations = example.localizations;
+  if (!localizations || typeof localizations !== 'object' || Array.isArray(localizations)) {
+    errors.push('example_missing_localizations');
+    return;
+  }
+  for (const lang of LANGS) {
+    const text = String(localizations[lang] || '').trim();
+    if (!text) {
+      errors.push(`example_missing_${lang}`);
+      continue;
+    }
+    validateGeneratedText(errors, `example_${lang}`, text);
+    if (!definitionLanguageLooksRight(text, lang)) errors.push(`example_language_${lang}`);
+    if (lang === 'zh' && toMainlandSimplified(text) !== text) errors.push('example_zh_not_simplified');
+  }
+  if (sourceText && String(localizations.zh || '').trim() !== sourceText) {
+    errors.push('example_source_zh_mismatch');
+  }
 }
 
 function validateGeneratedText(errors, field, value) {
@@ -2385,7 +2445,32 @@ function normalizeGeneratedOutput(row, output) {
   applyGenerationContractReading(row, normalized);
   applyUniqueJmdictReading(normalized);
   applyDeterministicPronunciations(normalized);
+  if (normalized.example && typeof normalized.example === 'object') {
+    normalized.example = normalizeGeneratedExample(normalized.example);
+  }
   return normalized;
+}
+
+function normalizeGeneratedExample(example) {
+  const localizations = example?.localizations && typeof example.localizations === 'object'
+    ? Object.fromEntries(
+        LANGS.map((lang) => {
+          const value = example.localizations[lang];
+          const text = typeof value === 'string' ? value : value?.text;
+          return [lang, lang === 'zh' ? toMainlandSimplified(text) : String(text || '').trim()];
+        })
+      )
+    : {};
+  // The public product contract always stores the Simplified Chinese sentence
+  // as the source example. Models occasionally anchor source_text to the input
+  // language even though the four localized sentences are otherwise correct.
+  const sourceText = toMainlandSimplified(localizations.zh || example?.source_text || '');
+  localizations.zh = sourceText;
+  return {
+    source_lang: 'zh',
+    source_text: sourceText,
+    localizations
+  };
 }
 
 function toMainlandSimplified(value) {
@@ -2457,7 +2542,9 @@ function applyReviewedEvidenceTerms(row, output) {
   if (review?.decision !== 'accept' || Number(review.confidence) < 0.9) return;
   const preferredTerms = review.preferred_terms || {};
   for (const lang of LANGS) {
-    const term = String(preferredTerms[lang] || '').trim();
+    const term = String(
+      preferredTerms[lang] || safelyBoundReviewedSuggestion(row, lang) || ''
+    ).trim();
     if (!term || !output.localizations?.[lang]) continue;
     output.localizations = { ...output.localizations };
     output.localizations[lang] = {
@@ -2478,6 +2565,33 @@ function applyReviewedEvidenceTerms(row, output) {
     reading_system: 'kana',
     term_source: 'deterministic:reviewed-source-evidence'
   };
+}
+
+function safelyBoundReviewedSuggestion(row, lang) {
+  // Source review suggestions are not lexical evidence. The only fallback
+  // allowed here repairs an English hint whose separators were lost by an
+  // upstream gloss normalizer (for example "trifle trifling matter"). The
+  // selected word must still be present as a complete phrase in both the
+  // reviewed anchor and an independently built generation hint; reverse
+  // evidence and final Gemma review remain mandatory downstream.
+  if (lang !== 'en') return '';
+  const review = row?.candidate_evidence_review;
+  if (review?.decision !== 'accept' || Number(review.confidence) < 0.9) return '';
+  const suggestion = String(review?.suggested_terms?.en || '').trim();
+  if (!suggestion) return '';
+  const normalizedSuggestion = normalize(suggestion);
+  if (!nonEmpty(review?.definition_contract?.en)) return '';
+  const hints = row?.generation_hints?.en?.terms || [];
+  return hints.some((hint) => startsWithWholePhrase(normalize(hint), normalizedSuggestion))
+    ? suggestion
+    : '';
+}
+
+function startsWithWholePhrase(value, phrase) {
+  if (!value || !phrase) return false;
+  const normalizedValue = String(value).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const normalizedPhrase = String(phrase).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  return normalizedValue === normalizedPhrase || normalizedValue.startsWith(`${normalizedPhrase} `);
 }
 
 function applyGenerationHintTerms(row, output) {
@@ -2631,6 +2745,8 @@ function expectedJapaneseReadings(term) {
 function lookupJapaneseReadings(term) {
   const direct = getJmdictReadingMap().get(term);
   if (direct?.size) return direct;
+  const numberReadings = compositionalJapaneseNumberReadings(term);
+  if (numberReadings?.size) return numberReadings;
   const canonicalTerm = JMDICT_CANONICAL_TERM_ALIASES.get(term);
   if (canonicalTerm) {
     const canonicalReadings = getJmdictReadingMap().get(canonicalTerm);
@@ -2643,6 +2759,11 @@ function lookupJapaneseReadings(term) {
     (prefix) => getJmdictReadingMap().get(prefix)
   );
   if (transparentCompoundReadings?.size) return transparentCompoundReadings;
+  const phraseReadings = compositionalJapanesePhraseReadings(
+    term,
+    (segment) => getJmdictReadingMap().get(segment)
+  );
+  if (phraseReadings?.size) return phraseReadings;
   for (const [suffix, suffixReading] of JMDICT_COMPOSITIONAL_SUFFIX_READINGS) {
     if (!term.endsWith(suffix) || term.length <= suffix.length) continue;
     const baseReadings = getJmdictReadingMap().get(term.slice(0, -suffix.length));
@@ -2903,6 +3024,31 @@ function applyOutputs(items, stats) {
         (product_sense_id, source_entry_id, source_sense_id, source_lang, source_word, source_frequency_rank, match_method, confidence)
       VALUES
         (@product_sense_id, @source_entry_id, @source_sense_id, @source_lang, @source_word, @source_frequency_rank, 'source_gap_unsloth', 0.78)
+    `),
+    upsertExample: db.prepare(`
+      INSERT INTO product_examples
+        (product_sense_id, source_example_id, example_order, source_lang, source_text, source, confidence, needs_review)
+      VALUES
+        (@product_sense_id, @source_example_id, 1, 'zh', @source_text, @source, 0.78, @needs_review)
+      ON CONFLICT(product_sense_id, source_example_id) DO UPDATE SET
+        source_lang = excluded.source_lang,
+        source_text = excluded.source_text,
+        source = excluded.source,
+        confidence = excluded.confidence,
+        needs_review = excluded.needs_review
+      RETURNING id
+    `),
+    upsertExampleLocalization: db.prepare(`
+      INSERT INTO product_example_localizations
+        (product_example_id, lang, text, reading, source, confidence, needs_review)
+      VALUES
+        (@product_example_id, @lang, @text, NULL, @source, 0.78, @needs_review)
+      ON CONFLICT(product_example_id, lang) DO UPDATE SET
+        text = excluded.text,
+        reading = excluded.reading,
+        source = excluded.source,
+        confidence = excluded.confidence,
+        needs_review = excluded.needs_review
     `)
   };
 
@@ -2995,6 +3141,29 @@ function applyOutputs(items, stats) {
           needs_review: appliedLocalizationNeedsReview
         });
         stats.localizations_upserted++;
+      }
+      if (item.example?.source_text && item.example?.localizations) {
+        const sourceExampleId = -Math.abs(Number(item.source_sense_id || item.source_entry_id || senseId));
+        const exampleId = Number(
+          statements.upsertExample.get({
+            product_sense_id: senseId,
+            source_example_id: sourceExampleId,
+            source_text: item.example.source_text,
+            source: SOURCE,
+            needs_review: appliedLocalizationNeedsReview
+          }).id
+        );
+        stats.examples_upserted++;
+        for (const lang of LANGS) {
+          statements.upsertExampleLocalization.run({
+            product_example_id: exampleId,
+            lang,
+            text: item.example.localizations[lang],
+            source: SOURCE,
+            needs_review: appliedLocalizationNeedsReview
+          });
+          stats.example_localizations_upserted++;
+        }
       }
       if (item.source_entry_id && item.source_sense_id) {
         stats.source_links_upserted += statements.insertSourceLink.run({
