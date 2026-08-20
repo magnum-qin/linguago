@@ -32,23 +32,28 @@ where exact replay was idempotent, deterministic promotion accepted 11/11,
 published-risk stayed at zero, and native D1 export/full memory import passed
 with all blocking integrity counts at zero.
 
-The main product DB and production D1 were not modified. The main DB SHA-256 is
-still `BBE5BBAC54A7D14113D9198783CCBCEA31978104804676EA39570F09D4D9F569`.
-Before enabling unattended production writes, implement a guarded controller
-that verifies expected hashes and isolated-validation evidence, creates a
-backup, writes/promotes in bounded transactions, reruns audits, and rolls back
-on failure. Remote Cloudflare authentication is a separate requirement for D1
-publication. Do not give `agy` authority over writes or deployment; its desktop
-OAuth is not currently available to the SSH/Scheduled Task context.
+The guarded controller subsequently committed the 11 accepted senses to the
+jump-host main product DB. The committed DB now contains 40,793 entries, 47,105
+senses, and 188,420 sense localizations and hashes to
+`D97F300A4E17E70D0ED06916B15807CC472EE3B5D6C70BD4DD1D9886526D954C`.
+The retained rollback DB is
+`D:\linguago-runner\backups\v124-remote-generated-candidate100-main-before-commit-20260820-154026.db`.
+Exact replay, promotion, published-risk, and full export/import audits passed.
+Production D1 and the Worker remain on v123 until the Cloudflare account issue
+below is corrected. Do not give `agy` authority over writes or deployment;
+deterministic release artifacts remain authoritative.
 
 The remote D1 gate is implemented separately by
-`release-remote-dictionary-d1.ps1`. Its first `Execute=false` rehearsal against
-the v124 isolated DB regenerated 24 native SQL chunks and passed full import
-audit for 40,793 entries and 47,105 senses without contacting Cloudflare.
-Execute mode is intentionally unavailable until the jump-host Cloudflare OAuth
-is replaced by a scoped non-interactive token; the detected OAuth token is
-expired. Worker source synchronization, cache bump, deployment, and online
-regression are not yet part of this D1 controller.
+`release-remote-dictionary-d1.ps1`. Its `Execute=false` rehearsal regenerated
+24 native SQL chunks and passed full import audit for 40,793 entries and 47,105
+senses without contacting Cloudflare. A scoped non-interactive token was then
+installed successfully, but it belongs to Cloudflare account
+`1fe446be160662c15527a4f536e5901a`; the production D1 configuration belongs to
+account `3ebbb03df81b809142eec47c07ef6801`. Consequently `wrangler d1 list`
+returns an empty list and the execute attempt stopped before the Time Travel
+bookmark or any D1 write. A token created under the production account is still
+required. The prepared Worker cache version is `v124-remote11-40793`; do not
+deploy it before D1 counts match the v124 manifest.
 
 The v123 run used Gemma review dynamically across `11444-11448`; Qwen complete
 record generation used `11447/11448`. A sandboxed first attempt reported

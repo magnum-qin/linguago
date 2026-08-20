@@ -16,9 +16,13 @@
 - Its 11 final accepts passed isolated controlled replay, idempotent replay,
   11/11 deterministic promotion, published-risk (`flagged_senses=0`), native
   export, and full in-memory import audit. Blocking audit counts were all zero.
-- The production DB was not modified and still hashes to
-  `BBE5BBAC54A7D14113D9198783CCBCEA31978104804676EA39570F09D4D9F569`.
-  D1 and Worker were not changed.
+- The guarded controller committed the 11 accepted senses to the jump-host main
+  DB. It now hashes to
+  `D97F300A4E17E70D0ED06916B15807CC472EE3B5D6C70BD4DD1D9886526D954C`
+  and contains 40,793 entries, 47,105 senses, and 188,420 localizations. The
+  rollback DB is
+  `D:\linguago-runner\backups\v124-remote-generated-candidate100-main-before-commit-20260820-154026.db`.
+  D1 and Worker are still unchanged.
 - Important Windows lesson: PowerShell 5.1 JSON readers must use explicit
   UTF-8. `Get-Content` can decode Node-generated Chinese/Japanese JSON through
   the legacy code page and cause false mojibake/parse failures.
@@ -34,10 +38,13 @@
 - `agy` remains optional and read-only. Desktop OAuth was not visible in the
   SSH/Scheduled Task context, so deterministic manifests, checkpoints, and
   audits remain authoritative.
-- Cloudflare remote release is currently blocked by authentication, not code:
-  Wrangler 4.107.0 is installed and finds an OAuth profile, but `whoami` reports
-  that its token expired and cannot refresh non-interactively. Install a scoped
-  user-level `CLOUDFLARE_API_TOKEN` before enabling D1/Worker publication.
+- Cloudflare remote release is currently blocked by account selection, not
+  token parsing or runner code. The installed API token authenticates account
+  `1fe446be160662c15527a4f536e5901a`, while production D1 belongs to
+  `3ebbb03df81b809142eec47c07ef6801`. `whoami` succeeds but `d1 list` is empty;
+  the formal release stopped before bookmark capture or D1 writes. Install a
+  scoped user-level token created under the production account and keep
+  `NODE_OPTIONS=--dns-result-order=ipv4first` on the jump host.
 - `release-remote-dictionary-d1.ps1` now implements the hash-locked D1 gate.
   Its v124 `Execute=false` rehearsal generated 24 native SQL chunks and passed
   full memory-import audit for 40,793 entries/47,105 senses; it reported

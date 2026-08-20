@@ -274,6 +274,14 @@ Before enabling remote D1 publication, configure a scoped
 context as the Scheduled Task. Never copy an interactive OAuth file into the
 runner or commit a token to Git.
 
+The first scoped-token attempt exposed a second, distinct failure mode. The
+token authenticated successfully but belonged to account
+`1fe446be160662c15527a4f536e5901a`, whereas the configured production D1 belongs
+to `3ebbb03df81b809142eec47c07ef6801`. In that state `wrangler whoami` succeeds
+but `wrangler d1 list --json` returns `[]`. Treat a nonempty list containing
+`linguago-dictionary` as part of authentication readiness; `whoami` alone is
+not sufficient. The release gate stopped before bookmark capture or D1 writes.
+
 `release-remote-dictionary-d1.ps1` is the separate D1 publication gate. It
 requires an exact DB hash, refuses to run beside pipeline/database release
 locks, regenerates native SQL, and runs the full in-memory import audit. Its
