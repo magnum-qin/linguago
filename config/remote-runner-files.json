@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-20T06:01:19.1433341Z",
+    "generated_at":  "2026-08-21T03:45:35.0000000Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
@@ -100,13 +100,13 @@
                   },
                   {
                       "path":  "scripts\\check-remote-cloudflare-auth.ps1",
-                      "bytes":  1625,
-                      "sha256":  "1F755B72D39C8D4635AF4E3C9CBA8B970C2BCC9227FA0A1C85239D86CAC37FEE"
+                      "bytes":  3091,
+                      "sha256":  "158575662B07A95873E137F74945B689E38133DC6AC5CA83387BA889BB7B5236"
                   },
                   {
                       "path":  "scripts\\release-remote-dictionary-d1.ps1",
-                      "bytes":  6336,
-                      "sha256":  "92900DF7343DC95EC982E4603D1B16F8DFCF56A6E318C51E51021664E957E757"
+                      "bytes":  7352,
+                      "sha256":  "371D01788ED5CFF5F03DB78081824E8468D2771225E44547A3632F0669652638"
                   },
                   {
                       "path":  "scripts\\push-dictionary-v2-native-to-d1.ps1",
@@ -120,8 +120,8 @@
                   },
                   {
                       "path":  "scripts\\deploy-remote-worker-release.ps1",
-                      "bytes":  6695,
-                      "sha256":  "1237922AAB535A5BF92969FEC4FED65DC40DD359FD721EC53F4BF846B2557FB6"
+                      "bytes":  7884,
+                      "sha256":  "9C16A5D497CDABFE74CD6438B3528F9E5A3E2772E23BC16570224E2760619326"
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-production-batch.ps1",
@@ -180,8 +180,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  350441472,
-                      "sha256":  "BBE5BBAC54A7D14113D9198783CCBCEA31978104804676EA39570F09D4D9F569"
+                      "bytes":  350461952,
+                      "sha256":  "D97F300A4E17E70D0ED06916B15807CC472EE3B5D6C70BD4DD1D9886526D954C"
                   }
               ]
 }

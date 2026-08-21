@@ -1,12 +1,12 @@
 # Dictionary Remote Runner
 
-## Remote runner baseline (2026-08-20)
+## Remote runner baseline (2026-08-21)
 
-The jump host now has a hash-verified copy of the v123 runner and product data.
+The jump host now has a hash-verified copy of the v124 runner and product data.
 The installed product database SHA-256 is
-`BBE5BBAC54A7D14113D9198783CCBCEA31978104804676EA39570F09D4D9F569`.
-The previous remote database is backed up as
-`D:\linguago-runner\backups\product-before-v123-20260820-124336.db`.
+`D97F300A4E17E70D0ED06916B15807CC472EE3B5D6C70BD4DD1D9886526D954C`.
+The immediate pre-v124 remote database is backed up as
+`D:\linguago-runner\backups\v124-remote-generated-candidate100-main-before-commit-20260820-154026.db`.
 Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
