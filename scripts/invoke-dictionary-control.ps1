@@ -5,6 +5,12 @@ param(
   [string]$RunId = '',
   [string]$Batch = '',
   [int]$Limit = 100,
+  [int]$GenerationTarget = 20,
+  [string]$SupplementalSourceDb = '',
+  [object]$ReverseEvidencePrefilter = $false,
+  [int]$ReverseEvidenceMinTargetLangs = 2,
+  [int]$ReverseEvidencePrefilterLimit = 1000000,
+  [object]$EnforceGenerationHintTerms = $false,
   [string]$ExpectedMainSha256 = '',
   [string]$DbPath = '',
   [string]$ExpectedDbSha256 = '',
@@ -49,9 +55,18 @@ switch ($Action) {
   'start' {
     Require-Value $RunId 'RunId'
     Require-Value $Batch 'Batch'
-    Invoke-RemoteScript 'manage-remote-dictionary-runner.ps1' @(
-      '-Action', 'start', '-RunId', $RunId, '-Batch', $Batch
+    $StartArguments = @(
+      '-Action', 'start', '-RunId', $RunId, '-Batch', $Batch,
+      '-GenerationTarget', [string]$GenerationTarget,
+      '-ReverseEvidencePrefilter', [string]$ReverseEvidencePrefilter,
+      '-ReverseEvidenceMinTargetLangs', [string]$ReverseEvidenceMinTargetLangs,
+      '-ReverseEvidencePrefilterLimit', [string]$ReverseEvidencePrefilterLimit,
+      '-EnforceGenerationHintTerms', [string]$EnforceGenerationHintTerms
     )
+    if (-not [string]::IsNullOrWhiteSpace($SupplementalSourceDb)) {
+      $StartArguments += @('-SupplementalSourceDb', $SupplementalSourceDb)
+    }
+    Invoke-RemoteScript 'manage-remote-dictionary-runner.ps1' $StartArguments
   }
   'status' {
     Require-Value $RunId 'RunId'

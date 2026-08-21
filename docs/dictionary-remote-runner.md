@@ -313,6 +313,37 @@ npm.cmd run dict:v2:remote-control -- -Action start -RunId <run-id> -Batch <rela
 npm.cmd run dict:v2:remote-control -- -Action status -RunId <run-id>
 ```
 
+For production source-gap batches, enable the local reverse-evidence prefilter
+before any Gemma review:
+
+```powershell
+npm.cmd run dict:v2:remote-control -- `
+  -Action start `
+  -RunId <run-id> `
+  -Batch <relative-batch-path> `
+  -GenerationTarget 100 `
+  -ReverseEvidencePrefilter true `
+  -ReverseEvidenceMinTargetLangs 2 `
+  -ReverseEvidencePrefilterLimit 500 `
+  -SupplementalSourceDb .tmp\combined\openwn-word2word3-ja-apertium-wikidata-v3-evidence.db `
+  -EnforceGenerationHintTerms true
+```
+
+Measured on 2026-08-21:
+
+- `v125-remote-production500`, without the prefilter: 500 Gemma source
+  reviews and 15 final accepted entries.
+- `v126-prefilter500`, with the prefilter: 500 local checks, 16 Gemma source
+  reviews, and 5 final accepted entries.
+- Initial Gemma calls per final accepted entry fell from about `33.3` to `3.2`,
+  approximately a 10x efficiency improvement.
+- The local prefilter took about 114 seconds for 500 candidates and did not
+  write to the product database.
+
+Keep the prefilter enabled for throughput-oriented production. Disable it only
+for an explicit recall audit, because it intentionally rejects candidates that
+do not yet have enough independent local dictionary evidence.
+
 Database commit and D1 publication require explicit expected SHA-256 values.
 Worker source staging accepts only a clean local Git worktree, creates a
 `git archive` for a full 40-character commit, verifies the archive SHA-256 on

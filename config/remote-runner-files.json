@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-21T04:08:22.7063094Z",
+    "generated_at":  "2026-08-21T04:37:14.3312387Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
@@ -65,8 +65,8 @@
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-runner.ps1",
-                      "bytes":  11695,
-                      "sha256":  "670D546DB67FEA61B5E52BC8647D991CED1C43A78AF5D9D04C106287EAFC7119"
+                      "bytes":  11948,
+                      "sha256":  "0DF82CA3B658D361C4657E3160CA2FDA8F89858C40BDDE6DE5ED1B36C218B7F9"
                   },
                   {
                       "path":  "scripts\\run-remote-dictionary-runner-job.ps1",
@@ -180,8 +180,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  350482432,
-                      "sha256":  "0C2E57ECDE702A32645CC3793A1C402B1B67AE2ED9362609C89D2780EB5A58D3"
+                      "bytes":  350498816,
+                      "sha256":  "4265891F3A5E07A5A2B15AFE749E42B8C8F58F99AB442238BA88A188E9632F90"
                   }
               ]
 }
