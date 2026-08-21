@@ -2,11 +2,11 @@
 
 ## Remote runner baseline (2026-08-21)
 
-The jump host now has a hash-verified copy of the v124 runner and product data.
-The installed product database SHA-256 is
-`D97F300A4E17E70D0ED06916B15807CC472EE3B5D6C70BD4DD1D9886526D954C`.
-The immediate pre-v124 remote database is backed up as
-`D:\linguago-runner\backups\v124-remote-generated-candidate100-main-before-commit-20260820-154026.db`.
+The jump host now has a hash-verified v128 runner and product database. The
+installed product database SHA-256 is
+`A60AAD5B7989DB09200CD9D53681CC0F75D2DA60CEE83787D1194AA2DAAC6F39`.
+The immediate pre-v128 remote database is backed up as
+`D:\linguago-runner\backups\v128-prefilter5000-main-before-commit-20260821-214844.db`.
 Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
@@ -16,10 +16,8 @@ node is available for a particular run. Prewarm determines the active pool.
 
 - Qwen generation: A6000-143 plus RTX 4090 nodes 47/56 on ports
   11441/11448/11447.
-- Gemma review: A6000 nodes 144/155 plus RTX 4090-224 on ports
-  11442/11445/11446.
-- A6000-147 (11444) is excluded and its model must remain unloaded until the
-  owner makes it available again.
+- Gemma review: A6000 nodes 144/147/155 plus RTX 4090-224 on ports
+  11442/11444/11445/11446, subject to prewarm availability.
 
 The remote runner is installed on the Tailscale Windows jump host at
 `D:\linguago-runner`. It keeps candidate data, dictionary evidence, model
@@ -357,6 +355,22 @@ Measured on 2026-08-21:
   `F50788101B26F6F57E5220480ABA91A5D7D1FFCD54981902C8382AFCA40F0042`.
   The rollback DB is
   `backups\v127-prefilter2000-main-before-commit-20260821-212659.db`.
+- `v128-prefilter5000` expanded the same frozen policy to 5,000 fresh
+  candidates. The local prefilter selected 229 in 284 seconds; Gemma approved
+  213, locked reverse evidence supported 111, semantic review accepted 85,
+  and 82 reached generation. Qwen returned 64 contract-valid entries; all 64
+  passed deterministic reverse evidence and 62 passed final no-correction
+  Gemma review.
+- Isolated apply and promotion inserted all 62 accepted entries and senses
+  (`ja=54`, `zh=8`) with 248 localizations. Idempotent replay wrote zero rows,
+  published-risk remained zero, and the full native D1 export/in-memory import
+  audit passed before commit. The guarded commit then atomically replaced the
+  main DB.
+- The post-v128 product counts are `entries=40895`, `senses=47207`, and
+  `sense_localizations=188828`; the main DB SHA-256 is
+  `A60AAD5B7989DB09200CD9D53681CC0F75D2DA60CEE83787D1194AA2DAAC6F39`.
+  The rollback DB is
+  `backups\v128-prefilter5000-main-before-commit-20260821-214844.db`.
 
 Keep the prefilter enabled for throughput-oriented production. Disable it only
 for an explicit recall audit, because it intentionally rejects candidates that

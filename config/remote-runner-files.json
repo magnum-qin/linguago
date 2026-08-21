@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-21T12:27:57.8638988Z",
+    "generated_at":  "2026-08-21T12:51:03.6429910Z",
     "root":  "D:\\linguago-runner",
     "files":  [
                   {
@@ -155,8 +155,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  350527488,
-                      "sha256":  "F50788101B26F6F57E5220480ABA91A5D7D1FFCD54981902C8382AFCA40F0042"
+                      "bytes":  350609408,
+                      "sha256":  "A60AAD5B7989DB09200CD9D53681CC0F75D2DA60CEE83787D1194AA2DAAC6F39"
                   }
               ]
 }
