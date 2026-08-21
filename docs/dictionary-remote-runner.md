@@ -2,11 +2,11 @@
 
 ## Remote runner baseline (2026-08-21)
 
-The jump host now has a hash-verified v128 runner and product database. The
+The jump host now has a hash-verified v129 runner and product database. The
 installed product database SHA-256 is
-`A60AAD5B7989DB09200CD9D53681CC0F75D2DA60CEE83787D1194AA2DAAC6F39`.
-The immediate pre-v128 remote database is backed up as
-`D:\linguago-runner\backups\v128-prefilter5000-main-before-commit-20260821-214844.db`.
+`6DF13A32DF38EC4E6A8B7C67A7F301E6E734BEC12B155835279F8B9AA9EF5611`.
+The immediate pre-v129 remote database is backed up as
+`D:\linguago-runner\backups\v129-prefilter1884-main-before-commit-20260821-215955.db`.
 Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
@@ -371,6 +371,24 @@ Measured on 2026-08-21:
   `A60AAD5B7989DB09200CD9D53681CC0F75D2DA60CEE83787D1194AA2DAAC6F39`.
   The rollback DB is
   `backups\v128-prefilter5000-main-before-commit-20260821-214844.db`.
+- After excluding all completed-run inputs, `v129-prefilter1884` consumed the
+  remaining 1,884 candidates in the v123 authoritative pool (`zh=1022`,
+  `ja=819`, `pt-BR=43`). The local prefilter selected 88 in 93 seconds; Gemma
+  approved 83, locked reverse evidence supported 44, semantic review accepted
+  36, and 20 generated entries passed both deterministic reverse evidence and
+  final Gemma review.
+- Isolated apply/promotion inserted all 20 entries and senses (`ja=17`,
+  `zh=3`) with 80 localizations. Idempotent replay wrote zero rows,
+  published-risk remained zero, and full native D1 export/import audit passed.
+  The guarded commit produced `entries=40915`, `senses=47227`, and
+  `sense_localizations=188908`; the main DB SHA-256 is
+  `6DF13A32DF38EC4E6A8B7C67A7F301E6E734BEC12B155835279F8B9AA9EF5611`.
+  The rollback DB is
+  `backups\v129-prefilter1884-main-before-commit-20260821-215955.db`.
+- v125 through v129 added 122 publishable entries in total. The current
+  authoritative pool no longer contains 5,000 unattempted candidates, so the
+  next production cycle must rebuild or expand the evidence-backed candidate
+  pool instead of recycling completed-run inputs.
 
 Keep the prefilter enabled for throughput-oriented production. Disable it only
 for an explicit recall audit, because it intentionally rejects candidates that
