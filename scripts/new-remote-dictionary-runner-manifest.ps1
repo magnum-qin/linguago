@@ -14,6 +14,7 @@ param(
     'scripts\select-dictionary-v2-source-gap-candidates-by-review.mjs',
     'scripts\filter-dictionary-v2-source-gap-jmdict-generation-preflight.mjs',
     'scripts\supplement-dictionary-v2-product-source-gaps-unsloth.mjs',
+    'scripts\invoke-dictionary-control.ps1',
     'scripts\manage-remote-dictionary-runner.ps1',
     'scripts\run-remote-dictionary-runner-job.ps1',
     'scripts\verify-remote-dictionary-runner.ps1',

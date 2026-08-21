@@ -2,14 +2,25 @@
 
 ## Remote runner baseline (2026-08-21)
 
-The jump host now has a hash-verified v129 runner and product database. The
+The jump host now has a hash-verified v134 runner and product database. The
 installed product database SHA-256 is
-`6DF13A32DF38EC4E6A8B7C67A7F301E6E734BEC12B155835279F8B9AA9EF5611`.
-The immediate pre-v129 remote database is backed up as
-`D:\linguago-runner\backups\v129-prefilter1884-main-before-commit-20260821-215955.db`.
+`C83A24A72E47A88404AC5DF7A307FAE76156853C745D8B41DAF05ECA5ABA4F15`.
+The immediate pre-v134 remote database is backed up as
+`D:\linguago-runner\backups\v134-authoritative-alignment43-main-before-commit-20260821-223822.db`.
 Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
+
+The v134 expansion rebuilt coverage from the full source DB after the frozen
+v123 pool was exhausted. The safe stage order is production authoritative
+source check, source-sense alignment, model review, reverse evidence, semantic
+review, generation, and final review. `SourceSenseAlignment` must be persisted
+through the Scheduled Task `launch.json`; passing it only to the interactive
+controller silently disables alignment in the background job. The corrected
+run accepted 11 Portuguese entries, passed idempotent replay and full native
+D1 import audit, and produced counts `entries=40926`, `senses=47238`, and
+`sense_localizations=188952`. D1 was not published because this increment is
+below the 5,000-entry release cadence.
 
 The model topology below is the configured default, not a guarantee that every
 node is available for a particular run. Prewarm determines the active pool.

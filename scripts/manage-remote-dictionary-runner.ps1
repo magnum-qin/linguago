@@ -11,6 +11,7 @@ param(
   [object]$ProductionPrefilter = $true,
   [object]$RequireAuthoritativeSourceSense = $true,
   [object]$DailyPrimarySenseSelection = $false,
+  [object]$SourceSenseAlignment = $false,
   [object]$ReverseEvidencePrefilter = $false,
   [int]$ReverseEvidenceMinTargetLangs = 2,
   [int]$ReverseEvidencePrefilterLimit = 1000000,
@@ -39,6 +40,7 @@ function ConvertTo-RunnerBoolean([object]$Value, [string]$Name) {
 $ProductionPrefilter = ConvertTo-RunnerBoolean $ProductionPrefilter 'ProductionPrefilter'
 $RequireAuthoritativeSourceSense = ConvertTo-RunnerBoolean $RequireAuthoritativeSourceSense 'RequireAuthoritativeSourceSense'
 $DailyPrimarySenseSelection = ConvertTo-RunnerBoolean $DailyPrimarySenseSelection 'DailyPrimarySenseSelection'
+$SourceSenseAlignment = ConvertTo-RunnerBoolean $SourceSenseAlignment 'SourceSenseAlignment'
 $ReverseEvidencePrefilter = ConvertTo-RunnerBoolean $ReverseEvidencePrefilter 'ReverseEvidencePrefilter'
 $EnforceGenerationHintTerms = ConvertTo-RunnerBoolean $EnforceGenerationHintTerms 'EnforceGenerationHintTerms'
 $AllowModelDownload = ConvertTo-RunnerBoolean $AllowModelDownload 'AllowModelDownload'
@@ -158,6 +160,7 @@ $Arguments = @(
   '--production-prefilter', $ProductionPrefilter.ToString().ToLowerInvariant(),
   '--require-authoritative-source-sense', $RequireAuthoritativeSourceSense.ToString().ToLowerInvariant(),
   '--daily-primary-sense-selection', $DailyPrimarySenseSelection.ToString().ToLowerInvariant(),
+  '--source-sense-alignment', $SourceSenseAlignment.ToString().ToLowerInvariant(),
   '--reverse-evidence-prefilter', $ReverseEvidencePrefilter.ToString().ToLowerInvariant(),
   '--reverse-evidence-min-target-langs', [string]$ReverseEvidenceMinTargetLangs,
   '--reverse-evidence-prefilter-limit', [string]$ReverseEvidencePrefilterLimit,
@@ -230,6 +233,7 @@ $Launch = [ordered]@{
   ProductionPrefilter = $ProductionPrefilter
   RequireAuthoritativeSourceSense = $RequireAuthoritativeSourceSense
   DailyPrimarySenseSelection = $DailyPrimarySenseSelection
+  SourceSenseAlignment = $SourceSenseAlignment
   ReverseEvidencePrefilter = $ReverseEvidencePrefilter
   EnforceGenerationHintTerms = $EnforceGenerationHintTerms
   AllowModelDownload = $AllowModelDownload

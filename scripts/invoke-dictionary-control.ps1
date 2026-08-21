@@ -8,6 +8,7 @@ param(
   [int]$GenerationTarget = 20,
   [string]$SupplementalSourceDb = '',
   [object]$ReverseEvidencePrefilter = $false,
+  [object]$SourceSenseAlignment = $false,
   [int]$ReverseEvidenceMinTargetLangs = 2,
   [int]$ReverseEvidencePrefilterLimit = 1000000,
   [object]$EnforceGenerationHintTerms = $false,
@@ -59,6 +60,7 @@ switch ($Action) {
       '-Action', 'start', '-RunId', $RunId, '-Batch', $Batch,
       '-GenerationTarget', [string]$GenerationTarget,
       '-ReverseEvidencePrefilter', [string]$ReverseEvidencePrefilter,
+      '-SourceSenseAlignment', [string]$SourceSenseAlignment,
       '-ReverseEvidenceMinTargetLangs', [string]$ReverseEvidenceMinTargetLangs,
       '-ReverseEvidencePrefilterLimit', [string]$ReverseEvidencePrefilterLimit,
       '-EnforceGenerationHintTerms', [string]$EnforceGenerationHintTerms
