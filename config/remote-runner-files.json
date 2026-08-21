@@ -1,7 +1,7 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-21T04:37:14.3312387Z",
-    "root":  "D:\\Projects\\linguago",
+    "generated_at":  "2026-08-21T12:27:57.8638988Z",
+    "root":  "D:\\linguago-runner",
     "files":  [
                   {
                       "path":  "package.json",
@@ -99,34 +99,9 @@
                       "sha256":  "30AA5ACB2DC8B34E6290FE7B43FB5E67C59E371B4FFCAD395CFBB54C78FBD631"
                   },
                   {
-                      "path":  "scripts\\check-remote-cloudflare-auth.ps1",
-                      "bytes":  3091,
-                      "sha256":  "158575662B07A95873E137F74945B689E38133DC6AC5CA83387BA889BB7B5236"
-                  },
-                  {
-                      "path":  "scripts\\release-remote-dictionary-d1.ps1",
-                      "bytes":  7352,
-                      "sha256":  "371D01788ED5CFF5F03DB78081824E8468D2771225E44547A3632F0669652638"
-                  },
-                  {
-                      "path":  "scripts\\push-dictionary-v2-native-to-d1.ps1",
-                      "bytes":  3235,
-                      "sha256":  "6A2C317FC9929F41748E370041811A34C3902D07B131A999B41F8193CE477DEB"
-                  },
-                  {
-                      "path":  "scripts\\stage-remote-worker-source.ps1",
-                      "bytes":  3314,
-                      "sha256":  "19EEA47F3C95F6C5EF6F3790A6267EA278D64643A5FA2333D4FEE76DFEF1F25D"
-                  },
-                  {
-                      "path":  "scripts\\deploy-remote-worker-release.ps1",
-                      "bytes":  7884,
-                      "sha256":  "9C16A5D497CDABFE74CD6438B3528F9E5A3E2772E23BC16570224E2760619326"
-                  },
-                  {
                       "path":  "scripts\\new-remote-dictionary-production-batch.ps1",
-                      "bytes":  3003,
-                      "sha256":  "A111AC195273E5E8139E23BAD4E8277D47F5D7F1EFDFFA2E26B8EBA764FE4C09"
+                      "bytes":  4260,
+                      "sha256":  "45A48D7A8D59AEFC80241095EEDBED03DD2D60ACFF5AAD7296B5CAF5989FA486"
                   },
                   {
                       "path":  "scripts\\select-dictionary-v2-source-gap-fresh-cohort.mjs",
@@ -180,8 +155,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  350498816,
-                      "sha256":  "4265891F3A5E07A5A2B15AFE749E42B8C8F58F99AB442238BA88A188E9632F90"
+                      "bytes":  350527488,
+                      "sha256":  "F50788101B26F6F57E5220480ABA91A5D7D1FFCD54981902C8382AFCA40F0042"
                   }
               ]
 }

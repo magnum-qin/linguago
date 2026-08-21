@@ -313,6 +313,12 @@ npm.cmd run dict:v2:remote-control -- -Action start -RunId <run-id> -Batch <rela
 npm.cmd run dict:v2:remote-control -- -Action status -RunId <run-id>
 ```
 
+`new-batch` excludes the static attempt history plus the input batch of every
+remote run whose manifest status is `complete`, `completed`, or `succeeded`.
+This prevents candidates rejected by deterministic evidence or model review
+from being selected again, while leaving candidates from interrupted runs
+eligible for resume or later selection.
+
 For production source-gap batches, enable the local reverse-evidence prefilter
 before any Gemma review:
 
@@ -339,6 +345,18 @@ Measured on 2026-08-21:
   approximately a 10x efficiency improvement.
 - The local prefilter took about 114 seconds for 500 candidates and did not
   write to the product database.
+- `v127-prefilter2000` verified the same policy at stress scale. It reduced
+  2,000 fresh candidates to 79 model-review candidates in 261 seconds. Gemma
+  approved 74, locked reverse evidence supported 38, semantic review accepted
+  31, and 20 of 20 generated entries passed final reverse evidence and Gemma
+  review. Isolated apply/promotion, idempotent replay, published-risk, and full
+  native D1 export/import audits all passed before the guarded main-DB commit.
+- The guarded v127 commit added 20 entries and senses. The post-commit product
+  counts are `entries=40833`, `senses=47145`, and
+  `sense_localizations=188580`; the main DB SHA-256 is
+  `F50788101B26F6F57E5220480ABA91A5D7D1FFCD54981902C8382AFCA40F0042`.
+  The rollback DB is
+  `backups\v127-prefilter2000-main-before-commit-20260821-212659.db`.
 
 Keep the prefilter enabled for throughput-oriented production. Disable it only
 for an explicit recall audit, because it intentionally rejects candidates that
