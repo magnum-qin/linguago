@@ -2,11 +2,11 @@
 
 ## Remote runner baseline (2026-08-22)
 
-The jump host now has a validated v135b runner and product database. The
+The jump host now has a validated v136 runner and product database. The
 installed product database SHA-256 is
-`76654840C24A9BBEDBB1CF51F23355801AAA003D46BD3DC02BC0061599F4FEE3`.
-The immediate pre-v135b remote database is backed up as
-`D:\linguago-runner\backups\v135b-native-daily-supported57-main-before-commit-20260822-000905.db`.
+`7E50B3C12F7F2F0BEBBBF4882BF211DECE09BACFCF51337CE7DBF693C01D8AEB`.
+The immediate pre-v136 remote database is backed up as
+`D:\linguago-runner\backups\v136-native-daily-supported97a-main-before-commit-20260822-021038.db`.
 Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
@@ -34,6 +34,23 @@ families. Model gates reduced those to 21 generation-ready rows and accepted
 export audits passed, and the guarded main commit produced counts
 `entries=40946`, `senses=47258`, and `sense_localizations=189032`. D1 remains
 unchanged because this increment is below the release cadence.
+
+The v136 cohort expanded the native scan to `zh=1000,ja=1000`. Daily-sense,
+production, alignment, and independent reverse-evidence gates reduced 2,000
+raw entries to 97 model inputs. Gemma approved 92 source proposals, 43 passed
+the source reverse-evidence gate, and 40 were generation-ready. The current
+remote product DB already covered 19 of those rows, so Qwen generated 21 new
+entries; 20 passed schema validation, reverse evidence, and final Gemma review.
+Isolated replay inserted 20 drafts, wrote zero rows on the idempotent replay,
+and promoted all 20. Full export/import audit passed with
+`entries=40966`, `senses=47278`, and `sense_localizations=189112`, while
+`flagged_senses` remained zero. D1 was not published.
+
+The native scanner must use a correlated `EXISTS` sense check instead of
+`JOIN senses + DISTINCT`. On the 8.7 GB source DB, the join form can create a
+large temporary sort and saturate the jump-host disk; the `EXISTS` form avoids
+the multiplied intermediate rows while preserving the eligibility rule. Do
+not launch a second scanner while diagnosing a slow first scan.
 
 For raw native candidates, the required order is native gap scan, daily-primary
 sense selection, authoritative production filter, source-sense alignment, and
@@ -156,6 +173,12 @@ starts. For an operator-attached run, `-Action run` remains available:
 ```powershell
 ssh ts-win-jump "powershell -ExecutionPolicy Bypass -File D:\linguago-runner\scripts\manage-remote-dictionary-runner.ps1 -Action run -Batch batches\v97-20c.json -RunId v97-20c-fixed-contract"
 ```
+
+If a scheduled run remains `manifest_status=not_started` for more than about
+two minutes and the child Node process has not written `manifest.json`, stop
+that run through the manager before retrying. Use attached `-Action run` and
+keep the SSH session open to capture stage output directly. Do not start a
+second scheduled copy with the same batch while the first child is alive.
 
 Do not treat a manifest left at `status=running` as model progress by itself.
 Use the watcher or manager status command and require either a live runner or a

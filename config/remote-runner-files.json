@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-21T15:11:40.4867085Z",
+    "generated_at":  "2026-08-21T16:58:27.6678291Z",
     "root":  "D:\\linguago-runner",
     "files":  [
                   {
@@ -25,8 +25,8 @@
                   },
                   {
                       "path":  "scripts\\find-dictionary-v2-native-daily-coverage-gaps.mjs",
-                      "bytes":  6991,
-                      "sha256":  "17CD02E0690CF71E66D390492FC50D326778EB3D61B130914C73D6A8C3BF5664"
+                      "bytes":  7065,
+                      "sha256":  "178E6B095E18823C25AA888F61FBDA8E03CF3B50D91FABE710A6C5951B32B0F7"
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-production-batch.mjs",
@@ -195,8 +195,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  350683136,
-                      "sha256":  "76654840C24A9BBEDBB1CF51F23355801AAA003D46BD3DC02BC0061599F4FEE3"
+                      "bytes":  350707712,
+                      "sha256":  "7E50B3C12F7F2F0BEBBBF4882BF211DECE09BACFCF51337CE7DBF693C01D8AEB"
                   }
               ]
 }

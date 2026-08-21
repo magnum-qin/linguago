@@ -32,7 +32,7 @@ sourceDb.pragma('busy_timeout = 30000');
 // This query scans native dictionary senses once. It deliberately avoids the
 // per-entry localization/example lookups used by the general coverage report.
 const nativeEntries = sourceDb.prepare(`
-  SELECT DISTINCT
+  SELECT
     e.id AS source_entry_id,
     e.word,
     e.normalized_key,
@@ -40,18 +40,22 @@ const nativeEntries = sourceDb.prepare(`
     e.frequency_rank,
     e.status AS source_status
   FROM entries e
-  JOIN senses s ON s.entry_id = e.id
   WHERE e.frequency_rank IS NOT NULL
     AND e.frequency_rank <= ?
     AND e.source_lang IN ('zh', 'ja')
     AND e.status <> 'deprecated'
-    AND s.needs_review = 0
-    AND NULLIF(TRIM(s.gloss_key), '') IS NOT NULL
-    AND lower(TRIM(s.gloss_key)) <> 'missing gloss'
-    AND (
-      (e.source_lang = 'zh' AND lower(COALESCE(s.source, '')) LIKE '%cc-cedict%')
-      OR
-      (e.source_lang = 'ja' AND lower(COALESCE(s.source, '')) LIKE '%jmdict%')
+    AND EXISTS (
+      SELECT 1
+      FROM senses s
+      WHERE s.entry_id = e.id
+        AND s.needs_review = 0
+        AND NULLIF(TRIM(s.gloss_key), '') IS NOT NULL
+        AND lower(TRIM(s.gloss_key)) <> 'missing gloss'
+        AND (
+          (e.source_lang = 'zh' AND lower(COALESCE(s.source, '')) LIKE '%cc-cedict%')
+          OR
+          (e.source_lang = 'ja' AND lower(COALESCE(s.source, '')) LIKE '%jmdict%')
+        )
     )
   ORDER BY e.frequency_rank, e.source_lang, e.id
   LIMIT ?
