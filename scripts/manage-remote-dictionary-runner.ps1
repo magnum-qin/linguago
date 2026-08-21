@@ -95,6 +95,14 @@ function Get-GlobalRunnerProcess {
   return $Process
 }
 
+function Get-CoverageScannerProcesses {
+  @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.CommandLine -like '*find-dictionary-v2-product-coverage-gaps.mjs*' -or
+      $_.CommandLine -like '*find-dictionary-v2-native-daily-coverage-gaps.mjs*'
+    })
+}
+
 if ($Action -eq 'status') {
   $Process = Get-RunnerProcess
   $GlobalProcess = Get-GlobalRunnerProcess
@@ -138,6 +146,11 @@ if ($Action -eq 'run' -and $ExistingLock -and $ExistingLock.run_id -ne $RunId) {
 }
 if (Get-GlobalRunnerProcess) { throw 'Another dictionary pipeline is already running on this host' }
 if (Get-RunnerProcess) { throw "Runner $RunId is already running" }
+$CoverageScanners = Get-CoverageScannerProcesses
+if ($CoverageScanners.Count -gt 0) {
+  $CoveragePids = ($CoverageScanners | ForEach-Object ProcessId) -join ','
+  throw "Coverage scanner processes are still running (pids=$CoveragePids); stop or finish them before starting the model pipeline"
+}
 $Key = [Environment]::GetEnvironmentVariable('UNSLOTH_API_KEY', 'User')
 if ([string]::IsNullOrWhiteSpace($Key)) { throw 'User UNSLOTH_API_KEY is missing' }
 $env:UNSLOTH_API_KEY = $Key

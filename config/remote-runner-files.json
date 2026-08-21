@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-21T13:39:32.3244890Z",
+    "generated_at":  "2026-08-21T15:11:40.4867085Z",
     "root":  "D:\\linguago-runner",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  16342,
-                      "sha256":  "489EFE224E44151E1F6B3D54E30A72C3FB2959BD3499518360672DABEFDF229B"
+                      "bytes":  16450,
+                      "sha256":  "D5366799F83A4556E6C23A72A0512B86479CC365855C4CDEC7875472A55C8B69"
                   },
                   {
                       "path":  "package-lock.json",
@@ -17,6 +17,16 @@
                       "path":  "scripts\\run-dictionary-v2-remote-pipeline.mjs",
                       "bytes":  51160,
                       "sha256":  "9533E01BDD0DFFE86EA6B22BE84FA5BA21198152C3802A706E609D393CAC86B6"
+                  },
+                  {
+                      "path":  "scripts\\find-dictionary-v2-product-coverage-gaps.mjs",
+                      "bytes":  16844,
+                      "sha256":  "578E530644C95D53FF0F39AC63F03E20ED7576078E7CEAF328CC4CA8FD80ABEB"
+                  },
+                  {
+                      "path":  "scripts\\find-dictionary-v2-native-daily-coverage-gaps.mjs",
+                      "bytes":  6991,
+                      "sha256":  "17CD02E0690CF71E66D390492FC50D326778EB3D61B130914C73D6A8C3BF5664"
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-production-batch.mjs",
@@ -65,13 +75,13 @@
                   },
                   {
                       "path":  "scripts\\invoke-dictionary-control.ps1",
-                      "bytes":  6853,
-                      "sha256":  "0F05187491FE0118376E67EAAC5AAA55EC604F225A17AC406A5DD5736A4EADE3"
+                      "bytes":  7211,
+                      "sha256":  "94835A570866B645EB9DB0E5248F456FAA10AACC7FB2CF39CDE8CF3990EF02B4"
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-runner.ps1",
-                      "bytes":  12213,
-                      "sha256":  "4941EBD93F21541921EE40FFBC9A2FD6F4351871BE539D4CFF9F67F083EB11A7"
+                      "bytes":  12830,
+                      "sha256":  "F03D1F122B773D0A1D15F8795F6D4B0420AFE7AC596EB9ACEDB4251DB58E72E8"
                   },
                   {
                       "path":  "scripts\\run-remote-dictionary-runner-job.ps1",
@@ -185,8 +195,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  350658560,
-                      "sha256":  "C83A24A72E47A88404AC5DF7A307FAE76156853C745D8B41DAF05ECA5ABA4F15"
+                      "bytes":  350683136,
+                      "sha256":  "76654840C24A9BBEDBB1CF51F23355801AAA003D46BD3DC02BC0061599F4FEE3"
                   }
               ]
 }

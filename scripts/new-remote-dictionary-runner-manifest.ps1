@@ -5,6 +5,8 @@ param(
     'package.json',
     'package-lock.json',
     'scripts\run-dictionary-v2-remote-pipeline.mjs',
+    'scripts\find-dictionary-v2-product-coverage-gaps.mjs',
+    'scripts\find-dictionary-v2-native-daily-coverage-gaps.mjs',
     'scripts\filter-dictionary-v2-production-batch.mjs',
     'scripts\review-dictionary-v2-product-source-gap-candidates-unsloth.mjs',
     'scripts\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs',

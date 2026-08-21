@@ -12,6 +12,9 @@ const productDbPath = path.resolve(args['product-db'] || DEFAULT_PRODUCT_DB);
 const outPath = path.resolve(args.out || 'logs/product-coverage-gaps-20260622.json');
 const maxRank = Number(args['max-rank'] || 50_000);
 const limit = Number(args.limit || 200);
+const balanced = args.balanced === 'true';
+const langTargets = parseLangTargets(args['lang-targets']);
+const fillRemaining = args['fill-remaining'] !== 'false';
 const minGlossLength = Number(args['min-gloss-length'] || 4);
 const requireSourceScript = args['require-source-script'] !== 'false';
 const includeDetails = args['include-details'] === true || args['include-details'] === 'true';
@@ -141,7 +144,11 @@ const stats = {
 };
 
 const gaps = [];
+const balancedCollected = Object.fromEntries(LANGS.map((lang) => [lang, 0]));
 for (const entry of sourceEntries) {
+  if (balanced && balancedCollected[entry.source_lang] >= Number(langTargets[entry.source_lang] || 0)) {
+    continue;
+  }
   const normalized = normalize(entry.normalized_key || entry.word);
   if (requireSourceScript && !sourceScriptOk(entry.word, entry.source_lang)) {
     stats.skipped_source_script_mismatch = (stats.skipped_source_script_mismatch || 0) + 1;
@@ -215,6 +222,7 @@ for (const entry of sourceEntries) {
     }));
   }
   gaps.push(gap);
+  balancedCollected[entry.source_lang]++;
   stats.gaps++;
   stats.by_lang[entry.source_lang] = (stats.by_lang[entry.source_lang] || 0) + 1;
   stats.by_status[entry.status] = (stats.by_status[entry.status] || 0) + 1;
@@ -223,7 +231,13 @@ for (const entry of sourceEntries) {
 sourceDb.close();
 
 gaps.sort(compareGaps);
-const selected = gaps.slice(0, limit);
+const selected = balanced ? selectBalanced(gaps, limit, langTargets, fillRemaining) : gaps.slice(0, limit);
+stats.selection = {
+  balanced,
+  lang_targets: balanced ? langTargets : null,
+  fill_remaining: balanced ? fillRemaining : null,
+  selected_by_lang: countByLang(selected)
+};
 const report = {
   ok: true,
   generated_at: new Date().toISOString(),
@@ -403,6 +417,50 @@ function compactExampleLocalization(row) {
     confidence: row.confidence,
     needs_review: Boolean(row.needs_review)
   };
+}
+
+function parseLangTargets(value) {
+  const defaults = { zh: 30, ja: 30, 'pt-BR': 25, en: 15 };
+  if (!value) return defaults;
+  const parsed = {};
+  for (const item of String(value).split(',')) {
+    const [rawLang, rawCount] = item.split('=');
+    const lang = String(rawLang || '').trim();
+    const count = Number(rawCount);
+    if (!LANGS.includes(lang)) throw new Error(`Unknown --lang-targets lang: ${lang}`);
+    if (!Number.isInteger(count) || count < 0) throw new Error(`Invalid --lang-targets count: ${item}`);
+    parsed[lang] = count;
+  }
+  return { ...defaults, ...parsed };
+}
+
+function selectBalanced(rows, maxItems, targets, shouldFillRemaining) {
+  const selected = [];
+  const used = new Set();
+  for (const lang of LANGS) {
+    let remaining = Number(targets[lang] || 0);
+    for (let index = 0; index < rows.length && remaining > 0 && selected.length < maxItems; index++) {
+      if (used.has(index) || rows[index].source_lang !== lang) continue;
+      selected.push(rows[index]);
+      used.add(index);
+      remaining--;
+    }
+  }
+  if (shouldFillRemaining && selected.length < maxItems) {
+    for (let index = 0; index < rows.length && selected.length < maxItems; index++) {
+      if (used.has(index)) continue;
+      selected.push(rows[index]);
+      used.add(index);
+    }
+  }
+  selected.sort(compareGaps);
+  return selected;
+}
+
+function countByLang(rows) {
+  const counts = {};
+  for (const row of rows) counts[row.source_lang] = (counts[row.source_lang] || 0) + 1;
+  return counts;
 }
 
 function parseArgs(argv) {

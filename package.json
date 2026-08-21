@@ -64,6 +64,7 @@
     "dict:v2:audit:product-published-risk": "node scripts/audit-dictionary-v2-product-published-risk.mjs",
     "dict:v2:triage:product-duplicate-localizations": "node scripts/triage-dictionary-v2-product-duplicate-localizations.mjs",
     "dict:v2:coverage:gaps": "node scripts/find-dictionary-v2-product-coverage-gaps.mjs",
+    "dict:v2:coverage:native-daily-gaps": "node scripts/find-dictionary-v2-native-daily-coverage-gaps.mjs",
     "dict:v2:coverage:filter-gaps": "node scripts/filter-dictionary-v2-product-coverage-gap-report.mjs",
     "dict:v2:coverage:align-source-gap-senses": "node scripts/align-dictionary-v2-product-source-gap-candidate-senses.mjs",
     "dict:v2:coverage:promote": "node scripts/promote-dictionary-v2-product-coverage-gaps.mjs",

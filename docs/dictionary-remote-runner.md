@@ -1,12 +1,12 @@
 # Dictionary Remote Runner
 
-## Remote runner baseline (2026-08-21)
+## Remote runner baseline (2026-08-22)
 
-The jump host now has a hash-verified v134 runner and product database. The
+The jump host now has a validated v135b runner and product database. The
 installed product database SHA-256 is
-`C83A24A72E47A88404AC5DF7A307FAE76156853C745D8B41DAF05ECA5ABA4F15`.
-The immediate pre-v134 remote database is backed up as
-`D:\linguago-runner\backups\v134-authoritative-alignment43-main-before-commit-20260821-223822.db`.
+`76654840C24A9BBEDBB1CF51F23355801AAA003D46BD3DC02BC0061599F4FEE3`.
+The immediate pre-v135b remote database is backed up as
+`D:\linguago-runner\backups\v135b-native-daily-supported57-main-before-commit-20260822-000905.db`.
 Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
@@ -21,6 +21,26 @@ run accepted 11 Portuguese entries, passed idempotent replay and full native
 D1 import audit, and produced counts `entries=40926`, `senses=47238`, and
 `sense_localizations=188952`. D1 was not published because this increment is
 below the 5,000-entry release cadence.
+
+The v135b expansion added a batch SQL native-dictionary coverage lane through
+`find-dictionary-v2-native-daily-coverage-gaps.mjs`. It scans CC-CEDICT and
+JMdict senses once, excludes product coverage in memory, and leaves specific
+sense/localization loading to the downstream daily-primary selector. A
+`zh=100,ja=100` scan completed in about 1.6 seconds; the previous generic N+1
+scanner could run for minutes without producing an output file. The 1,000-row
+v135 cohort produced 57 candidates with two independent reverse-evidence
+families. Model gates reduced those to 21 generation-ready rows and accepted
+20 final four-language entries. Isolated replay was idempotent, fast/full D1
+export audits passed, and the guarded main commit produced counts
+`entries=40946`, `senses=47258`, and `sense_localizations=189032`. D1 remains
+unchanged because this increment is below the release cadence.
+
+For raw native candidates, the required order is native gap scan, daily-primary
+sense selection, authoritative production filter, source-sense alignment, and
+local reverse-evidence prefilter. Upload the resulting locked report with
+`ProductionPrefilter=false`, `DailyPrimarySenseSelection=false`,
+`SourceSenseAlignment=false`, and `ReverseEvidencePrefilter=false`; repeating
+those gates on an already filtered report can incorrectly discard valid rows.
 
 The model topology below is the configured default, not a guarantee that every
 node is available for a particular run. Prewarm determines the active pool.
@@ -78,6 +98,11 @@ second sense for an entry that already has a draft and overstate batch growth.
   restore or repair the listed endpoint before the next review batch.
 - Every stage records output hashes in `runs/<run-id>/manifest.json`.
 - Resume refuses to continue when the input batch fingerprint changes.
+- Before a model run starts, the controller refuses to proceed while either
+  coverage scanner is still running. Two abandoned generic scanners once
+  saturated random SQLite I/O and stretched a normally 0.25-second evidence
+  stage to several minutes. Verify the command line before stopping a process;
+  never terminate an unrelated Node process by name alone.
 
 ## Pipeline
 
