@@ -11,6 +11,27 @@ Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
 
+### Dynamic idle-node discovery
+
+New runs enable `DynamicEndpointDiscovery` by default. Before every Unsloth
+model stage, the pipeline reads the jump-host Dashboard at
+`http://127.0.0.1:18080/api/status`, preserves configured nodes owned by the
+LinguaGo service user, and adds every mapped node that is currently idle. It
+excludes nodes with another user's GPU process, an unreachable status agent,
+GPU temperature above 84 C, or a missing requested model. The resolved pool,
+including exclusions and reasons, is written to each stage's
+`endpoint_discovery` manifest field.
+
+This is stage-level elasticity, not per-request polling. Model loading takes
+longer than a dictionary request, so checking before every individual item
+would reduce throughput and cause model thrashing. Each model stage discovers
+once, prewarms the selected pool, then uses one worker per endpoint. Dashboard
+failure degrades to the configured endpoint list rather than stopping a run.
+Use `-DynamicEndpointDiscovery false` only for reproducible topology tests.
+Run `npm.cmd run dict:v2:check:unsloth-pool -- --model <model> --endpoints
+<csv> --variants <csv>` on the jump host to inspect the selected pool without
+starting production.
+
 ### v139 evidence-yield qualification
 
 The v137/v138 funnel report showed that source-sense alignment was the dominant

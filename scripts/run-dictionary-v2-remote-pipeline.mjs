@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
+import { discoverUnslothStagePool } from './lib/unsloth-cluster-discovery.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const pipelineMode = String(args['pipeline-mode'] || 'legacy').trim().toLowerCase();
@@ -40,6 +41,9 @@ const elasticQwenVariants = String(
   args['elastic-qwen-variants'] || '11442=UD-Q4_K_XL,11445=UD-Q4_K_XL'
 );
 const elasticMinimumItems = Math.max(1, Number.parseInt(args['elastic-minimum-items'] || '20', 10));
+const dynamicEndpointDiscovery = args['dynamic-endpoint-discovery'] !== 'false';
+const clusterStatusUrl = String(args['cluster-status-url'] || 'http://127.0.0.1:18080/api/status');
+const clusterServiceUser = String(args['cluster-service-user'] || 'g24tka12');
 const batchItemCount = reportItemCount(batchPath);
 const sourceQwenPool = qwenPoolForWork(batchItemCount);
 const gemmaConcurrency = csvValues(gemmaEndpoints).length;
@@ -115,6 +119,8 @@ manifest.endpoint_variants = {
 };
 manifest.elastic_model_swap = elasticModelSwap;
 manifest.elastic_minimum_items = elasticMinimumItems;
+manifest.dynamic_endpoint_discovery = dynamicEndpointDiscovery;
+manifest.cluster_status_url = clusterStatusUrl;
 manifest.allow_model_download = allowModelDownload;
 manifest.require_authoritative_source_sense = requireAuthoritativeSourceSense;
 manifest.reverse_evidence_prefilter = reverseEvidencePrefilter;
@@ -921,13 +927,16 @@ async function stage(name, script, stageArgs, expectedOutputs) {
     console.log(`[resume] ${name}`);
     return;
   }
+  const discovery = await expandStageEndpointPool(script, stageArgs);
+  stageArgs = discovery.args;
   const logPath = output(`${name}.log`);
   manifest.stages[name] = {
     status: 'running',
     started_at: new Date().toISOString(),
     script,
     args: redactArgs(stageArgs),
-    log: relative(logPath)
+    log: relative(logPath),
+    ...(discovery.report ? { endpoint_discovery: discovery.report } : {})
   };
   writeManifest();
   const started = performance.now();
@@ -952,6 +961,58 @@ async function stage(name, script, stageArgs, expectedOutputs) {
     outputs: expectedOutputs.map((filePath) => ({ path: relative(filePath), sha256: sha256File(filePath) }))
   };
   writeManifest();
+}
+
+async function expandStageEndpointPool(script, stageArgs) {
+  if (!dynamicEndpointDiscovery || !/unsloth/u.test(script) || !optionValue(stageArgs, '--endpoints')) {
+    return { args: stageArgs, report: null };
+  }
+  const model = optionValue(stageArgs, '--model');
+  if (!model) return { args: stageArgs, report: null };
+  const configuredEndpoints = csvValues(optionValue(stageArgs, '--endpoints'));
+  const configuredVariants = parseVariantCsv(optionValue(stageArgs, '--endpoint-gguf-variants'));
+  const discovered = await discoverUnslothStagePool({
+    dashboardUrl: clusterStatusUrl,
+    configuredEndpoints,
+    configuredVariants,
+    model,
+    token,
+    serviceUser: clusterServiceUser,
+    requireInstalled: !allowModelDownload
+  });
+  const resolvedArgs = [...stageArgs];
+  setOptionValue(resolvedArgs, '--endpoints', discovered.endpoints.join(','));
+  setOptionValue(
+    resolvedArgs,
+    '--endpoint-gguf-variants',
+    [...discovered.variants.entries()].map(([port, variant]) => `${port}=${variant}`).join(',')
+  );
+  if (optionValue(resolvedArgs, '--concurrency') !== null) {
+    setOptionValue(resolvedArgs, '--concurrency', String(discovered.endpoints.length));
+  }
+  console.log(`[cluster] stage=${script} endpoints=${discovered.endpoints.map(endpointPort).join(',')} dynamic=${discovered.ok}`);
+  return {
+    args: resolvedArgs,
+    report: {
+      checked_at: new Date().toISOString(),
+      ok: discovered.ok,
+      degraded: discovered.degraded,
+      reason: discovered.reason || null,
+      selected: discovered.selected,
+      excluded: discovered.excluded
+    }
+  };
+}
+
+function optionValue(values, name) {
+  const index = values.indexOf(name);
+  return index >= 0 && index + 1 < values.length ? String(values[index + 1]) : null;
+}
+
+function setOptionValue(values, name, value) {
+  const index = values.indexOf(name);
+  if (index >= 0 && index + 1 < values.length) values[index + 1] = value;
+  else values.push(name, value);
 }
 
 function runNode(script, stageArgs, logPath) {

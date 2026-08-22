@@ -143,6 +143,8 @@
     "dict:v2:select:nemotron-targeted-review": "node scripts/select-dictionary-v2-source-gap-targeted-review.mjs",
     "dict:v2:run-llm-jobs": "node scripts/run-dictionary-v2-llm-jobs.mjs",
     "dict:v2:test:unsloth": "node scripts/test-unsloth-studio-cluster.mjs",
+    "dict:v2:test:unsloth-discovery": "node scripts/test-unsloth-cluster-discovery.mjs",
+    "dict:v2:check:unsloth-pool": "node scripts/check-unsloth-dynamic-pool.mjs",
     "dict:v2:test:unsloth-status": "node scripts/check-unsloth-topology-status.mjs",
     "dict:v2:audit": "node scripts/audit-dictionary-v2-quality.mjs",
     "dict:v2:audit:product-export": "node scripts/audit-dictionary-v2-product-export.mjs",

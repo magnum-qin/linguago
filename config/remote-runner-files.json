@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-22T04:15:12.3664330Z",
+    "generated_at":  "2026-08-22T15:00:37.8548999Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  17067,
-                      "sha256":  "BCC7A2A1B85C879263FB6EF0EE19E5660819BA472DD1C03B2321B56BA07FD48E"
+                      "bytes":  17237,
+                      "sha256":  "D2B772C0F21FA914FDD0A043C1B3AA9B3009EEE1C8A03AD523243EAC7C8EF01E"
                   },
                   {
                       "path":  "package-lock.json",
@@ -15,8 +15,23 @@
                   },
                   {
                       "path":  "scripts\\run-dictionary-v2-remote-pipeline.mjs",
-                      "bytes":  51551,
-                      "sha256":  "B185C3C66ED5789F5618DDD48147DAEA92CB3C05867DACF09E622E7F5C512F9E"
+                      "bytes":  54136,
+                      "sha256":  "61822015AA9D8AD9AB5BF22FACD809C33103AB5E482D097C7E40F7F1124A8B04"
+                  },
+                  {
+                      "path":  "scripts\\lib\\unsloth-cluster-discovery.mjs",
+                      "bytes":  5865,
+                      "sha256":  "021F404E58E1E483009353C0923B9B4E085F0DF208D4C0643BB435CEF42AB61F"
+                  },
+                  {
+                      "path":  "scripts\\check-unsloth-dynamic-pool.mjs",
+                      "bytes":  1360,
+                      "sha256":  "7A7850145556F399BF77BF5D19E19174B11E91C0BBB356464E5B76221AABFF60"
+                  },
+                  {
+                      "path":  "scripts\\test-unsloth-cluster-discovery.mjs",
+                      "bytes":  1361,
+                      "sha256":  "A5383E48A13453B2A66E6293F004F6DAB825F2D7ADDA2C35361A3AF6A25FFE32"
                   },
                   {
                       "path":  "scripts\\find-dictionary-v2-product-coverage-gaps.mjs",
@@ -50,8 +65,8 @@
                   },
                   {
                       "path":  "scripts\\complete-remote-dictionary-production-run.ps1",
-                      "bytes":  3555,
-                      "sha256":  "6EBC169D9236A2E880DFA7AA1C535C75AE0F51A0970BE843E4557133A20427A0"
+                      "bytes":  4339,
+                      "sha256":  "18646BD750E1486018D2A2F5B9C7DBB041246943470EE78AD674C76BCFB83634"
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-production-batch.mjs",
@@ -95,8 +110,8 @@
                   },
                   {
                       "path":  "scripts\\supplement-dictionary-v2-product-source-gaps-unsloth.mjs",
-                      "bytes":  170419,
-                      "sha256":  "3FEAE86DCA99069D91FE45FCA39BD195E2A7681296BAEC5445E0C450B43D389D"
+                      "bytes":  170934,
+                      "sha256":  "B836C0B29C458BBD96812C2547C19087E359D0446198F1C0675771E87BE4C13D"
                   },
                   {
                       "path":  "scripts\\invoke-dictionary-control.ps1",
@@ -105,8 +120,8 @@
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-runner.ps1",
-                      "bytes":  15700,
-                      "sha256":  "070F10E64D3C6BF86346205840D25FDAD86007E718A668EA96A02D6C6F0FF90C"
+                      "bytes":  16283,
+                      "sha256":  "EF86FDA70A86F7C0A2BDA257BAFA053A381F16D065F0DF418BDA1B3532D6ED3E"
                   },
                   {
                       "path":  "scripts\\run-remote-dictionary-runner-job.ps1",
@@ -125,8 +140,8 @@
                   },
                   {
                       "path":  "scripts\\validate-remote-dictionary-controlled-replay.ps1",
-                      "bytes":  5373,
-                      "sha256":  "E93DF331BF7A57DC49E110C7F8C245EE70868CC5C48B8C7F5D603DA16D139133"
+                      "bytes":  5833,
+                      "sha256":  "7750B0A9C370E11C96BFBABFADBEBD900227D594A75D376EF9A8E8285AE61EC7"
                   },
                   {
                       "path":  "scripts\\publish-remote-dictionary-controlled-run.ps1",
@@ -165,8 +180,8 @@
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-production-batch.ps1",
-                      "bytes":  4260,
-                      "sha256":  "45A48D7A8D59AEFC80241095EEDBED03DD2D60ACFF5AAD7296B5CAF5989FA486"
+                      "bytes":  4262,
+                      "sha256":  "950F37A285D54105FC70BB4F7D451A93C147D57BE4262D6662B2DEFDAEA61D91"
                   },
                   {
                       "path":  "scripts\\select-dictionary-v2-source-gap-fresh-cohort.mjs",

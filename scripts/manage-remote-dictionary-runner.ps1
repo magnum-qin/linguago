@@ -26,6 +26,9 @@ param(
   [string]$ElasticQwenVariants = '11442=UD-Q4_K_XL,11445=UD-Q4_K_XL',
   [int]$ElasticMinimumItems = 20,
   [object]$ElasticModelSwap = $true,
+  [object]$DynamicEndpointDiscovery = $true,
+  [string]$ClusterStatusUrl = 'http://127.0.0.1:18080/api/status',
+  [string]$ClusterServiceUser = 'g24tka12',
   [int]$StartTimeoutSeconds = 45
 )
 
@@ -48,6 +51,7 @@ $ReverseEvidencePrefilter = ConvertTo-RunnerBoolean $ReverseEvidencePrefilter 'R
 $EnforceGenerationHintTerms = ConvertTo-RunnerBoolean $EnforceGenerationHintTerms 'EnforceGenerationHintTerms'
 $AllowModelDownload = ConvertTo-RunnerBoolean $AllowModelDownload 'AllowModelDownload'
 $ElasticModelSwap = ConvertTo-RunnerBoolean $ElasticModelSwap 'ElasticModelSwap'
+$DynamicEndpointDiscovery = ConvertTo-RunnerBoolean $DynamicEndpointDiscovery 'DynamicEndpointDiscovery'
 
 $Root = 'D:\linguago-runner'
 $RunDir = Join-Path $Root (Join-Path 'runs' $RunId)
@@ -213,7 +217,10 @@ $Arguments = @(
   '--elastic-endpoints', $ElasticEndpoints,
   '--elastic-qwen-variants', $ElasticQwenVariants,
   '--elastic-minimum-items', $ElasticMinimumItems,
-  '--elastic-model-swap', $ElasticModelSwap.ToString().ToLowerInvariant()
+  '--elastic-model-swap', $ElasticModelSwap.ToString().ToLowerInvariant(),
+  '--dynamic-endpoint-discovery', $DynamicEndpointDiscovery.ToString().ToLowerInvariant(),
+  '--cluster-status-url', $ClusterStatusUrl,
+  '--cluster-service-user', $ClusterServiceUser
 )
 if (-not [string]::IsNullOrWhiteSpace($SourceRunDir)) {
   $ResolvedSourceRunDir = [IO.Path]::GetFullPath((Join-Path $Root $SourceRunDir))
@@ -286,6 +293,9 @@ $Launch = [ordered]@{
   ElasticQwenVariants = $ElasticQwenVariants
   ElasticMinimumItems = $ElasticMinimumItems
   ElasticModelSwap = $ElasticModelSwap
+  DynamicEndpointDiscovery = $DynamicEndpointDiscovery
+  ClusterStatusUrl = $ClusterStatusUrl
+  ClusterServiceUser = $ClusterServiceUser
   StartTimeoutSeconds = $StartTimeoutSeconds
 }
 $Launch | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $LaunchPath -Encoding UTF8
