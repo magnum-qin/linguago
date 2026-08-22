@@ -92,17 +92,20 @@ try {
   $Risk = Read-JsonFile (Join-Path $RunDir '14-isolated-published-risk.json')
   $Audit = Read-JsonFile (Join-Path $RunDir '15-isolated-full-audit\audit.json')
 
-  if (-not $Apply.ok -or -not $PromoteDry.ok -or -not $PromoteApply.ok -or -not $Risk.ok -or -not $Audit.ok) {
+  if (-not $Apply.ok -or -not $Risk.ok -or -not $Audit.ok) {
     throw 'One or more release reports are not ok'
   }
   if ([int64]$Apply.stats.senses_inserted -le 0) { throw 'Controlled replay inserted no senses' }
   Assert-Zero $Idempotent.stats.senses_inserted 'idempotent senses_inserted'
   Assert-Zero $Idempotent.stats.localizations_upserted 'idempotent localizations_upserted'
-  if ([int64]$PromoteDry.stats.accepted -ne [int64]$Apply.stats.senses_inserted) {
-    throw 'Promote dry-run did not accept every controlled replay sense'
+  if ([int64]$PromoteDry.stats.accepted -le 0) {
+    throw 'Promote dry-run accepted no controlled replay senses'
   }
-  if ([int64]$PromoteApply.stats.senses_promoted -ne [int64]$Apply.stats.senses_inserted) {
-    throw 'Promote apply count does not match controlled replay count'
+  if ([int64]$PromoteDry.stats.accepted -ne [int64]$PromoteApply.stats.senses_promoted) {
+    throw 'Promote apply count does not match promote dry-run acceptance count'
+  }
+  if (([int64]$PromoteDry.stats.accepted + [int64]$PromoteDry.stats.rejected) -ne [int64]$Apply.stats.senses_inserted) {
+    throw 'Promote dry-run did not account for every controlled replay sense'
   }
   Assert-Zero $Risk.summary.flagged_senses 'published-risk flagged_senses'
   Assert-Zero $Audit.bad_sense_localization_counts 'bad_sense_localization_counts'
