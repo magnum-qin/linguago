@@ -601,6 +601,12 @@ for (let chunkIndex = 0; chunkIndex < generationChunks.length; chunkIndex++) {
 
 writeRunOutput({ partial: false });
 console.log(JSON.stringify({ ok: stats.rejected === 0, out: path.relative(process.cwd(), outPath), stats }, null, 2));
+closeDeterministicSources();
+
+// Node's fetch implementation can retain idle Undici sockets on Windows after
+// every result and checkpoint have been durably written. This script is a
+// finite batch job, so do not let those handles stall the parent pipeline.
+process.exit(0);
 
 function writeRunOutput({ partial }) {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -2637,6 +2643,15 @@ function preloadDeterministicPronunciationSources() {
       LIMIT 1
     `);
   }
+}
+
+function closeDeterministicSources() {
+  findEcdictPronunciation = null;
+  findPortuguesePronunciation = null;
+  deterministicSourceDb?.close();
+  deterministicSourceDb = null;
+  ptPronunciationDb?.close();
+  ptPronunciationDb = null;
 }
 
 function applyDeterministicPronunciations(output) {
