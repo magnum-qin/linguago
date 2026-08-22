@@ -11,6 +11,53 @@ Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
 
+### v139 evidence-yield qualification
+
+The v137/v138 funnel report showed that source-sense alignment was the dominant
+loss: 5,248 rows ended as `no_eligible_sense`. CC-CEDICT and JMdict daily senses
+often contain a trustworthy native term and English gloss but no product-style
+localization rows, so the previous `clean_lang_count >= 2` rule rejected them
+before any model or independent reverse-evidence check could run.
+
+`align-dictionary-v2-product-source-gap-candidate-senses.mjs` now has an
+explicit, default-off `--allow-native-source-fallback` switch. It only accepts
+the candidate's current `first_sense_id`, only when Chinese is backed by
+CC-CEDICT or Japanese by JMdict, the candidate source family matches, source
+confidence is at least 0.9, the gloss is non-empty, and no accepted/draft
+product link exists. All later source review, deterministic reverse evidence,
+semantic review, generation, and final Gemma gates remain mandatory.
+
+Do not run the pre-generation reverse-evidence prefilter on this zero-
+localization retry lane. A 200-row v139 attempt aligned all 200 rows but the
+prefilter selected 0 because it had no proposed target terms. The corrected
+model-first run `v139b-native-fallback-model-first-dry200` reviewed all 200,
+Gemma source-approved 166, deterministic source reverse evidence supported 21,
+semantic review retained 17, generation preflight retained 15, Qwen produced
+15/15 valid records, post-generation reverse evidence supported 15/15, and
+final Gemma accepted 14/15 without correction. Raw-to-final yield was 7%,
+generation validity 100%, and final no-correction acceptance 93.3%; automatic
+database writes remained zero.
+
+Use `build-dictionary-v2-native-alignment-retry-cohort.mjs` to rebuild balanced,
+non-overlapping zh/ja cohorts from the historical daily-primary and alignment-
+rejected reports. This avoids another 8.7 GB source scan. The builder accepts
+`--exclude-reports`; always exclude earlier v139 cohorts when qualifying the
+500-row and 5,000-row stages. `config/dictionary-v2-production-v139.json` is the
+frozen profile. The independent run
+`v139d-native-fallback-write500-prefiltered` accepted 42/500 final records
+(8.4%); generation, post-generation reverse evidence, and final Gemma were all
+42/42. Isolated replay inserted 42 senses, the exact replay wrote zero rows,
+promotion accepted 42/42, and fast/published-risk/full import audits passed.
+The JMdict generation preflight now rejects Japanese single-character source
+gaps before Qwen because the existing final validator deterministically rejects
+that class. After excluding the 200- and 500-row qualification cohorts, this
+historical lane has at most 4,548 rows remaining; production should consume the
+complete remaining pool without adding weaker candidates to reach a cosmetic
+5,000. That run is active as
+`v139e-native-fallback-production-remaining4548` with 4,548 inputs. Do not
+start another copy while its manifest is running. D1 is still unchanged and
+remains a separate release action.
+
 The jump-host product DB is authoritative. The repository copy may lag behind
 remote controlled commits. When regenerating `remote-runner-files.json`, do
 not replace the product-DB entry with the local hash unless the remote DB was

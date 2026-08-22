@@ -12,6 +12,7 @@ param(
   [object]$RequireAuthoritativeSourceSense = $true,
   [object]$DailyPrimarySenseSelection = $false,
   [object]$SourceSenseAlignment = $false,
+  [object]$AllowNativeSourceFallback = $false,
   [object]$ReverseEvidencePrefilter = $false,
   [int]$ReverseEvidenceMinTargetLangs = 2,
   [int]$ReverseEvidencePrefilterLimit = 1000000,
@@ -42,6 +43,7 @@ $ProductionPrefilter = ConvertTo-RunnerBoolean $ProductionPrefilter 'ProductionP
 $RequireAuthoritativeSourceSense = ConvertTo-RunnerBoolean $RequireAuthoritativeSourceSense 'RequireAuthoritativeSourceSense'
 $DailyPrimarySenseSelection = ConvertTo-RunnerBoolean $DailyPrimarySenseSelection 'DailyPrimarySenseSelection'
 $SourceSenseAlignment = ConvertTo-RunnerBoolean $SourceSenseAlignment 'SourceSenseAlignment'
+$AllowNativeSourceFallback = ConvertTo-RunnerBoolean $AllowNativeSourceFallback 'AllowNativeSourceFallback'
 $ReverseEvidencePrefilter = ConvertTo-RunnerBoolean $ReverseEvidencePrefilter 'ReverseEvidencePrefilter'
 $EnforceGenerationHintTerms = ConvertTo-RunnerBoolean $EnforceGenerationHintTerms 'EnforceGenerationHintTerms'
 $AllowModelDownload = ConvertTo-RunnerBoolean $AllowModelDownload 'AllowModelDownload'
@@ -196,6 +198,7 @@ $Arguments = @(
   '--require-authoritative-source-sense', $RequireAuthoritativeSourceSense.ToString().ToLowerInvariant(),
   '--daily-primary-sense-selection', $DailyPrimarySenseSelection.ToString().ToLowerInvariant(),
   '--source-sense-alignment', $SourceSenseAlignment.ToString().ToLowerInvariant(),
+  '--allow-native-source-fallback', $AllowNativeSourceFallback.ToString().ToLowerInvariant(),
   '--reverse-evidence-prefilter', $ReverseEvidencePrefilter.ToString().ToLowerInvariant(),
   '--reverse-evidence-min-target-langs', [string]$ReverseEvidenceMinTargetLangs,
   '--reverse-evidence-prefilter-limit', [string]$ReverseEvidencePrefilterLimit,
@@ -269,6 +272,7 @@ $Launch = [ordered]@{
   RequireAuthoritativeSourceSense = $RequireAuthoritativeSourceSense
   DailyPrimarySenseSelection = $DailyPrimarySenseSelection
   SourceSenseAlignment = $SourceSenseAlignment
+  AllowNativeSourceFallback = $AllowNativeSourceFallback
   ReverseEvidencePrefilter = $ReverseEvidencePrefilter
   ReverseEvidenceMinTargetLangs = $ReverseEvidenceMinTargetLangs
   ReverseEvidencePrefilterLimit = $ReverseEvidencePrefilterLimit

@@ -12,6 +12,7 @@ param(
   [object]$DailyPrimarySenseSelection = $false,
   [object]$ReverseEvidencePrefilter = $false,
   [object]$SourceSenseAlignment = $false,
+  [object]$AllowNativeSourceFallback = $false,
   [int]$ReverseEvidenceMinTargetLangs = 2,
   [int]$ReverseEvidencePrefilterLimit = 1000000,
   [object]$EnforceGenerationHintTerms = $false,
@@ -67,6 +68,7 @@ switch ($Action) {
       '-DailyPrimarySenseSelection', [string]$DailyPrimarySenseSelection,
       '-ReverseEvidencePrefilter', [string]$ReverseEvidencePrefilter,
       '-SourceSenseAlignment', [string]$SourceSenseAlignment,
+      '-AllowNativeSourceFallback', [string]$AllowNativeSourceFallback,
       '-ReverseEvidenceMinTargetLangs', [string]$ReverseEvidenceMinTargetLangs,
       '-ReverseEvidencePrefilterLimit', [string]$ReverseEvidencePrefilterLimit,
       '-EnforceGenerationHintTerms', [string]$EnforceGenerationHintTerms

@@ -55,6 +55,7 @@ const dailyPrimarySenseSelection =
     ? args['daily-primary-sense-selection'] !== 'false'
     : pipelineMode === 'simplified';
 const sourceSenseAlignment = args['source-sense-alignment'] === 'true';
+const allowNativeSourceFallback = args['allow-native-source-fallback'] === 'true';
 const reverseEvidencePrefilter = args['reverse-evidence-prefilter'] === 'true';
 const reverseEvidenceMinimumTargetLanguages = Math.max(
   0,
@@ -119,6 +120,7 @@ manifest.require_authoritative_source_sense = requireAuthoritativeSourceSense;
 manifest.reverse_evidence_prefilter = reverseEvidencePrefilter;
 manifest.daily_primary_sense_selection = dailyPrimarySenseSelection;
 manifest.source_sense_alignment = sourceSenseAlignment;
+manifest.allow_native_source_fallback = allowNativeSourceFallback;
 manifest.reverse_evidence_min_target_langs = reverseEvidenceMinimumTargetLanguages;
 manifest.reverse_evidence_prefilter_limit = reverseEvidencePrefilterLimit;
 manifest.enforce_generation_hint_terms = enforceGenerationHintTerms;
@@ -583,7 +585,8 @@ async function runSimplifiedPipeline() {
         '--rejected-out', files.senseAlignmentRejected,
         '--min-langs', '2',
         '--max-langs', '3',
-        '--prefer-current-sense', 'true'
+        '--prefer-current-sense', 'true',
+        '--allow-native-source-fallback', String(allowNativeSourceFallback)
       ],
       [files.senseAligned, files.senseAlignmentRejected]
     );

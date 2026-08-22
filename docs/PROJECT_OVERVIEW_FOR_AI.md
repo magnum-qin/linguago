@@ -1,5 +1,39 @@
 # LinguaGo Project Overview For AI
 
+## Current local production baseline and v139 qualification (2026-08-22)
+
+The authoritative jump-host product DB is ahead of the currently released D1.
+After v138 it contains `entries=41023`, `senses=47335`, and
+`sense_localizations=189340`, with SHA-256
+`ACA285F7F27071A2A5C46EB4EC3140AFA9486151CBEBB174B7BD121F7443DACE`.
+Do not replace the remote manifest's DB entry with the older repository DB
+hash. The manifest generator now preserves the existing remote DB fingerprint
+by default.
+
+v139 targets the historical zero-localization CC-CEDICT/JMdict alignment lane.
+Its native fallback is opt-in and does not publish records directly. The first
+model-first 200-row qualification produced 14 final accepts (7% raw-to-final),
+15/15 structurally valid Qwen generations, 15/15 generated-record reverse-
+evidence support, and 14/15 final Gemma no-correction accepts. The incorrect
+pre-model reverse-evidence ordering produced 0/200 and must not be reused for
+this lane.
+
+The non-overlapping 500-row gate is now complete. Run
+`v139d-native-fallback-write500-prefiltered` produced 42 final accepts (8.4%),
+42/42 valid Qwen records, 42/42 generated-record reverse-evidence support, and
+42/42 final Gemma accepts. Its isolated replay inserted 42 draft senses and 168
+localizations, the second replay wrote zero rows, and promotion accepted 42/42.
+Fast, published-risk, native export, and full in-memory import audits passed;
+all blocking integrity counters were zero. Japanese single-character source
+gaps are now rejected before generation. The next production cohort should use
+the remaining 4,548 non-overlapping historical rows; do not weaken evidence
+requirements merely to round the batch to 5,000.
+
+The remaining-pool production run is active on the jump host as
+`v139e-native-fallback-production-remaining4548` with 4,548 inputs
+(`zh=2697`, `ja=1851`). Treat its manifest and stage reports as authoritative;
+do not start a second copy. It performs no automatic main-product-DB writes.
+
 ## Current production dictionary (v124, 2026-08-20)
 
 The jump-host release plane is now live end to end. The guarded controller

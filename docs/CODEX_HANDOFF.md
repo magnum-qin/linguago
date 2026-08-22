@@ -1,5 +1,49 @@
 # Codex Handoff
 
+## 2026-08-22 v139 evidence-yield qualification
+
+- The jump-host main DB remains the v138 baseline with SHA-256
+  `ACA285F7F27071A2A5C46EB4EC3140AFA9486151CBEBB174B7BD121F7443DACE`,
+  `entries=41023`, `senses=47335`, and `sense_localizations=189340`. D1 was not
+  changed by v139 qualification.
+- Funnel analysis of v137/v138 found 5,248 historical
+  `source_sense_alignment:no_eligible_sense` rows. The new default-off native
+  fallback only admits the locked current CC-CEDICT/JMdict sense with confidence
+  at least 0.9 and no product link; all strict downstream gates remain intact.
+- Pre-generation reverse evidence is invalid for this zero-localization lane:
+  the first 200-row run aligned 200/200 but selected 0/200. The corrected order
+  is Gemma source proposal -> deterministic source reverse evidence -> semantic
+  review -> Qwen complete record -> deterministic generated-record reverse
+  evidence -> final Gemma no-correction review.
+- `v139b-native-fallback-model-first-dry200` ended with 14 final accepts from
+  200 raw rows (7%). Qwen generation was 15/15 valid, reverse evidence was
+  15/15, final Gemma was 14/15, and database writes were zero. This passes the
+  v139 dry-run thresholds and authorizes the 500-row isolated write validation,
+  not a main-DB commit or D1 release.
+- Use `build-dictionary-v2-native-alignment-retry-cohort.mjs` with prior v139
+  cohorts in `--exclude-reports`. Do not restart a deep native scanner merely
+  to qualify this repaired historical lane.
+- `v139d-native-fallback-write500-prefiltered` completed the independent
+  500-row gate. It accepted 42/500 final records (8.4%), with Qwen 42/42 valid,
+  generated-record reverse evidence 42/42, final Gemma 42/42, zero network
+  failures, and zero automatic main-DB writes. Four Japanese single-character
+  source gaps that would always fail the existing semantic validator are now
+  rejected by the JMdict generation preflight instead of consuming Qwen calls.
+- Isolated controlled replay inserted 42 draft senses and 168 localizations;
+  the identical second replay wrote zero rows, and deterministic promotion
+  accepted 42/42. Fast audit, published-risk (`flagged_senses=0`), native export,
+  and full in-memory import audit all passed. The audited isolated export had
+  `entries=41065`, `senses=47377`, and `sense_localizations=189508`.
+- The 500-row gate is complete. The remaining historical retry pool contains at
+  most 4,548 non-overlapping rows after excluding the 200- and 500-row
+  qualification cohorts; use all remaining rows as the first large production
+  run rather than padding the batch with a weaker evidence lane.
+- The first large run is active on the jump host as
+  `v139e-native-fallback-production-remaining4548`, using batch
+  `batches\v139-native-fallback-production-remaining.json` (`zh=2697`,
+  `ja=1851`). Do not launch a duplicate run. It remains no-main-DB-write until
+  final reports pass controlled replay and release audits.
+
 ## 2026-08-20 v124 production release
 
 - v124 is live. Production contains `entries=40793`, `senses=47105`,

@@ -1,12 +1,16 @@
 param(
   [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
   [string]$Out = 'config\remote-runner-files.json',
+  [bool]$PreserveProductDbEntry = $true,
   [string[]]$Paths = @(
     'package.json',
     'package-lock.json',
     'scripts\run-dictionary-v2-remote-pipeline.mjs',
     'scripts\find-dictionary-v2-product-coverage-gaps.mjs',
     'scripts\find-dictionary-v2-native-daily-coverage-gaps.mjs',
+    'scripts\align-dictionary-v2-product-source-gap-candidate-senses.mjs',
+    'scripts\build-dictionary-v2-native-alignment-retry-cohort.mjs',
+    'scripts\report-dictionary-v2-remote-production-funnel.mjs',
     'scripts\filter-dictionary-v2-production-batch.mjs',
     'scripts\review-dictionary-v2-product-source-gap-candidates-unsloth.mjs',
     'scripts\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs',
@@ -35,6 +39,7 @@ param(
     'scripts\audit-dictionary-v2-product-export.mjs',
     'scripts\audit-dictionary-v2-product-published-risk.mjs',
     'scripts\export-dictionary-v2-product-native-d1-sql.mjs',
+    'config\dictionary-v2-production-v139.json',
     'config\dictionary-overrides\product-entry-form-aliases.json',
     'config\remote-candidate-sources.json',
     '.tmp\combined\openwn-word2word3-ja-apertium-wikidata-v3-evidence.db',
@@ -46,17 +51,33 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Root = [IO.Path]::GetFullPath($Root)
+$OutPath = [IO.Path]::GetFullPath((Join-Path $Root $Out))
+$ExistingManifest = if ($PreserveProductDbEntry -and (Test-Path -LiteralPath $OutPath)) {
+  Get-Content -LiteralPath $OutPath -Raw | ConvertFrom-Json
+} else { $null }
+$ProductDbRelativePath = 'data\processed\linguago_v2_product_top5000_freedict_filtered_candidate.db'
+$ExistingProductDbEntry = @($ExistingManifest.files) |
+  Where-Object { [string]$_.path -eq $ProductDbRelativePath } |
+  Select-Object -First 1
 $Files = foreach ($RelativePath in $Paths) {
   $Path = [IO.Path]::GetFullPath((Join-Path $Root $RelativePath))
   if (-not $Path.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Path escapes runner root: $RelativePath"
   }
   if (-not (Test-Path -LiteralPath $Path)) { throw "Required runner file not found: $Path" }
-  $Item = Get-Item -LiteralPath $Path
-  [ordered]@{
-    path = $RelativePath
-    bytes = $Item.Length
-    sha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+  if ($RelativePath -eq $ProductDbRelativePath -and $null -ne $ExistingProductDbEntry) {
+    [ordered]@{
+      path = $RelativePath
+      bytes = [long]$ExistingProductDbEntry.bytes
+      sha256 = [string]$ExistingProductDbEntry.sha256
+    }
+  } else {
+    $Item = Get-Item -LiteralPath $Path
+    [ordered]@{
+      path = $RelativePath
+      bytes = $Item.Length
+      sha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+    }
   }
 }
 $Manifest = [ordered]@{
@@ -65,7 +86,6 @@ $Manifest = [ordered]@{
   root = $Root
   files = @($Files)
 }
-$OutPath = [IO.Path]::GetFullPath((Join-Path $Root $Out))
 New-Item -ItemType Directory -Path (Split-Path -Parent $OutPath) -Force | Out-Null
 $Manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $OutPath -Encoding UTF8
 Write-Output $OutPath

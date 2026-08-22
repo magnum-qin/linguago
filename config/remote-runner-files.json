@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-22T01:29:40.1351545Z",
-    "root":  "D:\\linguago-runner",
+    "generated_at":  "2026-08-22T03:40:31.6519909Z",
+    "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  16450,
-                      "sha256":  "D5366799F83A4556E6C23A72A0512B86479CC365855C4CDEC7875472A55C8B69"
+                      "bytes":  16966,
+                      "sha256":  "86F466132E4D29DE73E6639250A4D3868F178BFBB22D838A9C390C93DD913450"
                   },
                   {
                       "path":  "package-lock.json",
@@ -15,8 +15,8 @@
                   },
                   {
                       "path":  "scripts\\run-dictionary-v2-remote-pipeline.mjs",
-                      "bytes":  51324,
-                      "sha256":  "2CDF1BC8F2C85EC73AF31A248955F0F8775B9485318502E51D15C1925109D47A"
+                      "bytes":  51551,
+                      "sha256":  "B185C3C66ED5789F5618DDD48147DAEA92CB3C05867DACF09E622E7F5C512F9E"
                   },
                   {
                       "path":  "scripts\\find-dictionary-v2-product-coverage-gaps.mjs",
@@ -27,6 +27,21 @@
                       "path":  "scripts\\find-dictionary-v2-native-daily-coverage-gaps.mjs",
                       "bytes":  8355,
                       "sha256":  "F14327343AAA44A5F4F7FA18392921B4D512EB5BF8CAE3FA03681734768AC1B0"
+                  },
+                  {
+                      "path":  "scripts\\align-dictionary-v2-product-source-gap-candidate-senses.mjs",
+                      "bytes":  15482,
+                      "sha256":  "69B61CC242EDBC1676AAEE216698CCD0909D91B3A7A2D3A69EE9851E9CD21753"
+                  },
+                  {
+                      "path":  "scripts\\build-dictionary-v2-native-alignment-retry-cohort.mjs",
+                      "bytes":  5140,
+                      "sha256":  "AE676EBB4151232A31603FC882455A230ADFBE356E07CBE2AAC36849FB778636"
+                  },
+                  {
+                      "path":  "scripts\\report-dictionary-v2-remote-production-funnel.mjs",
+                      "bytes":  14021,
+                      "sha256":  "8ABE7525C5B0E9C4B82762C4484DF8095C0638A1C37FDA387CDCA1B3EEDFE350"
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-production-batch.mjs",
@@ -65,8 +80,8 @@
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-source-gap-jmdict-generation-preflight.mjs",
-                      "bytes":  9400,
-                      "sha256":  "50F42B77E9966CBB74078420C62539B63DF27D14182970B2839A0D937414792E"
+                      "bytes":  9669,
+                      "sha256":  "C33F45B6B4FAD9DCDB82D5201A3D4E98CF4E19B6750ED86E428322B4EBCC696A"
                   },
                   {
                       "path":  "scripts\\supplement-dictionary-v2-product-source-gaps-unsloth.mjs",
@@ -75,13 +90,13 @@
                   },
                   {
                       "path":  "scripts\\invoke-dictionary-control.ps1",
-                      "bytes":  7211,
-                      "sha256":  "94835A570866B645EB9DB0E5248F456FAA10AACC7FB2CF39CDE8CF3990EF02B4"
+                      "bytes":  7330,
+                      "sha256":  "965F5C78E61ADFFE712F4CDCFC9868B3850041FD65E10D3078780EFD28E555D8"
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-runner.ps1",
-                      "bytes":  15394,
-                      "sha256":  "CAB447EB0BA21E39B04B4BDED6B69C75E7942D2805AEE5D68852847033F2A111"
+                      "bytes":  15700,
+                      "sha256":  "070F10E64D3C6BF86346205840D25FDAD86007E718A668EA96A02D6C6F0FF90C"
                   },
                   {
                       "path":  "scripts\\run-remote-dictionary-runner-job.ps1",
@@ -167,6 +182,11 @@
                       "path":  "scripts\\export-dictionary-v2-product-native-d1-sql.mjs",
                       "bytes":  20576,
                       "sha256":  "9E6CBE1157CB641A04B7BDFFDBBD06E3A6F530C6F75009AC7C170BCA2A920A28"
+                  },
+                  {
+                      "path":  "config\\dictionary-v2-production-v139.json",
+                      "bytes":  2456,
+                      "sha256":  "C09870CF02D2D58D92202842D2EF3334E41DEB76A6675CAD29A851871BFD3598"
                   },
                   {
                       "path":  "config\\dictionary-overrides\\product-entry-form-aliases.json",

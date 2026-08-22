@@ -21,6 +21,11 @@ const rejected = [];
 
 for (const row of report.selected || []) {
   if (excludeKeys.has(candidateKey(row))) continue;
+  const sourceWord = String(row?.word || '').trim();
+  if (row?.source_lang === 'ja' && [...sourceWord].length === 1) {
+    rejected.push(reject(row, 'ja_single_character_source_gap', sourceWord, []));
+    continue;
+  }
   const preferredTerm = String(row?.candidate_evidence_review?.preferred_terms?.ja || '').trim();
   const suggestedTerm = String(row?.candidate_evidence_review?.suggested_terms?.ja || '').trim();
   const nativeSourceTerm = row?.source_lang === 'ja' ? String(row.word || '').trim() : '';
@@ -56,6 +61,7 @@ const output = {
     allow_reviewed_suggested_ja_term_with_jmdict_exact_match: true,
     allow_reviewed_ja_generation_term_suggestions_with_jmdict_exact_match: true,
     require_unique_jmdict_ja_reading: true,
+    reject_ja_single_character_source_gap: true,
     hiragana_katakana_equivalent_for_reading_uniqueness: true,
     unique_jmdict_priority_reading_allowed: true
   },

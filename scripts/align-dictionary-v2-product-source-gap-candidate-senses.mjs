@@ -20,6 +20,7 @@ const expandAmbiguousBest = args['expand-ambiguous-best'] === 'true';
 const expandAllEligible = args['expand-all-eligible'] === 'true';
 const preferCurrentSense = args['prefer-current-sense'] === 'true';
 const excludeProductLinkedDrafts = args['exclude-product-linked-drafts'] !== 'false';
+const allowNativeSourceFallback = args['allow-native-source-fallback'] === 'true';
 
 if (!fs.existsSync(reportPath)) throw new Error(`Coverage report not found: ${reportPath}`);
 if (!fs.existsSync(sourceDbPath)) throw new Error(`Source DB not found: ${sourceDbPath}`);
@@ -122,6 +123,7 @@ const common = {
     expand_ambiguous_best: expandAmbiguousBest,
     expand_all_eligible: expandAllEligible,
     prefer_current_sense: preferCurrentSense,
+    allow_native_source_fallback: allowNativeSourceFallback,
     complete_senses_are_excluded: maxLangs < 4,
     accepted_product_linked_senses_are_excluded: true,
     draft_product_linked_senses_are_excluded: excludeProductLinkedDrafts,
@@ -168,6 +170,16 @@ function alignCandidate(candidate) {
       )
     ) {
       return rejectedResult('already_linked_draft_product_sense', candidate, senses);
+    }
+    const nativeFallback = trustedNativeCurrentSense(candidate, senses);
+    if (nativeFallback) {
+      return alignedResult(
+        candidate,
+        nativeFallback,
+        senses,
+        [nativeFallback],
+        'authoritative_native_current_sense_fallback'
+      );
     }
     return rejectedResult('no_eligible_sense', candidate, senses);
   }
@@ -292,6 +304,25 @@ function inspectSense(candidate, sense) {
     clean_langs: cleanLangs.sort(),
     source_term_exact: sourceTerms.some((term) => normalize(term) === normalize(candidate.word))
   };
+}
+
+function trustedNativeCurrentSense(candidate, senses) {
+  if (!allowNativeSourceFallback) return null;
+  const expectedSource = candidate.source_lang === 'zh'
+    ? 'cc-cedict'
+    : candidate.source_lang === 'ja'
+      ? 'jmdict'
+      : null;
+  if (!expectedSource || normalize(candidate.native_source_family) !== expectedSource) return null;
+  const currentSenseId = Number(candidate.first_sense_id);
+  return senses.find((sense) =>
+    Number(sense.id) === currentSenseId &&
+    normalize(sense.source) === expectedSource &&
+    Number(sense.confidence) >= 0.9 &&
+    cleanText(sense.gloss_key) &&
+    !sense.accepted_product_link &&
+    (!excludeProductLinkedDrafts || !sense.draft_product_link)
+  ) || null;
 }
 
 function rejectedResult(reason, candidate, senses, finalists = []) {
