@@ -2,11 +2,11 @@
 
 ## Remote runner baseline (2026-08-22)
 
-The jump host now has a validated v137 runner and product database. The
+The jump host now has a validated v138 runner and product database. The
 installed product database SHA-256 is
-`57DDBED51CE8ED247DBCC090A87A09740D71248D8554435C14C570C4E25D50CC`.
-The immediate pre-v137 remote database is backed up as
-`D:\linguago-runner\backups\v137-native-daily-raw5000b-main-before-commit-20260822-105448.db`.
+`ACA285F7F27071A2A5C46EB4EC3140AFA9486151CBEBB174B7BD121F7443DACE`.
+The immediate pre-v138 remote database is backed up as
+`D:\linguago-runner\backups\v138-native-daily-raw5000-main-before-commit-20260822-111016.db`.
 Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
@@ -73,6 +73,17 @@ than hydrated sense fields. Second, Scheduled Task launches must persist
 defaults. The controller now fixes both issues and records startup state while
 waiting for the manifest, terminating only the exact reserved launch if startup
 times out.
+
+The v138 cohort used `--exclude-reports` to select 5,000 new raw candidates
+with zero overlap against v137. Its funnel was `5000 -> 4948 -> 4541 -> 920 ->
+157 -> 148 -> 41 -> 40 -> 36 -> 34 -> 31 -> 28`. Controlled replay inserted
+28 draft senses and 112 localizations, exact replay wrote zero rows, and
+promotion accepted 28/28. All fast, published-risk, native export, and full
+in-memory import gates passed before the guarded commit. The resulting main DB
+has `entries=41023`, `senses=47335`, and `sense_localizations=189340`, with
+`flagged_senses=0`. Across v137 and v138, 10,000 non-overlapping raw candidates
+produced 57 published-quality senses; D1 remains unchanged pending the normal
+release threshold.
 
 The native scanner must use a correlated `EXISTS` sense check instead of
 `JOIN senses + DISTINCT`. On the 8.7 GB source DB, the join form can create a

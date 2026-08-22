@@ -195,8 +195,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  350760960,
-                      "sha256":  "57DDBED51CE8ED247DBCC090A87A09740D71248D8554435C14C570C4E25D50CC"
+                      "bytes":  350789632,
+                      "sha256":  "ACA285F7F27071A2A5C46EB4EC3140AFA9486151CBEBB174B7BD121F7443DACE"
                   }
               ]
 }
