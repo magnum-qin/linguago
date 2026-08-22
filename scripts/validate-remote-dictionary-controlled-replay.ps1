@@ -77,7 +77,20 @@ $PromoteArgs = @(
 )
 Invoke-Node 'scripts\promote-dictionary-v2-product-source-gap-drafts.mjs' ($PromoteArgs + @('--apply', 'false', '--out', $PromoteDry))
 Invoke-Node 'scripts\promote-dictionary-v2-product-source-gap-drafts.mjs' ($PromoteArgs + @('--apply', 'true', '--out', $PromoteApply))
-Invoke-Node 'scripts\audit-dictionary-v2-product-export.mjs' @('--db', $IsolatedDb, '--mode', 'fast')
+Invoke-Node 'scripts\checkpoint-sqlite-db.mjs' @('--db', $IsolatedDb)
+$FastAuditSucceeded = $false
+for ($Attempt = 1; $Attempt -le 2; $Attempt++) {
+  & node.exe (Join-Path $Root 'scripts\audit-dictionary-v2-product-export.mjs') '--db' $IsolatedDb '--mode' 'fast'
+  if ($LASTEXITCODE -eq 0) {
+    $FastAuditSucceeded = $true
+    break
+  }
+  if ($Attempt -lt 2) {
+    Start-Sleep -Seconds 3
+    Invoke-Node 'scripts\checkpoint-sqlite-db.mjs' @('--db', $IsolatedDb)
+  }
+}
+if (-not $FastAuditSucceeded) { throw 'Fast isolated export audit failed after 2 attempts' }
 Invoke-Node 'scripts\audit-dictionary-v2-product-published-risk.mjs' @('--db', $IsolatedDb, '--out', $RiskReport)
 Invoke-Node 'scripts\export-dictionary-v2-product-native-d1-sql.mjs' @(
   '--db', $IsolatedDb, '--out-dir', $ExportDir,

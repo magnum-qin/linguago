@@ -40,10 +40,25 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Production gates failed' }
 
   Write-Status 'validating_and_committing' @{}
-  $PublishOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
-    (Join-Path $Root 'scripts\publish-remote-dictionary-controlled-run.ps1') `
-    -Root $Root -RunId $RunId -ExpectedMainSha256 $ExpectedMainSha256 -Commit true -ForceValidation
-  if ($LASTEXITCODE -ne 0) { throw "Controlled publish failed with exit code $LASTEXITCODE" }
+  $PublishLog = Join-Path $RunDir 'controlled-publish-supervisor.log'
+  $PublishOutput = @()
+  $PublishExitCode = 1
+  for ($Attempt = 1; $Attempt -le 2; $Attempt++) {
+    $AttemptOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+      (Join-Path $Root 'scripts\publish-remote-dictionary-controlled-run.ps1') `
+      -Root $Root -RunId $RunId -ExpectedMainSha256 $ExpectedMainSha256 -Commit true -ForceValidation 2>&1)
+    $PublishExitCode = $LASTEXITCODE
+    $PublishOutput += @("[attempt $Attempt exit=$PublishExitCode]") + $AttemptOutput
+    [IO.File]::WriteAllLines($PublishLog, [string[]]$PublishOutput, (New-Object Text.UTF8Encoding($false)))
+    if ($PublishExitCode -eq 0) { break }
+    if ($Attempt -lt 2) {
+      Write-Status 'retrying_controlled_publish' @{ attempt = $Attempt; exit_code = $PublishExitCode; log = $PublishLog }
+      Start-Sleep -Seconds 5
+    }
+  }
+  if ($PublishExitCode -ne 0) {
+    throw "Controlled publish failed after 2 attempts with exit code $PublishExitCode; log=$PublishLog"
+  }
 
   $Release = [IO.File]::ReadAllText((Join-Path $RunDir 'release-controller.json'), [Text.Encoding]::UTF8) | ConvertFrom-Json
   $ManifestFile = Join-Path $Root 'config\remote-runner-files.json'
@@ -60,8 +75,8 @@ try {
 
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'scripts\verify-remote-dictionary-runner.ps1') -Root $Root
   if ($LASTEXITCODE -ne 0) { throw 'Post-commit runner verification failed' }
-  Write-Status 'complete' @{ release = $Release; main_sha256 = $MainHash; publish_output = @($PublishOutput) }
+  Write-Status 'complete' @{ release = $Release; main_sha256 = $MainHash; publish_log = $PublishLog; publish_output = @($PublishOutput) }
 } catch {
-  Write-Status 'failed' @{ error = $_.Exception.Message; stack = $_.ScriptStackTrace }
+  Write-Status 'failed' @{ error = $_.Exception.Message; stack = $_.ScriptStackTrace; publish_log = (Join-Path $RunDir 'controlled-publish-supervisor.log') }
   throw
 }
