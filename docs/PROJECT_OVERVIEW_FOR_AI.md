@@ -32,7 +32,15 @@ requirements merely to round the batch to 5,000.
 The remaining-pool production run is active on the jump host as
 `v139e-native-fallback-production-remaining4548` with 4,548 inputs
 (`zh=2697`, `ja=1851`). Treat its manifest and stage reports as authoritative;
-do not start a second copy. It performs no automatic main-product-DB writes.
+do not start a second copy. The model pipeline performs no automatic
+main-product-DB writes. A detached
+`complete-remote-dictionary-production-run.ps1` supervisor waits for successful
+completion, applies the fixed production gates, and then uses the existing
+hash-locked controlled replay path. It can atomically commit only after
+idempotence, promotion, fast/published-risk/full export audits all pass. Monitor
+`runs/v139e-native-fallback-production-remaining4548/production-supervisor.json`.
+This supervisor never pushes D1 or deploys the Worker; those remain a separate
+release step after reviewing the accumulated publishable count.
 
 ## Current production dictionary (v124, 2026-08-20)
 

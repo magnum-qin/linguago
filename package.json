@@ -149,6 +149,7 @@
     "dict:v2:audit:product-fast": "node scripts/audit-dictionary-v2-product-export.mjs --mode fast --db data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db --out logs/product-fast-audit.json",
     "dict:v2:daily:jmdict-preflight": "node scripts/filter-dictionary-v2-source-gap-jmdict-generation-preflight.mjs",
     "dict:v2:test:jmdict-preflight": "node scripts/test-jmdict-generation-preflight.mjs",
+    "dict:v2:test:production-run-gates": "node scripts/test-dictionary-v2-production-run-gates.mjs",
     "dict:v2:audit:product-full": "node scripts/audit-dictionary-v2-product-export.mjs --mode full --import memory",
     "dict:v2:query": "node scripts/query-dictionary-v2.mjs",
     "dict:v2:progress": "node scripts/inspect-dictionary-v2-progress.mjs data/processed/linguago_v2_full.db",

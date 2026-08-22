@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-22T03:40:31.6519909Z",
+    "generated_at":  "2026-08-22T04:15:12.3664330Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  16966,
-                      "sha256":  "86F466132E4D29DE73E6639250A4D3868F178BFBB22D838A9C390C93DD913450"
+                      "bytes":  17067,
+                      "sha256":  "BCC7A2A1B85C879263FB6EF0EE19E5660819BA472DD1C03B2321B56BA07FD48E"
                   },
                   {
                       "path":  "package-lock.json",
@@ -42,6 +42,16 @@
                       "path":  "scripts\\report-dictionary-v2-remote-production-funnel.mjs",
                       "bytes":  14021,
                       "sha256":  "8ABE7525C5B0E9C4B82762C4484DF8095C0638A1C37FDA387CDCA1B3EEDFE350"
+                  },
+                  {
+                      "path":  "scripts\\check-dictionary-v2-production-run-gates.mjs",
+                      "bytes":  3988,
+                      "sha256":  "F4C67B4202AAE3CCA2255B815EB21FEDE125859A75E51BA9017FED1427167A0B"
+                  },
+                  {
+                      "path":  "scripts\\complete-remote-dictionary-production-run.ps1",
+                      "bytes":  3555,
+                      "sha256":  "6EBC169D9236A2E880DFA7AA1C535C75AE0F51A0970BE843E4557133A20427A0"
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-production-batch.mjs",

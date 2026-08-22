@@ -11,6 +11,8 @@ param(
     'scripts\align-dictionary-v2-product-source-gap-candidate-senses.mjs',
     'scripts\build-dictionary-v2-native-alignment-retry-cohort.mjs',
     'scripts\report-dictionary-v2-remote-production-funnel.mjs',
+    'scripts\check-dictionary-v2-production-run-gates.mjs',
+    'scripts\complete-remote-dictionary-production-run.ps1',
     'scripts\filter-dictionary-v2-production-batch.mjs',
     'scripts\review-dictionary-v2-product-source-gap-candidates-unsloth.mjs',
     'scripts\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs',

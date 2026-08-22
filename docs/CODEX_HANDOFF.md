@@ -43,6 +43,24 @@
   `batches\v139-native-fallback-production-remaining.json` (`zh=2697`,
   `ja=1851`). Do not launch a duplicate run. It remains no-main-DB-write until
   final reports pass controlled replay and release audits.
+- A detached completion supervisor is active for this run. Its status is
+  `runs\v139e-native-fallback-production-remaining4548\production-supervisor.json`;
+  it is hosted by Windows scheduled task
+  `LinguaGo-v139e-production-supervisor` so it survives SSH disconnects. The
+  supervisor waits for a
+  successful pipeline manifest and lock release, runs
+  `check-dictionary-v2-production-run-gates.mjs`, and only then invokes the
+  existing controlled replay/promotion/audit controller against the hash-locked
+  v138 main DB. It requires raw-to-final >= 5%, Qwen validity >= 95%, final
+  Gemma no-correction acceptance >= 90%, infrastructure/JSON failure <= 2%,
+  zero automatic DB writes, and no final accepts without reverse evidence.
+- A passing supervisor may atomically update the jump-host main DB and its
+  remote runner manifest after isolated replay, idempotence, fast audit,
+  published-risk, native export, and full in-memory import all pass. It does
+  **not** upload Cloudflare D1 or deploy the Worker. D1 remains a separate,
+  explicitly reviewed release decision at the normal accumulated-sense
+  threshold. A failed gate or audit leaves the existing main DB unchanged and
+  records `status=failed` in the supervisor file.
 
 ## 2026-08-20 v124 production release
 
