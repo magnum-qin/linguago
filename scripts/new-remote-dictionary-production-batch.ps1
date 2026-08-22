@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Limit -lt 1 -or $Limit -gt 5000) { throw 'Limit must be between 1 and 5000' }
+if ($Limit -lt 1 -or $Limit -gt 20000) { throw 'Limit must be between 1 and 20000' }
 $Root = [IO.Path]::GetFullPath($Root)
 if (-not $SkipVerify) {
   & (Join-Path $Root 'scripts\verify-remote-dictionary-runner.ps1') -Root $Root
