@@ -60,7 +60,7 @@ export const MODEL_OPTIONS: Record<Provider, string[]> = {
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro']
 };
 
-export const TRANSLATION_CACHE_VERSION = 'v124-remote11-40793';
+export const TRANSLATION_CACHE_VERSION = 'v140-native242-41265';
 export const PREVIEW_TIMEOUT_MS = 10_000;
 export const FULL_TRANSLATION_TIMEOUT_MS = 30_000;
 export const MAX_INPUT_CHARS = 1200;
