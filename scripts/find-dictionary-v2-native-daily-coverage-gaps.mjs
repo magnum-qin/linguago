@@ -15,6 +15,7 @@ const outPath = path.resolve(args.out || 'logs/product-native-daily-coverage-gap
 const maxRank = positiveInteger(args['max-rank'], 200_000);
 const scanLimit = positiveInteger(args['scan-limit'], 100_000);
 const targets = parseTargets(args.targets || 'zh=500,ja=500');
+const excludedCandidateIds = loadExcludedCandidateIds(args['exclude-reports']);
 
 for (const dbPath of [sourceDbPath, productDbPath]) {
   if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
@@ -31,7 +32,7 @@ sourceDb.pragma('busy_timeout = 30000');
 
 // This query scans native dictionary senses once. It deliberately avoids the
 // per-entry localization/example lookups used by the general coverage report.
-const nativeEntries = sourceDb.prepare(`
+const nativeQuery = `
   SELECT
     e.id AS source_entry_id,
     e.word,
@@ -57,9 +58,18 @@ const nativeEntries = sourceDb.prepare(`
           (e.source_lang = 'ja' AND lower(COALESCE(s.source, '')) LIKE '%jmdict%')
         )
     )
-  ORDER BY e.frequency_rank, e.source_lang, e.id
+  -- Match idx_entries_frequency exactly so SQLite can stream rows instead of
+  -- materializing a large temporary sort for deep coverage scans.
+  ORDER BY e.frequency_rank, e.normalized_key, e.id
   LIMIT ?
-`);
+`;
+if (args.explain === 'true') {
+  const plan = sourceDb.prepare(`EXPLAIN QUERY PLAN ${nativeQuery}`).all(maxRank, scanLimit);
+  sourceDb.close();
+  console.log(JSON.stringify({ ok: true, query_plan: plan }, null, 2));
+  process.exit(0);
+}
+const nativeEntries = sourceDb.prepare(nativeQuery);
 
 const selected = [];
 const counts = { zh: 0, ja: 0 };
@@ -69,6 +79,7 @@ let scanned = 0;
 for (const row of nativeEntries.iterate(maxRank, scanLimit)) {
   scanned += 1;
   if (counts[row.source_lang] >= targets[row.source_lang]) continue;
+  if (excludedCandidateIds.has(String(row.source_entry_id))) continue;
   if (!sourceScriptOk(row.word, row.source_lang)) {
     scriptMismatch += 1;
     continue;
@@ -104,6 +115,7 @@ const report = {
     requested_by_lang: targets,
     scanned_native_entries: scanned,
     represented,
+    excluded_candidate_ids: excludedCandidateIds.size,
     skipped_source_script_mismatch: scriptMismatch,
     selected_by_lang: counts,
     targets_satisfied: targetsSatisfied(counts, targets)
@@ -166,6 +178,23 @@ function parseTargets(value) {
   }
   if (!targets.zh && !targets.ja) throw new Error('At least one positive language target is required');
   return targets;
+}
+
+function loadExcludedCandidateIds(value) {
+  const ids = new Set();
+  if (!value) return ids;
+  for (const rawPath of String(value).split(',')) {
+    const reportPath = path.resolve(rawPath.trim());
+    if (!rawPath.trim()) continue;
+    if (!fs.existsSync(reportPath)) throw new Error(`Excluded report not found: ${reportPath}`);
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    const rows = Array.isArray(report) ? report : report.selected || report.items || [];
+    for (const row of rows) {
+      const id = row?.source_entry_id ?? row?.entry_id;
+      if (id !== null && id !== undefined) ids.add(String(id));
+    }
+  }
+  return ids;
 }
 
 function targetsSatisfied(counts, targets) {

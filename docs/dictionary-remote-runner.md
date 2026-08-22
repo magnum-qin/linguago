@@ -2,14 +2,20 @@
 
 ## Remote runner baseline (2026-08-22)
 
-The jump host now has a validated v136 runner and product database. The
+The jump host now has a validated v137 runner and product database. The
 installed product database SHA-256 is
-`7E50B3C12F7F2F0BEBBBF4882BF211DECE09BACFCF51337CE7DBF693C01D8AEB`.
-The immediate pre-v136 remote database is backed up as
-`D:\linguago-runner\backups\v136-native-daily-supported97a-main-before-commit-20260822-021038.db`.
+`57DDBED51CE8ED247DBCC090A87A09740D71248D8554435C14C570C4E25D50CC`.
+The immediate pre-v137 remote database is backed up as
+`D:\linguago-runner\backups\v137-native-daily-raw5000b-main-before-commit-20260822-105448.db`.
 Use `config\remote-runner-files.json` and
 `verify-remote-dictionary-runner.ps1` as the source of truth for deployed file
 versions; do not infer readiness from file timestamps.
+
+The jump-host product DB is authoritative. The repository copy may lag behind
+remote controlled commits. When regenerating `remote-runner-files.json`, do
+not replace the product-DB entry with the local hash unless the remote DB was
+first downloaded and its hash verified. A script-only deployment must preserve
+the current remote DB byte count and SHA-256 in the manifest.
 
 The v134 expansion rebuilt coverage from the full source DB after the frozen
 v123 pool was exhausted. The safe stage order is production authoritative
@@ -46,18 +52,53 @@ and promoted all 20. Full export/import audit passed with
 `entries=40966`, `senses=47278`, and `sense_localizations=189112`, while
 `flagged_senses` remained zero. D1 was not published.
 
+The v137 cohort was the first 5,000-row raw native production scan. The exact
+funnel was `5000 -> 4905 -> 4406 -> 868 -> 150 -> 145 -> 40 -> 38 -> 35 ->
+32 -> 30 -> 30`, ending with 30 final Gemma accepts and no automatic database
+writes. Controlled replay excluded one row carrying source-review risk flags
+and two rows that did not match the final gate, then inserted 29 draft senses
+and 116 localizations. Exact replay wrote zero rows, deterministic promotion
+accepted 29/29, and fast, published-risk, native D1 export, and full in-memory
+import audits passed. The guarded commit produced `entries=40995`,
+`senses=47307`, and `sense_localizations=189228`; `flagged_senses` remained
+zero. D1 was not published because the cumulative release threshold has not
+been reached.
+
+The v137 attempt also exposed two orchestration defects. First, applying the
+production prefilter before daily-primary sense selection rejects every raw
+native row because the scan report intentionally contains entry IDs rather
+than hydrated sense fields. Second, Scheduled Task launches must persist
+`ReverseEvidenceMinTargetLangs`, `ReverseEvidencePrefilterLimit`, and
+`StartTimeoutSeconds` in `launch.json`; otherwise resumed jobs silently use
+defaults. The controller now fixes both issues and records startup state while
+waiting for the manifest, terminating only the exact reserved launch if startup
+times out.
+
 The native scanner must use a correlated `EXISTS` sense check instead of
 `JOIN senses + DISTINCT`. On the 8.7 GB source DB, the join form can create a
 large temporary sort and saturate the jump-host disk; the `EXISTS` form avoids
 the multiplied intermediate rows while preserving the eligibility rule. Do
 not launch a second scanner while diagnosing a slow first scan.
 
+Deep scans must also order by `(frequency_rank, normalized_key, id)`, matching
+`idx_entries_frequency`. Adding `source_lang` to the sort key forces SQLite to
+materialize another temporary sort and can make a 5,000-row scan run for
+minutes even though the equivalent 2,000-row scan is fast.
+
+Successive native production scans must pass prior raw batch reports through
+`--exclude-reports`. Product coverage alone excludes accepted rows but would
+reselect the thousands of unsupported or manual-review rows from the previous
+batch. Exclusion is based on `source_entry_id`, supports comma-separated JSON
+reports, and is applied before sense hydration or model calls.
+
 For raw native candidates, the required order is native gap scan, daily-primary
 sense selection, authoritative production filter, source-sense alignment, and
-local reverse-evidence prefilter. Upload the resulting locked report with
-`ProductionPrefilter=false`, `DailyPrimarySenseSelection=false`,
-`SourceSenseAlignment=false`, and `ReverseEvidencePrefilter=false`; repeating
-those gates on an already filtered report can incorrectly discard valid rows.
+local reverse-evidence prefilter. The simplified controller now enforces this
+order when all four gates are enabled. Do not run the production prefilter
+directly on a raw native gap report: those rows contain entry identities but no
+locked `first_sense_id`, so the authoritative source-sense gate will reject
+every row. If a fully filtered report is uploaded instead, set all four gate
+flags to `false`; repeating the gates can incorrectly discard valid rows.
 
 The model topology below is the configured default, not a guarantee that every
 node is available for a particular run. Prewarm determines the active pool.
@@ -179,6 +220,13 @@ two minutes and the child Node process has not written `manifest.json`, stop
 that run through the manager before retrying. Use attached `-Action run` and
 keep the SSH session open to capture stage output directly. Do not start a
 second scheduled copy with the same batch while the first child is alive.
+
+The manager now waits up to `StartTimeoutSeconds` (45 seconds by default) for
+the scheduled child to create `manifest.json`. It records the result in
+`runs\<run-id>\startup.json`. A timeout terminates only the PowerShell launch
+process whose command line contains the exact run ID, stops the scheduled task,
+and releases the global lock. The watcher includes this startup state. This
+turns a silent `not_started` reservation into an explicit recoverable failure.
 
 Do not treat a manifest left at `status=running` as model progress by itself.
 Use the watcher or manager status command and require either a live runner or a

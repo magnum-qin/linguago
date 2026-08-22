@@ -12,6 +12,7 @@ $RunDir = Join-Path $Root (Join-Path 'runs' $RunId)
 $ManifestPath = Join-Path $RunDir 'manifest.json'
 $SummaryPath = Join-Path $RunDir 'summary.json'
 $ControllerPath = Join-Path $RunDir 'controller.json'
+$StartupPath = Join-Path $RunDir 'startup.json'
 
 function Read-Json([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { return $null }
@@ -19,6 +20,7 @@ function Read-Json([string]$Path) {
 }
 
 $Controller = Read-Json $ControllerPath
+$Startup = Read-Json $StartupPath
 $Manifest = Read-Json $ManifestPath
 $Summary = Read-Json $SummaryPath
 $Process = if ($Controller -and $Controller.pid) {
@@ -47,6 +49,7 @@ $Status = [ordered]@{
   running = $null -ne $Process
   pid = if ($Process) { $Process.ProcessId } else { $null }
   manifest_status = if ($Manifest) { $Manifest.status } else { 'not_started' }
+  startup = $Startup
   stages = if ($Manifest) { $Manifest.stages } else { $null }
   summary = if ($Summary) { $Summary.summary } elseif ($Manifest) { $Manifest.summary } else { $null }
   recent_errors = $Errors

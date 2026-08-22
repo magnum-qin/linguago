@@ -542,18 +542,8 @@ try {
 
 async function runSimplifiedPipeline() {
   let sourceReviewInput = batchPath;
-  if (productionPrefilter) {
-    await stage('production_prefilter', 'scripts/filter-dictionary-v2-production-batch.mjs', [
-      '--report', batchPath,
-      '--out', files.productionFiltered,
-      '--rejected-out', files.productionRejected,
-      '--enabled', 'true',
-      '--require-authoritative-source-sense', String(requireAuthoritativeSourceSense),
-      '--allow-english-omw-source', args['allow-english-omw-source'] || 'false'
-    ], [files.productionFiltered, files.productionRejected]);
-    sourceReviewInput = files.productionFiltered;
-  }
-
+  // Raw native daily reports contain entry identities only. Load and lock one
+  // concrete source sense before applying the production source-sense gate.
   if (dailyPrimarySenseSelection) {
     await stage(
       'daily_primary_sense_selection',
@@ -569,6 +559,18 @@ async function runSimplifiedPipeline() {
       [files.dailyPrimary, files.dailyPrimaryRejected]
     );
     sourceReviewInput = files.dailyPrimary;
+  }
+
+  if (productionPrefilter) {
+    await stage('production_prefilter', 'scripts/filter-dictionary-v2-production-batch.mjs', [
+      '--report', sourceReviewInput,
+      '--out', files.productionFiltered,
+      '--rejected-out', files.productionRejected,
+      '--enabled', 'true',
+      '--require-authoritative-source-sense', String(requireAuthoritativeSourceSense),
+      '--allow-english-omw-source', args['allow-english-omw-source'] || 'false'
+    ], [files.productionFiltered, files.productionRejected]);
+    sourceReviewInput = files.productionFiltered;
   }
 
   if (sourceSenseAlignment) {

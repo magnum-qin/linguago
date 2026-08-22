@@ -24,7 +24,8 @@ param(
   [string]$ElasticEndpoints = 'http://127.0.0.1:11442,http://127.0.0.1:11445',
   [string]$ElasticQwenVariants = '11442=UD-Q4_K_XL,11445=UD-Q4_K_XL',
   [int]$ElasticMinimumItems = 20,
-  [object]$ElasticModelSwap = $true
+  [object]$ElasticModelSwap = $true,
+  [int]$StartTimeoutSeconds = 45
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,6 +51,7 @@ $Root = 'D:\linguago-runner'
 $RunDir = Join-Path $Root (Join-Path 'runs' $RunId)
 $ControllerPath = Join-Path $RunDir 'controller.json'
 $ManifestPath = Join-Path $RunDir 'manifest.json'
+$StartupPath = Join-Path $RunDir 'startup.json'
 $StateDir = Join-Path $Root 'state'
 $GlobalControllerPath = Join-Path $StateDir 'remote-pipeline-controller.json'
 $GlobalLockPath = Join-Path $StateDir 'remote-pipeline.lock.json'
@@ -101,6 +103,26 @@ function Get-CoverageScannerProcesses {
       $_.CommandLine -like '*find-dictionary-v2-product-coverage-gaps.mjs*' -or
       $_.CommandLine -like '*find-dictionary-v2-native-daily-coverage-gaps.mjs*'
     })
+}
+
+function Get-ScheduledLaunchProcesses {
+  @(
+    Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
+      Where-Object {
+        $_.CommandLine -like '*run-remote-dictionary-runner-job.ps1*' -and
+        $_.CommandLine -like "*$RunId*"
+      }
+  )
+}
+
+function Write-StartupState([string]$Status, [hashtable]$Details = @{}) {
+  $State = [ordered]@{
+    run_id = $RunId
+    status = $Status
+    observed_at = [DateTime]::UtcNow.ToString('o')
+  }
+  foreach ($Key in $Details.Keys) { $State[$Key] = $Details[$Key] }
+  $State | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $StartupPath -Encoding UTF8
 }
 
 if ($Action -eq 'status') {
@@ -248,6 +270,8 @@ $Launch = [ordered]@{
   DailyPrimarySenseSelection = $DailyPrimarySenseSelection
   SourceSenseAlignment = $SourceSenseAlignment
   ReverseEvidencePrefilter = $ReverseEvidencePrefilter
+  ReverseEvidenceMinTargetLangs = $ReverseEvidenceMinTargetLangs
+  ReverseEvidencePrefilterLimit = $ReverseEvidencePrefilterLimit
   EnforceGenerationHintTerms = $EnforceGenerationHintTerms
   AllowModelDownload = $AllowModelDownload
   QwenEndpoints = $QwenEndpoints
@@ -258,8 +282,10 @@ $Launch = [ordered]@{
   ElasticQwenVariants = $ElasticQwenVariants
   ElasticMinimumItems = $ElasticMinimumItems
   ElasticModelSwap = $ElasticModelSwap
+  StartTimeoutSeconds = $StartTimeoutSeconds
 }
 $Launch | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $LaunchPath -Encoding UTF8
+Write-StartupState 'reserved' @{ timeout_seconds = $StartTimeoutSeconds }
 @{
   run_id = $RunId
   reserved_at = [DateTime]::UtcNow.ToString('o')
@@ -275,7 +301,40 @@ try {
   Register-ScheduledTask -TaskName $ScheduledTaskName -Action $TaskAction -Trigger $TaskTrigger -Force | Out-Null
   Start-ScheduledTask -TaskName $ScheduledTaskName
 } catch {
+  Write-StartupState 'launch_failed' @{ error = [string]$_.Exception.Message }
   Remove-Item -LiteralPath $GlobalLockPath -Force -ErrorAction SilentlyContinue
   throw
 }
-Write-Output "started scheduled_task=$ScheduledTaskName run_id=$RunId"
+
+$Deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(5, $StartTimeoutSeconds))
+do {
+  Start-Sleep -Milliseconds 500
+  $Manifest = Read-JsonFile $ManifestPath
+  if ($Manifest) {
+    Write-StartupState 'started' @{
+      manifest_status = [string]$Manifest.status
+      manifest_started_at = [string]$Manifest.started_at
+    }
+    Write-Output "started scheduled_task=$ScheduledTaskName run_id=$RunId manifest_status=$($Manifest.status)"
+    exit 0
+  }
+  $TaskInfo = Get-ScheduledTaskInfo -TaskName $ScheduledTaskName -ErrorAction SilentlyContinue
+  if ($TaskInfo -and $TaskInfo.LastTaskResult -ne 267009 -and $TaskInfo.LastRunTime -gt [DateTime]::MinValue) {
+    break
+  }
+} while ([DateTime]::UtcNow -lt $Deadline)
+
+$LaunchProcesses = Get-ScheduledLaunchProcesses
+foreach ($LaunchProcess in $LaunchProcesses) {
+  & taskkill.exe /PID $LaunchProcess.ProcessId /T /F | Out-Null
+}
+Stop-ScheduledTask -TaskName $ScheduledTaskName -ErrorAction SilentlyContinue
+$TaskInfo = Get-ScheduledTaskInfo -TaskName $ScheduledTaskName -ErrorAction SilentlyContinue
+Write-StartupState 'startup_timeout' @{
+  timeout_seconds = $StartTimeoutSeconds
+  task_result = if ($TaskInfo) { $TaskInfo.LastTaskResult } else { $null }
+  terminated_process_ids = @($LaunchProcesses | ForEach-Object ProcessId)
+}
+Remove-Item -LiteralPath $GlobalControllerPath -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $GlobalLockPath -Force -ErrorAction SilentlyContinue
+throw "Scheduled runner did not create manifest.json within $StartTimeoutSeconds seconds; the reserved run was stopped and unlocked"
