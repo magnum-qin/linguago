@@ -6434,6 +6434,13 @@ untracked. The durable extractors are
   a legacy fallback only from the matching generation report and still verifies
   every observed checkpoint commit against the 50-item maximum.
 
+- v148 also showed that the initial production gate mixed throughput with
+  quality: it divided valid model outputs by all generation-ready candidates
+  and blocked a low-yield but clean cohort. The gate now measures generation
+  validity over actual model attempts and reports low `raw_to_final` as a
+  throughput warning. Final consensus, reverse evidence, network/JSON limits,
+  and positive accepted output remain blocking.
+
 - The remote pipeline child runner now has a five-second post-exit pipe-drain
   fallback. This addresses the v147 Qwen stage where the generation report and
   checkpoint were complete but a descendant-held stdout/stderr pipe prevented

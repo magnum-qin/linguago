@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T20:24:19.8893474Z",
+    "generated_at":  "2026-08-23T20:27:32.2992040Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
@@ -100,8 +100,8 @@
                   },
                   {
                       "path":  "scripts\\check-dictionary-v2-production-run-gates.mjs",
-                      "bytes":  4451,
-                      "sha256":  "BE93928D2D82AB8C767C7C8CC4A1F904079DA12DC8ED75D1703B1D43A1322A23"
+                      "bytes":  4684,
+                      "sha256":  "1B91FBDB492FCF49F4DBC01114189B6A3AF0544A69F3F0D0CC115B2EC7DA0583"
                   },
                   {
                       "path":  "scripts\\audit-dictionary-v2-production-cadence.mjs",
@@ -130,8 +130,8 @@
                   },
                   {
                       "path":  "scripts\\test-dictionary-v2-production-run-gates.mjs",
-                      "bytes":  2104,
-                      "sha256":  "72F9667969A7FDEC50F7911482646579E38E71D95CA6BE33D9002D0D9FC02F82"
+                      "bytes":  2197,
+                      "sha256":  "6A691020F0257BAE3DF50571C435ABB00213F18F39A8AAA83E6DDC68E35F6AF3"
                   },
                   {
                       "path":  "scripts\\complete-remote-dictionary-production-run.ps1",

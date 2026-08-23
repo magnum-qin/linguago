@@ -348,6 +348,12 @@ the cadence audit may use `generation.stats.chunk_size` from the matching run;
 observed commit groups are still checked independently against the configured
 maximum.
 
+The production gate treats `raw_to_final` as a throughput warning rather than a
+publication-quality failure. Generation validity is measured against actual
+model attempts, not all candidates that reached pre-generation eligibility.
+Final no-correction acceptance, reverse-evidence coverage, infrastructure and
+JSON failure limits remain blocking.
+
 `stop` is an explicit operator action. A failed stage remains resumable; fix
 the endpoint or input issue and run `start` again with the same run ID.
 

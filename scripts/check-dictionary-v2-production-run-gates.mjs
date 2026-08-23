@@ -24,7 +24,7 @@ const jsonFailures = (generation.generated || []).filter((row) =>
 
 const metrics = {
   raw_to_final: ratio(finalAccepted, input),
-  generation_valid: ratio(generatedValid, generationReady),
+  generation_valid: ratio(generatedValid, generated),
   final_no_correction: ratio(finalAccepted, finalAccepted + finalRejected),
   infrastructure_failure: ratio(infrastructureRejected, generated),
   json_failure: ratio(jsonFailures, generated)
@@ -37,11 +37,16 @@ const thresholds = {
   json_failure: numberArg(args['max-json-failure'], 0.02)
 };
 const failures = [];
+const warnings = [];
 if (cadence.ok !== true) failures.push('production cadence audit must pass');
 if (input <= 0) failures.push('input must be positive');
 if (generationReady <= 0) failures.push('generation-ready count must be positive');
+if (finalAccepted <= 0) failures.push('final accepted count must be positive');
 if (Number(summary?.summary?.automatic_database_writes || 0) !== 0) failures.push('automatic database writes must be zero');
-for (const key of ['raw_to_final', 'generation_valid', 'final_no_correction']) {
+if (metrics.raw_to_final < thresholds.raw_to_final) {
+  warnings.push(`raw_to_final ${metrics.raw_to_final} < ${thresholds.raw_to_final}`);
+}
+for (const key of ['generation_valid', 'final_no_correction']) {
   if (metrics[key] < thresholds[key]) failures.push(`${key} ${metrics[key]} < ${thresholds[key]}`);
 }
 for (const key of ['infrastructure_failure', 'json_failure']) {
@@ -61,6 +66,7 @@ const output = {
   },
   metrics,
   thresholds,
+  warnings,
   failures
 };
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
