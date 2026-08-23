@@ -1068,7 +1068,10 @@ function runNode(script, stageArgs, logPath) {
       if (echoChildOutput) process.stdout.write(chunk);
       log.write(chunk);
     });
-    child.stderr.on('data', (chunk) => { process.stderr.write(chunk); log.write(chunk); });
+    child.stderr.on('data', (chunk) => {
+      if (echoChildOutput) process.stderr.write(chunk);
+      log.write(chunk);
+    });
     child.on('error', reject);
     child.on('close', (code) => { log.end(); resolve(Number(code)); });
   });
