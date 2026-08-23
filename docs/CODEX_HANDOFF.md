@@ -6403,6 +6403,23 @@ untracked. The durable extractors are
 
 ## 2026-08-24 v147 progress and v148 four-language intake
 
+- v147 completed all model, replay, promotion, and audit stages. The 5,000 raw
+  candidates produced 353 valid Qwen records, 350 reverse-supported records,
+  and 345 final Gemma accepts. Controlled replay and promotion published all
+  345 accepted senses; the main DB now has 43,499 entries, 49,811 senses, and
+  199,244 sense localizations with `flagged_senses=0`. Its SHA-256 is
+  `E18593AC63E76F04EBA0191ADA7054DF1D1F416F1BCBE9D1B40B43F26F32DFBD`.
+  The release cohort is still accumulating: 1,625 senses have been added since
+  the v142 online baseline and 3,375 remain before the 5,000-sense D1 cadence.
+
+- v148 was rebuilt after the v147 commit, so product and completed-run
+  exclusions include v147. The deep native scan found 50,000 coverage gaps and
+  froze 5,000 fresh candidates (`pt-BR=1,340`, `en=3,660`). The zh/ja daily
+  lanes were exhausted by prior completed-batch exclusions for this cohort.
+  `v148-native-daily-production5000` is running under the dynamic endpoint
+  pipeline with an attached production supervisor; its first stage started at
+  `2026-08-23T20:04:07Z`.
+
 - The remote pipeline child runner now has a five-second post-exit pipe-drain
   fallback. This addresses the v147 Qwen stage where the generation report and
   checkpoint were complete but a descendant-held stdout/stderr pipe prevented
