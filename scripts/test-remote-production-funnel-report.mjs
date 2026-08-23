@@ -5,7 +5,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const reportScript = path.join(path.dirname(fileURLToPath(import.meta.url)), 'report-dictionary-v2-remote-production-funnel.mjs');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'linguago-funnel-'));
 const run = path.join(root, 'runs', 'fixture');
 const batch = path.join(root, 'batches', 'fixture.json');
@@ -23,6 +25,9 @@ write(path.join(run, '00-production-prefilter-rejected.json'), {
 });
 write(path.join(run, '00b-source-sense-alignment-rejected.json'), {
   rejected: [{ ...candidate(3), sense_alignment: { reason: 'ambiguous_best_sense' } }]
+});
+write(path.join(run, '00b-source-sense-aligned.json'), {
+  selected: [{ ...candidate(4, 44) }]
 });
 write(path.join(run, '00c-reverse-evidence-prefilter-details.json'), {
   validations: [{ ...candidate(4, 44), decision: 'supported', reason: null }]
@@ -55,7 +60,7 @@ write(path.join(run, '08-controlled-replay.json'), {
 });
 
 execFileSync(process.execPath, [
-  path.resolve('scripts/report-dictionary-v2-remote-production-funnel.mjs'),
+  reportScript,
   '--root', root,
   '--run-dirs', 'runs/fixture',
   '--out', out
@@ -73,6 +78,18 @@ assert.deepEqual(report.summary.stages, {
 assert.equal(report.summary.repair_lanes.source_index_repair, 1);
 assert.equal(report.summary.repair_lanes.excluded_policy, 1);
 assert.equal(report.summary.repair_lanes.source_alignment_repair, 1);
+
+fs.rmSync(path.join(run, '00c-reverse-evidence-prefilter-details.json'));
+fs.rmSync(path.join(run, '00c-reverse-evidence-prefilter.json'));
+execFileSync(process.execPath, [
+  reportScript,
+  '--root', root,
+  '--run-dirs', 'runs/fixture',
+  '--out', out
+]);
+const legacyReport = JSON.parse(fs.readFileSync(out, 'utf8'));
+assert.equal(legacyReport.ok, true);
+assert.equal(legacyReport.summary.accepted, 1);
 console.log(JSON.stringify({ ok: true, input: report.summary.input }));
 
 function candidate(entry, sense = null) {

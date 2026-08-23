@@ -1,7 +1,7 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T08:37:24.4701194Z",
-    "root":  "D:\\Projects\\linguago",
+    "generated_at":  "2026-08-23T10:08:30.8733157Z",
+    "root":  "D:\\linguago-runner",
     "files":  [
                   {
                       "path":  "package.json",
@@ -15,8 +15,13 @@
                   },
                   {
                       "path":  "scripts\\run-dictionary-v2-remote-pipeline.mjs",
-                      "bytes":  54727,
-                      "sha256":  "84035BFBFAFD800F1FC2A74FD884D2A30E54637343AB0AC230B68CB574B327E4"
+                      "bytes":  55782,
+                      "sha256":  "221FA4996C92519D5B13EC853DF49BE550A845E94C46698BEEE9586F22BB54FE"
+                  },
+                  {
+                      "path":  "scripts\\lib\\dictionary-pipeline-stage-recovery.mjs",
+                      "bytes":  2420,
+                      "sha256":  "39A9731CE2ECA0A80A5634E6E957E96C3B85B888A99C74CDD35A6E4DF66E09F2"
                   },
                   {
                       "path":  "scripts\\lib\\unsloth-cluster-discovery.mjs",
@@ -32,6 +37,11 @@
                       "path":  "scripts\\test-unsloth-cluster-discovery.mjs",
                       "bytes":  1361,
                       "sha256":  "A5383E48A13453B2A66E6293F004F6DAB825F2D7ADDA2C35361A3AF6A25FFE32"
+                  },
+                  {
+                      "path":  "scripts\\test-dictionary-pipeline-stage-recovery.mjs",
+                      "bytes":  1764,
+                      "sha256":  "6D0B990073C88DF319A689722891813EFBCC04410ADCA92B7E5596281EE60FDC"
                   },
                   {
                       "path":  "scripts\\find-dictionary-v2-product-coverage-gaps.mjs",
@@ -55,8 +65,13 @@
                   },
                   {
                       "path":  "scripts\\report-dictionary-v2-remote-production-funnel.mjs",
-                      "bytes":  14021,
-                      "sha256":  "8ABE7525C5B0E9C4B82762C4484DF8095C0638A1C37FDA387CDCA1B3EEDFE350"
+                      "bytes":  14562,
+                      "sha256":  "3E939B08FB6A7A051C496D5CAA266D7FEE3D4A916854FE54F43BA6F8085ECA5F"
+                  },
+                  {
+                      "path":  "scripts\\test-remote-production-funnel-report.mjs",
+                      "bytes":  3991,
+                      "sha256":  "254C435F2BFE289481D8146196A93B90F8A26D76954B97B98610E13A2A7B183A"
                   },
                   {
                       "path":  "scripts\\check-dictionary-v2-production-run-gates.mjs",
@@ -67,6 +82,11 @@
                       "path":  "scripts\\complete-remote-dictionary-production-run.ps1",
                       "bytes":  4339,
                       "sha256":  "18646BD750E1486018D2A2F5B9C7DBB041246943470EE78AD674C76BCFB83634"
+                  },
+                  {
+                      "path":  "scripts\\start-remote-dictionary-production-supervisor.ps1",
+                      "bytes":  1705,
+                      "sha256":  "76E5DD7DC3ED843E24B2512DE7AD219DDDEF4C4C0640E894729B01D5F3053D67"
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-production-batch.mjs",
@@ -150,8 +170,8 @@
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-runner-manifest.ps1",
-                      "bytes":  4784,
-                      "sha256":  "55D9EF7C53C8FF0CED9236F560808BC9DC75CE83F1FD6F9E950F333605AB40B5"
+                      "bytes":  5022,
+                      "sha256":  "1227B34F9AD86024855771B9D57E93D3FC1B4666C55E67A03B40C219E21FED4D"
                   },
                   {
                       "path":  "scripts\\validate-remote-dictionary-controlled-replay.ps1",
@@ -255,8 +275,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  352038912,
-                      "sha256":  "226F90EA9A607598672E259828B8811A1924B36CBB88DAC6BFEE9847DCD11649"
+                      "bytes":  352497664,
+                      "sha256":  "0A04DD99E31E153EC62D8C52D50F160722D09F4ABA4B334A37D6F8E9E6833A1C"
                   }
               ]
 }

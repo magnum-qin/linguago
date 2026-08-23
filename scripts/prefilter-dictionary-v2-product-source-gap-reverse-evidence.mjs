@@ -237,9 +237,9 @@ const findSupplementalByTerm = supplementalDb?.prepare(`
   ORDER BY source_key, concept_id, english_gloss
 `);
 const reverseGlossTargetIndexes = new Map([
-  ["pt-BR", buildReverseGlossTargetIndex(["freedict-por-eng", "wikdict-pt-en"], "pt-BR")],
-  ["ja", buildReverseGlossTargetIndex(["jmdict"], "ja")],
-  ["zh", buildReverseGlossTargetIndex(["cc-cedict", "wikdict-zh-en"], "zh")]
+  ["pt-BR", buildReverseGlossTargetIndexWithProgress(["freedict-por-eng", "wikdict-pt-en"], "pt-BR")],
+  ["ja", buildReverseGlossTargetIndexWithProgress(["jmdict"], "ja")],
+  ["zh", buildReverseGlossTargetIndexWithProgress(["cc-cedict", "wikdict-zh-en"], "zh")]
 ]);
 const wikidataConceptRowsByEnglish = lockHintsToUniqueWikidataConcept && supplementalDb
   ? buildWikidataConceptIndex(supplementalDb)
@@ -255,7 +255,13 @@ const findPtPronunciation = ptPronunciationDb?.prepare(`
   LIMIT 1
 `);
 
-const validations = candidates.map(validateCandidate);
+const validations = [];
+for (const [index, candidate] of candidates.entries()) {
+  validations.push(validateCandidate(candidate));
+  if ((index + 1) % 100 === 0 || index + 1 === candidates.length) {
+    console.log(`[reverse-evidence-prefilter] validated=${index + 1}/${candidates.length}`);
+  }
+}
 const candidatesByKey = new Map(candidates.map((row) => [candidateKey(row), row]));
 const supported = validations
   .filter((item) => item.decision === "supported" && item.target_coverage_count >= minTargetLangs)
@@ -1020,6 +1026,19 @@ function findForwardTargetTerms(anchor, lang, boundCandidateKey = null) {
   return results;
 }
 
+function buildReverseGlossTargetIndexWithProgress(sourceKeys, lang) {
+  const startedAt = Date.now();
+  console.log(`[reverse-evidence-prefilter] index_start lang=${lang}`);
+  const index = buildReverseGlossTargetIndex(sourceKeys, lang);
+  console.log(
+    `[reverse-evidence-prefilter] index_complete lang=${lang} keys=${index.size} seconds=${(
+      (Date.now() - startedAt) /
+      1000
+    ).toFixed(1)}`
+  );
+  return index;
+}
+
 function buildReverseGlossTargetIndex(sourceKeys, lang) {
   const index = new Map();
   const keys = Array.isArray(sourceKeys) ? sourceKeys : [sourceKeys];
@@ -1047,9 +1066,6 @@ function buildReverseGlossTargetIndex(sourceKeys, lang) {
             const mainlandDifference =
               mainlandChineseTermPriority(left.term) - mainlandChineseTermPriority(right.term);
             if (mainlandDifference) return mainlandDifference;
-            const frequencyDifference =
-              canonicalTermFrequency(lang, left.term) - canonicalTermFrequency(lang, right.term);
-            if (frequencyDifference) return frequencyDifference;
             return left.term.localeCompare(right.term, "zh-CN");
           });
         }

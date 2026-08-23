@@ -1,6 +1,44 @@
 # Codex Handoff
 
-## 2026-08-23 v143 native daily production started
+## 2026-08-23 v143 native daily production completed
+
+- The strict 5,000-row run completed with `291` final model accepts. Controlled
+  replay inserted `291` draft senses and `1,164` localizations into an isolated
+  database; a second replay wrote zero rows. Deterministic promotion published
+  `289` senses and retained two rejects (`zh_definition_not_simplified=1`,
+  `semantic_drift_luck_fortune=1`) outside the publication set.
+- The guarded main-DB commit succeeded. The authoritative product DB SHA-256 is
+  now `0A04DD99E31E153EC62D8C52D50F160722D09F4ABA4B334A37D6F8E9E6833A1C`.
+  Its rollback copy is
+  `D:\linguago-runner\backups\v143-native-daily-production5000-main-before-commit-20260823-181640.db`.
+- Fast audit, published-risk audit, native export, and full in-memory import all
+  pass with `entries=42163`, `senses=48475`,
+  `sense_localizations=193900`, `examples=3030`, and
+  `example_localizations=11898`. All blocking counters and
+  `flagged_senses` are zero. The `481` duplicate-localization groups remain a
+  non-blocking observation.
+- The runner manifest was regenerated only after the guarded commit and now
+  matches the new product DB hash. Remote verification reports healthy managed
+  endpoints and no file/hash mismatches. D1 and Worker were deliberately not
+  released for this single batch; v143 contributes `289` toward the next
+  approximately 5,000-sense release cohort.
+- The exclusive v143 funnel classifies all 5,000 raw rows: `434` production
+  policy rejects, `65` source-index rejects, `765` source-alignment exits,
+  `656` Gemma source-review exits, and `2,679` reverse-evidence exits. Once a
+  candidate reached generation, the contract was stable: `303` generation-ready
+  rows produced `302` valid Qwen entries and `289` published senses.
+- A retrospective hard-prefilter experiment selected `171/3,736` aligned rows
+  but recalled only `40/291` final accepts (`13.75%`) and recalled no accepted
+  Chinese rows. The stricter two-family prefilter must therefore not become a
+  production exclusion gate. It remains useful as a priority/diagnostic signal;
+  the existing source review followed by the full reverse-evidence validator
+  remains the production path.
+- The prefilter now emits index-build and every-100-row heartbeats. Chinese
+  reverse-index construction no longer performs a product-frequency SQLite
+  lookup during every insertion; it keeps the mainland-Chinese priority and a
+  deterministic lexical tie-break at index time. Frequency ordering still
+  applies later when the small final generation-hint set is ranked. This avoids
+  a silent multi-minute per-term query pattern without weakening evidence gates.
 
 - The frozen `v123-authoritative-pool` is exhausted after source-entry history
   exclusion and must not be replayed. The `new-batch` control action now
@@ -56,6 +94,18 @@
   Large cohorts could therefore look stalled to the watchdog despite rising
   process CPU time. It now emits a progress heartbeat every 100 rows and writes
   both final JSON reports atomically; the evidence decisions are unchanged.
+- The first v143 Qwen generation pass durably completed all 303 selected rows
+  (`accepted=302`, `rejected=1`, `pending=0`, all 7 chunks committed), but the
+  parent runner remained in `qwen_generation=running` after the child process
+  had exited. The watchdog correctly detected the stale artifacts and restarted
+  the same run ID, exposing a resume gap: a stage marked `running` did not reuse
+  already-complete generation outputs. Generation stages now recover only when
+  the report explicitly has `partial=false`, checkpoint pending is zero,
+  completed equals selected, committed chunks equal total chunks, and report
+  generated count matches selected. This recovery happens before endpoint
+  discovery, records hashes and recovery metadata in the manifest, and never
+  treats incomplete or malformed output as complete. Validate it with
+  `node scripts/test-dictionary-pipeline-stage-recovery.mjs`.
 
 ## 2026-08-23 v141 controlled product DB commit
 

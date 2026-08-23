@@ -73,12 +73,20 @@ function analyzeRun(runDir) {
   const alignmentRejected = indexByEntry(
     readRows(runDir, '00b-source-sense-alignment-rejected.json', ['rejected'])
   );
-  const prefilterSelected = keySet(
-    readRows(runDir, '00c-reverse-evidence-prefilter.json', ['selected', 'candidates', 'validations'])
+  const alignedRows = readRows(runDir, '00b-source-sense-aligned.json', ['selected']);
+  const prefilterRows = readOptionalRows(
+    runDir,
+    '00c-reverse-evidence-prefilter.json',
+    ['selected', 'candidates', 'validations']
   );
-  const prefilterValidations = indexByCandidate(
-    readRows(runDir, '00c-reverse-evidence-prefilter-details.json', ['validations'])
+  const prefilterDetailRows = readOptionalRows(
+    runDir,
+    '00c-reverse-evidence-prefilter-details.json',
+    ['validations']
   );
+  const prefilterEnabled = prefilterRows !== null && prefilterDetailRows !== null;
+  const prefilterSelected = keySet(prefilterEnabled ? prefilterRows : alignedRows);
+  const prefilterValidations = indexByCandidate(prefilterEnabled ? prefilterDetailRows : alignedRows);
   const gemma = indexByCandidate(readRows(runDir, '03-gemma-source-review.json', ['reviews']));
   const reverse = indexByCandidate(
     readRows(runDir, '04b-source-consensus-reverse-evidence.json', ['validations'])
@@ -260,6 +268,11 @@ function sampleByBucket(rows, limit) {
 
 function readRows(runDir, name, preferred) {
   return rowsFrom(readJson(path.join(runDir, name)), preferred);
+}
+
+function readOptionalRows(runDir, name, preferred) {
+  const filePath = path.join(runDir, name);
+  return fs.existsSync(filePath) ? rowsFrom(readJson(filePath), preferred) : null;
 }
 
 function rowsFrom(value, preferred = []) {

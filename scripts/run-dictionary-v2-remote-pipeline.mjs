@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 import { discoverUnslothStagePool } from './lib/unsloth-cluster-discovery.mjs';
+import { inspectCompletedGenerationStage } from './lib/dictionary-pipeline-stage-recovery.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const pipelineMode = String(args['pipeline-mode'] || 'legacy').trim().toLowerCase();
@@ -935,6 +936,31 @@ async function stage(name, script, stageArgs, expectedOutputs) {
   if (resume && existing?.status === 'complete' && outputsMatch(existing.outputs, expectedOutputs)) {
     console.log(`[resume] ${name}`);
     return;
+  }
+  if (resume && existing?.status !== 'complete') {
+    const recovery = inspectCompletedGenerationStage(name, expectedOutputs);
+    if (recovery.recoverable) {
+      manifest.stages[name] = {
+        ...existing,
+        status: 'complete',
+        exit_code: 0,
+        completed_at: new Date().toISOString(),
+        recovered_at: new Date().toISOString(),
+        recovery_reason: recovery.reason,
+        recovery_counts: {
+          selected: recovery.selected,
+          accepted: recovery.accepted,
+          rejected: recovery.rejected
+        },
+        output_item_counts: Object.fromEntries(
+          expectedOutputs.map((filePath) => [relative(filePath), safeReportItemCount(filePath)])
+        ),
+        outputs: expectedOutputs.map((filePath) => ({ path: relative(filePath), sha256: sha256File(filePath) }))
+      };
+      writeManifest();
+      console.log(`[resume] recovered ${name} from complete durable outputs`);
+      return;
+    }
   }
   const discovery = await expandStageEndpointPool(script, stageArgs);
   stageArgs = discovery.args;
