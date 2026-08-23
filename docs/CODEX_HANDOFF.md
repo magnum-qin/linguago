@@ -1,5 +1,35 @@
 # Codex Handoff
 
+## 2026-08-23 v144 active production and persistent supervisor
+
+- `v144-native-daily-production5000` is the next non-overlapping native daily
+  cohort. Its frozen batch is
+  `D:\linguago-runner\batches\production-5000-20260823-095752.json`
+  (`zh=2883`, `ja=2117`). It was selected after scanning `135667` native
+  entries and excluding completed source-entry history. The strict reverse
+  evidence prefilter is deliberately disabled as an exclusion gate because the
+  v143 retrospective test recalled only `40/291` final accepts.
+- Dynamic discovery selected all six currently safe endpoints (`11442`,
+  `11444`, `11445`, `11446`, `11447`, `11448`) and excluded `a6000-048` and
+  `a6000-143` because they had foreign GPU processes. Per-endpoint Gemma review
+  counts confirm that all six selected nodes receive work; the watchdog remains
+  healthy and can resume the same checkpoints after infrastructure failure.
+- Do not launch the completion supervisor with a detached `Start-Process`
+  child from an SSH session. Windows OpenSSH tears down that child when the SSH
+  job closes; the process can disappear before writing status or logs. The
+  launcher now registers and starts the fixed scheduled task
+  `LinguaGo Dictionary Production Supervisor`, then requires a matching live
+  process before reporting success. Its authoritative status is
+  `runs\v144-native-daily-production5000\production-supervisor.json` and is
+  currently `waiting_for_pipeline`.
+- The supervisor is hash-locked to the v143 main DB
+  `0A04DD99E31E153EC62D8C52D50F160722D09F4ABA4B334A37D6F8E9E6833A1C`.
+  It will run production gates, isolated replay, idempotence, deterministic
+  promotion, fast/published-risk/full export audits, guarded main-DB commit,
+  runner-manifest regeneration, and post-commit verification. It never uploads
+  D1 or deploys the Worker; those remain deferred until the cumulative release
+  cohort reaches approximately 5,000 newly promoted senses.
+
 ## 2026-08-23 v143 native daily production completed
 
 - The strict 5,000-row run completed with `291` final model accepts. Controlled

@@ -85,8 +85,8 @@
                   },
                   {
                       "path":  "scripts\\start-remote-dictionary-production-supervisor.ps1",
-                      "bytes":  1705,
-                      "sha256":  "76E5DD7DC3ED843E24B2512DE7AD219DDDEF4C4C0640E894729B01D5F3053D67"
+                      "bytes":  2803,
+                      "sha256":  "BF2340D83B7B78D7C4A778BEB384662AC12866D7CCDE7BEACDBDA27141E98144"
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-production-batch.mjs",
