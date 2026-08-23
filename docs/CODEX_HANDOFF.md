@@ -28,12 +28,25 @@
   `e6660eb7e77cf986bdc620fb53faf1a2001314b0` fixed that stale test baseline
   before the successful deploy.
 - The next strictly non-overlapping production run is active as
-  `v141-native-daily-production5000` (PID `103248`). Its 5,000-row batch is
+  `v141-native-daily-production5000`. Its 5,000-row batch is
   `batches\v141-native-daily-production5000.json` (`zh=2883`, `ja=2117`). It
   was selected from an expanded 91,369-row native gap report after excluding
   37 historical reports and 31,786 previously attempted source entries. The
-  initial stage is daily-primary sense selection; no startup errors were
-  observed. Do not launch a duplicate run.
+  run resumed safely from its existing checkpoints after one controlled
+  process restart; do not infer progress from the original PID and do not
+  launch a duplicate run.
+- The jump host now runs scheduled task
+  `LinguaGo Dictionary Pipeline Watchdog` every two minutes. It records the
+  authoritative observation in
+  `D:\linguago-runner\state\dictionary-watchdog.json`, declares a stage
+  stalled only after ten minutes without log or checkpoint progress, probes
+  configured model endpoints, and restarts the same run ID from its existing
+  checkpoints only when at least one endpoint is healthy. Restarts have a
+  ten-minute cooldown and a limit of three per hour. The task was verified
+  with `LastTaskResult=0` and no missed runs.
+- The watchdog is recovery-only. It cannot replay drafts into the product DB,
+  promote senses, export or upload D1, or deploy the Worker. Those operations
+  remain behind the existing deterministic release gates.
 
 ## 2026-08-22 v139 evidence-yield qualification
 

@@ -341,6 +341,35 @@ Deterministic monitoring:
 ssh ts-win-jump "powershell -ExecutionPolicy Bypass -File D:\linguago-runner\scripts\watch-remote-dictionary-runner.ps1 -RunId <run-id>"
 ```
 
+The watcher includes the matching entry from
+`D:\linguago-runner\state\dictionary-watchdog.json` when one exists. Install
+the unattended recovery task once on the jump host:
+
+```powershell
+ssh ts-win-jump "powershell -NoProfile -ExecutionPolicy Bypass -File D:\linguago-runner\scripts\manage-remote-dictionary-watchdog.ps1 -Action install -Root D:\linguago-runner -PollMinutes 2 -StallMinutes 10 -RestartCooldownMinutes 10 -MaxRestartsPerHour 3"
+```
+
+Inspect or remove it with:
+
+```powershell
+ssh ts-win-jump "powershell -NoProfile -ExecutionPolicy Bypass -File D:\linguago-runner\scripts\manage-remote-dictionary-watchdog.ps1 -Action status -Root D:\linguago-runner"
+ssh ts-win-jump "powershell -NoProfile -ExecutionPolicy Bypass -File D:\linguago-runner\scripts\manage-remote-dictionary-watchdog.ps1 -Action uninstall -Root D:\linguago-runner"
+```
+
+The scheduled task is named `LinguaGo Dictionary Pipeline Watchdog`. Each pass
+uses an exclusive lock, discovers the active run from the host lock/controller,
+and compares stage-log plus checkpoint/output timestamps. A live PID alone is
+not considered progress. After the stall threshold it probes the configured
+model endpoints; recovery is skipped when all endpoints are unavailable. Any
+restart preserves the run ID, launch arguments, and checkpoints. A ten-minute
+cooldown and a maximum of three restart events per hour prevent restart loops.
+Completed and failed manifests are terminal.
+
+The watchdog never replays or promotes records, modifies the product database,
+exports or uploads D1, or deploys the Worker. It only restores the checkpointed
+generation process. Run `npm run dict:v2:test:remote-watchdog` after changing
+this behavior.
+
 After completing an interactive Google OAuth login for `agy` on the jump host,
 the watcher can request a second, read-only diagnosis:
 

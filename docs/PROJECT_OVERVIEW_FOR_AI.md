@@ -30,10 +30,21 @@ The next run is active on the jump host as
 `v141-native-daily-production5000`, using a fresh 5,000-row native daily batch
 (`zh=2883`, `ja=2117`). The expanded source scan found 91,369 uncovered native
 candidates; selection excluded all previously completed run batches and
-31,786 historical source entries. The run started as PID `103248` and entered
-daily-primary sense selection without errors. Treat its manifest as
-authoritative and do not start a duplicate process. It remains separate from
-the live D1 release until controlled replay, promotion, and all audits pass.
+31,786 historical source entries. The run has demonstrated checkpoint-safe
+resume after a controlled process restart. Treat its manifest and watchdog
+state as authoritative rather than retaining an old PID, and do not start a
+duplicate process. It remains separate from the live D1 release until
+controlled replay, promotion, and all audits pass.
+
+Unattended liveness recovery is installed on the jump host as Windows scheduled
+task `LinguaGo Dictionary Pipeline Watchdog`. It executes every two minutes and
+writes `D:\linguago-runner\state\dictionary-watchdog.json`. A run is eligible
+for recovery after ten minutes without stage-log or checkpoint movement; the
+watchdog then probes the configured model endpoints and restarts the same run
+from its existing checkpoints only if capacity remains reachable. Recovery is
+rate-limited to three restarts per hour with a ten-minute cooldown. Completed
+or failed manifests are never restarted. The watchdog does not perform product
+DB replay, promotion, D1 upload, or Worker deployment.
 
 ## Current local production baseline and v139 qualification (2026-08-22)
 

@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-22T15:00:37.8548999Z",
-    "root":  "D:\\Projects\\linguago",
+    "generated_at":  "2026-08-23T05:06:52.4179189Z",
+    "root":  "D:\\linguago-runner",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  17237,
-                      "sha256":  "D2B772C0F21FA914FDD0A043C1B3AA9B3009EEE1C8A03AD523243EAC7C8EF01E"
+                      "bytes":  17376,
+                      "sha256":  "CB31BF54273C4FDB18877424E3D16E9E352359CAB704CD6CA57938715BBBD8CF"
                   },
                   {
                       "path":  "package-lock.json",
@@ -15,8 +15,8 @@
                   },
                   {
                       "path":  "scripts\\run-dictionary-v2-remote-pipeline.mjs",
-                      "bytes":  54136,
-                      "sha256":  "61822015AA9D8AD9AB5BF22FACD809C33103AB5E482D097C7E40F7F1124A8B04"
+                      "bytes":  54394,
+                      "sha256":  "C53962C42C62BFD8666D9543A872811D7D00E12172D1A0D0D429A0F9D4CE409F"
                   },
                   {
                       "path":  "scripts\\lib\\unsloth-cluster-discovery.mjs",
@@ -135,8 +135,23 @@
                   },
                   {
                       "path":  "scripts\\watch-remote-dictionary-runner.ps1",
-                      "bytes":  3105,
-                      "sha256":  "BC51D19F5EF4FE5E708A30B7D434713A294673A39E62B5CA14CB74DEFFB2E10C"
+                      "bytes":  3304,
+                      "sha256":  "F51117C18AE02FC83267D386D05B137D5EAFE4E9042B79724DF1844F0AA4CC2E"
+                  },
+                  {
+                      "path":  "scripts\\manage-remote-dictionary-watchdog.ps1",
+                      "bytes":  13462,
+                      "sha256":  "652F8B42B4860986A79FF252AC4B5A2FD190753CE4EFA23B867FDD3E5154FD1F"
+                  },
+                  {
+                      "path":  "scripts\\test-remote-dictionary-watchdog.ps1",
+                      "bytes":  2283,
+                      "sha256":  "36EE2CE5FE0AE0C8B73B10F16396B1421BC1BF1A5FF0C83D4861894FF38C7E0F"
+                  },
+                  {
+                      "path":  "scripts\\new-remote-dictionary-runner-manifest.ps1",
+                      "bytes":  4784,
+                      "sha256":  "55D9EF7C53C8FF0CED9236F560808BC9DC75CE83F1FD6F9E950F333605AB40B5"
                   },
                   {
                       "path":  "scripts\\validate-remote-dictionary-controlled-replay.ps1",
@@ -145,8 +160,8 @@
                   },
                   {
                       "path":  "scripts\\publish-remote-dictionary-controlled-run.ps1",
-                      "bytes":  6509,
-                      "sha256":  "AA4897B8E003DDC80F206879AA6B78008FBD3DC5DC8CF242919E2AB0B94F71A8"
+                      "bytes":  6627,
+                      "sha256":  "E21940649A3F029B0F297573AF740D63451E83AE8AB5D2CC15471011EEB5EA69"
                   },
                   {
                       "path":  "scripts\\checkpoint-sqlite-db.mjs",
@@ -240,8 +255,8 @@
                   },
                   {
                       "path":  "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-                      "bytes":  350789632,
-                      "sha256":  "ACA285F7F27071A2A5C46EB4EC3140AFA9486151CBEBB174B7BD121F7443DACE"
+                      "bytes":  351567872,
+                      "sha256":  "BD1C498E3CBD75C8FBB9A3B04DB83F10DD71D5CE0EE472E886E2C18BFC048BD0"
                   }
               ]
 }

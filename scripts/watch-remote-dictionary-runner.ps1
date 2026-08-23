@@ -13,6 +13,7 @@ $ManifestPath = Join-Path $RunDir 'manifest.json'
 $SummaryPath = Join-Path $RunDir 'summary.json'
 $ControllerPath = Join-Path $RunDir 'controller.json'
 $StartupPath = Join-Path $RunDir 'startup.json'
+$WatchdogPath = Join-Path $Root 'state\dictionary-watchdog.json'
 
 function Read-Json([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { return $null }
@@ -23,6 +24,7 @@ $Controller = Read-Json $ControllerPath
 $Startup = Read-Json $StartupPath
 $Manifest = Read-Json $ManifestPath
 $Summary = Read-Json $SummaryPath
+$Watchdog = Read-Json $WatchdogPath
 $Process = if ($Controller -and $Controller.pid) {
   Get-CimInstance Win32_Process -Filter "ProcessId=$($Controller.pid)" -ErrorAction SilentlyContinue
 } else { $null }
@@ -52,6 +54,7 @@ $Status = [ordered]@{
   startup = $Startup
   stages = if ($Manifest) { $Manifest.stages } else { $null }
   summary = if ($Summary) { $Summary.summary } elseif ($Manifest) { $Manifest.summary } else { $null }
+  watchdog = if ($Watchdog -and [string]$Watchdog.run_id -eq $RunId) { $Watchdog } else { $null }
   recent_errors = $Errors
 }
 $StatusJson = $Status | ConvertTo-Json -Depth 12
