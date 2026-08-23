@@ -17,7 +17,14 @@ const finalReview = readJson(path.join(runDir, '07-final-gemma.json'));
 const controlled = readJson(path.join(runDir, '08-controlled-replay.json'));
 
 const checkpointItems = Object.values(checkpoint.items || {}).sort(compareCompletedAt);
-const configuredChunkSize = Number(checkpoint?.config?.chunk_size);
+const checkpointChunkSize = Number(checkpoint?.config?.chunk_size);
+const reportChunkSize = Number(generation?.stats?.chunk_size);
+const configuredChunkSize = Number.isInteger(checkpointChunkSize) && checkpointChunkSize > 0
+  ? checkpointChunkSize
+  : reportChunkSize;
+const configuredChunkSizeSource = Number.isInteger(checkpointChunkSize) && checkpointChunkSize > 0
+  ? 'checkpoint.config.chunk_size'
+  : 'generation.stats.chunk_size';
 const generatedRows = rowsFrom(generation, ['generated']);
 const generatedByKey = indexByKey(generatedRows);
 const reverseByKey = indexByKey(rowsFrom(reverse, ['validations', 'selected']));
@@ -101,6 +108,7 @@ const output = {
     checkpoint_items: checkpointItems.length,
     checkpoint_commits: commitGroups.length,
     configured_chunk_size: Number.isInteger(configuredChunkSize) ? configuredChunkSize : null,
+    configured_chunk_size_source: Number.isInteger(configuredChunkSize) ? configuredChunkSizeSource : null,
     generation_rows: generatedRows.length,
     reverse_rows: reverseByKey.size,
     final_review_rows: finalByKey.size,

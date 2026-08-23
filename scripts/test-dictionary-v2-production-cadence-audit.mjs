@@ -34,9 +34,18 @@ try {
   assert.equal(ok.status, 0, ok.stderr || ok.stdout);
   const audit = JSON.parse(fs.readFileSync(path.join(dir, 'production-cadence-audit.json'), 'utf8'));
   assert.equal(audit.ok, true);
+  assert.equal(audit.counts.configured_chunk_size_source, 'checkpoint.config.chunk_size');
   assert.deepEqual(audit.generation_windows.map((window) => window.completed), [500, 500, 200]);
   assert.deepEqual(audit.validation_windows.map((window) => window.completed), [1000, 200]);
   assert.equal(Math.max(...audit.checkpoint_commits.map((commit) => commit.items)), 50);
+
+  write('05-qwen-generation.checkpoint.json', { config: {}, items });
+  write('05-qwen-generation.json', { stats: { chunk_size: 50 }, generated });
+  const legacy = spawnSync(process.execPath, [script, '--run-dir', dir], { encoding: 'utf8' });
+  assert.equal(legacy.status, 0, legacy.stderr || legacy.stdout);
+  const legacyAudit = JSON.parse(fs.readFileSync(path.join(dir, 'production-cadence-audit.json'), 'utf8'));
+  assert.equal(legacyAudit.counts.configured_chunk_size, 50);
+  assert.equal(legacyAudit.counts.configured_chunk_size_source, 'generation.stats.chunk_size');
 
   items['1201:11201'] = { source_entry_id: 1201, source_sense_id: 11201, status: 'accepted', completed_at: items['1200:11200'].completed_at, generated_item: { source_entry_id: 1201, source_sense_id: 11201, valid: true, errors: [] } };
   generated.push(items['1201:11201'].generated_item);

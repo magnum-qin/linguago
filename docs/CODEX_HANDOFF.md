@@ -6428,6 +6428,12 @@ untracked. The durable extractors are
   failures occurred before controlled publishing and did not modify the main
   DB.
 
+- The same v148 recovery exposed a legacy checkpoint metadata omission:
+  generation reports recorded `stats.chunk_size=50`, but checkpoint configs did
+  not. New checkpoints now record and sign `chunk_size`. Cadence audit permits
+  a legacy fallback only from the matching generation report and still verifies
+  every observed checkpoint commit against the 50-item maximum.
+
 - The remote pipeline child runner now has a five-second post-exit pipe-drain
   fallback. This addresses the v147 Qwen stage where the generation report and
   checkpoint were complete but a descendant-held stdout/stderr pipe prevented

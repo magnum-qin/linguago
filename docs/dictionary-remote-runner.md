@@ -342,6 +342,12 @@ intentionally verify controlled-replay membership and cadence results.
 Use the watcher or manager status command and require either a live runner or a
 terminal manifest state.
 
+Generation checkpoints record `config.chunk_size`, and that value participates
+in the checkpoint signature. For legacy runs created before this field existed,
+the cadence audit may use `generation.stats.chunk_size` from the matching run;
+observed commit groups are still checked independently against the configured
+maximum.
+
 `stop` is an explicit operator action. A failed stage remains resumable; fix
 the endpoint or input issue and run `start` again with the same run ID.
 

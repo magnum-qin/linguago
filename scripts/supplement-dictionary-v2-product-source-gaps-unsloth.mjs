@@ -3590,6 +3590,7 @@ function buildCheckpointConfig() {
     publishable,
     apply,
     dry_run: dryRun,
+    chunk_size: chunkSize,
     force_reload: forceReload,
     circuit_breaker_reset_ms: circuitBreakerResetMs,
     endpoint_cooldown_ms: endpointCooldownMs
@@ -3629,6 +3630,7 @@ function buildCheckpointConfig() {
         publishable: config.publishable,
         apply: config.apply,
         dry_run: config.dry_run,
+        chunk_size: config.chunk_size,
         force_reload: config.force_reload,
         circuit_breaker_reset_ms: config.circuit_breaker_reset_ms,
         endpoint_cooldown_ms: config.endpoint_cooldown_ms

@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T20:21:09.1624529Z",
+    "generated_at":  "2026-08-23T20:24:19.8893474Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
@@ -105,13 +105,13 @@
                   },
                   {
                       "path":  "scripts\\audit-dictionary-v2-production-cadence.mjs",
-                      "bytes":  8056,
-                      "sha256":  "E5937679BADA5983ECD9CFE21C7B3ED64D61342E0B4792154988E9FEDD2DC3C6"
+                      "bytes":  8534,
+                      "sha256":  "64317481069DCBF837F6967AC4B6FBEF1C4A109672849C1DB9255EA758AD3A26"
                   },
                   {
                       "path":  "scripts\\test-dictionary-v2-production-cadence-audit.mjs",
-                      "bytes":  2708,
-                      "sha256":  "A72E996DF557D77055DCB1821E35E8BDEAF15ABE3671C2FE879864E56EDB145C"
+                      "bytes":  3376,
+                      "sha256":  "34DC4DF3DA5430F03295D9B3733EF1C4FB77E1025ECC88E8C37781909F291D40"
                   },
                   {
                       "path":  "scripts\\test-remote-production-supervisor-order.mjs",
@@ -190,8 +190,8 @@
                   },
                   {
                       "path":  "scripts\\supplement-dictionary-v2-product-source-gaps-unsloth.mjs",
-                      "bytes":  170995,
-                      "sha256":  "EFEE521D8448AEC6D8B3E934F8B0BE3C7F99E4FB0E4651415F2C9E7DC85E04EC"
+                      "bytes":  171061,
+                      "sha256":  "D9940FDA8E9CFEBCD8D1BDE6AA3E7F88E3C29EAFEAF02B5168BD14D5E33E3F8F"
                   },
                   {
                       "path":  "scripts\\invoke-dictionary-control.ps1",
