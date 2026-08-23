@@ -1712,3 +1712,15 @@ finish from its existing checkpoint; v148 is the first run that should use the
 four-language intake. `new-remote-dictionary-production-batch.ps1` serializes
 candidate scans with an exclusive `state/candidate-build.lock` file handle, so
 parallel control requests cannot duplicate an expensive source-DB scan.
+
+### v149 production result
+
+`v149-native-daily-production4767` is complete on the jump host. Dynamic
+discovery used seven endpoints. Qwen produced 62/62 valid full entries, reverse
+evidence supported all 62, and Gemma accepted 60; all 60 were promoted after
+isolated replay and full audit. The authoritative DB is now `entries=43579`,
+`senses=49891`, `sense_localizations=199564`, SHA-256
+`8E86485FBB324CFD3D9BAB3BE413EC1AD03DF7076EFA43F53FF94D94340CC688`.
+Published-risk remains zero. Since v142, 1,705 senses have accumulated and
+3,295 remain before the next D1 release. The next task is evidence-backed
+candidate acquisition, not relaxing publication gates.

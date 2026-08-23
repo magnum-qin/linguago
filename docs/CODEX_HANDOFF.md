@@ -6492,3 +6492,25 @@ untracked. The durable extractors are
   version before deploy and automatically rolls back if any online dictionary
   regression fails. It has not been executed because the jump-host OAuth token
   is expired and no non-interactive `CLOUDFLARE_API_TOKEN` is currently set.
+
+## 2026-08-24 v149 completion
+
+- `v149-native-daily-production4767` completed the dynamic seven-endpoint
+  pipeline and guarded publication without infrastructure or JSON failures.
+  The strict funnel retained 63 generation-ready candidates, Qwen generated
+  62 valid records, reverse evidence supported all 62, and final Gemma review
+  accepted 60. All seven discovered ports participated and no circuit breaker
+  opened.
+- Controlled replay selected and promoted 60 senses. The cadence audit passed
+  with `chunk_size=50`, the production gate passed, full isolated audit passed,
+  and published-risk remained `flagged_senses=0`.
+- The authoritative jump-host DB now has `entries=43579`, `senses=49891`, and
+  `sense_localizations=199564`. Its SHA-256 is
+  `8E86485FBB324CFD3D9BAB3BE413EC1AD03DF7076EFA43F53FF94D94340CC688`.
+  Rollback DB:
+  `backups/v149-native-daily-production4767-main-before-commit-20260824-054358.db`.
+- The v142 release cohort has accumulated 1,705 new senses and needs 3,295 more
+  before the 5,000-sense D1/Worker release cadence. Do not deploy D1 yet.
+- Candidate supply, not model reliability, is now the limiting factor. Rebuild
+  the next cohort from additional high-value evidence or newly unlocked source
+  families; do not lower reverse-evidence, consensus, or published-risk gates.
