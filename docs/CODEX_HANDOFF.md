@@ -387,6 +387,11 @@
   1,000-item reverse-evidence, final-review, and controlled-replay windows.
   These are isolated audit windows; the main DB is still replaced only after
   the complete controlled replay and full audit pass.
+- Use `scripts/report-dictionary-v2-production-progress.mjs` for active-run
+  monitoring. It reads atomic JSON summaries and emits compact progress only.
+  Avoid full-log parsing or `Get-CimInstance | ConvertTo-Json` monitoring on
+  the jump host; abandoned versions of those commands previously consumed
+  multi-gigabyte working sets and exhausted Windows commit memory.
 
 ## 2026-08-20 v124 production release
 

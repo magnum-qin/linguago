@@ -585,6 +585,16 @@ npm.cmd run dict:v2:remote-control -- -Action start -RunId <run-id> -Batch <rela
 npm.cmd run dict:v2:remote-control -- -Action status -RunId <run-id>
 ```
 
+For active production runs, prefer the compact Node progress report over
+ad-hoc PowerShell commands that parse complete reports or logs:
+
+```powershell
+npm.cmd run dict:v2:report:production-progress -- --run-dir D:\linguago-runner\runs\<run-id>
+```
+
+It reads atomic stage reports/checkpoints and emits only the current stage,
+counts, and heartbeat age. It does not serialize the full process table.
+
 `new-batch` excludes the static attempt history plus the input batch of every
 remote run whose manifest status is `complete`, `completed`, or `succeeded`.
 This prevents candidates rejected by deterministic evidence or model review
