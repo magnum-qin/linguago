@@ -399,6 +399,10 @@ This prevents dashboards and control scripts from parsing a partially written
 multi-megabyte report. Readers should tolerate a short missing-file interval
 on Windows, where replacing an existing destination can require remove/rename.
 
+Deterministic reverse-evidence validation logs a heartbeat every 100 rows. The
+watchdog uses that output timestamp as real progress while the process performs
+SQLite lookups; do not remove it or replace the loop with a silent bulk map.
+
 If an older running process predates this circuit breaker and its checkpoint
 stops advancing, first verify endpoint status and reload an accidentally
 unloaded model. If progress still does not resume, use the control script's

@@ -53,6 +53,7 @@ const includeInvalid = args["include-invalid"] === "true";
 const inputMode = args["input-mode"] || "generated";
 const requireSourceReverseEvidence = args["require-source-reverse-evidence"] === "true";
 const evidenceFamilyPolicy = args["evidence-family-policy"] || "wiktionary";
+const progressEvery = Math.max(1, Number.parseInt(args["progress-every"] || "100", 10));
 const allowedReviewedSupplementalSourceKeys = new Set(
   String(args["reviewed-supplemental-source-keys"] || "")
     .split(",")
@@ -185,7 +186,18 @@ const findSupplementalReverse = supplementalDb?.prepare(`
   ORDER BY source_key, concept_id, english_gloss
 `);
 
-const validations = rows.map(validateGeneratedRow);
+const validations = [];
+const validationStartedAt = Date.now();
+for (let index = 0; index < rows.length; index += 1) {
+  validations.push(validateGeneratedRow(rows[index]));
+  const completed = index + 1;
+  if (completed % progressEvery === 0 || completed === rows.length) {
+    console.log(
+      `[reverse-evidence] completed=${completed}/${rows.length} ` +
+        `elapsed_seconds=${((Date.now() - validationStartedAt) / 1000).toFixed(1)}`
+    );
+  }
+}
 const summary = summarize(validations, generated.length, includeInvalid);
 const output = {
   ok: true,
@@ -218,7 +230,7 @@ const output = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+writeJsonAtomic(outPath, output);
 const supportedIds = new Set(
   validations
     .filter((item) => item.decision === "supported")
@@ -245,7 +257,7 @@ const supportedReport =
             supportedIds.has(sourceSenseKey(item.source_entry_id, item.output?.source_sense_id ?? item.source_sense_id))
         )
       };
-fs.writeFileSync(supportedReportPath, `${JSON.stringify(supportedReport, null, 2)}\n`, "utf8");
+writeJsonAtomic(supportedReportPath, supportedReport);
 db.close();
 supplementalDb?.close();
 console.log(
@@ -269,6 +281,21 @@ function candidateSourceSenseKey(row) {
     row.source_entry_id,
     row.source_sense_id ?? row.first_sense_id ?? row.useful_senses?.[0]?.id
   );
+}
+
+function writeJsonAtomic(targetPath, value) {
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  const temporaryPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  try {
+    fs.renameSync(temporaryPath, targetPath);
+  } catch (error) {
+    if (!["EEXIST", "EPERM"].includes(error?.code)) throw error;
+    fs.rmSync(targetPath, { force: true });
+    fs.renameSync(temporaryPath, targetPath);
+  } finally {
+    fs.rmSync(temporaryPath, { force: true });
+  }
 }
 
 function reviewedCandidateToGenerated(row) {

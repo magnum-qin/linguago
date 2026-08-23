@@ -51,6 +51,11 @@
   file and atomically renamed into place. On Windows replacement conflicts,
   the writer uses a short missing-file window instead of exposing partial JSON.
   Monitoring code should still retry missing/in-flight files briefly.
+- Deterministic reverse-evidence validation previously used one blocking
+  `rows.map(...)` pass and emitted nothing until every SQLite lookup finished.
+  Large cohorts could therefore look stalled to the watchdog despite rising
+  process CPU time. It now emits a progress heartbeat every 100 rows and writes
+  both final JSON reports atomically; the evidence decisions are unchanged.
 
 ## 2026-08-23 v141 controlled product DB commit
 

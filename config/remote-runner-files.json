@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T08:21:40.5766551Z",
+    "generated_at":  "2026-08-23T08:37:24.4701194Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
@@ -80,8 +80,8 @@
                   },
                   {
                       "path":  "scripts\\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs",
-                      "bytes":  35025,
-                      "sha256":  "B425D54D641839816C68038434A600B9383F68E79F4A52064810194B83E9B91E"
+                      "bytes":  35999,
+                      "sha256":  "EDBDE72E795FB97C43323210B3C9D3306906633E9FBBBD2C1EFB823C8D2E7628"
                   },
                   {
                       "path":  "scripts\\build-dictionary-v2-product-source-gap-controlled-consensus-input.mjs",
