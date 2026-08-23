@@ -6414,6 +6414,11 @@ untracked. The durable extractors are
   selection retained 361, and the conservative production prefilter retained
   144 (`zh=48`, `ja=76`, `pt-BR=10`, `en=10`). This is an intake validation,
   not a DB write or release.
+- Candidate construction now holds `state/candidate-build.lock` with an
+  exclusive file handle for the full scan and selection. A concurrent request
+  fails immediately instead of launching another multi-gigabyte SQLite scan.
+  Process termination releases the handle automatically; the zero-byte lock
+  file itself may remain and must not be used as a stale-lock signal.
 - `deploy-remote-worker-release.ps1 -Execute true` records the current Worker
   version before deploy and automatically rolls back if any online dictionary
   regression fails. It has not been executed because the jump-host OAuth token

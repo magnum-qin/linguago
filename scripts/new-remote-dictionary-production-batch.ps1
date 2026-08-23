@@ -16,6 +16,22 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($Limit -lt 1 -or $Limit -gt 20000) { throw 'Limit must be between 1 and 20000' }
 $Root = [IO.Path]::GetFullPath($Root)
+$StateRoot = Join-Path $Root 'state'
+New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
+$BuildLockPath = Join-Path $StateRoot 'candidate-build.lock'
+$BuildLock = $null
+try {
+  $BuildLock = [IO.File]::Open(
+    $BuildLockPath,
+    [IO.FileMode]::OpenOrCreate,
+    [IO.FileAccess]::ReadWrite,
+    [IO.FileShare]::None
+  )
+} catch [IO.IOException] {
+  throw "Another dictionary candidate build is already running: $BuildLockPath"
+}
+
+try {
 if (-not $SkipVerify) {
   & (Join-Path $Root 'scripts\verify-remote-dictionary-runner.ps1') -Root $Root
   if ($LASTEXITCODE -ne 0) { throw 'Remote runner verification failed' }
@@ -118,3 +134,6 @@ $Batch = [IO.File]::ReadAllText($OutPath, [Text.Encoding]::UTF8) | ConvertFrom-J
   CoveragePool = $PoolPath
   SelectedBySourceLang = $Batch.summary.selected_by_source_lang
 } | ConvertTo-Json -Depth 6
+} finally {
+  if ($null -ne $BuildLock) { $BuildLock.Dispose() }
+}

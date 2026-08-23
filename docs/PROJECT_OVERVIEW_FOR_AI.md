@@ -1703,4 +1703,6 @@ WikDict/OMW cannot independently certify a sense. FreeDict `eng-por` is treated
 as an authoritative English starting sense, consistent with its independently
 reviewed upstream provenance. The active v147 run predates this change and must
 finish from its existing checkpoint; v148 is the first run that should use the
-four-language intake.
+four-language intake. `new-remote-dictionary-production-batch.ps1` serializes
+candidate scans with an exclusive `state/candidate-build.lock` file handle, so
+parallel control requests cannot duplicate an expensive source-DB scan.
