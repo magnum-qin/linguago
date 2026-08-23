@@ -34,6 +34,27 @@ try {
   assert.equal(output.progress.accepted, 31);
   assert.equal(output.progress.rejected, 9);
   assert.equal(output.heartbeat.source, '03-gemma-source-review.json');
+
+  write('manifest.json', {
+    run_id: 'test-production',
+    status: 'running',
+    stages: {
+      gemma_source_review: { status: 'complete' },
+      source_suggested_reverse_evidence: { status: 'running' }
+    }
+  });
+  fs.writeFileSync(
+    path.join(runDir, 'source_suggested_reverse_evidence.log'),
+    '[reverse-evidence] completed=100/2900\n[reverse-evidence] completed=400/2900\n',
+    'utf8'
+  );
+  const logResult = spawnSync(process.execPath, [script, '--run-dir', runDir], { encoding: 'utf8' });
+  assert.equal(logResult.status, 0, logResult.stderr || logResult.stdout);
+  const logOutput = JSON.parse(logResult.stdout);
+  assert.equal(logOutput.progress.completed, 400);
+  assert.equal(logOutput.progress.total, 2900);
+  assert.equal(logOutput.progress.remaining, 2500);
+  assert.equal(logOutput.heartbeat.source, 'source_suggested_reverse_evidence.log');
   console.log('Production progress report regression passed.');
 } finally {
   fs.rmSync(runDir, { recursive: true, force: true });

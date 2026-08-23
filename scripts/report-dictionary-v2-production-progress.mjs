@@ -43,18 +43,21 @@ function inspectStageProgress(stageName) {
       accepted: (report) => Number(report?.summary?.approved || 0),
       rejected: (report) => Number(report?.summary?.rejected || 0) + Number(report?.summary?.manual_review || 0)
     },
+    source_suggested_reverse_evidence: reportDescriptor('04b-source-consensus-reverse-evidence.json', ['validations', 'selected'], '03-gemma-source-review-approved.json'),
+    semantic_preview_gemma: reportDescriptor('04d-semantic-preview-gemma.json', ['reviews'], '04c-semantic-preview.json'),
     qwen_generation: generationDescriptor('05-qwen-generation.checkpoint.json', '04f-generation-ready-candidates.json'),
-    reverse_evidence: reportDescriptor('06-reverse-evidence.json', ['validations', 'selected']),
-    final_gemma: reportDescriptor('07-final-gemma.json', ['reviews']),
+    reverse_evidence: reportDescriptor('06-reverse-evidence.json', ['validations', 'selected'], '05-qwen-generation.json'),
+    final_gemma: reportDescriptor('07-final-gemma.json', ['reviews'], '06-reverse-evidence-supported.json'),
     qwen_repair_generation: generationDescriptor('09-qwen-repair-generation.checkpoint.json', '08-structured-correction-retry.json'),
-    repair_reverse_evidence: reportDescriptor('10-repair-reverse-evidence.json', ['validations', 'selected']),
-    repair_final_gemma: reportDescriptor('11-repair-final-gemma.json', ['reviews'])
+    repair_reverse_evidence: reportDescriptor('10-repair-reverse-evidence.json', ['validations', 'selected'], '09-qwen-repair-generation.json'),
+    repair_final_gemma: reportDescriptor('11-repair-final-gemma.json', ['reviews'], '10-repair-reverse-evidence-supported.json')
   };
   const descriptor = descriptors[stageName];
-  if (!descriptor) return { stage: stageName, completed: null, total: null, remaining: null, accepted: null, rejected: null, source_path: null };
+  if (!descriptor) return inspectLogProgress(stageName);
   const reportPath = path.join(runDir, descriptor.report);
   const inputPath = descriptor.input ? path.join(runDir, descriptor.input) : null;
-  const report = optionalJson(reportPath) || {};
+  const report = optionalJson(reportPath);
+  if (!report) return inspectLogProgress(stageName);
   const input = inputPath ? optionalJson(inputPath) : null;
   const completed = descriptor.completed(report);
   const total = input ? reportItemCount(input) : numberOrNull(report?.summary?.selected) ?? completed;
@@ -93,13 +96,49 @@ function generationDescriptor(report, input) {
   };
 }
 
-function reportDescriptor(report, rowKeys) {
+function reportDescriptor(report, rowKeys, input = null) {
   return {
     report,
+    input,
     completed: (value) => Number(value?.summary?.reviewed ?? value?.summary?.validated ?? rowsFrom(value, rowKeys).length),
     accepted: (value) => Number(value?.summary?.approved ?? value?.summary?.supported ?? value?.summary?.accepted ?? 0),
     rejected: (value) => Number(value?.summary?.rejected ?? value?.summary?.unsupported ?? 0)
   };
+}
+
+function inspectLogProgress(stageName) {
+  const sourcePath = `${stageName}.log`;
+  const logPath = path.join(runDir, sourcePath);
+  if (!fs.existsSync(logPath)) {
+    return { stage: stageName, completed: null, total: null, remaining: null, accepted: null, rejected: null, source_path: null };
+  }
+  const tail = readFileTail(logPath, 64 * 1024);
+  const matches = [...tail.matchAll(/completed=(\d+)\/(\d+)/gu)];
+  const latest = matches.at(-1);
+  const completed = latest ? Number(latest[1]) : null;
+  const total = latest ? Number(latest[2]) : null;
+  return {
+    stage: stageName,
+    completed,
+    total,
+    remaining: completed !== null && total !== null ? Math.max(0, total - completed) : null,
+    accepted: null,
+    rejected: null,
+    source_path: sourcePath
+  };
+}
+
+function readFileTail(filePath, maximumBytes) {
+  const size = fs.statSync(filePath).size;
+  const length = Math.min(size, maximumBytes);
+  const buffer = Buffer.alloc(length);
+  const descriptor = fs.openSync(filePath, 'r');
+  try {
+    fs.readSync(descriptor, buffer, 0, length, size - length);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  return buffer.toString('utf8');
 }
 
 function reportItemCount(value) {
