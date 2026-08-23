@@ -312,7 +312,19 @@ try {
   $TaskArguments = "-NoProfile -ExecutionPolicy Bypass -File `"$TaskScript`" -Config `"$LaunchPath`""
   $TaskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $TaskArguments -WorkingDirectory $Root
   $TaskTrigger = New-ScheduledTaskTrigger -Once -At ([DateTime]::Now.AddDays(1))
-  Register-ScheduledTask -TaskName $ScheduledTaskName -Action $TaskAction -Trigger $TaskTrigger -Force | Out-Null
+  # Use the signed-in user's interactive token. On this jump host, Node can be
+  # created under the default background token but remain before ESM startup,
+  # leaving a PID without ever writing manifest.json.
+  $TaskPrincipal = New-ScheduledTaskPrincipal `
+    -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) `
+    -LogonType Interactive `
+    -RunLevel Limited
+  Register-ScheduledTask `
+    -TaskName $ScheduledTaskName `
+    -Action $TaskAction `
+    -Trigger $TaskTrigger `
+    -Principal $TaskPrincipal `
+    -Force | Out-Null
   Start-ScheduledTask -TaskName $ScheduledTaskName
 } catch {
   Write-StartupState 'launch_failed' @{ error = [string]$_.Exception.Message }
@@ -325,13 +337,13 @@ do {
   Start-Sleep -Milliseconds 500
   $Manifest = Read-JsonFile $ManifestPath
   $StartedProcess = Get-RunnerProcess
-  if ($StartedProcess) {
+  if ($StartedProcess -and $Manifest) {
     Write-StartupState 'started' @{
       pid = $StartedProcess.Id
-      manifest_status = if ($Manifest) { [string]$Manifest.status } else { 'not_started' }
-      manifest_started_at = if ($Manifest) { [string]$Manifest.started_at } else { $null }
+      manifest_status = [string]$Manifest.status
+      manifest_started_at = [string]$Manifest.started_at
     }
-    Write-Output "started scheduled_task=$ScheduledTaskName run_id=$RunId pid=$($StartedProcess.Id) manifest_status=$(if ($Manifest) { $Manifest.status } else { 'not_started' })"
+    Write-Output "started scheduled_task=$ScheduledTaskName run_id=$RunId pid=$($StartedProcess.Id) manifest_status=$($Manifest.status)"
     exit 0
   }
   $TaskInfo = Get-ScheduledTaskInfo -TaskName $ScheduledTaskName -ErrorAction SilentlyContinue

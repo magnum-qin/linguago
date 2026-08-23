@@ -256,6 +256,12 @@ second sense for an entry that already has a draft and overstate batch growth.
   saturated random SQLite I/O and stretched a normally 0.25-second evidence
   stage to several minutes. Verify the command line before stopping a process;
   never terminate an unrelated Node process by name alone.
+- A scheduled launch is not considered healthy merely because a Node PID
+  exists. The controller waits for `manifest.json`, and the task runs with the
+  signed-in jump-host user's interactive token. This avoids the observed
+  failure mode where background Task Scheduler created Node but Node remained
+  before ESM initialization indefinitely. Startup timeout cleanup still kills
+  only the process tree whose command line contains the reserved run ID.
 
 ## Pipeline
 
