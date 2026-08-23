@@ -1,5 +1,31 @@
 # Codex Handoff
 
+## 2026-08-23 v141 controlled product DB commit
+
+- `v141-native-daily-production5000` completed its 5,000-candidate strict
+  funnel. It produced 323 final accepts (`zh=177`, `ja=146`); no LLM stage
+  wrote directly to the product database.
+- Controlled replay inserted 323 entries, 323 senses, and 1,292 four-language
+  localizations into an isolated copy. Replaying the same report a second time
+  wrote zero rows. Deterministic promotion accepted and promoted all 323 rows.
+- The authoritative jump-host product DB SHA-256 is now
+  `226F90EA9A607598672E259828B8811A1924B36CBB88DAC6BFEE9847DCD11649`.
+  The rollback copy is
+  `D:\linguago-runner\backups\v141-native-daily-production5000-main-before-commit-20260823-152650.db`.
+- Fast audit and published-risk audit pass. The full 25-chunk native
+  export/import audit also passes with `entries=41874`, `senses=48186`,
+  `sense_localizations=192744`, `examples=3030`, and
+  `example_localizations=11898`. Count mismatches, bad localization counts,
+  duplicate sense orders, orphans, mojibake, HTML artifacts, and flagged senses
+  are all zero. Duplicate localization groups remain a non-blocking warning.
+- The runner manifest was deliberately regenerated with
+  `PreserveProductDbEntry=false` only after the controlled commit succeeded.
+  `verify-remote-dictionary-runner.ps1` now reports `Ok=true`, five healthy
+  endpoints, zero file/hash mismatches, and the new product DB hash.
+- Cloudflare D1 and the Worker were not changed by this commit. The v140 data
+  release remains online until an explicit, separately gated D1 release is
+  requested.
+
 ## 2026-08-23 v140 native production release
 
 - The v140 controlled production run promoted 286 of 287 final records. The

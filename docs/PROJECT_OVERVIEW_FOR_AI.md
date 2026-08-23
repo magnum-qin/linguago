@@ -1,6 +1,28 @@
 # LinguaGo Project Overview For AI
 
-## Current production release (v140/v141, 2026-08-23)
+## Current controlled product baseline (v141, 2026-08-23)
+
+The jump-host run `v141-native-daily-production5000` is complete. From 5,000
+fresh Chinese/Japanese native candidates, the strict funnel accepted 323
+records (`zh=177`, `ja=146`). Controlled replay inserted 323 entries and 323
+senses with 1,292 four-language localizations. A second replay wrote zero rows,
+proving idempotence. Deterministic promotion accepted all 323 replayed drafts.
+
+The authoritative jump-host product DB now has SHA-256
+`226F90EA9A607598672E259828B8811A1924B36CBB88DAC6BFEE9847DCD11649`.
+Its pre-commit rollback copy is
+`D:\linguago-runner\backups\v141-native-daily-production5000-main-before-commit-20260823-152650.db`.
+The full native export/import audit passed with `entries=41874`,
+`senses=48186`, `sense_localizations=192744`, `examples=3030`, and
+`example_localizations=11898`; count mismatches, publication risks, orphans,
+mojibake, and HTML artifacts are all zero. The refreshed runner manifest
+verifies with five healthy endpoints and zero file/hash mismatches.
+
+This v141 product DB has **not** been pushed to Cloudflare D1 and no Worker was
+deployed in this step. The live D1/Worker release remains the v140 data release
+described below until the separate release command is explicitly executed.
+
+## Current online production release (v140 data / v141 Worker, 2026-08-23)
 
 The v140 native production run has completed controlled replay and promoted
 286 records into the authoritative jump-host product DB. Its SHA-256 is
@@ -26,15 +48,15 @@ reading, and IPA checks. Keep pronunciation completeness as a separate quality
 queue: `沸点` currently exposes `boiling point` with IPA covering only
 `boiling`. This does not weaken the structural publication gates.
 
-The next run is active on the jump host as
+The completed follow-up run was
 `v141-native-daily-production5000`, using a fresh 5,000-row native daily batch
 (`zh=2883`, `ja=2117`). The expanded source scan found 91,369 uncovered native
 candidates; selection excluded all previously completed run batches and
-31,786 historical source entries. The run has demonstrated checkpoint-safe
-resume after a controlled process restart. Treat its manifest and watchdog
-state as authoritative rather than retaining an old PID, and do not start a
-duplicate process. It remains separate from the live D1 release until
-controlled replay, promotion, and all audits pass.
+31,786 historical source entries. The run demonstrated checkpoint-safe resume
+after a controlled process restart and subsequently passed controlled replay,
+promotion, and all audits. Its main DB commit is complete, but it remains
+separate from the live D1 release until the explicit Cloudflare release stage
+runs.
 
 Unattended liveness recovery is installed on the jump host as Windows scheduled
 task `LinguaGo Dictionary Pipeline Watchdog`. It executes every two minutes and
