@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T06:32:33.3468092Z",
+    "generated_at":  "2026-08-23T06:37:35.1654167Z",
     "root":  "D:\\linguago-runner",
     "files":  [
                   {
@@ -175,8 +175,8 @@
                   },
                   {
                       "path":  "scripts\\release-remote-dictionary-d1.ps1",
-                      "bytes":  7352,
-                      "sha256":  "371D01788ED5CFF5F03DB78081824E8468D2771225E44547A3632F0669652638"
+                      "bytes":  7772,
+                      "sha256":  "6B721B606060DFA8A0A586F8964D30FE890F72EE1B506A73D642B6CDD95EC8FD"
                   },
                   {
                       "path":  "scripts\\push-dictionary-v2-native-to-d1.ps1",
