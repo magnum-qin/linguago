@@ -26,9 +26,43 @@
   `release-cohort-status.json` after a guarded main-DB commit; the report does
   not weaken or replace any publication audit.
 
-## 2026-08-23 v144 active production and persistent supervisor
+## 2026-08-23 v145 active production and persistent supervisor
 
-- `v144-native-daily-production5000` is the next non-overlapping native daily
+- `v145-native-daily-production5000` is running from frozen batch
+  `D:\linguago-runner\batches\production-5000-20260823-115426.json` with
+  `zh=2808` and `ja=2192`. It excludes `46,786` source entries already covered
+  by completed runs and is hash-locked to the v144 product DB
+  `B8510C26FDA939F934EC53BEC49E0FC4B76690D775AEEB01589D7C2D5F84DB9A`.
+- The pipeline and `LinguaGo Dictionary Production Supervisor` Scheduled Tasks
+  are both active. Dynamic endpoint discovery remains enabled across ports
+  `11442`, `11444`, `11445`, `11446`, `11447`, and `11448`; foreign GPU
+  processes are excluded at each model stage.
+- Building the v145 native coverage pool scanned `135,667` source entries and
+  took about 40 minutes on the jump host. This is a SQLite I/O bottleneck, not
+  GPU work. Future batching should reuse an incrementally maintained coverage
+  pool instead of rebuilding the complete pool for every 5,000-row run.
+
+## 2026-08-23 v144 native daily production completed
+
+- The v144 pipeline completed after checkpoint recovery. Qwen generated
+  `343/343` rows (`342` accepted, `1` rejected); the controlled final gate
+  selected `326` rows and deterministic promotion published all `326` senses.
+- Isolated replay, idempotence, promote dry-run/apply, fast audit,
+  published-risk audit, native export, and full in-memory import all passed.
+  `flagged_senses=0`; all publication blockers remain zero.
+- The authoritative product DB now has `entries=42489`, `senses=48801`,
+  `sense_localizations=195204`, `examples=3030`, and
+  `example_localizations=11898`. Its SHA-256 is
+  `B8510C26FDA939F934EC53BEC49E0FC4B76690D775AEEB01589D7C2D5F84DB9A`.
+  Rollback DB:
+  `D:\linguago-runner\backups\v144-native-daily-production5000-main-before-commit-20260823-204602.db`.
+- Relative to the live v142 D1 baseline, the unpublished cohort now contains
+  `615` new senses and needs `4,385` more before the approximately 5,000-sense
+  D1 release gate. No D1 import or Worker deployment was performed for v144.
+
+## 2026-08-23 v144 production configuration and recovery notes
+
+- `v144-native-daily-production5000` was the next non-overlapping native daily
   cohort. Its frozen batch is
   `D:\linguago-runner\batches\production-5000-20260823-095752.json`
   (`zh=2883`, `ja=2117`). It was selected after scanning `135667` native
@@ -47,10 +81,10 @@
   `LinguaGo Dictionary Production Supervisor`, then requires a matching live
   process before reporting success. Its authoritative status is
   `runs\v144-native-daily-production5000\production-supervisor.json` and is
-  currently `waiting_for_pipeline`.
+  now `complete`.
 - The supervisor is hash-locked to the v143 main DB
   `0A04DD99E31E153EC62D8C52D50F160722D09F4ABA4B334A37D6F8E9E6833A1C`.
-  It will run production gates, isolated replay, idempotence, deterministic
+  It ran production gates, isolated replay, idempotence, deterministic
   promotion, fast/published-risk/full export audits, guarded main-DB commit,
   runner-manifest regeneration, and post-commit verification. It never uploads
   D1 or deploys the Worker; those remain deferred until the cumulative release

@@ -3,14 +3,17 @@
 ## Current jump-host baseline and online release (2026-08-23)
 
 The authoritative jump-host product database has advanced beyond the online
-release through `v143-native-daily-production5000`. It has SHA-256
-`0A04DD99E31E153EC62D8C52D50F160722D09F4ABA4B334A37D6F8E9E6833A1C`
-and audited counts `entries=42163`, `senses=48475`,
-`sense_localizations=193900`, `examples=3030`, and
+release through `v144-native-daily-production5000`. It has SHA-256
+`B8510C26FDA939F934EC53BEC49E0FC4B76690D775AEEB01589D7C2D5F84DB9A`
+and audited counts `entries=42489`, `senses=48801`,
+`sense_localizations=195204`, `examples=3030`, and
 `example_localizations=11898`. Its rollback copy is
-`D:\linguago-runner\backups\v143-native-daily-production5000-main-before-commit-20260823-181640.db`.
+`D:\linguago-runner\backups\v144-native-daily-production5000-main-before-commit-20260823-204602.db`.
 Production D1 remains the v142 Worker release described below while additional
 audited senses accumulate toward the next approximately 5,000-sense release.
+The unpublished cohort currently contains `615` senses, and v145 is processing
+another frozen 5,000-row native daily batch under the persistent watchdog and
+completion supervisor.
 
 ## Current online baseline (v142 Worker / v141 data, 2026-08-23)
 
