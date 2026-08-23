@@ -6428,6 +6428,15 @@ untracked. The durable extractors are
   failures occurred before controlled publishing and did not modify the main
   DB.
 
+- v148 subsequently completed controlled replay and publication: 20 draft
+  senses were inserted and promoted, idempotent replay wrote 0 duplicates,
+  `flagged_senses=0`, and full isolated audit passed. The main DB now has
+  `entries=43519`, `senses=49831`, `sense_localizations=199324`, SHA256
+  `CEA97EF49EF90FF94AB489B57C9A8116186686631A0166E39C7AF92435F65A73`.
+  The v142 release cohort has accumulated 1645 new senses and needs 3355 more
+  before the next D1/Worker release. Rollback DB:
+  `backups/v148-native-daily-production5000-main-before-commit-20260824-052851.db`.
+
 - The same v148 recovery exposed a legacy checkpoint metadata omission:
   generation reports recorded `stats.chunk_size=50`, but checkpoint configs did
   not. New checkpoints now record and sign `chunk_size`. Cadence audit permits

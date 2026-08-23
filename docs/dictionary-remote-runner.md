@@ -354,6 +354,11 @@ model attempts, not all candidates that reached pre-generation eligibility.
 Final no-correction acceptance, reverse-evidence coverage, infrastructure and
 JSON failure limits remain blocking.
 
+The v148 recovery validated this sequence end to end: 20 senses passed isolated
+replay, idempotency, deterministic promotion, published-risk, full export audit,
+and atomic replacement. Its low `raw_to_final` remained visible as a throughput
+warning and did not weaken any publication-quality gate.
+
 `stop` is an explicit operator action. A failed stage remains resumable; fix
 the endpoint or input issue and run `start` again with the same run ID.
 
