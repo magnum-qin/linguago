@@ -20,12 +20,20 @@ export async function discoverUnslothStagePool(options) {
     maxIdleGpuUtil = 10,
     maxTemperature = 84,
     requireInstalled = true,
-    fetchImpl = fetch
+    fetchImpl = fetch,
+    dashboardTimeoutMs = 15_000,
+    modelCheckTimeoutMs = 30_000
   } = options;
 
   const configuredByPort = new Map(configuredEndpoints.map((endpoint) => [endpointPort(endpoint), endpoint]));
   try {
-    const response = await fetchImpl(dashboardUrl, { signal: AbortSignal.timeout(15_000) });
+    const response = await fetchWithHardTimeout(
+      dashboardUrl,
+      {},
+      dashboardTimeoutMs,
+      fetchImpl,
+      'dashboard_timeout'
+    );
     if (!response.ok) throw new Error(`dashboard_http_${response.status}`);
     const payload = await response.json();
     const selection = selectClusterEndpoints(payload, {
@@ -42,7 +50,13 @@ export async function discoverUnslothStagePool(options) {
     }));
     const verified = await Promise.all(endpointRows.map(async (row) => {
       if (!requireInstalled) return { ...row, model_available: true };
-      const available = await endpointHasModel(row.endpoint, model, token, fetchImpl);
+      const available = await endpointHasModel(
+        row.endpoint,
+        model,
+        token,
+        fetchImpl,
+        modelCheckTimeoutMs
+      );
       return { ...row, model_available: available };
     }));
     const usable = verified.filter((row) => row.model_available);
@@ -134,12 +148,15 @@ export function selectClusterEndpoints(payload, options = {}) {
   return { selected, excluded };
 }
 
-async function endpointHasModel(endpoint, model, token, fetchImpl) {
+async function endpointHasModel(endpoint, model, token, fetchImpl, timeoutMs) {
   try {
-    const response = await fetchImpl(`${endpoint}/api/models/local`, {
-      headers: token ? { authorization: `Bearer ${token}` } : {},
-      signal: AbortSignal.timeout(30_000)
-    });
+    const response = await fetchWithHardTimeout(
+      `${endpoint}/api/models/local`,
+      { headers: token ? { authorization: `Bearer ${token}` } : {} },
+      timeoutMs,
+      fetchImpl,
+      'model_list_timeout'
+    );
     if (!response.ok) return false;
     const payload = await response.json();
     const rows = Array.isArray(payload?.models)
@@ -155,6 +172,26 @@ async function endpointHasModel(endpoint, model, token, fetchImpl) {
   }
 }
 
+async function fetchWithHardTimeout(url, init, timeoutMs, fetchImpl, timeoutReason) {
+  const controller = new AbortController();
+  const timeout = Math.max(1, Number(timeoutMs) || 1);
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(timeoutReason));
+    }, timeout);
+  });
+  try {
+    return await Promise.race([
+      fetchImpl(url, { ...init, signal: controller.signal }),
+      deadline
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function defaultVariant(model, group) {
   if (/qwen/i.test(model) && /4090/i.test(group || '')) return 'UD-IQ4_NL';
   return 'UD-Q4_K_XL';
@@ -163,4 +200,3 @@ function defaultVariant(model, group) {
 function endpointPort(endpoint) {
   try { return new URL(endpoint).port; } catch { return String(endpoint); }
 }
-

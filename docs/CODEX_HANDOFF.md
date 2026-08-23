@@ -1,5 +1,37 @@
 # Codex Handoff
 
+## 2026-08-24 v145 native daily production completed
+
+- `v145-native-daily-production5000` completed from 5,000 frozen Chinese and
+  Japanese source candidates. The strict funnel produced `349` valid Qwen
+  entries, deterministic reverse evidence supported `346`, and the final
+  independent Gemma gate accepted `340` entries.
+- Controlled replay inserted `340` draft senses and `1,360` four-language
+  localizations into an isolated database. The second replay wrote zero rows,
+  deterministic promotion accepted all `340`, and fast audit, published-risk,
+  native export, and full in-memory import all passed. `flagged_senses=0` and
+  every blocking integrity counter remains zero.
+- The authoritative jump-host DB now has `entries=42829`, `senses=49141`,
+  `sense_localizations=196564`, `examples=3030`, and
+  `example_localizations=11898`. SHA-256:
+  `A1782F15D3B1506996B6A784CE7A605D92341BECA710E3ECBDE7D3250B95AF3A`.
+  Rollback DB:
+  `D:\linguago-runner\backups\v145-native-daily-production5000-main-before-commit-20260824-002405.db`.
+- Relative to the online v142 baseline, the unpublished cohort contains `955`
+  senses and needs `4,045` more before the approximately 5,000-sense D1 release
+  gate. D1 and Worker remain unchanged.
+- The first isolated replay attempt exited on Windows with native code
+  `0xC0000409`. Replay mode had opened deterministic ECDICT/Portuguese
+  pronunciation SQLite handles and then called `process.exit(0)` without
+  closing them. Replay now closes all deterministic sources in `finally` before
+  exit. The same isolated validation then passed end to end.
+- The guarded DB commit succeeded before the post-commit runner verification
+  detected stale manifest hashes for newly synchronized recovery scripts. The
+  manifest was regenerated, verification passed, and supervisor status was
+  recovered to `complete`. Completion now regenerates the full runner manifest
+  after updating the DB entry, and its child publish output is streamed to
+  `controlled-publish-supervisor.log` instead of being retained only in memory.
+
 ## 2026-08-23 exact v142 Cloudflare rollback state
 
 - The current online data baseline is the v142 Worker release of the v141
@@ -26,15 +58,14 @@
   `release-cohort-status.json` after a guarded main-DB commit; the report does
   not weaken or replace any publication audit.
 
-## 2026-08-23 v145 active production and persistent supervisor
+## 2026-08-23 v145 production setup (historical)
 
-- `v145-native-daily-production5000` is running from frozen batch
+- `v145-native-daily-production5000` ran from frozen batch
   `D:\linguago-runner\batches\production-5000-20260823-115426.json` with
   `zh=2808` and `ja=2192`. It excludes `46,786` source entries already covered
   by completed runs and is hash-locked to the v144 product DB
   `B8510C26FDA939F934EC53BEC49E0FC4B76690D775AEEB01589D7C2D5F84DB9A`.
-- The pipeline and `LinguaGo Dictionary Production Supervisor` Scheduled Tasks
-  are both active. Dynamic endpoint discovery remains enabled across ports
+- Dynamic endpoint discovery was enabled across ports
   `11442`, `11444`, `11445`, `11446`, `11447`, and `11448`; foreign GPU
   processes are excluded at each model stage.
 - Building the v145 native coverage pool scanned `135,667` source entries and

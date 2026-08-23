@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 import { discoverUnslothStagePool } from './lib/unsloth-cluster-discovery.mjs';
-import { inspectCompletedGenerationStage } from './lib/dictionary-pipeline-stage-recovery.mjs';
+import { inspectCompletedPipelineStage } from './lib/dictionary-pipeline-stage-recovery.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const pipelineMode = String(args['pipeline-mode'] || 'legacy').trim().toLowerCase();
@@ -938,7 +938,7 @@ async function stage(name, script, stageArgs, expectedOutputs) {
     return;
   }
   if (resume && existing?.status !== 'complete') {
-    const recovery = inspectCompletedGenerationStage(name, expectedOutputs);
+    const recovery = inspectCompletedPipelineStage(name, expectedOutputs);
     if (recovery.recoverable) {
       manifest.stages[name] = {
         ...existing,

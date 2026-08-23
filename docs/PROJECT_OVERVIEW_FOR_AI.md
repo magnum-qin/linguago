@@ -1,19 +1,19 @@
 # LinguaGo Project Overview For AI
 
-## Current jump-host baseline and online release (2026-08-23)
+## Current jump-host baseline and online release (2026-08-24)
 
 The authoritative jump-host product database has advanced beyond the online
-release through `v144-native-daily-production5000`. It has SHA-256
-`B8510C26FDA939F934EC53BEC49E0FC4B76690D775AEEB01589D7C2D5F84DB9A`
-and audited counts `entries=42489`, `senses=48801`,
-`sense_localizations=195204`, `examples=3030`, and
+release through `v145-native-daily-production5000`. It has SHA-256
+`A1782F15D3B1506996B6A784CE7A605D92341BECA710E3ECBDE7D3250B95AF3A`
+and audited counts `entries=42829`, `senses=49141`,
+`sense_localizations=196564`, `examples=3030`, and
 `example_localizations=11898`. Its rollback copy is
-`D:\linguago-runner\backups\v144-native-daily-production5000-main-before-commit-20260823-204602.db`.
+`D:\linguago-runner\backups\v145-native-daily-production5000-main-before-commit-20260824-002405.db`.
 Production D1 remains the v142 Worker release described below while additional
 audited senses accumulate toward the next approximately 5,000-sense release.
-The unpublished cohort currently contains `615` senses, and v145 is processing
-another frozen 5,000-row native daily batch under the persistent watchdog and
-completion supervisor.
+The unpublished cohort currently contains `955` senses and needs `4,045` more
+before that release gate. v145 promoted `340/340` controlled replay senses;
+published-risk and all blocking export counters are zero.
 
 ## Current online baseline (v142 Worker / v141 data, 2026-08-23)
 

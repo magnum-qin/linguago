@@ -43,13 +43,18 @@ try {
   $PublishLog = Join-Path $RunDir 'controlled-publish-supervisor.log'
   $PublishOutput = @()
   $PublishExitCode = 1
+  [IO.File]::WriteAllText($PublishLog, '', (New-Object Text.UTF8Encoding($false)))
   for ($Attempt = 1; $Attempt -le 2; $Attempt++) {
+    $AttemptHeader = "[attempt $Attempt started=$([DateTime]::UtcNow.ToString('o'))]"
+    [IO.File]::AppendAllText($PublishLog, "$AttemptHeader`r`n", (New-Object Text.UTF8Encoding($false)))
     $AttemptOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
       (Join-Path $Root 'scripts\publish-remote-dictionary-controlled-run.ps1') `
-      -Root $Root -RunId $RunId -ExpectedMainSha256 $ExpectedMainSha256 -Commit true -ForceValidation 2>&1)
+      -Root $Root -RunId $RunId -ExpectedMainSha256 $ExpectedMainSha256 -Commit true -ForceValidation 2>&1 | `
+      Tee-Object -FilePath $PublishLog -Append)
     $PublishExitCode = $LASTEXITCODE
-    $PublishOutput += @("[attempt $Attempt exit=$PublishExitCode]") + $AttemptOutput
-    [IO.File]::WriteAllLines($PublishLog, [string[]]$PublishOutput, (New-Object Text.UTF8Encoding($false)))
+    $AttemptFooter = "[attempt $Attempt exit=$PublishExitCode ended=$([DateTime]::UtcNow.ToString('o'))]"
+    $PublishOutput += @($AttemptHeader) + $AttemptOutput + @($AttemptFooter)
+    [IO.File]::AppendAllText($PublishLog, "$AttemptFooter`r`n", (New-Object Text.UTF8Encoding($false)))
     if ($PublishExitCode -eq 0) { break }
     if ($Attempt -lt 2) {
       Write-Status 'retrying_controlled_publish' @{ attempt = $Attempt; exit_code = $PublishExitCode; log = $PublishLog }
@@ -72,6 +77,9 @@ try {
   $DbEntry.sha256 = $MainHash
   $RunnerManifest.generated_at = [DateTime]::UtcNow.ToString('o')
   [IO.File]::WriteAllText($ManifestFile, ($RunnerManifest | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+    (Join-Path $Root 'scripts\new-remote-dictionary-runner-manifest.ps1') -Root $Root
+  if ($LASTEXITCODE -ne 0) { throw 'Runner manifest refresh failed' }
 
   $CohortReport = Join-Path $RunDir 'release-cohort-status.json'
   $CohortOutput = @(& node.exe (Join-Path $Root 'scripts\report-dictionary-v2-release-cohort.mjs') `

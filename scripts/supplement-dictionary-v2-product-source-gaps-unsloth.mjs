@@ -445,7 +445,11 @@ if (
 }
 
 if (replayReportPath) {
-  replayGeneratedReport();
+  try {
+    replayGeneratedReport();
+  } finally {
+    closeDeterministicSources();
+  }
   process.exit(0);
 }
 
