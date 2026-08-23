@@ -1,5 +1,29 @@
 # Codex Handoff
 
+## 2026-08-23 v140 native production release
+
+- The v140 controlled production run promoted 286 of 287 final records. The
+  single deterministic rejection was `晦气` (`semantic_drift_luck_fortune`),
+  so no rejected record entered the product database.
+- The authoritative jump-host product DB SHA-256 is
+  `BD1C498E3CBD75C8FBB9A3B04DB83F10DD71D5CE0EE472E886E2C18BFC048BD0`.
+  Its pre-commit rollback copy is
+  `D:\linguago-runner\backups\v140-native-daily-production5000-main-before-commit-20260823-010643.db`.
+- The audited D1 export contains `entries=41551`, `senses=47863`,
+  `sense_localizations=191452`, `examples=3030`, and
+  `example_localizations=11898`. All blocking full-import audit counters are
+  zero; `duplicate_sense_localizations=481` remains a non-blocking observation.
+- Cloudflare D1 accepted all 25 native SQL chunks and remote counts match the
+  manifest. The pre-release Time Travel bookmark is
+  `D:\linguago-runner\runs\v140-native-daily-production5000\cloudflare-d1-before-release-bookmark.json`.
+- A stratified 24-record Chinese/Japanese sample had complete four-language
+  terms and definitions, Chinese/Japanese readings, and English/Portuguese IPA.
+  A non-blocking pronunciation-quality follow-up remains for `沸点`: the
+  English term `boiling point` currently has IPA only for `boiling`.
+- Worker cache `v141-native286-41551` is the cache paired with this D1 release.
+  Confirm the deployed Worker version and online regression result in the
+  release record before treating v141 as live.
+
 ## 2026-08-22 v139 evidence-yield qualification
 
 - The jump-host main DB remains the v138 baseline with SHA-256

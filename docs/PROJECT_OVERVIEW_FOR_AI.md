@@ -1,5 +1,26 @@
 # LinguaGo Project Overview For AI
 
+## Current production data candidate (v140/v141, 2026-08-23)
+
+The v140 native production run has completed controlled replay and promoted
+286 records into the authoritative jump-host product DB. Its SHA-256 is
+`BD1C498E3CBD75C8FBB9A3B04DB83F10DD71D5CE0EE472E886E2C18BFC048BD0`.
+One otherwise final record, `晦气`, was rejected by deterministic promotion for
+semantic drift and was not published.
+
+The full native D1 export/import audit passed with all blocking counters at
+zero. D1 now contains `entries=41551`, `senses=47863`,
+`sense_localizations=191452`, `examples=3030`, and
+`example_localizations=11898`; all 25 SQL chunks were imported and remote
+counts match the manifest. The matching Worker cache version is
+`v141-native286-41551`. Do not call v141 live until the immutable Worker source
+archive deploy and its online API/render regressions have passed.
+
+A 24-record stratified Chinese/Japanese sample passed the four-language field,
+reading, and IPA checks. Keep pronunciation completeness as a separate quality
+queue: `沸点` currently exposes `boiling point` with IPA covering only
+`boiling`. This does not weaken the structural publication gates.
+
 ## Current local production baseline and v139 qualification (2026-08-22)
 
 The authoritative jump-host product DB is ahead of the currently released D1.
