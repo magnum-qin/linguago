@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T20:18:19.6295383Z",
+    "generated_at":  "2026-08-23T20:21:09.1624529Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
@@ -115,8 +115,8 @@
                   },
                   {
                       "path":  "scripts\\test-remote-production-supervisor-order.mjs",
-                      "bytes":  1038,
-                      "sha256":  "0EB4D6FD1C96105041F0D6BA473215AF27692E67E9A25E15986CFE591D13B6D8"
+                      "bytes":  1395,
+                      "sha256":  "664CCA4320E4EA514C791D34C7F604C9284AC79706A5DEE4992FB07BDBAF4A71"
                   },
                   {
                       "path":  "scripts\\report-dictionary-v2-production-progress.mjs",
@@ -135,8 +135,8 @@
                   },
                   {
                       "path":  "scripts\\complete-remote-dictionary-production-run.ps1",
-                      "bytes":  5453,
-                      "sha256":  "AE7B28D2756DFC54FD52A8D83322E8062D7A692D02378742F93A55195C431703"
+                      "bytes":  5194,
+                      "sha256":  "58F77654F22C28F93FC0515883014A9BC39BE8BBC57C46009C1857C143092562"
                   },
                   {
                       "path":  "scripts\\start-remote-dictionary-production-supervisor.ps1",
@@ -240,8 +240,8 @@
                   },
                   {
                       "path":  "scripts\\publish-remote-dictionary-controlled-run.ps1",
-                      "bytes":  6965,
-                      "sha256":  "41C56E1804A4B8C8D6D54A9844AB624C7241CC5EAB4FA19F4A91B94056EF5F8A"
+                      "bytes":  7273,
+                      "sha256":  "24C125A5D6AC69855EC63904BA41AEDDEF57AF406093AFBB69EFF64422FF38BC"
                   },
                   {
                       "path":  "scripts\\checkpoint-sqlite-db.mjs",

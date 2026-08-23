@@ -11,13 +11,20 @@ assert.doesNotMatch(
   /audit-dictionary-v2-production-cadence\.mjs/u,
   'supervisor must not run cadence audit before controlled replay exists'
 );
+assert.doesNotMatch(
+  supervisor,
+  /check-dictionary-v2-production-run-gates\.mjs/u,
+  'supervisor must not run the cadence-dependent production gate before controlled replay exists'
+);
 
 const validationIndex = publisher.indexOf('validate-remote-dictionary-controlled-replay.ps1');
 const cadenceIndex = publisher.indexOf('audit-dictionary-v2-production-cadence.mjs');
+const gateIndex = publisher.indexOf('check-dictionary-v2-production-run-gates.mjs');
 const replaceIndex = publisher.indexOf('[IO.File]::Replace');
 
 assert.ok(validationIndex >= 0, 'controlled replay validation call is missing');
 assert.ok(cadenceIndex > validationIndex, 'cadence audit must run after controlled replay');
-assert.ok(replaceIndex > cadenceIndex, 'cadence audit must run before main DB replacement');
+assert.ok(gateIndex > cadenceIndex, 'production gate must run after cadence audit');
+assert.ok(replaceIndex > gateIndex, 'production gate must run before main DB replacement');
 
 console.log('Remote production supervisor ordering regression passed.');

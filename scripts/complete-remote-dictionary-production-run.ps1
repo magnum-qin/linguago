@@ -34,11 +34,6 @@ try {
     Start-Sleep -Seconds 5
   }
 
-  Write-Status 'checking_gates' @{}
-  & node.exe (Join-Path $Root 'scripts\check-dictionary-v2-production-run-gates.mjs') `
-    --run-dir $RunDir --out (Join-Path $RunDir 'production-gate.json')
-  if ($LASTEXITCODE -ne 0) { throw 'Production gates failed' }
-
   Write-Status 'validating_and_committing' @{}
   $PublishLog = Join-Path $RunDir 'controlled-publish-supervisor.log'
   $PublishOutput = @()

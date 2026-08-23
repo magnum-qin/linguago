@@ -6422,9 +6422,11 @@ untracked. The durable extractors are
 
 - v148 exposed an ordering bug in the new cadence gate: the supervisor invoked
   it before controlled replay had created `08-controlled-replay.json`. The
-  cadence check now runs inside the guarded publisher after isolated replay and
-  before the main DB replacement. A static ordering regression protects this
-  safety property. The initial supervisor failure did not modify the main DB.
+  cadence check and dependent production gate now run inside the guarded
+  publisher after isolated replay and before the main DB replacement. A static
+  ordering regression protects this safety property. Both initial supervisor
+  failures occurred before controlled publishing and did not modify the main
+  DB.
 
 - The remote pipeline child runner now has a five-second post-exit pipe-drain
   fallback. This addresses the v147 Qwen stage where the generation report and
