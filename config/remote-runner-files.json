@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T08:07:28.6633139Z",
+    "generated_at":  "2026-08-23T08:21:40.5766551Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
@@ -75,8 +75,8 @@
                   },
                   {
                       "path":  "scripts\\review-dictionary-v2-product-source-gap-candidates-unsloth.mjs",
-                      "bytes":  62350,
-                      "sha256":  "8B88ED4F7CE58972FC84E205490103B2374E731B0BAA5EA40EBA37262C38F00F"
+                      "bytes":  62896,
+                      "sha256":  "356022C6BE272734A733A7740A7DA9C8A74D063ADC2FA9D5C1C34237D731AA86"
                   },
                   {
                       "path":  "scripts\\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs",

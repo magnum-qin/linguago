@@ -1239,11 +1239,27 @@ function candidateKey(row) {
 
 function writeOutputs() {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, JSON.stringify(buildOutput(), null, 2), 'utf8');
+  writeJsonAtomic(outPath, buildOutput());
   fs.mkdirSync(path.dirname(approvedOutPath), { recursive: true });
-  fs.writeFileSync(approvedOutPath, JSON.stringify(buildApprovedReport(), null, 2), 'utf8');
+  writeJsonAtomic(approvedOutPath, buildApprovedReport());
   fs.mkdirSync(path.dirname(rejectedOutPath), { recursive: true });
-  fs.writeFileSync(rejectedOutPath, JSON.stringify(buildRejectedReport(), null, 2), 'utf8');
+  writeJsonAtomic(rejectedOutPath, buildRejectedReport());
+}
+
+function writeJsonAtomic(targetPath, value) {
+  const temporaryPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporaryPath, JSON.stringify(value, null, 2), 'utf8');
+  try {
+    fs.renameSync(temporaryPath, targetPath);
+  } catch (error) {
+    // Windows can reject replacement when the destination already exists.
+    // Removing it creates only a short missing-file window, never partial JSON.
+    if (!['EEXIST', 'EPERM'].includes(error?.code)) throw error;
+    fs.rmSync(targetPath, { force: true });
+    fs.renameSync(temporaryPath, targetPath);
+  } finally {
+    fs.rmSync(temporaryPath, { force: true });
+  }
 }
 
 async function postJson(endpoint, pathName, body, timeout) {

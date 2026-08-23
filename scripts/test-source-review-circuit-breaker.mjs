@@ -70,6 +70,13 @@ try {
   assert.equal(result.code, 0, result.stderr || result.stdout);
 
   const report = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+  JSON.parse(fs.readFileSync(approvedPath, 'utf8'));
+  JSON.parse(fs.readFileSync(rejectedPath, 'utf8'));
+  assert.deepEqual(
+    fs.readdirSync(tempDir).filter((name) => name.endsWith('.tmp')),
+    [],
+    'atomic checkpoint writes must not leave temporary files'
+  );
   assert.equal(report.summary.reviewed, 4);
   assert.equal(report.summary.failed, 0);
   const stalledRuntime = report.summary.endpoint_runtime[`http://127.0.0.1:${stalledPort}`];

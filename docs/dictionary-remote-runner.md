@@ -394,6 +394,11 @@ and recoveries. Validate this behavior with:
 npm.cmd run dict:v2:test:source-review-circuit-breaker
 ```
 
+Source-review JSON checkpoints use temporary-file plus rename replacement.
+This prevents dashboards and control scripts from parsing a partially written
+multi-megabyte report. Readers should tolerate a short missing-file interval
+on Windows, where replacing an existing destination can require remove/rename.
+
 If an older running process predates this circuit breaker and its checkpoint
 stops advancing, first verify endpoint status and reload an accidentally
 unloaded model. If progress still does not resume, use the control script's

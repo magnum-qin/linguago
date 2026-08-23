@@ -41,6 +41,16 @@
   remote pipeline passes a 60-second review timeout, two-failure threshold,
   and 30-second cooldown. Run
   `npm run dict:v2:test:source-review-circuit-breaker` before syncing changes.
+- The resumed process initially retained the old three-node Gemma launch pool.
+  A second controlled restart preserved the same checkpoint and expanded both
+  model roles to all six currently safe nodes: 144, 147, 155, 224, 47, and 56.
+  Ports 11443 and 11441 remained excluded because they had foreign GPU work.
+  The six-node reviewer resumed with zero duplicate rows and exposes per-node
+  calls/failures in `summary.endpoint_runtime`.
+- Source-review checkpoint reports are now written to a complete temporary
+  file and atomically renamed into place. On Windows replacement conflicts,
+  the writer uses a short missing-file window instead of exposing partial JSON.
+  Monitoring code should still retry missing/in-flight files briefly.
 
 ## 2026-08-23 v141 controlled product DB commit
 
