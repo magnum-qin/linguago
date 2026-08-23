@@ -1692,3 +1692,15 @@ rollback version before deployment and rolls back after failed online checks.
 Remote D1/Worker execution is currently credential-blocked until a scoped
 Cloudflare API token is installed in the Scheduled Task user environment; dry
 runs are validated and do not require that token.
+
+### v148 four-language daily intake
+
+The optimized native-daily scanner now covers en, pt-BR, zh, and ja instead of
+only zh/ja. The default source-language budget is Mainland-Chinese first:
+`zh=30000,ja=10000,pt-BR=5000,en=5000`. Candidate-source eligibility does not
+replace the publication evidence gate: model output remains draft-only, and
+WikDict/OMW cannot independently certify a sense. FreeDict `eng-por` is treated
+as an authoritative English starting sense, consistent with its independently
+reviewed upstream provenance. The active v147 run predates this change and must
+finish from its existing checkpoint; v148 is the first run that should use the
+four-language intake.

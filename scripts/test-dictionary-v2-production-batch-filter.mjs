@@ -114,7 +114,8 @@ fs.writeFileSync(authoritativeInputPath, `${JSON.stringify({ selected: [
   anchoredRow(22, 'ja', '将棋', 'shogi', 'jmdict'),
   anchoredRow(23, 'pt-BR', 'regras', 'menstruation', 'omw-30'),
   anchoredRow(24, 'pt-BR', 'menu', 'menu', 'freedict-por-eng'),
-  anchoredRow(25, 'en', 'shack', 'trail behind', 'omw-30')
+  anchoredRow(25, 'en', 'shack', 'trail behind', 'omw-30'),
+  anchoredRow(26, 'en', 'beware', 'be cautious', 'freedict-eng-por')
 ] })}\n`);
 const authoritative = spawnSync(process.execPath, [
   'scripts/filter-dictionary-v2-production-batch.mjs',
@@ -126,7 +127,7 @@ const authoritative = spawnSync(process.execPath, [
 assert.equal(authoritative.status, 0, authoritative.stderr || authoritative.stdout);
 assert.deepEqual(
   JSON.parse(fs.readFileSync(authoritativeOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
-  [21, 22, 24]
+  [21, 22, 24, 26]
 );
 console.log('production batch prefilter tests passed');
 

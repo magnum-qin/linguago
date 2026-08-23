@@ -6389,6 +6389,31 @@ untracked. The durable extractors are
   deployment. A dry-run of HEAD `72194cd3...` passed only with its committed
   cache `v114-production5012-40105`; the uncommitted v123 cache was correctly
   rejected.
+
+## 2026-08-24 v147 progress and v148 four-language intake
+
+- v147 continues on the jump host without a restart. Its active Gemma source
+  review checkpoint was healthy at `963/3662`; the watchdog reported recent
+  progress, no circuit break, and no recovery action.
+- v147 is intentionally a zh/ja cohort. The cause is not model scheduling or
+  missing evidence: `find-dictionary-v2-native-daily-coverage-gaps.mjs` only
+  admitted CC-CEDICT and JMdict entries when that batch was created.
+- The native daily intake now supports all four source languages. Eligible
+  starting lexicons are CC-CEDICT for zh, JMdict for ja, FreeDict/WikDict/
+  Dicionario for pt-BR, and FreeDict/WikDict/ECDICT for en. WikDict and OMW are
+  still not sufficient independent publication evidence by themselves.
+- The default v148 intake ratio is Mainland-Chinese first:
+  `zh=30000,ja=10000,pt-BR=5000,en=5000`. Latin candidates reject one-letter
+  forms, all-capital abbreviations, unexpected scripts, and malformed tokens
+  before any model request.
+- Fixed an existing English gate mismatch: `freedict-eng-por` was eligible in
+  the source DB but was not recognized as a native/authoritative English sense
+  by daily-primary selection and production prefilter. It is now accepted;
+  English OMW and WikDict senses remain gated.
+- A local 400-row smoke scan selected 100 candidates per language. Daily-primary
+  selection retained 361, and the conservative production prefilter retained
+  144 (`zh=48`, `ja=76`, `pt-BR=10`, `en=10`). This is an intake validation,
+  not a DB write or release.
 - `deploy-remote-worker-release.ps1 -Execute true` records the current Worker
   version before deploy and automatically rolls back if any online dictionary
   regression fails. It has not been executed because the jump-host OAuth token

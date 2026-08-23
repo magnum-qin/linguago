@@ -9,7 +9,7 @@ param(
   [string]$CandidateMode = 'native-daily',
   [int]$NativeMaxRank = 2000000,
   [int]$NativeScanLimit = 2000000,
-  [string]$NativeTargets = 'zh=50000,ja=50000',
+  [string]$NativeTargets = 'zh=30000,ja=10000,pt-BR=5000,en=5000',
   [int]$GenerationTarget = 20,
   [string]$SupplementalSourceDb = '',
   [object]$ProductionPrefilter = $true,

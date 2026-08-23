@@ -14,7 +14,7 @@ const productDbPath = path.resolve(
 const outPath = path.resolve(args.out || 'logs/product-native-daily-coverage-gaps.json');
 const maxRank = positiveInteger(args['max-rank'], 200_000);
 const scanLimit = positiveInteger(args['scan-limit'], 100_000);
-const targets = parseTargets(args.targets || 'zh=500,ja=500');
+const targets = parseTargets(args.targets || 'zh=300,ja=100,pt-BR=50,en=50');
 const excludedCandidateIds = loadExcludedCandidateIds(args['exclude-reports']);
 
 for (const dbPath of [sourceDbPath, productDbPath]) {
@@ -43,7 +43,7 @@ const nativeQuery = `
   FROM entries e
   WHERE e.frequency_rank IS NOT NULL
     AND e.frequency_rank <= ?
-    AND e.source_lang IN ('zh', 'ja')
+    AND e.source_lang IN ('en', 'pt-BR', 'zh', 'ja')
     AND e.status <> 'deprecated'
     AND EXISTS (
       SELECT 1
@@ -54,8 +54,23 @@ const nativeQuery = `
         AND lower(TRIM(s.gloss_key)) <> 'missing gloss'
         AND (
           (e.source_lang = 'zh' AND lower(COALESCE(s.source, '')) LIKE '%cc-cedict%')
-          OR
-          (e.source_lang = 'ja' AND lower(COALESCE(s.source, '')) LIKE '%jmdict%')
+          OR (e.source_lang = 'ja' AND lower(COALESCE(s.source, '')) LIKE '%jmdict%')
+          OR (
+            e.source_lang = 'pt-BR'
+            AND (
+              lower(COALESCE(s.source, '')) LIKE '%freedict-por-eng%'
+              OR lower(COALESCE(s.source, '')) LIKE '%wikdict-pt-%'
+              OR lower(COALESCE(s.source, '')) LIKE '%dicionario%'
+            )
+          )
+          OR (
+            e.source_lang = 'en'
+            AND (
+              lower(COALESCE(s.source, '')) LIKE '%freedict-eng-por%'
+              OR lower(COALESCE(s.source, '')) LIKE '%wikdict-en-%'
+              OR lower(COALESCE(s.source, '')) LIKE '%ecdict%'
+            )
+          )
         )
     )
   -- Match idx_entries_frequency exactly so SQLite can stream rows instead of
@@ -72,7 +87,7 @@ if (args.explain === 'true') {
 const nativeEntries = sourceDb.prepare(nativeQuery);
 
 const selected = [];
-const counts = { zh: 0, ja: 0 };
+const counts = Object.fromEntries(Object.keys(targets).map((lang) => [lang, 0]));
 let represented = 0;
 let scriptMismatch = 0;
 let scanned = 0;
@@ -97,7 +112,7 @@ for (const row of nativeEntries.iterate(maxRank, scanLimit)) {
     normalized_key: normalized,
     candidate_key: String(row.source_entry_id),
     selection_reason: 'uncovered_native_daily_dictionary_entry',
-    native_source_family: row.source_lang === 'zh' ? 'cc-cedict' : 'jmdict'
+    native_source_family: nativeSourceFamily(row.source_lang)
   });
   counts[row.source_lang] += 1;
   if (targetsSatisfied(counts, targets)) break;
@@ -124,7 +139,8 @@ const report = {
   selected,
   notes: [
     'Read-only candidate report; no database rows were modified.',
-    'Only native CC-CEDICT Chinese senses and JMdict Japanese senses are eligible.',
+    'Eligible native sources are CC-CEDICT (zh), JMdict (ja), FreeDict/WikDict/Dicionario (pt-BR), and FreeDict/WikDict/ECDICT (en).',
+    'Latin-script candidates exclude single-letter forms, all-caps abbreviations, and unexpected symbols.',
     'Specific daily senses and localizations must be loaded by the downstream daily-primary selector.',
     'LLM output must remain draft-only until deterministic validation and independent review pass.'
   ]
@@ -167,7 +183,7 @@ function loadProductCoverage(db) {
 }
 
 function parseTargets(value) {
-  const targets = { zh: 0, ja: 0 };
+  const targets = { en: 0, 'pt-BR': 0, zh: 0, ja: 0 };
   for (const item of String(value).split(',')) {
     const [rawLang, rawCount] = item.split('=');
     const lang = String(rawLang || '').trim();
@@ -176,7 +192,9 @@ function parseTargets(value) {
     if (!Number.isInteger(count) || count < 0) throw new Error(`Invalid target count: ${item}`);
     targets[lang] = count;
   }
-  if (!targets.zh && !targets.ja) throw new Error('At least one positive language target is required');
+  if (!Object.values(targets).some((count) => count > 0)) {
+    throw new Error('At least one positive language target is required');
+  }
   return targets;
 }
 
@@ -208,7 +226,21 @@ function sourceScriptOk(word, lang) {
   const hasKana = /[\p{Script=Hiragana}\p{Script=Katakana}\u30fc\uff70]/u.test(text);
   if (lang === 'zh') return hasHan && !hasKana;
   if (lang === 'ja') return hasHan || hasKana;
+  if (lang === 'en' || lang === 'pt-BR') {
+    if (text.length < 2 || text.length > 80) return false;
+    if (!/^\p{L}[\p{L}\p{M}' -]*\p{L}$/u.test(text)) return false;
+    if (/^[A-Z\p{M}]{2,}$/u.test(text)) return false;
+    return /\p{Script=Latin}/u.test(text) && !hasHan && !hasKana;
+  }
   return false;
+}
+
+function nativeSourceFamily(lang) {
+  if (lang === 'zh') return 'cc-cedict';
+  if (lang === 'ja') return 'jmdict';
+  if (lang === 'pt-BR') return 'freedict-wikdict-dicionario';
+  if (lang === 'en') return 'freedict-wikdict-ecdict';
+  throw new Error(`Unsupported source language: ${lang}`);
 }
 
 function coverageKey(lang, normalized) {

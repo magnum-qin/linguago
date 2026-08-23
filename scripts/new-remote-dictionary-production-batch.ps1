@@ -8,7 +8,7 @@ param(
   [string]$History = 'data\candidates\v123-attempted-source-history.json',
   [int]$NativeMaxRank = 2000000,
   [int]$NativeScanLimit = 2000000,
-  [string]$NativeTargets = 'zh=50000,ja=50000',
+  [string]$NativeTargets = 'zh=30000,ja=10000,pt-BR=5000,en=5000',
   [switch]$IncludeCompletedRunBatches = $true,
   [switch]$SkipVerify
 )

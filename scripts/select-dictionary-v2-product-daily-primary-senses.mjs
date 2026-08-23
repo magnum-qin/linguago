@@ -197,6 +197,7 @@ function nativeSourceScore(lang, source) {
     if (value.includes('kaikki-pt')) return 4_500;
   }
   if (lang === 'en') {
+    if (value.includes('freedict-eng-por')) return 6_000;
     if (value.includes('ecdict')) return 6_000;
     if (value.includes('wordnet')) return 5_500;
     if (value.includes('kaikki-en')) return 4_500;
@@ -213,7 +214,12 @@ function isNativeSource(lang, source) {
   if (lang === 'pt-BR')
     return value.includes('dicionario') || value.includes('freedict') || value.includes('kaikki-pt');
   if (lang === 'en')
-    return value.includes('ecdict') || value.includes('wordnet') || value.includes('kaikki-en');
+    return (
+      value.includes('freedict-eng-por') ||
+      value.includes('ecdict') ||
+      value.includes('wordnet') ||
+      value.includes('kaikki-en')
+    );
   return false;
 }
 

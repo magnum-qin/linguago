@@ -115,7 +115,12 @@ function hasAuthoritativeSelectedSense(row, lang) {
   if (lang === 'ja') return source.includes('jmdict');
   if (lang === 'pt-BR') return source.includes('freedict') || source.includes('dicionario');
   if (lang === 'en') {
-    return source.includes('ecdict') || source.includes('wordnet') || (allowEnglishOmwSource && source.includes('omw'));
+    return (
+      source.includes('freedict-eng-por') ||
+      source.includes('ecdict') ||
+      source.includes('wordnet') ||
+      (allowEnglishOmwSource && source.includes('omw'))
+    );
   }
   return false;
 }
