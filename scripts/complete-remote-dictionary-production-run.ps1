@@ -73,9 +73,24 @@ try {
   $RunnerManifest.generated_at = [DateTime]::UtcNow.ToString('o')
   [IO.File]::WriteAllText($ManifestFile, ($RunnerManifest | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
 
+  $CohortReport = Join-Path $RunDir 'release-cohort-status.json'
+  $CohortOutput = @(& node.exe (Join-Path $Root 'scripts\report-dictionary-v2-release-cohort.mjs') `
+    --db $MainDb `
+    --baseline (Join-Path $Root 'config\dictionary-v2-online-baseline.json') `
+    --out $CohortReport 2>&1)
+  $CohortExitCode = $LASTEXITCODE
+
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'scripts\verify-remote-dictionary-runner.ps1') -Root $Root
   if ($LASTEXITCODE -ne 0) { throw 'Post-commit runner verification failed' }
-  Write-Status 'complete' @{ release = $Release; main_sha256 = $MainHash; publish_log = $PublishLog; publish_output = @($PublishOutput) }
+  Write-Status 'complete' @{
+    release = $Release
+    main_sha256 = $MainHash
+    publish_log = $PublishLog
+    publish_output = @($PublishOutput)
+    release_cohort_report = $CohortReport
+    release_cohort_exit_code = $CohortExitCode
+    release_cohort_output = @($CohortOutput)
+  }
 } catch {
   Write-Status 'failed' @{ error = $_.Exception.Message; stack = $_.ScriptStackTrace; publish_log = (Join-Path $RunDir 'controlled-publish-supervisor.log') }
   throw

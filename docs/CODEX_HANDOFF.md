@@ -15,6 +15,16 @@
   `226F90EA9A607598672E259828B8811A1924B36CBB88DAC6BFEE9847DCD11649`
   and whose 25-chunk D1 counts are `entries=41874`, `senses=48186`, and
   `sense_localizations=192744`.
+- The same state is machine-readable in
+  `config\dictionary-v2-online-baseline.json`. Run
+  `npm run dict:v2:report:release-cohort` on the authoritative jump-host DB to
+  calculate the accumulated unpublished delta. The v143 baseline reports
+  `delta.senses=289`, `remaining_senses=4711`, and
+  `status=accumulating`. A database older than the online baseline returns
+  `ok=false` and `status=behind_online_baseline` rather than a misleading
+  negative release cohort. Future completion supervisors write
+  `release-cohort-status.json` after a guarded main-DB commit; the report does
+  not weaken or replace any publication audit.
 
 ## 2026-08-23 v144 active production and persistent supervisor
 

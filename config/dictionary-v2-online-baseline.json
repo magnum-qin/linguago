@@ -1,0 +1,18 @@
+{
+  "release": "v142-native323-41874",
+  "source_run_id": "v141-native-daily-production5000",
+  "published_at": "2026-08-23T06:38:11.747Z",
+  "product_db_sha256": "226F90EA9A607598672E259828B8811A1924B36CBB88DAC6BFEE9847DCD11649",
+  "worker_version_id": "558b9e4f-3275-4397-a4a8-13851fa710b1",
+  "rollback_worker_version_id": "c4378e54-747d-4461-87ed-d199a78b8dd3",
+  "d1_time_travel_bookmark": "0000022b-00000000-000050d0-8224f5a51847899fe008f9410bde7da1",
+  "d1_bookmark_file": "D:\\linguago-runner\\runs\\v141-native-daily-production5000\\cloudflare-d1-before-release-bookmark.json",
+  "counts": {
+    "entries": 41874,
+    "senses": 48186,
+    "sense_localizations": 192744,
+    "examples": 3030,
+    "example_localizations": 11898
+  },
+  "release_threshold_new_senses": 5000
+}

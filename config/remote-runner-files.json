@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T10:08:30.8733157Z",
-    "root":  "D:\\linguago-runner",
+    "generated_at":  "2026-08-23T10:31:32.3935535Z",
+    "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  17481,
-                      "sha256":  "5D09DC6D9AF1E8F1C6685EB03486F20DEF87DA5CBF4A061787E0DA8EEE9763B3"
+                      "bytes":  17663,
+                      "sha256":  "3B863F6E9034435CAC8D215FEB091D16BDD5893336FA42AB3B540ADB1C71A7C0"
                   },
                   {
                       "path":  "package-lock.json",
@@ -74,14 +74,24 @@
                       "sha256":  "254C435F2BFE289481D8146196A93B90F8A26D76954B97B98610E13A2A7B183A"
                   },
                   {
+                      "path":  "scripts\\report-dictionary-v2-release-cohort.mjs",
+                      "bytes":  3970,
+                      "sha256":  "C6CE092ADC39A0B3A6516C3A298EE55E44F29CC016888D4FC19AF3A5E5026801"
+                  },
+                  {
+                      "path":  "scripts\\test-dictionary-v2-release-cohort.mjs",
+                      "bytes":  2521,
+                      "sha256":  "CC2D7F7346B2C670D41CA147D3300014C46C1344686A07B85F6608910069C402"
+                  },
+                  {
                       "path":  "scripts\\check-dictionary-v2-production-run-gates.mjs",
                       "bytes":  3988,
                       "sha256":  "F4C67B4202AAE3CCA2255B815EB21FEDE125859A75E51BA9017FED1427167A0B"
                   },
                   {
                       "path":  "scripts\\complete-remote-dictionary-production-run.ps1",
-                      "bytes":  4339,
-                      "sha256":  "18646BD750E1486018D2A2F5B9C7DBB041246943470EE78AD674C76BCFB83634"
+                      "bytes":  4817,
+                      "sha256":  "5022126FF3E652EE36C5348B4E00F209E7693DE7A1EB39E3ABD1B6EE70EFDBFA"
                   },
                   {
                       "path":  "scripts\\start-remote-dictionary-production-supervisor.ps1",
@@ -170,8 +180,8 @@
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-runner-manifest.ps1",
-                      "bytes":  5022,
-                      "sha256":  "1227B34F9AD86024855771B9D57E93D3FC1B4666C55E67A03B40C219E21FED4D"
+                      "bytes":  5179,
+                      "sha256":  "6798B2F68204D78023572C25D4377725DD7AA9295C93B150B5B3207029CF4FD8"
                   },
                   {
                       "path":  "scripts\\validate-remote-dictionary-controlled-replay.ps1",
@@ -247,6 +257,11 @@
                       "path":  "config\\dictionary-v2-production-v139.json",
                       "bytes":  2456,
                       "sha256":  "C09870CF02D2D58D92202842D2EF3334E41DEB76A6675CAD29A851871BFD3598"
+                  },
+                  {
+                      "path":  "config\\dictionary-v2-online-baseline.json",
+                      "bytes":  782,
+                      "sha256":  "5F47314F296D3645913E09010B6004B7460C5669AF60AC6CF1578261AA04FD71"
                   },
                   {
                       "path":  "config\\dictionary-overrides\\product-entry-form-aliases.json",

@@ -91,6 +91,8 @@
     "dict:v2:test:remote-watchdog": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-remote-dictionary-watchdog.ps1",
     "dict:v2:production-profile": "node scripts/run-dictionary-v2-production-profile.mjs",
     "dict:v2:report:remote-production-funnel": "node scripts/report-dictionary-v2-remote-production-funnel.mjs",
+    "dict:v2:report:release-cohort": "node scripts/report-dictionary-v2-release-cohort.mjs",
+    "dict:v2:test:release-cohort": "node scripts/test-dictionary-v2-release-cohort.mjs",
     "dict:v2:test:remote-production-funnel": "node scripts/test-remote-production-funnel-report.mjs",
     "dict:v2:test:native-source-fallback": "node scripts/test-source-sense-native-fallback.mjs",
     "dict:v2:build:native-alignment-retry": "node scripts/build-dictionary-v2-native-alignment-retry-cohort.mjs",
