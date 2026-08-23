@@ -279,13 +279,17 @@ async function reviewWithRetry(row, startEndpointIndex) {
   const attemptLimit = Math.max(maxAttempts, activeEndpoints.length);
   const attemptedEndpoints = new Set();
   for (let attempt = 1; attempt <= attemptLimit; attempt++) {
-    const endpoint = await acquireEndpoint(startEndpointIndex, attemptedEndpoints);
+    const endpoint = await acquireEndpoint(startEndpointIndex, attemptedEndpoints, timeoutMs);
     if (!endpoint) break;
     attemptedEndpoints.add(endpoint);
     const state = endpointRuntimeStates.get(endpoint);
     state.calls += 1;
     try {
-      const review = await reviewRow(row, endpoint, attempt, lastError);
+      const review = await withHardDeadline(
+        reviewRow(row, endpoint, attempt, lastError),
+        timeoutMs + 5_000,
+        `review_hard_timeout:${endpointPort(endpoint)}`
+      );
       state.consecutiveFailures = 0;
       return review;
     } catch (error) {
@@ -321,7 +325,8 @@ async function reviewWithRetry(row, startEndpointIndex) {
   };
 }
 
-async function acquireEndpoint(startEndpointIndex, attemptedEndpoints) {
+async function acquireEndpoint(startEndpointIndex, attemptedEndpoints, waitTimeoutMs) {
+  const deadline = Date.now() + Math.max(1_000, Number(waitTimeoutMs) || 1_000);
   while (attemptedEndpoints.size < activeEndpoints.length) {
     const now = Date.now();
     for (let offset = 0; offset < activeEndpoints.length; offset++) {
@@ -337,9 +342,28 @@ async function acquireEndpoint(startEndpointIndex, attemptedEndpoints) {
       state.inFlight += 1;
       return endpoint;
     }
+    if (Date.now() >= deadline) return null;
     await delay(25);
   }
   return null;
+}
+
+async function withHardDeadline(promise, deadlineMs, label) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          const error = new Error(label);
+          error.name = 'TimeoutError';
+          reject(error);
+        }, Math.max(1_000, Number(deadlineMs) || 1_000));
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function isInfrastructureError(error) {
