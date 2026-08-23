@@ -119,6 +119,13 @@ try {
       throw 'Committed database hash does not match the release-controller report'
     }
 
+    $env:CLOUDFLARE_API_TOKEN = [Environment]::GetEnvironmentVariable('CLOUDFLARE_API_TOKEN', 'User')
+    $env:CLOUDFLARE_ACCOUNT_ID = [Environment]::GetEnvironmentVariable('CLOUDFLARE_ACCOUNT_ID', 'User')
+    $env:NODE_OPTIONS = '--dns-result-order=ipv4first'
+    if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)) {
+      throw 'CLOUDFLARE_API_TOKEN is not configured in the release user environment'
+    }
+
     $Wrangler = Join-Path $Root 'node_modules\.bin\wrangler.cmd'
     $PreviousPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
