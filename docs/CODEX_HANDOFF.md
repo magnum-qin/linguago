@@ -6419,6 +6419,10 @@ untracked. The durable extractors are
   fails immediately instead of launching another multi-gigabyte SQLite scan.
   Process termination releases the handle automatically; the zero-byte lock
   file itself may remain and must not be used as a stale-lock signal.
+- The runner manifest now includes the daily-primary selector and its
+  production-prefilter regression test. After synchronizing any production
+  script, regenerate `config/remote-runner-files.json`; otherwise the verifier
+  correctly reports stale hashes even when the script itself is valid.
 - `deploy-remote-worker-release.ps1 -Execute true` records the current Worker
   version before deploy and automatically rolls back if any online dictionary
   regression fails. It has not been executed because the jump-host OAuth token
