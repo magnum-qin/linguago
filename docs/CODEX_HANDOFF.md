@@ -22,9 +22,19 @@
   `PreserveProductDbEntry=false` only after the controlled commit succeeded.
   `verify-remote-dictionary-runner.ps1` now reports `Ok=true`, five healthy
   endpoints, zero file/hash mismatches, and the new product DB hash.
-- Cloudflare D1 and the Worker were not changed by this commit. The v140 data
-  release remains online until an explicit, separately gated D1 release is
-  requested.
+- The separately gated Cloudflare release subsequently succeeded. D1 imported
+  all 25 chunks, remote counts match the manifest, and
+  `published_at=2026-08-23T06:38:11.747Z`. The pre-import Time Travel bookmark
+  is `D:\linguago-runner\runs\v141-native-daily-production5000\cloudflare-d1-before-release-bookmark.json`.
+- Worker cache `v142-native323-41874` is live in Worker version
+  `558b9e4f-3275-4397-a4a8-13851fa710b1`. General API, focused API, and
+  mobile/desktop focused render checks passed. No horizontal overflow was
+  found and no rollback was required. The captured rollback target was Worker
+  version `c4378e54-747d-4461-87ed-d199a78b8dd3`.
+- The first D1 execution attempt stopped before bookmark capture or writes when
+  `wrangler whoami` timed out. `release-remote-dictionary-d1.ps1` now loads the
+  scoped token/account from the release user's environment and forces IPv4 DNS
+  ordering, matching the Worker deployment path. The retry completed normally.
 
 ## 2026-08-23 v140 native production release
 

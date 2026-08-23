@@ -18,11 +18,16 @@ The full native export/import audit passed with `entries=41874`,
 mojibake, and HTML artifacts are all zero. The refreshed runner manifest
 verifies with five healthy endpoints and zero file/hash mismatches.
 
-This v141 product DB has **not** been pushed to Cloudflare D1 and no Worker was
-deployed in this step. The live D1/Worker release remains the v140 data release
-described below until the separate release command is explicitly executed.
+This v141 product DB is now live in Cloudflare D1. D1 reports
+`published_at=2026-08-23T06:38:11.747Z`, and all remote counts match the
+25-chunk manifest. Worker cache `v142-native323-41874` is live in Worker version
+`558b9e4f-3275-4397-a4a8-13851fa710b1`. General API, focused API, and focused
+mobile/desktop render regressions passed with no horizontal overflow. The
+release captured a D1 Time Travel bookmark before import and retained Worker
+version `c4378e54-747d-4461-87ed-d199a78b8dd3` as its rollback target; no
+rollback was required.
 
-## Current online production release (v140 data / v141 Worker, 2026-08-23)
+## Previous online production release (v140 data / v141 Worker, 2026-08-23)
 
 The v140 native production run has completed controlled replay and promoted
 286 records into the authoritative jump-host product DB. Its SHA-256 is
