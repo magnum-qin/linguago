@@ -4,11 +4,11 @@ import './lib/load-local-env.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 import { discoverUnslothStagePool } from './lib/unsloth-cluster-discovery.mjs';
 import { inspectCompletedPipelineStage } from './lib/dictionary-pipeline-stage-recovery.mjs';
+import { runChildProcessWithLog } from './lib/run-child-process-with-log.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const pipelineMode = String(args['pipeline-mode'] || 'legacy').trim().toLowerCase();
@@ -1051,29 +1051,19 @@ function setOptionValue(values, name, value) {
 }
 
 function runNode(script, stageArgs, logPath) {
-  return new Promise((resolve, reject) => {
-    const log = fs.createWriteStream(logPath, { flags: 'a' });
+  return runChildProcessWithLog({
+    command: process.execPath,
+    args: [script, ...stageArgs],
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      UNSLOTH_REQUIRE_INSTALLED_MODEL: allowModelDownload ? '0' : '1'
+    },
+    logPath,
     // Scheduled tasks have no reader for stdout. Forwarding every child report can
     // fill the Windows pipe and leave an otherwise completed pipeline stuck.
-    const echoChildOutput = Boolean(process.stdout.isTTY);
-    const child = spawn(process.execPath, [script, ...stageArgs], {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        UNSLOTH_REQUIRE_INSTALLED_MODEL: allowModelDownload ? '0' : '1'
-      },
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    child.stdout.on('data', (chunk) => {
-      if (echoChildOutput) process.stdout.write(chunk);
-      log.write(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      if (echoChildOutput) process.stderr.write(chunk);
-      log.write(chunk);
-    });
-    child.on('error', reject);
-    child.on('close', (code) => { log.end(); resolve(Number(code)); });
+    echoOutput: Boolean(process.stdout.isTTY),
+    exitDrainTimeoutMs: 5000
   });
 }
 

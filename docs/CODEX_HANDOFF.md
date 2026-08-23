@@ -6403,6 +6403,13 @@ untracked. The durable extractors are
 
 ## 2026-08-24 v147 progress and v148 four-language intake
 
+- The remote pipeline child runner now has a five-second post-exit pipe-drain
+  fallback. This addresses the v147 Qwen stage where the generation report and
+  checkpoint were complete but a descendant-held stdout/stderr pipe prevented
+  the parent from receiving `close`. The helper has a dedicated inherited-pipe
+  regression test and should be synchronized only after the active v147 run
+  finishes.
+
 - v147 continues on the jump host without a restart. Its active Gemma source
   review checkpoint was healthy at `963/3662`; the watchdog reported recent
   progress, no circuit break, and no recovery action.

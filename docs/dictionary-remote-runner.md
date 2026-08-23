@@ -330,6 +330,10 @@ and releases the global lock. The watcher includes this startup state. This
 turns a silent `not_started` reservation into an explicit recoverable failure.
 
 Do not treat a manifest left at `status=running` as model progress by itself.
+Pipeline child processes normally wait for stdout and stderr to drain after
+exit. If an inherited handle keeps those pipes open, the runner now closes the
+pipes after a five-second grace period and advances using the child's real exit
+code. This prevents a completed model stage from remaining indefinitely active.
 Use the watcher or manager status command and require either a live runner or a
 terminal manifest state.
 
