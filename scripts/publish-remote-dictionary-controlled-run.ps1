@@ -85,14 +85,19 @@ try {
   & powershell.exe @ValidationArgs
   if ($LASTEXITCODE -ne 0) { throw "Isolated validation failed with exit code $LASTEXITCODE" }
 
+  & node.exe (Join-Path $Root 'scripts\audit-dictionary-v2-production-cadence.mjs') `
+    --run-dir $RunDir --out (Join-Path $RunDir 'production-cadence-audit.json')
+  if ($LASTEXITCODE -ne 0) { throw 'Production cadence audit failed' }
+
   $Apply = Read-JsonFile (Join-Path $RunDir '09-isolated-controlled-apply.json')
   $Idempotent = Read-JsonFile (Join-Path $RunDir '10-isolated-controlled-idempotent.json')
   $PromoteDry = Read-JsonFile (Join-Path $RunDir '11-isolated-promote-dry-run.json')
   $PromoteApply = Read-JsonFile (Join-Path $RunDir '12-isolated-promote-apply.json')
   $Risk = Read-JsonFile (Join-Path $RunDir '14-isolated-published-risk.json')
   $Audit = Read-JsonFile (Join-Path $RunDir '15-isolated-full-audit\audit.json')
+  $Cadence = Read-JsonFile (Join-Path $RunDir 'production-cadence-audit.json')
 
-  if (-not $Apply.ok -or -not $Risk.ok -or -not $Audit.ok) {
+  if (-not $Apply.ok -or -not $Risk.ok -or -not $Audit.ok -or -not $Cadence.ok) {
     throw 'One or more release reports are not ok'
   }
   if ([int64]$Apply.stats.senses_inserted -le 0) { throw 'Controlled replay inserted no senses' }

@@ -6420,6 +6420,12 @@ untracked. The durable extractors are
   pipeline with an attached production supervisor; its first stage started at
   `2026-08-23T20:04:07Z`.
 
+- v148 exposed an ordering bug in the new cadence gate: the supervisor invoked
+  it before controlled replay had created `08-controlled-replay.json`. The
+  cadence check now runs inside the guarded publisher after isolated replay and
+  before the main DB replacement. A static ordering regression protects this
+  safety property. The initial supervisor failure did not modify the main DB.
+
 - The remote pipeline child runner now has a five-second post-exit pipe-drain
   fallback. This addresses the v147 Qwen stage where the generation report and
   checkpoint were complete but a descendant-held stdout/stderr pipe prevented

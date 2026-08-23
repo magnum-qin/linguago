@@ -25,6 +25,7 @@ param(
     'scripts\check-dictionary-v2-production-run-gates.mjs',
     'scripts\audit-dictionary-v2-production-cadence.mjs',
     'scripts\test-dictionary-v2-production-cadence-audit.mjs',
+    'scripts\test-remote-production-supervisor-order.mjs',
     'scripts\report-dictionary-v2-production-progress.mjs',
     'scripts\test-dictionary-v2-production-progress-report.mjs',
     'scripts\test-dictionary-v2-production-run-gates.mjs',

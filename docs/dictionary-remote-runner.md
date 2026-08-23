@@ -334,6 +334,10 @@ Pipeline child processes normally wait for stdout and stderr to drain after
 exit. If an inherited handle keeps those pipes open, the runner now closes the
 pipes after a five-second grace period and advances using the child's real exit
 code. This prevents a completed model stage from remaining indefinitely active.
+The production cadence audit runs inside the controlled publisher after the
+isolated replay has created `08-controlled-replay.json`, and before the main DB
+is atomically replaced. Running it in the supervisor before replay is invalid
+because the audit intentionally verifies controlled-replay membership.
 Use the watcher or manager status command and require either a live runner or a
 terminal manifest state.
 

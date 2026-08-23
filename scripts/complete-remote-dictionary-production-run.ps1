@@ -35,9 +35,6 @@ try {
   }
 
   Write-Status 'checking_gates' @{}
-  & node.exe (Join-Path $Root 'scripts\audit-dictionary-v2-production-cadence.mjs') `
-    --run-dir $RunDir --out (Join-Path $RunDir 'production-cadence-audit.json')
-  if ($LASTEXITCODE -ne 0) { throw 'Production cadence audit failed' }
   & node.exe (Join-Path $Root 'scripts\check-dictionary-v2-production-run-gates.mjs') `
     --run-dir $RunDir --out (Join-Path $RunDir 'production-gate.json')
   if ($LASTEXITCODE -ne 0) { throw 'Production gates failed' }

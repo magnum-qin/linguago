@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T19:45:43.9328622Z",
+    "generated_at":  "2026-08-23T20:18:19.6295383Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  18065,
-                      "sha256":  "8C861524A53E071FD2CA994E24321F7EAF4B037EA2C5823612507AF4D600EB5E"
+                      "bytes":  18173,
+                      "sha256":  "9E921D331D6214C39F4A8F60B699B101EAFB12E9900817F73A5C8A97FB598584"
                   },
                   {
                       "path":  "package-lock.json",
@@ -114,6 +114,11 @@
                       "sha256":  "A72E996DF557D77055DCB1821E35E8BDEAF15ABE3671C2FE879864E56EDB145C"
                   },
                   {
+                      "path":  "scripts\\test-remote-production-supervisor-order.mjs",
+                      "bytes":  1038,
+                      "sha256":  "0EB4D6FD1C96105041F0D6BA473215AF27692E67E9A25E15986CFE591D13B6D8"
+                  },
+                  {
                       "path":  "scripts\\report-dictionary-v2-production-progress.mjs",
                       "bytes":  7487,
                       "sha256":  "257F33C0B28436918A1DEBDD660EACF4966E6939C5141E4454D561E31F294979"
@@ -130,8 +135,8 @@
                   },
                   {
                       "path":  "scripts\\complete-remote-dictionary-production-run.ps1",
-                      "bytes":  5690,
-                      "sha256":  "5615195AA48352F67D53E571CCD178F637E67E9A8523E452292C2A35F3E7740B"
+                      "bytes":  5453,
+                      "sha256":  "AE7B28D2756DFC54FD52A8D83322E8062D7A692D02378742F93A55195C431703"
                   },
                   {
                       "path":  "scripts\\start-remote-dictionary-production-supervisor.ps1",
@@ -225,8 +230,8 @@
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-runner-manifest.ps1",
-                      "bytes":  5716,
-                      "sha256":  "BA655131AFC59704E0069BD380D251F433C09EBB6E421151C625B39388259A4E"
+                      "bytes":  5775,
+                      "sha256":  "244ED691CDC2414B043F9C10872CDF226BD279F5F26D4BB96838FACDEAE0E9E2"
                   },
                   {
                       "path":  "scripts\\validate-remote-dictionary-controlled-replay.ps1",
@@ -235,8 +240,8 @@
                   },
                   {
                       "path":  "scripts\\publish-remote-dictionary-controlled-run.ps1",
-                      "bytes":  6627,
-                      "sha256":  "E21940649A3F029B0F297573AF740D63451E83AE8AB5D2CC15471011EEB5EA69"
+                      "bytes":  6965,
+                      "sha256":  "41C56E1804A4B8C8D6D54A9844AB624C7241CC5EAB4FA19F4A91B94056EF5F8A"
                   },
                   {
                       "path":  "scripts\\checkpoint-sqlite-db.mjs",

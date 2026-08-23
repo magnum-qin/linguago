@@ -158,6 +158,7 @@
     "dict:v2:test:jmdict-preflight": "node scripts/test-jmdict-generation-preflight.mjs",
     "dict:v2:test:production-run-gates": "node scripts/test-dictionary-v2-production-run-gates.mjs",
     "dict:v2:test:production-cadence": "node scripts/test-dictionary-v2-production-cadence-audit.mjs",
+    "dict:v2:test:production-supervisor-order": "node scripts/test-remote-production-supervisor-order.mjs",
     "dict:v2:test:production-progress": "node scripts/test-dictionary-v2-production-progress-report.mjs",
     "dict:v2:test:child-process-log": "node scripts/test-run-child-process-with-log.mjs",
     "dict:v2:audit:product-full": "node scripts/audit-dictionary-v2-product-export.mjs --mode full --import memory",
