@@ -1,6 +1,6 @@
 # LinguaGo Project Overview For AI
 
-## Current production data candidate (v140/v141, 2026-08-23)
+## Current production release (v140/v141, 2026-08-23)
 
 The v140 native production run has completed controlled replay and promoted
 286 records into the authoritative jump-host product DB. Its SHA-256 is
@@ -12,14 +12,28 @@ The full native D1 export/import audit passed with all blocking counters at
 zero. D1 now contains `entries=41551`, `senses=47863`,
 `sense_localizations=191452`, `examples=3030`, and
 `example_localizations=11898`; all 25 SQL chunks were imported and remote
-counts match the manifest. The matching Worker cache version is
-`v141-native286-41551`. Do not call v141 live until the immutable Worker source
-archive deploy and its online API/render regressions have passed.
+counts match the manifest. Worker cache `v141-native286-41551` is live in
+Worker version `baa37f00-ec3d-4b8e-99a3-b65f87044867`. The immutable source
+archive SHA-256 is
+`2600D1FBEAC18EA96AB0AC7D0F13752ABA7CBB3F44D476766211409A10481BF0`.
+Health, general/focused API, and mobile/desktop render regressions passed. The
+deployment guard also proved its rollback path by reverting an initial deploy
+whose focused-count fixture was stale; the corrected fixture was committed
+before the successful release.
 
 A 24-record stratified Chinese/Japanese sample passed the four-language field,
 reading, and IPA checks. Keep pronunciation completeness as a separate quality
 queue: `沸点` currently exposes `boiling point` with IPA covering only
 `boiling`. This does not weaken the structural publication gates.
+
+The next run is active on the jump host as
+`v141-native-daily-production5000`, using a fresh 5,000-row native daily batch
+(`zh=2883`, `ja=2117`). The expanded source scan found 91,369 uncovered native
+candidates; selection excluded all previously completed run batches and
+31,786 historical source entries. The run started as PID `103248` and entered
+daily-primary sense selection without errors. Treat its manifest as
+authoritative and do not start a duplicate process. It remains separate from
+the live D1 release until controlled replay, promotion, and all audits pass.
 
 ## Current local production baseline and v139 qualification (2026-08-22)
 

@@ -20,9 +20,20 @@
   terms and definitions, Chinese/Japanese readings, and English/Portuguese IPA.
   A non-blocking pronunciation-quality follow-up remains for `沸点`: the
   English term `boiling point` currently has IPA only for `boiling`.
-- Worker cache `v141-native286-41551` is the cache paired with this D1 release.
-  Confirm the deployed Worker version and online regression result in the
-  release record before treating v141 as live.
+- Worker cache `v141-native286-41551` is live in Worker version
+  `baa37f00-ec3d-4b8e-99a3-b65f87044867`. `/health`, general/focused API
+  checks, and mobile/desktop focused render checks passed against the exact D1
+  manifest counts. The first deploy correctly rolled back when the focused
+  test still expected the old counts; commit
+  `e6660eb7e77cf986bdc620fb53faf1a2001314b0` fixed that stale test baseline
+  before the successful deploy.
+- The next strictly non-overlapping production run is active as
+  `v141-native-daily-production5000` (PID `103248`). Its 5,000-row batch is
+  `batches\v141-native-daily-production5000.json` (`zh=2883`, `ja=2117`). It
+  was selected from an expanded 91,369-row native gap report after excluding
+  37 historical reports and 31,786 previously attempted source entries. The
+  initial stage is daily-primary sense selection; no startup errors were
+  observed. Do not launch a duplicate run.
 
 ## 2026-08-22 v139 evidence-yield qualification
 
