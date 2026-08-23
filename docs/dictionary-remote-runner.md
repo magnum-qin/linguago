@@ -1,5 +1,21 @@
 # Dictionary Remote Runner
 
+## Native daily cohort rebuild after frozen-pool exhaustion
+
+`new-remote-dictionary-production-batch.ps1` now defaults to
+`-CandidateMode native-daily`. It runs the indexed native coverage scanner
+against the current product DB before applying attempt-history and completed
+run exclusions. Use `-CandidateMode authoritative-pool` only when deliberately
+reproducing the older frozen-pool path. The local control wrapper exposes
+`-NativeMaxRank`, `-NativeScanLimit`, and `-NativeTargets`; the production
+defaults mirror the validated v141 deep scan (`2,000,000`, `2,000,000`, and
+`zh=50000,ja=50000`).
+
+The deep scan is read-only but I/O bound on the 9.3 GB source DB. Run only one
+scanner at a time. The generated coverage report and frozen batch stay under
+`D:\linguago-runner\batches`, and no LLM output or database write occurs in
+this action.
+
 ## Remote runner baseline (2026-08-22)
 
 The jump host now has a validated v138 runner and product database. The

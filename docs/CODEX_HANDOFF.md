@@ -1,5 +1,34 @@
 # Codex Handoff
 
+## 2026-08-23 v143 native daily production started
+
+- The frozen `v123-authoritative-pool` is exhausted after source-entry history
+  exclusion and must not be replayed. The `new-batch` control action now
+  defaults to `native-daily`: it rescans the full CC-CEDICT/JMdict source DB
+  against the current product DB, then excludes the historical attempt index
+  and every completed run batch before selecting a cohort. The legacy
+  `authoritative-pool` mode remains explicit for reproducibility only.
+- The v142-based scan selected `91,198` uncovered native candidates
+  (`zh=50,000`, `ja=41,198`). After excluding 38 historical reports and
+  36,786 prior source entries, the frozen production batch is
+  `batches\production-5000-20260823-070554.json` with `zh=2,902` and
+  `ja=2,098`. Its pool SHA-256 is
+  `BCEEF0062726741E81E126B97E907A63D0DA080155A4CCABFBCB67A78EAE221A`.
+- A local audit of all 5,000 frozen rows found zero empty headwords, mojibake,
+  or HTML artifacts. Raw native rows can still contain proper names and domain
+  terms; the mandatory daily-primary hydration and production prefilter run
+  before any model stage and must not be bypassed.
+- Dynamic discovery selected six idle nodes for both model roles:
+  `a6000-144`, `a6000-147`, `a6000-155`, `rtx4090-224`, `rtx4090-47`, and
+  `rtx4090-56`. It excluded `a6000-048` and `a6000-143` because the dashboard
+  reported foreign GPU processes. Qwen remains the generation role and Gemma
+  the independent review role; model switching is per stage, not per item.
+- `v143-native-daily-production5000` started through the existing Scheduled
+  Task with checkpoint resume, native source fallback, daily-primary sense
+  selection, source-sense alignment, strict generation hint enforcement, and
+  no direct product-DB writes. Controlled replay, promotion, audit, D1, and
+  Worker deployment remain separate gates after the run completes.
+
 ## 2026-08-23 v141 controlled product DB commit
 
 - `v141-native-daily-production5000` completed its 5,000-candidate strict
