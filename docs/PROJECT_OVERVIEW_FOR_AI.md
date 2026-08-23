@@ -1,6 +1,18 @@
 # LinguaGo Project Overview For AI
 
-## Current controlled product baseline (v141, 2026-08-23)
+## Current jump-host baseline and online release (2026-08-23)
+
+The authoritative jump-host product database has advanced beyond the online
+release through `v143-native-daily-production5000`. It has SHA-256
+`0A04DD99E31E153EC62D8C52D50F160722D09F4ABA4B334A37D6F8E9E6833A1C`
+and audited counts `entries=42163`, `senses=48475`,
+`sense_localizations=193900`, `examples=3030`, and
+`example_localizations=11898`. Its rollback copy is
+`D:\linguago-runner\backups\v143-native-daily-production5000-main-before-commit-20260823-181640.db`.
+Production D1 remains the v142 Worker release described below while additional
+audited senses accumulate toward the next approximately 5,000-sense release.
+
+## Current online baseline (v142 Worker / v141 data, 2026-08-23)
 
 The jump-host run `v141-native-daily-production5000` is complete. From 5,000
 fresh Chinese/Japanese native candidates, the strict funnel accepted 323
@@ -25,7 +37,9 @@ This v141 product DB is now live in Cloudflare D1. D1 reports
 mobile/desktop render regressions passed with no horizontal overflow. The
 release captured a D1 Time Travel bookmark before import and retained Worker
 version `c4378e54-747d-4461-87ed-d199a78b8dd3` as its rollback target; no
-rollback was required.
+rollback was required. The exact bookmark is
+`0000022b-00000000-000050d0-8224f5a51847899fe008f9410bde7da1`, persisted at
+`D:\linguago-runner\runs\v141-native-daily-production5000\cloudflare-d1-before-release-bookmark.json`.
 
 ## Previous online production release (v140 data / v141 Worker, 2026-08-23)
 

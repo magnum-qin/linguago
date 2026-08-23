@@ -1,5 +1,21 @@
 # Codex Handoff
 
+## 2026-08-23 exact v142 Cloudflare rollback state
+
+- The current online data baseline is the v142 Worker release of the v141
+  product database. Live Worker Version ID:
+  `558b9e4f-3275-4397-a4a8-13851fa710b1`; rollback Worker Version ID:
+  `c4378e54-747d-4461-87ed-d199a78b8dd3`; cache:
+  `v142-native323-41874`.
+- The pre-import D1 Time Travel bookmark is
+  `0000022b-00000000-000050d0-8224f5a51847899fe008f9410bde7da1` and is
+  persisted at
+  `D:\linguago-runner\runs\v141-native-daily-production5000\cloudflare-d1-before-release-bookmark.json`.
+  The matching release record is `cloudflare-d1-release.json`, whose DB hash is
+  `226F90EA9A607598672E259828B8811A1924B36CBB88DAC6BFEE9847DCD11649`
+  and whose 25-chunk D1 counts are `entries=41874`, `senses=48186`, and
+  `sense_localizations=192744`.
+
 ## 2026-08-23 v144 active production and persistent supervisor
 
 - `v144-native-daily-production5000` is the next non-overlapping native daily
