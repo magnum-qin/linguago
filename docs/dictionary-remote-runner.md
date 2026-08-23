@@ -381,6 +381,26 @@ restart preserves the run ID, launch arguments, and checkpoints. A ten-minute
 cooldown and a maximum of three restart events per hour prevent restart loops.
 Completed and failed manifests are terminal.
 
+Model-stage scripts also enforce endpoint-local recovery. Source review uses
+one in-flight request per endpoint, records consecutive infrastructure
+failures, and opens that endpoint's circuit after two failures for 30 seconds.
+Pending rows are acquired by another healthy endpoint; output-format errors
+are retried but do not count as infrastructure failures. Production review
+requests use a 60-second timeout. The report's
+`summary.endpoint_runtime` records calls, failures, timeouts, circuit opens,
+and recoveries. Validate this behavior with:
+
+```powershell
+npm.cmd run dict:v2:test:source-review-circuit-breaker
+```
+
+If an older running process predates this circuit breaker and its checkpoint
+stops advancing, first verify endpoint status and reload an accidentally
+unloaded model. If progress still does not resume, use the control script's
+`stop` action and restart the same run ID with the exact original batch and
+arguments. The runner always passes `--resume true`; do not delete or rewrite
+the existing run directory.
+
 Recovery starts the existing `Linguago Remote Dictionary Pipeline` scheduled
 task. Do not re-register that task from the watchdog context: the scheduled
 watchdog principal may be allowed to start it but denied permission to replace

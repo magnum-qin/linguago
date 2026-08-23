@@ -42,6 +42,8 @@ const maxTokens = boundedInteger(args['max-tokens'], 320, 100);
 const maxAttempts = boundedInteger(args['max-attempts'], 2, 1, 4);
 const checkpointEvery = boundedInteger(args['checkpoint-every'], 20, 1);
 const checkpointIntervalMs = boundedInteger(args['checkpoint-interval-ms'], 10_000, 1_000);
+const circuitBreakerFailures = boundedInteger(args['circuit-breaker-failures'], 2, 1, 20);
+const circuitBreakerResetMs = boundedInteger(args['circuit-breaker-reset-ms'], 30_000, 1_000, 600_000);
 const resume = args.resume === 'true';
 const retryInvalidOnResume = args['retry-invalid-on-resume'] === 'true';
 const retryDecisionsOnResume = new Set(
@@ -201,6 +203,22 @@ if (prewarm && prewarmResults.every((row) => !row.ok)) {
 const activeEndpoints = prewarm
   ? prewarmResults.filter((row) => row.ok).map((row) => row.endpoint)
   : endpoints;
+const endpointRuntimeStates = new Map(
+  activeEndpoints.map((endpoint) => [
+    endpoint,
+    {
+      endpoint,
+      calls: 0,
+      failures: 0,
+      timeouts: 0,
+      consecutiveFailures: 0,
+      circuitOpens: 0,
+      recoveries: 0,
+      openUntil: 0,
+      inFlight: 0
+    }
+  ])
+);
 
 await runPool(pendingCandidates);
 writeOutputs();
@@ -259,13 +277,31 @@ async function reviewWithRetry(row, startEndpointIndex) {
   let lastError = null;
   const endpointAttempts = [];
   const attemptLimit = Math.max(maxAttempts, activeEndpoints.length);
+  const attemptedEndpoints = new Set();
   for (let attempt = 1; attempt <= attemptLimit; attempt++) {
-    const endpoint = activeEndpoints[(startEndpointIndex + attempt - 1) % activeEndpoints.length];
+    const endpoint = await acquireEndpoint(startEndpointIndex, attemptedEndpoints);
+    if (!endpoint) break;
+    attemptedEndpoints.add(endpoint);
+    const state = endpointRuntimeStates.get(endpoint);
+    state.calls += 1;
     try {
-      return await reviewRow(row, endpoint, attempt, lastError);
+      const review = await reviewRow(row, endpoint, attempt, lastError);
+      state.consecutiveFailures = 0;
+      return review;
     } catch (error) {
       lastError = errorMessage(error);
       endpointAttempts.push({ endpoint, attempt, error: lastError });
+      if (isInfrastructureError(error)) {
+        state.failures += 1;
+        state.consecutiveFailures += 1;
+        if (isTimeoutError(error)) state.timeouts += 1;
+        if (state.consecutiveFailures >= circuitBreakerFailures) {
+          state.openUntil = Date.now() + circuitBreakerResetMs;
+          state.circuitOpens += 1;
+        }
+      }
+    } finally {
+      state.inFlight = Math.max(0, state.inFlight - 1);
     }
   }
   return {
@@ -283,6 +319,46 @@ async function reviewWithRetry(row, startEndpointIndex) {
     endpoint_attempts: endpointAttempts,
     error: lastError
   };
+}
+
+async function acquireEndpoint(startEndpointIndex, attemptedEndpoints) {
+  while (attemptedEndpoints.size < activeEndpoints.length) {
+    const now = Date.now();
+    for (let offset = 0; offset < activeEndpoints.length; offset++) {
+      const endpoint = activeEndpoints[(startEndpointIndex + offset) % activeEndpoints.length];
+      if (attemptedEndpoints.has(endpoint)) continue;
+      const state = endpointRuntimeStates.get(endpoint);
+      if (state.openUntil && state.openUntil <= now) {
+        state.openUntil = 0;
+        state.consecutiveFailures = 0;
+        state.recoveries += 1;
+      }
+      if (state.openUntil > now || state.inFlight > 0) continue;
+      state.inFlight += 1;
+      return endpoint;
+    }
+    await delay(25);
+  }
+  return null;
+}
+
+function isInfrastructureError(error) {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    isTimeoutError(error) ||
+    message.includes('fetch failed') ||
+    message.includes('econn') ||
+    message.includes('socket') ||
+    message.includes('network') ||
+    message.includes('no model loaded') ||
+    message.includes('model_not_loaded') ||
+    /http 5\d\d/u.test(message)
+  );
+}
+
+function isTimeoutError(error) {
+  const message = errorMessage(error).toLowerCase();
+  return error?.name === 'TimeoutError' || error?.name === 'AbortError' || message.includes('timeout');
 }
 
 async function reviewRow(row, endpoint, attempt, previousError) {
@@ -940,6 +1016,21 @@ function buildOutput() {
       ordered.filter((row) => row.endpoint === endpoint).length
     ])
   );
+  const endpointRuntime = Object.fromEntries(
+    [...endpointRuntimeStates.entries()].map(([endpoint, state]) => [
+      endpoint,
+      {
+        calls: state.calls,
+        failures: state.failures,
+        timeouts: state.timeouts,
+        consecutive_failures: state.consecutiveFailures,
+        circuit_opens: state.circuitOpens,
+        recoveries: state.recoveries,
+        circuit_open: state.openUntil > Date.now(),
+        open_until: state.openUntil ? new Date(state.openUntil).toISOString() : null
+      }
+    ])
+  );
   return {
     ok: ordered.length === targetCandidates.length && counts.failed === 0,
     created_at: new Date().toISOString(),
@@ -954,11 +1045,18 @@ function buildOutput() {
     blind_semantic_match: blindSemanticMatch,
     require_daily_primary: requireDailyPrimary,
     retry_decisions: [...retryDecisionsOnResume],
+    circuit_breaker_failures: circuitBreakerFailures,
+    circuit_breaker_reset_ms: circuitBreakerResetMs,
     prewarm_results: prewarmResults,
     confidence_threshold: confidenceThreshold,
     offset,
     elapsed_seconds: secondsSince(started),
-    summary: { ...counts, active_endpoints: activeEndpoints.length, endpoint_counts: endpointCounts },
+    summary: {
+      ...counts,
+      active_endpoints: activeEndpoints.length,
+      endpoint_counts: endpointCounts,
+      endpoint_runtime: endpointRuntime
+    },
     reviews: ordered
   };
 }
@@ -1236,6 +1334,10 @@ function parseJson(content) {
     if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1));
     throw new Error(`json_parse_failed:${text.slice(0, 300)}`);
   }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function loadExistingReviews(filePath) {

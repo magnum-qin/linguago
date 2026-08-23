@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T07:05:05.9282312Z",
+    "generated_at":  "2026-08-23T08:07:28.6633139Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  17376,
-                      "sha256":  "CB31BF54273C4FDB18877424E3D16E9E352359CAB704CD6CA57938715BBBD8CF"
+                      "bytes":  17481,
+                      "sha256":  "5D09DC6D9AF1E8F1C6685EB03486F20DEF87DA5CBF4A061787E0DA8EEE9763B3"
                   },
                   {
                       "path":  "package-lock.json",
@@ -15,8 +15,8 @@
                   },
                   {
                       "path":  "scripts\\run-dictionary-v2-remote-pipeline.mjs",
-                      "bytes":  54394,
-                      "sha256":  "C53962C42C62BFD8666D9543A872811D7D00E12172D1A0D0D429A0F9D4CE409F"
+                      "bytes":  54727,
+                      "sha256":  "84035BFBFAFD800F1FC2A74FD884D2A30E54637343AB0AC230B68CB574B327E4"
                   },
                   {
                       "path":  "scripts\\lib\\unsloth-cluster-discovery.mjs",
@@ -75,8 +75,8 @@
                   },
                   {
                       "path":  "scripts\\review-dictionary-v2-product-source-gap-candidates-unsloth.mjs",
-                      "bytes":  59062,
-                      "sha256":  "92E64DECC2177DEFB9AD74263660AFA20C1757CD9F4163508B51A6A7A8457991"
+                      "bytes":  62350,
+                      "sha256":  "8B88ED4F7CE58972FC84E205490103B2374E731B0BAA5EA40EBA37262C38F00F"
                   },
                   {
                       "path":  "scripts\\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs",

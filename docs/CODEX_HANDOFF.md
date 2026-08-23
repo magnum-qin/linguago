@@ -28,6 +28,19 @@
   selection, source-sense alignment, strict generation hint enforcement, and
   no direct product-DB writes. Controlled replay, promotion, audit, D1, and
   Worker deployment remain separate gates after the run completes.
+- During Gemma source review, `rtx4090-224`/port `11446` unexpectedly had no
+  active model while its API and GPU remained healthy. The review checkpoint
+  stopped at 2,343 rows because the old reviewer had per-request timeout and
+  retry but no endpoint-level circuit breaker. Reloading Gemma did not wake the
+  already-stuck Node requests. A controlled stop/start with the same run ID
+  resumed from 2,343 without duplicates and advanced immediately.
+- The reviewer now has endpoint-level infrastructure failure counters,
+  single-request endpoint leases, a configurable circuit breaker/cooldown, and
+  runtime statistics in its report. Timeout, connection, missing-model, and
+  HTTP 5xx failures can open a circuit; malformed model output does not. The
+  remote pipeline passes a 60-second review timeout, two-failure threshold,
+  and 30-second cooldown. Run
+  `npm run dict:v2:test:source-review-circuit-breaker` before syncing changes.
 
 ## 2026-08-23 v141 controlled product DB commit
 
