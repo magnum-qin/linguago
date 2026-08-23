@@ -2384,6 +2384,8 @@ function normalizeGeneratedOutput(row, output) {
   normalized.source_sense_id = normalized.source_sense_id ?? row.first_sense_id ?? row.useful_senses?.[0]?.id ?? null;
   normalized.source_word = normalized.source_word ?? row.word;
   normalized.source_frequency_rank = normalized.source_frequency_rank ?? row.frequency_rank ?? null;
+  normalized.product_entry_id = normalized.product_entry_id ?? row.product_entry_id ?? null;
+  normalized.candidate_lane = normalized.candidate_lane ?? row.candidate_lane ?? null;
   normalized.headword = row.word;
   normalized.normalized_key = normalized.normalized_key || row.normalized_key || row.word;
   normalized.primary_lang = row.source_lang;
@@ -2991,6 +2993,7 @@ function applyOutputs(items, stats) {
 
   const statements = {
     getEntry: db.prepare('SELECT id, headword, primary_lang, status FROM product_entries WHERE group_key = ?'),
+    getEntryById: db.prepare('SELECT id, headword, primary_lang, status FROM product_entries WHERE id = ?'),
     insertEntry: db.prepare(`
       INSERT INTO product_entries
         (headword, normalized_key, primary_lang, frequency_rank, group_key, group_method, status, source_count, lang_count, created_at)
@@ -3075,8 +3078,24 @@ function applyOutputs(items, stats) {
     for (const item of items) {
       const baseGroupKey = `source-gap:${item.primary_lang}:${normalize(item.normalized_key || item.headword)}`;
       let groupKey = baseGroupKey;
-      let existingEntry = statements.getEntry.get(groupKey);
+      const requestedEntryId = Number(item.product_entry_id);
+      const isAdditionalSense = item.candidate_lane === 'additional_unlinked_source_sense';
+      let existingEntry =
+        isAdditionalSense && Number.isInteger(requestedEntryId)
+          ? statements.getEntryById.get(requestedEntryId)
+          : statements.getEntry.get(groupKey);
+      if (isAdditionalSense) {
+        if (!existingEntry) throw new Error(`Additional-sense product entry not found: ${requestedEntryId}`);
+        if (
+          existingEntry.primary_lang !== item.primary_lang ||
+          normalize(existingEntry.headword) !== normalize(item.headword) ||
+          !['accepted', 'draft_single_source'].includes(existingEntry.status)
+        ) {
+          throw new Error(`Additional-sense product entry mismatch: ${requestedEntryId}`);
+        }
+      }
       if (
+        !isAdditionalSense &&
         existingEntry &&
         (existingEntry.primary_lang !== item.primary_lang ||
           normalize(existingEntry.headword) !== normalize(item.headword) ||

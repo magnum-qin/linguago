@@ -68,6 +68,8 @@ const productSenseBySourceSense = checkpointProductSenseBySourceSense.size
   : loadProductSenseBySourceSense(dbPath);
 const reportGlossBySource = reportPath ? loadReportGlosses(reportPath) : new Map();
 const reportSourceSenseIds = reportPath ? loadReportSourceSenseIds(reportPath) : [];
+const allowAcceptedEntryAdditionalSenses =
+  restrictToReport && reportPath ? reportContainsAdditionalSenseLane(reportPath) : false;
 if (restrictToReport && !reportSourceSenseIds.length) {
   throw new Error('Restricted coverage report has no source sense IDs');
 }
@@ -124,7 +126,10 @@ const candidates = db
     FROM product_entries pe
     JOIN product_senses ps ON ps.product_entry_id = pe.id
     JOIN product_localizations pl ON pl.product_sense_id = ps.id
-    WHERE pe.group_method = 'source_gap_unsloth'
+    WHERE (
+        pe.group_method = 'source_gap_unsloth'
+        OR (@allowAcceptedEntryAdditionalSenses = 1 AND pe.status = 'accepted')
+      )
       AND ps.status = 'draft_single_source'
       AND pl.source LIKE @sourcePrefix
       ${checkpointClause}
@@ -135,6 +140,7 @@ const candidates = db
   )
   .all({
     sourcePrefix: `${sourcePrefix}%`,
+    allowAcceptedEntryAdditionalSenses: allowAcceptedEntryAdditionalSenses ? 1 : 0,
     queryLimit: reverseEvidenceApprovals || semanticReviewPath ? 100000 : limit,
     ...Object.fromEntries(checkpointSenseIds.map((id, index) => [`checkpoint_${index}`, id])),
     ...Object.fromEntries(reportSourceSenseIds.map((id, index) => [`report_sense_${index}`, id]))
@@ -196,6 +202,7 @@ const stats = {
   db: path.relative(process.cwd(), dbPath),
   apply,
   source_prefix: sourcePrefix,
+  allow_accepted_entry_additional_senses: allowAcceptedEntryAdditionalSenses,
   checkpoint: checkpointPath ? path.relative(process.cwd(), checkpointPath) : null,
   report: reportPath ? path.relative(process.cwd(), reportPath) : null,
   restrict_to_report: restrictToReport,
@@ -327,6 +334,17 @@ function loadReportSourceSenseIds(filePath) {
         .filter(Number.isInteger)
     )
   ];
+}
+
+function reportContainsAdditionalSenseLane(filePath) {
+  const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const rows = report?.selected || report?.residuals || report?.generated || [];
+  return rows.some(
+    (row) =>
+      row?.candidate_lane === 'additional_unlinked_source_sense' &&
+      row?.daily_sense_selection?.policy === 'native_dictionary_additional_unlinked_sense' &&
+      Number.isInteger(Number(row?.product_entry_id))
+  );
 }
 
 function loadSemanticApprovals(filePath, confidenceThreshold, productSenseBySourceSense) {

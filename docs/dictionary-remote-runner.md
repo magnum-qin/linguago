@@ -753,3 +753,31 @@ Use a scoped `CLOUDFLARE_API_TOKEN` from production account
 `ee613260-5c1f-4bb5-8959-c54118174e0e` to be visible before any write. A token
 for another account can make `wrangler whoami` succeed while `d1 list` is empty.
 Do not store tokens in Git, runner manifests, command lines, or logs.
+
+## Additional-sense production lane
+
+For entries already present in the product dictionary, the production lane can
+add a previously unlinked native dictionary sense without creating a duplicate
+entry. Ownership is strict: the source entry language and normalized headword
+must match the product entry primary language and normalized headword. Never
+select a product entry only because a translation localization or an old source
+link matches.
+
+The verified sequence is:
+
+1. Find represented source entries with unlinked native senses.
+2. Select the highest-value unlinked CC-CEDICT, JMdict, or FreeDict sense.
+3. Apply the conservative production filter and exclude all prior run reports.
+4. Run dynamic Gemma source review, locked reverse evidence, semantic review,
+   Qwen four-language generation, reverse validation, and final Gemma review.
+5. Replay accepted rows into an isolated database, repeat the write to prove
+   idempotency, promote, then run fast, published-risk, and full memory-import
+   audits.
+6. Replace the authoritative database only through
+   `publish-remote-dictionary-controlled-run.ps1` with the current expected
+   SHA-256. The script creates a rollback database before replacement.
+
+`v156-additional-sense-production500` is the reference run: 500 raw candidates,
+145 final accepted senses, no infrastructure or JSON failures, zero repeated
+sense writes, and `flagged_senses=0`. Its post-commit main DB SHA-256 is
+`582FD6962D09F954F915C8B7E13A915C40D06058FDBE3E58D6FAD159278307EF`.

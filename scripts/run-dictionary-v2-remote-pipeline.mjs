@@ -59,6 +59,8 @@ const dailyPrimarySenseSelection =
   args['daily-primary-sense-selection'] !== undefined
     ? args['daily-primary-sense-selection'] !== 'false'
     : pipelineMode === 'simplified';
+const allowLinkedPrimaryForAdditionalSense =
+  args['allow-linked-primary-for-additional-sense'] === 'true';
 const sourceSenseAlignment = args['source-sense-alignment'] === 'true';
 const allowNativeSourceFallback = args['allow-native-source-fallback'] === 'true';
 const reverseEvidencePrefilter = args['reverse-evidence-prefilter'] === 'true';
@@ -569,7 +571,9 @@ async function runSimplifiedPipeline() {
         '--product-db', args['product-db'] || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db',
         '--out', files.dailyPrimary,
         '--rejected-out', files.dailyPrimaryRejected,
-        '--min-score', args['daily-primary-min-score'] || '2500'
+        '--min-score', args['daily-primary-min-score'] || '2500',
+        '--allow-linked-primary-for-additional-sense',
+        String(allowLinkedPrimaryForAdditionalSense)
       ],
       [files.dailyPrimary, files.dailyPrimaryRejected]
     );

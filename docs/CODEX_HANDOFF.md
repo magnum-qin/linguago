@@ -6514,3 +6514,37 @@ untracked. The durable extractors are
 - Candidate supply, not model reliability, is now the limiting factor. Rebuild
   the next cohort from additional high-value evidence or newly unlocked source
   families; do not lower reverse-evidence, consensus, or published-risk gates.
+
+## 2026-08-24 additional-sense production continuation
+
+- Additional-sense ownership must be resolved only to a product entry whose
+  `primary_lang` and normalized `headword` match the source entry. Historical
+  source links can point at translated entries; choosing the lowest linked
+  product entry ID caused Chinese senses such as `给` to be assigned to an
+  English entry. Translation-localization matches are evidence, not ownership.
+- `find-dictionary-v2-product-additional-sense-entries.mjs` now evaluates all
+  linked product entries and skips the source entry when no exact primary
+  language/headword owner exists. The regression test includes a wrong low-ID
+  translated entry and verifies selection of the correct source-language entry.
+- `v155-additional-sense-validation100` validated the corrected mapping. It
+  promoted 29 senses with zero idempotent replay writes and zero published-risk
+  flags. The guarded main-DB commit produced SHA-256
+  `175753E83C3F3CB5390094B5AD65CAA00F3C4A96E36834E918001C0F3013CCD6`.
+- `v156-additional-sense-production500` reviewed 500 candidates, generated 147
+  contract-valid records, and accepted 145 after reverse evidence and final
+  Gemma review. Isolated apply, idempotent replay, fast audit, published-risk,
+  and full in-memory export/import audit passed before the guarded commit.
+- The authoritative jump-host DB after v156 has 43,581 entries, 50,067
+  publishable senses, 200,268 sense localizations, 3,030 examples, and 11,898
+  example localizations. Its SHA-256 is
+  `582FD6962D09F954F915C8B7E13A915C40D06058FDBE3E58D6FAD159278307EF`.
+  Rollback DB:
+  `backups\v156-additional-sense-production500-main-before-commit-20260824-071921.db`.
+- Relative to the v142 release baseline of 48,186 senses, 1,881 new senses have
+  accumulated; 3,119 remain before the approximate 5,000-sense D1/Worker
+  release cadence. Do not publish D1 early.
+- `v157-additional-sense-production1000` is the active next batch. Strict supply
+  produced 939 candidates (`zh=500`, `ja=250`, `en=100`, `pt-BR=89`) rather
+  than padding the Portuguese quota with weak evidence. It uses dynamic endpoint
+  discovery, Qwen generation, Gemma independent review, checkpointed writes,
+  circuit breaking, and no automatic database writes.

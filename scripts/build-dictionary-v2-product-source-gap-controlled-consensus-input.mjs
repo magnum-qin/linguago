@@ -198,6 +198,16 @@ function hasLockedSourceSense(row) {
     sourceConsensus?.gemma?.approved === true &&
     sourceConsensus?.preferred_term_agreement === true &&
     Number(row?.reverse_evidence_prefilter?.target_coverage_count || 0) >= 3
+  const additionalSenseLocked =
+    selection?.policy === 'native_dictionary_additional_unlinked_sense' &&
+    selection?.requires_independent_source_review === true &&
+    Number.isInteger(Number(row?.product_entry_id)) &&
+    Number.isInteger(firstSenseId) &&
+    selectedAlternative?.blocked_reason == null &&
+    selectedAlternative?.linked_product_sense == null &&
+    authoritativeAdditionalSenseSource(row?.source_lang, selectedAlternative?.source) &&
+    String(row?.candidate_key || '') === `${Number(row?.source_entry_id)}:${firstSenseId}`
+  if (additionalSenseLocked) return true
   return (
     selection?.policy === 'native_dictionary_then_daily_semantics' &&
     selection?.requires_independent_source_review === true &&
@@ -209,6 +219,15 @@ function hasLockedSourceSense(row) {
     ) &&
     String(row?.candidate_key || '') === `${Number(row?.source_entry_id)}:${firstSenseId}`
   )
+}
+
+function authoritativeAdditionalSenseSource(lang, value) {
+  const source = String(value || '').trim().toLowerCase()
+  if (lang === 'zh') return source.includes('cc-cedict')
+  if (lang === 'ja') return source.includes('jmdict')
+  if (lang === 'pt-BR') return source.includes('freedict') || source.includes('dicionario')
+  if (lang === 'en') return source.includes('freedict-eng-por') || source.includes('ecdict')
+  return false
 }
 
 function isResolvedRiskFlag(value) {

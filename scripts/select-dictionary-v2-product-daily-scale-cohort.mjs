@@ -14,6 +14,8 @@ const minimumTargetCoverage = nonNegativeInteger(args['minimum-target-coverage']
 const minimumMatchingSources = nonNegativeInteger(args['minimum-matching-sources'], 0);
 const minimumMatchRatio = boundedRatio(args['minimum-match-ratio'], 0);
 const includeExtended = args['include-extended'] === 'true';
+const allowExistingQueryable = args['allow-existing-queryable'] === 'true';
+const allowMissingDailyTier = args['allow-missing-daily-tier'] === 'true';
 const qualityProfile = String(args['quality-profile'] || 'daily-general').trim();
 const excludedCandidateKeys = loadExcludedCandidateKeys(args['exclude-reports']);
 const sourceLanguageQuotas = {
@@ -85,6 +87,8 @@ const output = {
     exclude_numeric_glosses: true,
     exclude_proper_and_specialized_glosses: true,
     exclude_existing_published_localization_lookup: true,
+    allow_existing_queryable_for_additional_sense: allowExistingQueryable,
+    allow_missing_daily_tier_for_additional_sense: allowMissingDailyTier,
     exclude_previously_attempted_candidates: excludedCandidateKeys.size,
     quality_profile: qualityProfile,
     automatic_promotion: false,
@@ -110,7 +114,7 @@ console.log(JSON.stringify({ ok: true, out: relative(outPath), summary: output.s
 function rejectionReason(row) {
   if (!enabledSourceLangs.has(row.source_lang)) return 'unsupported_source_lang';
   if (excludedCandidateKeys.has(candidateKey(row))) return 'previously_attempted';
-  if (!['core', 'common'].includes(row.daily_tier) && !(includeExtended && row.daily_tier === 'extended')) return 'non_daily_tier';
+  if (!['core', 'common'].includes(row.daily_tier) && !(includeExtended && row.daily_tier === 'extended') && !(allowMissingDailyTier && !row.daily_tier)) return 'non_daily_tier';
   if (targetCoverage(row) < minimumTargetCoverage) return 'insufficient_target_coverage';
   if (matchingSourceCount(row) < minimumMatchingSources) return 'insufficient_matching_sources';
   if (matchRatio(row) < minimumMatchRatio) return 'insufficient_gloss_match_ratio';
@@ -124,7 +128,7 @@ function rejectionReason(row) {
   if (looksLikeProperNamePartOfSpeech(row.part_of_speech) || looksLikeStandaloneProperNameGloss(gloss)) {
     return 'proper_name';
   }
-  if (publishedLocalizationTerms.has(word.normalize('NFKC'))) return 'already_queryable_localization';
+  if (!allowExistingQueryable && publishedLocalizationTerms.has(word.normalize('NFKC'))) return 'already_queryable_localization';
   if (/\d/u.test(word) || /(?:^|\b)\d+(?:st|nd|rd|th)?(?:\b|$)/iu.test(gloss)) return 'numeric';
   if (/\b(?:city|province|prefecture|territory|republic|country name|surname|given name|brand|company|dynasty|emperor|chemical|enzyme|protein|disease|syndrome|military|weapon|taxon|species|genus|war|wartime|bomb|missile|army|monarch|pope|camp|religion|political|glycosuria|diabetes|masturbation|sexual harassment)\b/iu.test(gloss)) return 'proper_or_specialized';
   if (/^(?:zero|one|two|three|four|five|six|seven|eight|nine|ten)$/iu.test(gloss)) return 'numeric';

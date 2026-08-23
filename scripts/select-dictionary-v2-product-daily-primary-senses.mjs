@@ -15,6 +15,8 @@ const outPath = path.resolve(args.out || 'logs/product-daily-primary-senses.json
 const rejectedOutPath = path.resolve(args['rejected-out'] || outPath.replace(/\.json$/u, '-rejected.json'));
 const minimumScore = Number(args['min-score'] || 2_500);
 const requireNativeSource = args['require-native-source'] === 'true';
+const allowLinkedPrimaryForAdditionalSense =
+  args['allow-linked-primary-for-additional-sense'] === 'true';
 
 const report = readJson(reportPath);
 const candidates = Array.isArray(report.selected) ? report.selected : [];
@@ -63,7 +65,7 @@ for (const candidate of candidates) {
   const primaryNativeSense = alternatives
     .filter((sense) => isNativeSource(candidate.source_lang, sense.source) && !sense.blocked_reason)
     .sort((left, right) => left.sense_order - right.sense_order)[0];
-  if (primaryNativeSense?.linked_product_sense) {
+  if (primaryNativeSense?.linked_product_sense && !allowLinkedPrimaryForAdditionalSense) {
     rejected.push({
       ...identity(candidate),
       reason: 'primary_native_sense_already_linked_use_entry_form_alias',
@@ -96,12 +98,14 @@ for (const candidate of candidates) {
     first_sense_clean_localization_lang_count: best.clean_localization_langs.length,
     first_sense_localizations: best.localizations,
     daily_sense_selection: {
-      policy: 'native_dictionary_then_daily_semantics',
+      policy: allowLinkedPrimaryForAdditionalSense
+        ? 'native_dictionary_additional_unlinked_sense'
+        : 'native_dictionary_then_daily_semantics',
       score: best.daily_sense_score,
       reasons: best.score_reasons,
       original_sense_id: candidate.first_sense_id ?? null,
       changed: Number(candidate.first_sense_id) !== Number(best.id),
-      alternatives: alternatives.slice(0, 12).map(compactAlternative),
+      alternatives: compactSelectedAlternatives(alternatives, best),
       requires_independent_source_review: true
     }
   });
@@ -123,7 +127,8 @@ const common = {
     independent_source_review_still_required: true,
     automatic_publication: false,
     minimum_score: minimumScore,
-    require_native_source: requireNativeSource
+    require_native_source: requireNativeSource,
+    allow_linked_primary_for_additional_sense: allowLinkedPrimaryForAdditionalSense
   },
   summary: {
     input: candidates.length,
@@ -262,6 +267,11 @@ function compactAlternative(sense) {
     blocked_reason: sense.blocked_reason,
     linked_product_sense: sense.linked_product_sense
   };
+}
+
+function compactSelectedAlternatives(alternatives, selectedSense) {
+  const rows = [selectedSense, ...alternatives.filter((sense) => sense.id !== selectedSense.id)];
+  return rows.slice(0, 12).map(compactAlternative);
 }
 
 function compactLocalization(row) {
