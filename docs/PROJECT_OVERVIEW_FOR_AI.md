@@ -141,6 +141,12 @@ idempotence, promotion, fast/published-risk/full export audits all pass. Monitor
 This supervisor never pushes D1 or deploys the Worker; those remain a separate
 release step after reviewing the accumulated publishable count.
 
+Runs created after v147 additionally require
+`production-cadence-audit.json`. Generation checkpoint writes are configured
+at no more than 50 items, with explicit 500-item generation windows and
+1,000-item deterministic/final-review publication windows. This adds
+traceability without allowing incremental writes to the main product DB.
+
 ## Current production dictionary (v124, 2026-08-20)
 
 The jump-host release plane is now live end to end. The guarded controller

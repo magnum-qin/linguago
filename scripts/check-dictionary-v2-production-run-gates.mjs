@@ -8,6 +8,7 @@ const runDir = path.resolve(required(args['run-dir'], 'run-dir'));
 const outPath = path.resolve(args.out || path.join(runDir, 'production-gate.json'));
 const summary = readJson(path.join(runDir, 'summary.json'));
 const generation = readJson(path.join(runDir, '05-qwen-generation.json'));
+const cadence = readJson(path.join(runDir, 'production-cadence-audit.json'));
 
 const input = Number(summary?.summary?.input || 0);
 const generationReady = Number(summary?.summary?.jmdict_generation_ready || 0);
@@ -36,6 +37,7 @@ const thresholds = {
   json_failure: numberArg(args['max-json-failure'], 0.02)
 };
 const failures = [];
+if (cadence.ok !== true) failures.push('production cadence audit must pass');
 if (input <= 0) failures.push('input must be positive');
 if (generationReady <= 0) failures.push('generation-ready count must be positive');
 if (Number(summary?.summary?.automatic_database_writes || 0) !== 0) failures.push('automatic database writes must be zero');
@@ -52,6 +54,11 @@ const output = {
   generated_at: new Date().toISOString(),
   run_id: summary.run_id,
   counts: { input, generation_ready: generationReady, generated_valid: generatedValid, reverse_supported: reverseSupported, final_accepted: finalAccepted, final_rejected: finalRejected, generated, infrastructure_rejected: infrastructureRejected, json_failures: jsonFailures },
+  cadence: {
+    checkpoint_commits: Number(cadence?.counts?.checkpoint_commits || 0),
+    generation_windows: Array.isArray(cadence?.generation_windows) ? cadence.generation_windows.length : 0,
+    validation_windows: Array.isArray(cadence?.validation_windows) ? cadence.validation_windows.length : 0
+  },
   metrics,
   thresholds,
   failures

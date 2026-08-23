@@ -10,6 +10,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'linguago-production-gates-'))
 try {
   fs.writeFileSync(path.join(dir, 'summary.json'), JSON.stringify({ run_id: 'test', summary: { input: 500, jmdict_generation_ready: 42, generated_valid: 42, reverse_supported: 42, final_accepted: 42, final_rejected: 0, automatic_database_writes: 0 } }));
   fs.writeFileSync(path.join(dir, '05-qwen-generation.json'), JSON.stringify({ stats: { generated: 42, infrastructure_rejected: 0 }, generated: Array.from({ length: 42 }, () => ({ valid: true, errors: [] })) }));
+  fs.writeFileSync(path.join(dir, 'production-cadence-audit.json'), JSON.stringify({ ok: true, counts: { checkpoint_commits: 1 }, generation_windows: [{}], validation_windows: [{}] }));
   const result = spawnSync(process.execPath, [path.resolve('scripts/check-dictionary-v2-production-run-gates.mjs'), '--run-dir', dir], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   const gate = JSON.parse(fs.readFileSync(path.join(dir, 'production-gate.json'), 'utf8'));

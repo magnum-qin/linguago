@@ -381,6 +381,12 @@
   explicitly reviewed release decision at the normal accumulated-sense
   threshold. A failed gate or audit leaves the existing main DB unchanged and
   records `status=failed` in the supervisor file.
+- Runs created after v147 also produce `production-cadence-audit.json` before
+  the production gate. It verifies that generation checkpoint chunks are no
+  larger than 50 and records 500-item generation-quality windows plus
+  1,000-item reverse-evidence, final-review, and controlled-replay windows.
+  These are isolated audit windows; the main DB is still replaced only after
+  the complete controlled replay and full audit pass.
 
 ## 2026-08-20 v124 production release
 
