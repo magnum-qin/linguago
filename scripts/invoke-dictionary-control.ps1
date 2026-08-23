@@ -32,6 +32,20 @@ function Require-Value([string]$Value, [string]$Name) {
   if ([string]::IsNullOrWhiteSpace($Value)) { throw "$Name is required for action $Action" }
 }
 
+function Get-Sha256([string]$Path) {
+  $Stream = [IO.File]::OpenRead($Path)
+  try {
+    $Hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+      return ([BitConverter]::ToString($Hasher.ComputeHash($Stream))).Replace('-', '')
+    } finally {
+      $Hasher.Dispose()
+    }
+  } finally {
+    $Stream.Dispose()
+  }
+}
+
 function Invoke-RemoteScript([string]$Script, [string[]]$Arguments = @()) {
   $RemoteScript = Join-Path "$RemoteRoot\scripts" $Script
   $SshArgs = @(
@@ -136,7 +150,7 @@ switch ($Action) {
     $Archive = Join-Path $env:TEMP "linguago-worker-$ResolvedCommit.zip"
     & git.exe archive --format=zip --output=$Archive $ResolvedCommit
     if ($LASTEXITCODE -ne 0) { throw 'git archive failed' }
-    $Hash = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash
+    $Hash = Get-Sha256 $Archive
     $RemoteArchive = "$RemoteRoot\incoming\linguago-worker-$ResolvedCommit.zip"
     Invoke-RemotePowerShell "New-Item -ItemType Directory -Path '$RemoteRoot\incoming' -Force | Out-Null"
     & scp.exe $Archive "${HostAlias}:D:/linguago-runner/incoming/linguago-worker-$ResolvedCommit.zip"
