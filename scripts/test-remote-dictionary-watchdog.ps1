@@ -15,6 +15,9 @@ Write-Utf8Json (Join-Path $CompleteDir 'manifest.json') @{ status = 'complete'; 
 & $Script -Action once -Root $Root -RunId $CompleteRun -NoRecovery | Out-Null
 $Complete = Get-Content (Join-Path $Root 'state\dictionary-watchdog.json') -Raw | ConvertFrom-Json
 if ($Complete.status -ne 'complete' -or $Complete.recovery -ne 'not_needed') { throw 'Complete fixture classification failed' }
+if ($Complete.supervisor_recovery -notin @('task_missing', 'different_run')) {
+  throw 'Inactive supervisor task classification failed'
+}
 
 $StalledRun = 'stalled-fixture'
 $StalledDir = Join-Path $Root "runs\$StalledRun"

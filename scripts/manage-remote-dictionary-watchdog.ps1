@@ -203,6 +203,25 @@ function Restart-FromLaunch([string]$ResolvedRunId, [string]$RunDir, [object]$La
   throw "Runner scheduled task did not create a process within 45 seconds"
 }
 
+function Ensure-ProductionSupervisor([string]$ResolvedRunId, [string]$ManifestStatus) {
+  $SupervisorTaskName = 'LinguaGo Dictionary Production Supervisor'
+  $SupervisorTask = Get-ScheduledTask -TaskName $SupervisorTaskName -ErrorAction SilentlyContinue
+  if (-not $SupervisorTask) { return 'task_missing' }
+
+  $Arguments = @($SupervisorTask.Actions | ForEach-Object { [string]$_.Arguments }) -join ' '
+  if ($Arguments -notlike "*$ResolvedRunId*") { return 'different_run' }
+  if ([string]$SupervisorTask.State -eq 'Running') { return 'running' }
+  if ($ManifestStatus -ne 'running') { return 'not_needed' }
+  if ($NoRecovery) { return 'disabled' }
+
+  try {
+    Start-ScheduledTask -TaskName $SupervisorTaskName
+    return 'started'
+  } catch {
+    return 'start_failed:' + $_.Exception.Message
+  }
+}
+
 if ($Action -eq 'install') {
   $ScriptPath = Join-Path $Root 'scripts\manage-remote-dictionary-watchdog.ps1'
   if (-not (Test-Path -LiteralPath $ScriptPath)) { throw "Watchdog script not found: $ScriptPath" }
@@ -289,6 +308,8 @@ try {
     }
   }
 
+  $SupervisorRecovery = Ensure-ProductionSupervisor $ResolvedRunId $ManifestStatus
+
   $Status = [ordered]@{
     observed_at = [DateTime]::UtcNow.ToString('o')
     status = $State
@@ -301,6 +322,7 @@ try {
     progress = $Progress
     endpoints = $EndpointResults
     recovery = $Recovery
+    supervisor_recovery = $SupervisorRecovery
     restart_events = $RestartEvents
   }
   Write-JsonAtomic $StatusPath $Status

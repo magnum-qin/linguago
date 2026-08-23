@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T10:31:32.3935535Z",
+    "generated_at":  "2026-08-23T11:09:29.6406925Z",
     "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
@@ -170,13 +170,13 @@
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-watchdog.ps1",
-                      "bytes":  15044,
-                      "sha256":  "5BC847DEA98598CA7EFFC3AC7853FA96031AC940A6FAC636FA5568703520B75A"
+                      "bytes":  15977,
+                      "sha256":  "0BC01F58AA62053CC5372F6055913D0EB0A0A96A7A9F71EAD463D9556F705212"
                   },
                   {
                       "path":  "scripts\\test-remote-dictionary-watchdog.ps1",
-                      "bytes":  3118,
-                      "sha256":  "48BFCF1799CD92F4B50ED24FE42DD055A69EF61F34FA672AC772C8997032AD61"
+                      "bytes":  3256,
+                      "sha256":  "0BA466399F4E0C6359DE27FA23FB27396EEEBCEFB7083FD1EC1F43BC9BACF43E"
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-runner-manifest.ps1",
