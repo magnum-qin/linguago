@@ -1,7 +1,7 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T06:37:35.1654167Z",
-    "root":  "D:\\linguago-runner",
+    "generated_at":  "2026-08-23T07:05:05.9282312Z",
+    "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
                       "path":  "package.json",
@@ -115,8 +115,8 @@
                   },
                   {
                       "path":  "scripts\\invoke-dictionary-control.ps1",
-                      "bytes":  7330,
-                      "sha256":  "965F5C78E61ADFFE712F4CDCFC9868B3850041FD65E10D3078780EFD28E555D8"
+                      "bytes":  8020,
+                      "sha256":  "347DB874E4178239A49D2CD77A79ABBEB35A530C89F1AB92C8D3E493CE5FE77F"
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-runner.ps1",
@@ -195,8 +195,8 @@
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-production-batch.ps1",
-                      "bytes":  4262,
-                      "sha256":  "950F37A285D54105FC70BB4F7D451A93C147D57BE4262D6662B2DEFDAEA61D91"
+                      "bytes":  5380,
+                      "sha256":  "4FCD6639A31F9C10423AA4EE28B9940CA4A6F00DC25E01A3811AC31200413106"
                   },
                   {
                       "path":  "scripts\\select-dictionary-v2-source-gap-fresh-cohort.mjs",

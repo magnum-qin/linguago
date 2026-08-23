@@ -5,6 +5,11 @@ param(
   [string]$RunId = '',
   [string]$Batch = '',
   [int]$Limit = 100,
+  [ValidateSet('authoritative-pool', 'native-daily')]
+  [string]$CandidateMode = 'native-daily',
+  [int]$NativeMaxRank = 2000000,
+  [int]$NativeScanLimit = 2000000,
+  [string]$NativeTargets = 'zh=50000,ja=50000',
   [int]$GenerationTarget = 20,
   [string]$SupplementalSourceDb = '',
   [object]$ProductionPrefilter = $true,
@@ -69,7 +74,13 @@ switch ($Action) {
   }
   'new-batch' {
     if ($Limit -lt 1 -or $Limit -gt 5000) { throw 'Limit must be between 1 and 5000' }
-    Invoke-RemoteScript 'new-remote-dictionary-production-batch.ps1' @('-Limit', [string]$Limit)
+    Invoke-RemoteScript 'new-remote-dictionary-production-batch.ps1' @(
+      '-Limit', [string]$Limit,
+      '-CandidateMode', $CandidateMode,
+      '-NativeMaxRank', [string]$NativeMaxRank,
+      '-NativeScanLimit', [string]$NativeScanLimit,
+      '-NativeTargets', $NativeTargets
+    )
   }
   'start' {
     Require-Value $RunId 'RunId'
