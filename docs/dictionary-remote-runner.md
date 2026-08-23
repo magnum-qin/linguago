@@ -365,6 +365,14 @@ restart preserves the run ID, launch arguments, and checkpoints. A ten-minute
 cooldown and a maximum of three restart events per hour prevent restart loops.
 Completed and failed manifests are terminal.
 
+Recovery starts the existing `Linguago Remote Dictionary Pipeline` scheduled
+task. Do not re-register that task from the watchdog context: the scheduled
+watchdog principal may be allowed to start it but denied permission to replace
+it. A restart is only reported successful after a matching process appears;
+the presence of an old `manifest.json` is insufficient. Exceptions from the
+scheduled runner wrapper are appended to `scheduled-task-error.log` beside the
+run's `launch.json`.
+
 The watchdog never replays or promotes records, modifies the product database,
 exports or uploads D1, or deploys the Worker. It only restores the checkpointed
 generation process. Run `npm run dict:v2:test:remote-watchdog` after changing

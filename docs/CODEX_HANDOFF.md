@@ -47,6 +47,14 @@
 - The watchdog is recovery-only. It cannot replay drafts into the product DB,
   promote senses, export or upload D1, or deploy the Worker. Those operations
   remain behind the existing deterministic release gates.
+- The first v141 recovery exercise exposed two startup-control defects that are
+  now fixed: the watchdog no longer passes an unsupported `-Root` parameter to
+  the runner manager, and it reuses the already registered
+  `Linguago Remote Dictionary Pipeline` task instead of trying to register a
+  task from a restricted scheduled-task context. Startup success now requires
+  a real matching process rather than merely finding the old manifest. Failed
+  recovery also retains the prior running `run_id` for the next watchdog pass
+  and writes scheduled-task exceptions to `scheduled-task-error.log`.
 
 ## 2026-08-22 v139 evidence-yield qualification
 

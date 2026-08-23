@@ -46,6 +46,15 @@ rate-limited to three restarts per hour with a ten-minute cooldown. Completed
 or failed manifests are never restarted. The watchdog does not perform product
 DB replay, promotion, D1 upload, or Worker deployment.
 
+Recovery must start the existing `Linguago Remote Dictionary Pipeline`
+scheduled task; a watchdog task may not have permission to re-register it.
+Startup is successful only after a matching runner process is visible. If a
+restart fails after locks are removed, the next watchdog pass recovers the run
+identity from the prior status/restart event while its manifest remains
+`running`. The v141 checkpoint recovery was exercised through this path and
+continued from semantic preview review into Qwen generation without replaying
+completed stages.
+
 ## Current local production baseline and v139 qualification (2026-08-22)
 
 The authoritative jump-host product DB is ahead of the currently released D1.

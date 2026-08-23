@@ -324,12 +324,14 @@ $Deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(5, $StartTimeoutSeconds))
 do {
   Start-Sleep -Milliseconds 500
   $Manifest = Read-JsonFile $ManifestPath
-  if ($Manifest) {
+  $StartedProcess = Get-RunnerProcess
+  if ($StartedProcess) {
     Write-StartupState 'started' @{
-      manifest_status = [string]$Manifest.status
-      manifest_started_at = [string]$Manifest.started_at
+      pid = $StartedProcess.Id
+      manifest_status = if ($Manifest) { [string]$Manifest.status } else { 'not_started' }
+      manifest_started_at = if ($Manifest) { [string]$Manifest.started_at } else { $null }
     }
-    Write-Output "started scheduled_task=$ScheduledTaskName run_id=$RunId manifest_status=$($Manifest.status)"
+    Write-Output "started scheduled_task=$ScheduledTaskName run_id=$RunId pid=$($StartedProcess.Id) manifest_status=$(if ($Manifest) { $Manifest.status } else { 'not_started' })"
     exit 0
   }
   $TaskInfo = Get-ScheduledTaskInfo -TaskName $ScheduledTaskName -ErrorAction SilentlyContinue

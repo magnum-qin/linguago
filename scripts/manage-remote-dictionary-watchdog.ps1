@@ -35,7 +35,7 @@ function Write-JsonAtomic([string]$Path, [object]$Value) {
   Move-Item -LiteralPath $Temp -Destination $Path -Force
 }
 
-function Resolve-RunId {
+function Resolve-RunId([object]$PreviousStatus) {
   if (-not [string]::IsNullOrWhiteSpace($RunId)) { return $RunId }
   foreach ($Path in @(
     (Join-Path $StateDir 'remote-pipeline.lock.json'),
@@ -44,6 +44,19 @@ function Resolve-RunId {
     $State = Read-Json $Path
     if ($State -and -not [string]::IsNullOrWhiteSpace([string]$State.run_id)) {
       return [string]$State.run_id
+    }
+  }
+  if ($PreviousStatus -and -not [string]::IsNullOrWhiteSpace([string]$PreviousStatus.run_id)) {
+    $PreviousManifest = Read-Json (Join-Path $Root (Join-Path 'runs' (Join-Path ([string]$PreviousStatus.run_id) 'manifest.json')))
+    if ($PreviousManifest -and [string]$PreviousManifest.status -eq 'running') {
+      return [string]$PreviousStatus.run_id
+    }
+  }
+  $LastRestart = @($PreviousStatus.restart_events) | Select-Object -Last 1
+  if ($LastRestart -and -not [string]::IsNullOrWhiteSpace([string]$LastRestart.run_id)) {
+    $RestartManifest = Read-Json (Join-Path $Root (Join-Path 'runs' (Join-Path ([string]$LastRestart.run_id) 'manifest.json')))
+    if ($RestartManifest -and [string]$RestartManifest.status -eq 'running') {
+      return [string]$LastRestart.run_id
     }
   }
   return $null
@@ -168,14 +181,26 @@ function Test-Endpoints([string[]]$Urls) {
 function Restart-FromLaunch([string]$ResolvedRunId, [string]$RunDir, [object]$Launch) {
   if (-not $Launch) { throw "Launch configuration missing for $ResolvedRunId" }
   $Manager = Join-Path $Root 'scripts\manage-remote-dictionary-runner.ps1'
-  & $Manager -Root $Root -Action stop -RunId $ResolvedRunId | Out-Null
+  & $Manager -Action stop -RunId $ResolvedRunId | Out-Null
   Start-Sleep -Seconds 3
-  $Parameters = @{ Root = $Root; Action = 'start' }
-  foreach ($Property in $Launch.PSObject.Properties) {
-    if ($Property.Name -in @('Action', 'Root')) { continue }
-    $Parameters[$Property.Name] = $Property.Value
+  $RunnerTaskName = 'Linguago Remote Dictionary Pipeline'
+  $RunnerTask = Get-ScheduledTask -TaskName $RunnerTaskName -ErrorAction SilentlyContinue
+  if (-not $RunnerTask) {
+    throw "Runner scheduled task is missing: $RunnerTaskName"
   }
-  & $Manager @Parameters | Out-Null
+  Start-ScheduledTask -TaskName $RunnerTaskName
+  $Deadline = [DateTime]::UtcNow.AddSeconds(45)
+  do {
+    Start-Sleep -Milliseconds 500
+    $StartedProcess = Get-RunnerProcess $ResolvedRunId $RunDir
+    if ($StartedProcess) { return }
+    $TaskInfo = Get-ScheduledTaskInfo -TaskName $RunnerTaskName -ErrorAction SilentlyContinue
+    $TaskState = (Get-ScheduledTask -TaskName $RunnerTaskName -ErrorAction SilentlyContinue).State
+    if ($TaskState -ne 'Running' -and $TaskInfo -and $TaskInfo.LastTaskResult -notin @(0, 267009) -and $TaskInfo.LastRunTime -gt [DateTime]::MinValue) {
+      throw "Runner scheduled task failed with result $($TaskInfo.LastTaskResult)"
+    }
+  } while ([DateTime]::UtcNow -lt $Deadline)
+  throw "Runner scheduled task did not create a process within 45 seconds"
 }
 
 if ($Action -eq 'install') {
@@ -213,7 +238,7 @@ try {
   $RestartEvents = @($Previous.restart_events | Where-Object {
     try { ($NowUtc - ([datetime]$_.at).ToUniversalTime()).TotalHours -le 24 } catch { $false }
   })
-  $ResolvedRunId = Resolve-RunId
+  $ResolvedRunId = Resolve-RunId $Previous
   if ([string]::IsNullOrWhiteSpace($ResolvedRunId)) {
     $Status = [ordered]@{ observed_at = $NowUtc.ToString('o'); status = 'idle'; run_id = $null; restart_events = $RestartEvents }
     Write-JsonAtomic $StatusPath $Status

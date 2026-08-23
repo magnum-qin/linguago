@@ -12,5 +12,12 @@ foreach ($Property in $Raw.PSObject.Properties) {
   $Arguments[$Property.Name] = $Property.Value
 }
 $Manager = Join-Path $PSScriptRoot 'manage-remote-dictionary-runner.ps1'
-& $Manager @Arguments
-exit $LASTEXITCODE
+$ErrorLog = Join-Path (Split-Path -Parent $Config) 'scheduled-task-error.log'
+try {
+  & $Manager @Arguments
+  exit $LASTEXITCODE
+} catch {
+  $Message = "[$([DateTime]::UtcNow.ToString('o'))] $($_ | Out-String)"
+  [IO.File]::AppendAllText($ErrorLog, $Message, [Text.UTF8Encoding]::new($false))
+  throw
+}

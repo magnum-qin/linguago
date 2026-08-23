@@ -33,4 +33,19 @@ if ($Stalled.status -ne 'stalled' -or $Stalled.reason -ne 'runner_missing' -or $
 }
 if ($Stalled.progress.completed -ne 1 -or $Stalled.progress.total -ne 10) { throw 'Progress parsing failed' }
 
+# A failed restart may remove the global lock before the next watchdog pass.
+# The watchdog must continue tracking the still-running manifest from its last
+# restart event instead of becoming idle.
+Write-Utf8Json (Join-Path $Root 'state\dictionary-watchdog.json') @{
+  observed_at = [DateTime]::UtcNow.AddMinutes(-1).ToString('o')
+  status = 'idle'
+  run_id = $null
+  restart_events = @(@{ at = [DateTime]::UtcNow.AddMinutes(-1).ToString('o'); run_id = $StalledRun; reason = 'runner_missing' })
+}
+& $Script -Action once -Root $Root -StallMinutes 5 -NoRecovery | Out-Null
+$RecoveredIdentity = Get-Content (Join-Path $Root 'state\dictionary-watchdog.json') -Raw | ConvertFrom-Json
+if ($RecoveredIdentity.run_id -ne $StalledRun -or $RecoveredIdentity.status -ne 'stalled') {
+  throw 'Run identity fallback after failed restart failed'
+}
+
 Write-Output 'remote dictionary watchdog tests passed'

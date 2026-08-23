@@ -1,6 +1,6 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T05:06:52.4179189Z",
+    "generated_at":  "2026-08-23T05:47:52.4361012Z",
     "root":  "D:\\linguago-runner",
     "files":  [
                   {
@@ -120,13 +120,13 @@
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-runner.ps1",
-                      "bytes":  16283,
-                      "sha256":  "EF86FDA70A86F7C0A2BDA257BAFA053A381F16D065F0DF418BDA1B3532D6ED3E"
+                      "bytes":  16502,
+                      "sha256":  "A8CA162DA1F745DC84EB6C09A91F854963EA49A5657D7726212521B2BF8E801C"
                   },
                   {
                       "path":  "scripts\\run-remote-dictionary-runner-job.ps1",
-                      "bytes":  503,
-                      "sha256":  "D38FF5C7D0F5CEF07B989860D83402BC836A92D7C00E282AAAEE72DC1FC742B7"
+                      "bytes":  765,
+                      "sha256":  "98E53D61DB368B4D9E4631CCB52B83D39B4A1B364DF25412F057B6B2E221F094"
                   },
                   {
                       "path":  "scripts\\verify-remote-dictionary-runner.ps1",
@@ -140,13 +140,13 @@
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-watchdog.ps1",
-                      "bytes":  13462,
-                      "sha256":  "652F8B42B4860986A79FF252AC4B5A2FD190753CE4EFA23B867FDD3E5154FD1F"
+                      "bytes":  15044,
+                      "sha256":  "5BC847DEA98598CA7EFFC3AC7853FA96031AC940A6FAC636FA5568703520B75A"
                   },
                   {
                       "path":  "scripts\\test-remote-dictionary-watchdog.ps1",
-                      "bytes":  2283,
-                      "sha256":  "36EE2CE5FE0AE0C8B73B10F16396B1421BC1BF1A5FF0C83D4861894FF38C7E0F"
+                      "bytes":  3118,
+                      "sha256":  "48BFCF1799CD92F4B50ED24FE42DD055A69EF61F34FA672AC772C8997032AD61"
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-runner-manifest.ps1",
