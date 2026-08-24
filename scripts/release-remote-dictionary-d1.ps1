@@ -8,6 +8,7 @@ param(
   [string]$ExpectedDbSha256,
   [string]$DatabaseName = 'linguago-dictionary',
   [string]$ExpectedAccountId = '3ebbb03df81b809142eec47c07ef6801',
+  [object]$ReuseValidatedExport = $false,
   [object]$Execute = $false
 )
 
@@ -32,6 +33,7 @@ function Invoke-Node([string]$Script, [string[]]$Arguments) {
 }
 
 $Execute = ConvertTo-RunnerBoolean $Execute 'Execute'
+$ReuseValidatedExport = ConvertTo-RunnerBoolean $ReuseValidatedExport 'ReuseValidatedExport'
 $Root = [IO.Path]::GetFullPath($Root)
 $RunDir = [IO.Path]::GetFullPath((Join-Path $Root (Join-Path 'runs' $RunId)))
 if (-not $RunDir.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase)) {
@@ -75,16 +77,39 @@ $LockPayload = [ordered]@{
 
 try {
   $OutDir = Join-Path $RunDir 'cloudflare-d1-release'
-  Invoke-Node 'scripts\export-dictionary-v2-product-native-d1-sql.mjs' @(
-    '--db', $ResolvedDb, '--out-dir', $OutDir,
-    '--entry-form-aliases', (Join-Path $Root 'config\dictionary-overrides\product-entry-form-aliases.json')
-  )
-  Invoke-Node 'scripts\audit-dictionary-v2-product-export.mjs' @(
-    '--db', $ResolvedDb, '--mode', 'full', '--import', 'memory', '--out-dir', $OutDir
-  )
+  if ($ReuseValidatedExport) {
+    $ManifestPath = Join-Path $OutDir 'manifest.json'
+    $AuditPath = Join-Path $OutDir 'audit.json'
+    if (-not (Test-Path -LiteralPath $ManifestPath) -or -not (Test-Path -LiteralPath $AuditPath)) {
+      throw 'ReuseValidatedExport requires an existing manifest and full audit'
+    }
+    $NewestDbWrite = (Get-Item -LiteralPath $ResolvedDb).LastWriteTimeUtc
+    if ((Get-Item -LiteralPath $ManifestPath).LastWriteTimeUtc -lt $NewestDbWrite -or
+        (Get-Item -LiteralPath $AuditPath).LastWriteTimeUtc -lt $NewestDbWrite) {
+      throw 'Existing export predates the current database'
+    }
+  } else {
+    Invoke-Node 'scripts\export-dictionary-v2-product-native-d1-sql.mjs' @(
+      '--db', $ResolvedDb, '--out-dir', $OutDir,
+      '--entry-form-aliases', (Join-Path $Root 'config\dictionary-overrides\product-entry-form-aliases.json')
+    )
+    Invoke-Node 'scripts\audit-dictionary-v2-product-export.mjs' @(
+      '--db', $ResolvedDb, '--mode', 'full', '--import', 'memory', '--out-dir', $OutDir
+    )
+  }
 
   $Manifest = Read-JsonFile (Join-Path $OutDir 'manifest.json')
   $Audit = Read-JsonFile (Join-Path $OutDir 'audit.json')
+  foreach ($SqlFile in @($Manifest.schema) + @($Manifest.chunks)) {
+    $ResolvedSqlFile = if ([IO.Path]::IsPathRooted([string]$SqlFile)) {
+      [string]$SqlFile
+    } else {
+      Join-Path $Root ([string]$SqlFile)
+    }
+    if (-not (Test-Path -LiteralPath $ResolvedSqlFile)) {
+      throw "Export SQL file not found: $ResolvedSqlFile"
+    }
+  }
   if (-not $Manifest.ok -or -not $Audit.ok) { throw 'D1 export or audit is not ok' }
   if ($Audit.count_mismatches.Count -ne 0) { throw 'D1 export count mismatch' }
   if ([int64]$Audit.bad_sense_localization_counts -ne 0) { throw 'Bad sense localization counts' }
