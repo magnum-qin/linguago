@@ -70,8 +70,14 @@ try {
 
   Invoke-Node 'scripts\checkpoint-sqlite-db.mjs' @('--db', $ReplayDb)
   $ReplayHash = (Get-FileHash -LiteralPath $ReplayDb -Algorithm SHA256).Hash.ToUpperInvariant()
-  if ($ReplayHash -ne $Actual) {
-    throw "Manual override replay differs from main DB: replay=$ReplayHash main=$Actual"
+  $MainLogical = @(& node.exe (Join-Path $Root 'scripts\fingerprint-sqlite-logical.mjs') '--db' $MainDb) -join "`n"
+  if ($LASTEXITCODE -ne 0) { throw 'Main DB logical fingerprint failed' }
+  $ReplayLogical = @(& node.exe (Join-Path $Root 'scripts\fingerprint-sqlite-logical.mjs') '--db' $ReplayDb) -join "`n"
+  if ($LASTEXITCODE -ne 0) { throw 'Replay DB logical fingerprint failed' }
+  $MainLogicalReport = $MainLogical | ConvertFrom-Json
+  $ReplayLogicalReport = $ReplayLogical | ConvertFrom-Json
+  if ([string]$ReplayLogicalReport.logical_sha256 -ne [string]$MainLogicalReport.logical_sha256) {
+    throw "Manual override replay differs logically from main DB: replay=$($ReplayLogicalReport.logical_sha256) main=$($MainLogicalReport.logical_sha256)"
   }
 
   Invoke-Node 'scripts\audit-dictionary-v2-product-export.mjs' @('--db', $ReplayDb, '--mode', 'fast')
@@ -103,6 +109,7 @@ try {
     backup_db = $ResolvedBackup
     replay_db = $ReplayDb
     replay_sha256 = $ReplayHash
+    logical_sha256 = [string]$MainLogicalReport.logical_sha256
     override = $ResolvedOverrides
     resolved_senses = [int64]$Apply.stats.resolved_senses
     skipped = [int64]$Apply.stats.skipped.Count
