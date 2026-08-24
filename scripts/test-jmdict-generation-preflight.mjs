@@ -14,10 +14,29 @@ try {
   const outPath = path.join(tempDir, 'out.json');
   fs.writeFileSync(reportPath, JSON.stringify({ selected: [
     { source_entry_id: 1, first_sense_id: 1, source_lang: 'ja', word: '央' },
-    { source_entry_id: 2, first_sense_id: 2, source_lang: 'ja', word: '眺める' }
+    { source_entry_id: 2, first_sense_id: 2, source_lang: 'ja', word: '眺める' },
+    {
+      source_entry_id: 3,
+      first_sense_id: 3,
+      source_lang: 'zh',
+      word: '我',
+      candidate_evidence_review: { preferred_terms: { ja: '自分自身' } },
+      first_sense_localizations: [{ lang: 'ja', term: '私' }]
+    },
+    {
+      source_entry_id: 4,
+      first_sense_id: 4,
+      source_lang: 'en',
+      word: 'view',
+      generation_contract: { ja_term: '眺める' },
+      candidate_evidence_review: { preferred_terms: { ja: '眺望を楽しむ' } }
+    }
   ] }), 'utf8');
   fs.writeFileSync(jmdictPath, zlib.gzipSync(`
-    <JMdict><entry><k_ele><keb>眺める</keb></k_ele><r_ele><reb>ながめる</reb></r_ele></entry></JMdict>
+    <JMdict>
+      <entry><k_ele><keb>眺める</keb></k_ele><r_ele><reb>ながめる</reb></r_ele></entry>
+      <entry><k_ele><keb>私</keb></k_ele><r_ele><reb>わたし</reb></r_ele></entry>
+    </JMdict>
   `));
 
   const result = spawnSync(process.execPath, [
@@ -29,10 +48,17 @@ try {
   assert.equal(result.status, 0, result.stderr || result.stdout);
 
   const output = JSON.parse(fs.readFileSync(outPath, 'utf8'));
-  assert.equal(output.selected_count, 1);
+  assert.equal(output.selected_count, 3);
   assert.equal(output.selected[0].word, '眺める');
+  assert.equal(output.selected[1].generation_contract.ja_term, '私');
+  assert.equal(output.selected[1].generation_contract.ja_reading, 'わたし');
+  assert.equal(output.selected[1].generation_contract.ja_term_source, 'source-localization+jmdict-exact');
+  assert.equal(output.selected[2].generation_contract.ja_term, '眺める');
+  assert.equal(output.selected[2].generation_contract.ja_term_source, 'deterministic:locked-generation-contract');
   assert.equal(output.jmdict_preflight_summary.rejected_by_reason.ja_single_character_source_gap, 1);
   assert.equal(output.selection_policy.reject_ja_single_character_source_gap, true);
+  assert.equal(output.selection_policy.allow_source_localization_ja_term_with_jmdict_exact_match, true);
+  assert.equal(output.selection_policy.preserve_locked_generation_contract_with_jmdict_exact_match, true);
   console.log('JMdict generation preflight regression passed.');
 } finally {
   fs.rmSync(tempDir, { recursive: true, force: true });

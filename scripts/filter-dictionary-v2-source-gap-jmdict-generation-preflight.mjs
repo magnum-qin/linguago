@@ -29,14 +29,23 @@ for (const row of report.selected || []) {
   const preferredTerm = String(row?.candidate_evidence_review?.preferred_terms?.ja || '').trim();
   const suggestedTerm = String(row?.candidate_evidence_review?.suggested_terms?.ja || '').trim();
   const nativeSourceTerm = row?.source_lang === 'ja' ? String(row.word || '').trim() : '';
+  const sourceLocalizationTerm = String(
+    (row?.first_sense_localizations || []).find((localization) => localization?.lang === 'ja')?.term || ''
+  ).trim();
+  const lockedGenerationTerm = String(row?.generation_contract?.ja_term || '').trim();
   const candidates = uniqueTerms([
+    lockedGenerationTerm && { term: lockedGenerationTerm, source: 'deterministic:locked-generation-contract' },
     preferredTerm && { term: preferredTerm, source: 'reviewed:preferred-term' },
     nativeSourceTerm && { term: nativeSourceTerm, source: 'deterministic:jmdict-source-headword' },
     suggestedTerm && { term: suggestedTerm, source: 'reviewed:suggested-term+jmdict-exact' },
     ...(jaSuggestionTerms.get(candidateKey(row)) || []).map((term) => ({
       term,
       source: 'reviewed:ja-generation-term-suggestion+jmdict-exact'
-    }))
+    })),
+    sourceLocalizationTerm && {
+      term: sourceLocalizationTerm,
+      source: 'source-localization+jmdict-exact'
+    }
   ].filter(Boolean));
   if (!candidates.length) {
     rejected.push(reject(row, 'missing_reviewed_ja_term', '', []));
@@ -60,6 +69,8 @@ const output = {
     require_jmdict_ja_term: true,
     allow_reviewed_suggested_ja_term_with_jmdict_exact_match: true,
     allow_reviewed_ja_generation_term_suggestions_with_jmdict_exact_match: true,
+    allow_source_localization_ja_term_with_jmdict_exact_match: true,
+    preserve_locked_generation_contract_with_jmdict_exact_match: true,
     require_unique_jmdict_ja_reading: true,
     reject_ja_single_character_source_gap: true,
     hiragana_katakana_equivalent_for_reading_uniqueness: true,
