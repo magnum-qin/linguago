@@ -3,7 +3,7 @@
 ## Current jump-host baseline and online release (2026-08-24)
 
 The authoritative jump-host product database and Cloudflare release are now
-the v178/v144 baseline. The product DB SHA-256 is
+the v178/v145 baseline. The product DB SHA-256 is
 `3F352A9E60BFCDA387C426CF3EB074B1FD09043783661DE364D3C8A3FC2F0CA3`;
 its internal product counts are `entries=45771`, `senses=53184`, and
 `sense_localizations=212728`. The publishable D1 subset has `entries=44549`,
@@ -12,13 +12,14 @@ its internal product counts are `entries=45771`, `senses=53184`, and
 counter are zero.
 
 Cloudflare D1 reports `published_at=2026-08-24T12:43:18.343Z`. Worker cache
-`v144-localized-sense-isolation` was deployed from commit
-`ae12fdf3f4437a697bc15596858b4ebc9beec316` as Worker version
-`16249a94-40ca-4a27-b3cb-3b4ffb4a58db`. The D1 pre-import Time Travel bookmark
+`v145-localized-reading-context` was deployed from commit
+`5254e6cb4fe833dd7f02fd28655417bf2cef5a9a` as Worker version
+`1ca0bbe1-cc3b-4df4-832d-f2d0949042a1`. The D1 pre-import Time Travel bookmark
 is `0000023d-00000000-000050d1-9cd81d0adb0a033ec9b49ea35f5ee806`.
 General/focused API checks and mobile/desktop focused render checks passed.
 Localized-form lookup now isolates the matching senses instead of returning
-unrelated senses from a fused entry; `春节` is the regression case.
+unrelated senses from a fused entry and derives pronunciation groups from the
+matched language; `春节 / chūn jié` is the regression case.
 The v142 section below is retained as historical rollback context, not the
 current production state.
 

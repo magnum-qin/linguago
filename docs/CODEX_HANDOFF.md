@@ -1,6 +1,6 @@
 # Codex Handoff
 
-## 2026-08-24 v178 Spring Festival sense-isolation repair
+## 2026-08-24 v178 Spring Festival sense-isolation repair (v145 Worker)
 
 - Querying `春节` previously selected the Japanese headword entry `春` through
   a localized form, then returned every sense under that fused entry. This
@@ -20,11 +20,12 @@
   `sense_localizations=206952`, `examples=3030`, and
   `example_localizations=11898`; D1 `published_at` is
   `2026-08-24T12:43:18.343Z`.
-- Cache `v144-localized-sense-isolation` was deployed from commit
-  `ae12fdf3f4437a697bc15596858b4ebc9beec316` as Worker version
-  `16249a94-40ca-4a27-b3cb-3b4ffb4a58db`. General, focused, and mobile/desktop
-  render regressions passed. `春节` now returns one sense and no `青春` or
-  `prime (of life)` text.
+- Final cache `v145-localized-reading-context` was deployed from commit
+  `5254e6cb4fe833dd7f02fd28655417bf2cef5a9a` as Worker version
+  `1ca0bbe1-cc3b-4df4-832d-f2d0949042a1`. General, focused, and mobile/desktop
+  render regressions passed. `春节` now returns one sense, no `青春` or
+  `prime (of life)` text, and uses the matched Chinese reading `chūn jié` for
+  its pronunciation group instead of inheriting the Japanese entry reading.
 
 ## 2026-08-24 v176 production and v143 Cloudflare release
 
