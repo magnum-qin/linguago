@@ -57,8 +57,16 @@ function Assert-RemoteCounts {
     $columns += "(SELECT COUNT(*) FROM $($item.Value)) AS $($item.Key)"
   }
   $sql = "SELECT $($columns -join ', ');"
-  $raw = & (Join-Path $root "node_modules/.bin/wrangler.cmd") d1 execute $DatabaseName --remote --command $sql --json
-  if ($LASTEXITCODE -ne 0) { throw "Remote D1 count verification failed" }
+  $raw = $null
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    $raw = & (Join-Path $root "node_modules/.bin/wrangler.cmd") d1 execute $DatabaseName --remote --command $sql --json
+    if ($LASTEXITCODE -eq 0) { break }
+    if ($attempt -lt $MaxAttempts) {
+      Write-Warning "Remote D1 count verification failed (attempt $attempt/$MaxAttempts); retrying."
+      Start-Sleep -Seconds ([Math]::Min(10, 2 * $attempt))
+    }
+  }
+  if ($LASTEXITCODE -ne 0) { throw "Remote D1 count verification failed after $MaxAttempts attempts" }
   $response = $raw | ConvertFrom-Json
   $actual = $response[0].results[0]
   foreach ($name in $tables.Keys) {

@@ -32,6 +32,27 @@ function Invoke-Node([string]$Script, [string[]]$Arguments) {
   if ($LASTEXITCODE -ne 0) { throw "$Script failed with exit code $LASTEXITCODE" }
 }
 
+function Invoke-WranglerWithRetry(
+  [string]$Wrangler,
+  [string[]]$Arguments,
+  [string]$Operation,
+  [int]$MaxAttempts = 3
+) {
+  for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $Output = @(& $Wrangler @Arguments 2>&1)
+    $Succeeded = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $PreviousPreference
+    if ($Succeeded) { return $Output }
+    if ($Attempt -lt $MaxAttempts) {
+      Write-Warning "$Operation failed (attempt $Attempt/$MaxAttempts); retrying."
+      Start-Sleep -Seconds ([Math]::Min(15, 3 * $Attempt))
+    }
+  }
+  throw "$Operation failed after $MaxAttempts attempts: $($Output -join ' ')"
+}
+
 $Execute = ConvertTo-RunnerBoolean $Execute 'Execute'
 $ReuseValidatedExport = ConvertTo-RunnerBoolean $ReuseValidatedExport 'ReuseValidatedExport'
 $Root = [IO.Path]::GetFullPath($Root)
@@ -152,24 +173,14 @@ try {
     }
 
     $Wrangler = Join-Path $Root 'node_modules\.bin\wrangler.cmd'
-    $PreviousPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    $WhoAmI = @(& $Wrangler whoami 2>&1)
-    $WhoAmIOk = $LASTEXITCODE -eq 0
-    $ErrorActionPreference = $PreviousPreference
-    if (-not $WhoAmIOk) { throw "Cloudflare authentication failed: $($WhoAmI -join ' ')" }
+    $WhoAmI = @(Invoke-WranglerWithRetry $Wrangler @('whoami') 'Cloudflare authentication')
 
     $ConfiguredAccountId = [Environment]::GetEnvironmentVariable('CLOUDFLARE_ACCOUNT_ID', 'User')
     if ($ConfiguredAccountId -ne $ExpectedAccountId) {
       throw "Cloudflare account mismatch: expected=$ExpectedAccountId configured=$ConfiguredAccountId"
     }
 
-    $PreviousPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    $D1ListLines = @(& $Wrangler d1 list --json 2>&1)
-    $D1ListOk = $LASTEXITCODE -eq 0
-    $ErrorActionPreference = $PreviousPreference
-    if (-not $D1ListOk) { throw "Cloudflare D1 list failed: $($D1ListLines -join ' ')" }
+    $D1ListLines = @(Invoke-WranglerWithRetry $Wrangler @('d1', 'list', '--json') 'Cloudflare D1 list')
     try {
       $D1Databases = @(($D1ListLines -join "`n") | ConvertFrom-Json)
     } catch {
@@ -180,8 +191,7 @@ try {
     }
 
     $BookmarkPath = Join-Path $RunDir 'cloudflare-d1-before-release-bookmark.json'
-    $Bookmark = @(& $Wrangler d1 time-travel info $DatabaseName --json 2>&1)
-    if ($LASTEXITCODE -ne 0) { throw "D1 Time Travel bookmark failed: $($Bookmark -join ' ')" }
+    $Bookmark = @(Invoke-WranglerWithRetry $Wrangler @('d1', 'time-travel', 'info', $DatabaseName, '--json') 'D1 Time Travel bookmark')
     [IO.File]::WriteAllText($BookmarkPath, ($Bookmark -join "`n"), (New-Object Text.UTF8Encoding($false)))
     $Result.time_travel_bookmark_captured = $true
     $Result.time_travel_bookmark_file = $BookmarkPath
