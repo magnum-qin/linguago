@@ -1412,5 +1412,42 @@
         "definition": "Passar por algo diretamente; experimentar ou provar."
       }
     }
+  },
+  {
+    "target": {
+      "headword": "春",
+      "primary_lang": "ja",
+      "sense_order": 3
+    },
+    "source": "manual:spring-festival-repair-20260824",
+    "part_of_speech": "noun",
+    "gloss_key": "Spring Festival; Chinese New Year",
+    "confidence": 0.99,
+    "localizations": {
+      "en": {
+        "term": "Spring Festival; Chinese New Year",
+        "pronunciation": "/ˌsprɪŋ ˈfes.tɪ.vəl/; /ˌtʃaɪ.niːz njuː ˈjɪər/",
+        "pronunciation_system": "IPA",
+        "definition": "The traditional Chinese festival marking the beginning of the lunar new year."
+      },
+      "zh": {
+        "term": "春节",
+        "reading": "chūn jié",
+        "reading_system": "pinyin",
+        "definition": "中国农历新年，是中国最重要的传统节日之一。"
+      },
+      "ja": {
+        "term": "春節",
+        "reading": "しゅんせつ",
+        "reading_system": "kana",
+        "definition": "中国の旧暦の新年を祝う伝統的な祝祭。"
+      },
+      "pt-BR": {
+        "term": "Festival da Primavera; Ano-Novo Chinês",
+        "pronunciation": "/fes.tʃiˈvaw da pɾi.maˈvɛ.ɾa/",
+        "pronunciation_system": "IPA",
+        "definition": "Festival tradicional chinês que celebra o início do ano-novo lunar."
+      }
+    }
   }
 ]

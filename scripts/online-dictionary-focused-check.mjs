@@ -32,6 +32,13 @@ const cases = [
     expectedTerms: ['pole; post; staff', 'shaft; handle; classifier']
   },
   { id: 'zh-nihao', term: '你好', minSenses: 1, expectedTerms: ['hello'] },
+  {
+    id: 'zh-spring-festival',
+    term: '春节',
+    minSenses: 1,
+    expectedTerms: ['Spring Festival', 'Chinese New Year'],
+    forbiddenTerms: ['青春', 'prime (of life)']
+  },
   { id: 'en-inside', term: 'inside', minSenses: 1, requirePronunciationGroups: true, expectedTerms: ['inside'] },
   { id: 'zh-secret', term: '秘密', minSenses: 2, requirePronunciationGroups: true, expectedTerms: ['secret'] },
   { id: 'ja-itsu', term: '何時', minSenses: 3, requirePronunciationGroups: true, expectedTerms: ['when', 'what time'] },
@@ -186,6 +193,9 @@ async function checkTerm(item) {
   }
   for (const term of item.expectedTerms || []) {
     if (!serialized.includes(term)) errors.push(`missing expected term ${term}`);
+  }
+  for (const term of item.forbiddenTerms || []) {
+    if (serialized.includes(term)) errors.push(`contains forbidden term ${term}`);
   }
 
   const zhExampleText = Array.isArray(data?.examples)

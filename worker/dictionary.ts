@@ -34,9 +34,9 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
     const preferredSourceLang = preferredDictionarySourceLang(input.text, input.targetLang, input.sourceLang);
 
     try {
-      type EntryMatch = { id: number; matched_lang: string };
+      type EntryMatch = { id: number; matched_lang: string; matched_form_type: string };
       let match = await input.env.DB.prepare(
-        `SELECT id, source_lang AS matched_lang
+        `SELECT id, source_lang AS matched_lang, 'headword' AS matched_form_type
          FROM v2_entries
          WHERE normalized_key = ?
          ORDER BY CASE WHEN source_lang = ? THEN 0 ELSE 1 END,
@@ -47,7 +47,7 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
         .first<EntryMatch>();
       if (!match) {
         match = await input.env.DB.prepare(
-          `SELECT e.id, ef.lang AS matched_lang
+          `SELECT e.id, ef.lang AS matched_lang, ef.form_type AS matched_form_type
            FROM v2_entry_forms ef
            JOIN v2_entries e ON e.id = ef.entry_id
            WHERE ef.normalized_form = ?
@@ -61,7 +61,7 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
       }
       if (!match) {
         match = await input.env.DB.prepare(
-          `SELECT e.id, sl.lang AS matched_lang
+          `SELECT e.id, sl.lang AS matched_lang, 'localized_term' AS matched_form_type
            FROM v2_sense_localizations sl
            JOIN v2_senses s ON s.id = sl.sense_id
            JOIN v2_entries e ON e.id = s.entry_id
@@ -78,7 +78,7 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
 
       const sql = `
         WITH base_entry AS (
-          SELECT e.*, ? AS matched_lang
+          SELECT e.*, ? AS matched_lang, ? AS matched_form_type
           FROM v2_entries e
           WHERE e.id = ?
         ),
@@ -163,6 +163,15 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
               FROM v2_senses s
               LEFT JOIN v2_pronunciation_groups g ON g.id=s.pronunciation_group_id
               WHERE s.entry_id IN (SELECT id FROM selected_entries)
+                AND (
+                  (SELECT matched_form_type FROM base_entry) <> 'localized_term'
+                  OR EXISTS (
+                    SELECT 1
+                    FROM v2_sense_localizations sl_match
+                    WHERE sl_match.sense_id = s.id
+                      AND sl_match.normalized_term = ?
+                  )
+                )
               ORDER BY
                 CASE WHEN EXISTS (
                   SELECT 1
@@ -185,7 +194,9 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
       const row = await input.env.DB.prepare(sql)
         .bind(
           match.matched_lang,
+          match.matched_form_type,
           match.id,
+          normalized,
           normalized,
           normalized
         )
