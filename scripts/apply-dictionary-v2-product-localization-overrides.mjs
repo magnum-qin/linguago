@@ -9,6 +9,7 @@ const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
 const overridesPath = path.resolve(args.overrides || DEFAULT_OVERRIDES);
 const apply = args.apply === 'true' || args.apply === true;
+const outPath = args.out ? path.resolve(args.out) : null;
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 if (!fs.existsSync(overridesPath)) throw new Error(`Overrides not found: ${overridesPath}`);
@@ -203,22 +204,25 @@ if (apply) {
   })();
 }
 
-console.log(
-  JSON.stringify(
-    {
-      ok: stats.skipped.length === 0,
-      stats,
-      preview: resolved.slice(0, 20).map((item) => ({
-        target: item.row.target,
-        sense_id: item.sense.id,
-        sense_order: item.sense.sense_order,
-        langs: item.localizations.map((localization) => localization.lang)
-      }))
-    },
-    null,
-    2
-  )
-);
+const serialized = `${JSON.stringify(
+  {
+    ok: stats.skipped.length === 0,
+    stats,
+    preview: resolved.slice(0, 20).map((item) => ({
+      target: item.row.target,
+      sense_id: item.sense.id,
+      sense_order: item.sense.sense_order,
+      langs: item.localizations.map((localization) => localization.lang)
+    }))
+  },
+  null,
+  2
+)}\n`;
+if (outPath) {
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, serialized, 'utf8');
+}
+process.stdout.write(serialized);
 db.close();
 
 function cleanText(value) {

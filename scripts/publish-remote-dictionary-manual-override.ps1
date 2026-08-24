@@ -61,10 +61,9 @@ try {
   Copy-Item -LiteralPath $ResolvedBackup -Destination $ReplayDb -Force
 
   $ApplyReport = Join-Path $RunDir 'manual-override-apply.json'
-  $ApplyOutput = @(& node.exe (Join-Path $Root 'scripts\apply-dictionary-v2-product-localization-overrides.mjs') `
-    '--db' $ReplayDb '--overrides' $ResolvedOverrides '--apply' 'true')
+  & node.exe (Join-Path $Root 'scripts\apply-dictionary-v2-product-localization-overrides.mjs') `
+    '--db' $ReplayDb '--overrides' $ResolvedOverrides '--apply' 'true' '--out' $ApplyReport | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'Manual override replay failed' }
-  [IO.File]::WriteAllText($ApplyReport, ($ApplyOutput -join "`n"), (New-Object Text.UTF8Encoding($false)))
   $Apply = [IO.File]::ReadAllText($ApplyReport, [Text.Encoding]::UTF8) | ConvertFrom-Json
   if (-not $Apply.ok -or $Apply.stats.skipped.Count -ne 0) { throw 'Manual override replay report is not clean' }
 
