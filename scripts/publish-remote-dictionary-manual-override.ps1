@@ -13,8 +13,16 @@ $ErrorActionPreference = 'Stop'
 $Root = [IO.Path]::GetFullPath($Root)
 $RunDir = [IO.Path]::GetFullPath((Join-Path $Root (Join-Path 'runs' $RunId)))
 $MainDb = Join-Path $Root 'data\processed\linguago_v2_product_top5000_freedict_filtered_candidate.db'
-$ResolvedBackup = [IO.Path]::GetFullPath((Join-Path $Root $BackupDb))
-$ResolvedOverrides = [IO.Path]::GetFullPath((Join-Path $Root $OverridePath))
+$ResolvedBackup = if ([IO.Path]::IsPathRooted($BackupDb)) {
+  [IO.Path]::GetFullPath($BackupDb)
+} else {
+  [IO.Path]::GetFullPath((Join-Path $Root $BackupDb))
+}
+$ResolvedOverrides = if ([IO.Path]::IsPathRooted($OverridePath)) {
+  [IO.Path]::GetFullPath($OverridePath)
+} else {
+  [IO.Path]::GetFullPath((Join-Path $Root $OverridePath))
+}
 $StateDir = Join-Path $Root 'state'
 $ReleaseLock = Join-Path $StateDir 'dictionary-release.lock.json'
 
