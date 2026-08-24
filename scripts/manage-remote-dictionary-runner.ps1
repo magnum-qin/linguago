@@ -29,7 +29,7 @@ param(
   [object]$DynamicEndpointDiscovery = $true,
   [string]$ClusterStatusUrl = 'http://127.0.0.1:18080/api/status',
   [string]$ClusterServiceUser = 'g24tka12',
-  [int]$StartTimeoutSeconds = 45
+  [int]$StartTimeoutSeconds = 90
 )
 
 $ErrorActionPreference = 'Stop'
