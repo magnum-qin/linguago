@@ -12,8 +12,10 @@ const productDbPath = path.resolve(
   args['product-db'] || 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db'
 );
 const outPath = path.resolve(args.out || 'logs/product-native-daily-coverage-gaps.json');
+const minRank = positiveInteger(args['min-rank'], 1);
 const maxRank = positiveInteger(args['max-rank'], 200_000);
 const scanLimit = positiveInteger(args['scan-limit'], 100_000);
+if (minRank > maxRank) throw new Error(`min-rank must be <= max-rank, got ${minRank} > ${maxRank}`);
 const targets = parseTargets(args.targets || 'zh=300,ja=100,pt-BR=50,en=50');
 const excludedCandidateIds = loadExcludedCandidateIds(args['exclude-reports']);
 
@@ -42,6 +44,7 @@ const nativeQuery = `
     e.status AS source_status
   FROM entries e
   WHERE e.frequency_rank IS NOT NULL
+    AND e.frequency_rank >= ?
     AND e.frequency_rank <= ?
     AND e.source_lang IN ('en', 'pt-BR', 'zh', 'ja')
     AND e.status <> 'deprecated'
@@ -79,7 +82,7 @@ const nativeQuery = `
   LIMIT ?
 `;
 if (args.explain === 'true') {
-  const plan = sourceDb.prepare(`EXPLAIN QUERY PLAN ${nativeQuery}`).all(maxRank, scanLimit);
+  const plan = sourceDb.prepare(`EXPLAIN QUERY PLAN ${nativeQuery}`).all(minRank, maxRank, scanLimit);
   sourceDb.close();
   console.log(JSON.stringify({ ok: true, query_plan: plan }, null, 2));
   process.exit(0);
@@ -92,7 +95,7 @@ let represented = 0;
 let scriptMismatch = 0;
 let lowValueCandidate = 0;
 let scanned = 0;
-for (const row of nativeEntries.iterate(maxRank, scanLimit)) {
+for (const row of nativeEntries.iterate(minRank, maxRank, scanLimit)) {
   scanned += 1;
   if (counts[row.source_lang] >= targets[row.source_lang]) continue;
   if (excludedCandidateIds.has(String(row.source_entry_id))) continue;
@@ -130,6 +133,7 @@ const report = {
   summary: {
     source_db: relative(sourceDbPath),
     product_db: relative(productDbPath),
+    min_rank: minRank,
     max_rank: maxRank,
     scan_limit: scanLimit,
     requested_by_lang: targets,
