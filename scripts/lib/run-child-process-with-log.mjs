@@ -20,11 +20,15 @@ export function runChildProcessWithLog({
     let settled = false;
     let exitCode = null;
     let drainTimer = null;
+    const exitPoll = setInterval(() => {
+      if (child.exitCode !== null) finish(child.exitCode);
+    }, 1000);
 
     const finish = (code) => {
       if (settled) return;
       settled = true;
       if (drainTimer) clearTimeout(drainTimer);
+      clearInterval(exitPoll);
       child.stdout?.destroy();
       child.stderr?.destroy();
       log.end(() => resolve(Number.isInteger(Number(code)) ? Number(code) : 1));
@@ -34,6 +38,7 @@ export function runChildProcessWithLog({
       if (settled) return;
       settled = true;
       if (drainTimer) clearTimeout(drainTimer);
+      clearInterval(exitPoll);
       log.destroy();
       reject(error);
     };
