@@ -90,6 +90,7 @@ const selected = [];
 const counts = Object.fromEntries(Object.keys(targets).map((lang) => [lang, 0]));
 let represented = 0;
 let scriptMismatch = 0;
+let lowValueCandidate = 0;
 let scanned = 0;
 for (const row of nativeEntries.iterate(maxRank, scanLimit)) {
   scanned += 1;
@@ -97,6 +98,10 @@ for (const row of nativeEntries.iterate(maxRank, scanLimit)) {
   if (excludedCandidateIds.has(String(row.source_entry_id))) continue;
   if (!sourceScriptOk(row.word, row.source_lang)) {
     scriptMismatch += 1;
+    continue;
+  }
+  if (isLowValueCandidate(row.word, row.source_lang)) {
+    lowValueCandidate += 1;
     continue;
   }
   const normalized = normalize(row.normalized_key || row.word);
@@ -132,6 +137,7 @@ const report = {
     represented,
     excluded_candidate_ids: excludedCandidateIds.size,
     skipped_source_script_mismatch: scriptMismatch,
+    skipped_low_value_candidate: lowValueCandidate,
     selected_by_lang: counts,
     targets_satisfied: targetsSatisfied(counts, targets)
   },
@@ -140,7 +146,7 @@ const report = {
   notes: [
     'Read-only candidate report; no database rows were modified.',
     'Eligible native sources are CC-CEDICT (zh), JMdict (ja), FreeDict/WikDict/Dicionario (pt-BR), and FreeDict/WikDict/ECDICT (en).',
-    'Latin-script candidates exclude single-letter forms, all-caps abbreviations, and unexpected symbols.',
+    'Latin-script candidates exclude single-letter forms, all-caps abbreviations, title-case proper-name forms, and unexpected symbols.',
     'Specific daily senses and localizations must be loaded by the downstream daily-primary selector.',
     'LLM output must remain draft-only until deterministic validation and independent review pass.'
   ]
@@ -233,6 +239,15 @@ function sourceScriptOk(word, lang) {
     return /\p{Script=Latin}/u.test(text) && !hasHan && !hasKana;
   }
   return false;
+}
+
+function isLowValueCandidate(word, lang) {
+  if (lang !== 'en' && lang !== 'pt-BR') return false;
+  const text = String(word || '').trim();
+  // Native source dictionaries normally store common lemmas in lowercase.
+  // Title-case Latin forms are overwhelmingly names, brands, places, or
+  // sentence-derived variants and should not consume the LLM production lane.
+  return /^(?:\p{Lu}[\p{Ll}\p{M}'-]+)(?: \p{Lu}[\p{Ll}\p{M}'-]+)*$/u.test(text);
 }
 
 function nativeSourceFamily(lang) {
