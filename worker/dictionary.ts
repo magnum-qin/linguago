@@ -95,6 +95,7 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
           'normalized_key', e.normalized_key,
           'source_lang', e.source_lang,
           'matched_lang', e.matched_lang,
+          'matched_form_type', e.matched_form_type,
           'frequency_rank', e.frequency_rank,
           'senses', (
             SELECT json_group_array(json_object(
@@ -555,7 +556,12 @@ function v2DictionaryEntryToResponse(
     .sort((a, b) => a.sense_order - b.sense_order);
   const firstSense = senses[0] || null;
   const translations = v2PrimaryTranslations(senses);
-  const pronunciationGroups = v2PronunciationGroups(senses, String(entry.word || original));
+  const pronunciationGroups = v2PronunciationGroups(
+    senses,
+    String(entry.word || original),
+    String(entry.matched_lang || ''),
+    String(entry.matched_form_type || '')
+  );
   const targetText =
     translations[targetLang]?.text ||
     translations[String(entry.source_lang || 'en') as LanguageCode]?.text ||
@@ -591,13 +597,32 @@ function v2DictionaryEntryToResponse(
   };
 }
 
-function v2PronunciationGroups(senses: V2WordSense[], headword: string): WordPronunciationGroup[] {
+function v2PronunciationGroups(
+  senses: V2WordSense[],
+  headword: string,
+  matchedLang = '',
+  matchedFormType = ''
+): WordPronunciationGroup[] {
   const groups: WordPronunciationGroup[] = [];
   const groupIndex = new Map<string, WordPronunciationGroup>();
   const ungroupedKey = '__ungrouped';
 
   for (const sense of senses) {
-    const group = sense.pronunciation_group;
+    const localization = matchedFormType === 'localized_term'
+      ? sense.localizations?.[matchedLang as LanguageCode]
+      : undefined;
+    const localizedReading = localization?.reading || localization?.pronunciation || '';
+    const localizedSystem = localization?.reading
+      ? localization.reading_system
+      : localization?.pronunciation_system;
+    const group = localizedReading
+      ? {
+          lang: matchedLang,
+          reading: localizedReading,
+          reading_key: localizedReading,
+          reading_system: localizedSystem || ''
+        }
+      : sense.pronunciation_group;
     const key = group?.reading_key || group?.reading || ungroupedKey;
     let item = groupIndex.get(key);
     if (!item) {

@@ -36,6 +36,8 @@ const cases = [
     id: 'zh-spring-festival',
     term: '春节',
     minSenses: 1,
+    requirePronunciationGroups: true,
+    expectedReadings: ['chūn jié'],
     expectedTerms: ['Spring Festival', 'Chinese New Year'],
     forbiddenTerms: ['青春', 'prime (of life)']
   },
