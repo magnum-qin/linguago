@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as OpenCC from "opencc-js";
 import { canonicalEnglishSpellingVariant } from "./lib/source-gap-lexical-contract.mjs";
+import { candidateSourceSenseKey, sourceSenseKey } from "./lib/source-sense-key.mjs";
 
 const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
 const DEFAULT_SUPPLEMENTAL_SOURCE_DB =
@@ -271,17 +272,6 @@ console.log(
     2
   )
 );
-
-function sourceSenseKey(sourceEntryId, sourceSenseId) {
-  return `${Number(sourceEntryId)}:${Number(sourceSenseId)}`;
-}
-
-function candidateSourceSenseKey(row) {
-  return sourceSenseKey(
-    row.source_entry_id,
-    row.source_sense_id ?? row.first_sense_id ?? row.useful_senses?.[0]?.id
-  );
-}
 
 function writeJsonAtomic(targetPath, value) {
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });

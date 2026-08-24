@@ -1,6 +1,7 @@
 import './lib/load-local-env.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
+import { sourceSenseKey } from './lib/source-sense-key.mjs';
 import { performance } from 'node:perf_hooks';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 
@@ -376,10 +377,6 @@ function loadEvidenceRows(report) {
       }));
   }
   throw new Error('Evidence report must contain validations or reviews');
-}
-
-function sourceSenseKey(sourceEntryId, sourceSenseId) {
-  return `${Number(sourceEntryId)}:${Number(sourceSenseId)}`;
 }
 
 function buildPrompt(payload, previousError) {
