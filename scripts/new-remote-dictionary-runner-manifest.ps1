@@ -53,6 +53,7 @@ param(
     'scripts\new-remote-dictionary-runner-manifest.ps1',
     'scripts\validate-remote-dictionary-controlled-replay.ps1',
     'scripts\publish-remote-dictionary-controlled-run.ps1',
+    'scripts\publish-remote-dictionary-manual-override.ps1',
     'scripts\checkpoint-sqlite-db.mjs',
     'scripts\check-remote-cloudflare-auth.ps1',
     'scripts\release-remote-dictionary-d1.ps1',
