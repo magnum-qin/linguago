@@ -9,6 +9,7 @@ const args = parseArgs(process.argv.slice(2));
 const poolPath = requiredPath(args.pool, 'pool');
 const outPath = path.resolve(args.out || 'logs/product-source-gap-fresh-cohort.json');
 const limit = positiveInteger(args.limit, 20);
+const sourceLangQuotas = parseQuotas(args['source-lang-quotas']);
 const requiredHintSource = normalize(args['require-generation-hint-source']);
 const onePerSourceEntry = args['one-per-source-entry'] === 'true';
 const excludeSourceEntries = args['exclude-source-entries'] === 'true';
@@ -51,6 +52,7 @@ if (attemptIndexPath) {
 }
 
 const selected = [];
+const selectedBySourceLang = new Map();
 const seen = new Set();
 const seenSourceEntries = new Set();
 const productDb = new Database(productDbPath, { readonly: true });
@@ -89,6 +91,11 @@ let excludedBySourceEntryDeduplication = 0;
 let excludedByHistoricalAttempt = 0;
 let excludedByGenerationHintAmbiguity = 0;
 for (const row of rows) {
+  const sourceLang = String(row?.source_lang || '');
+  if (sourceLangQuotas.size > 0) {
+    const quota = sourceLangQuotas.get(sourceLang) || 0;
+    if ((selectedBySourceLang.get(sourceLang) || 0) >= quota) continue;
+  }
   const key = candidateKey(row);
   if (excluded.has(key) || seen.has(key)) continue;
   const sourceEntryId = Number(row?.source_entry_id);
@@ -125,6 +132,7 @@ for (const row of rows) {
     continue;
   }
   selected.push(row);
+  selectedBySourceLang.set(sourceLang, (selectedBySourceLang.get(sourceLang) || 0) + 1);
   seen.add(key);
   if (onePerSourceEntry) seenSourceEntries.add(sourceEntryId);
   if (selected.length >= limit) break;
@@ -153,6 +161,7 @@ const output = {
     exclude_source_entries: excludeSourceEntries,
     max_generation_hint_terms: maxGenerationHintTerms || null,
     require_all_hint_languages: requireAllHintLanguages,
+    source_lang_quotas: Object.fromEntries(sourceLangQuotas),
     attempt_index: attemptIndexPath ? relative(attemptIndexPath) : null,
     selected_by_source_lang: countBy(selected, (row) => row.source_lang),
     selected_by_lane: countBy(selected, (row) => row.scale_review_lane)
@@ -184,6 +193,19 @@ function countBy(rowsToCount, selector) {
     counts[key] = (counts[key] || 0) + 1;
   }
   return counts;
+}
+
+function parseQuotas(value) {
+  const quotas = new Map();
+  for (const part of String(value || '').split(',').map((item) => item.trim()).filter(Boolean)) {
+    const separator = part.indexOf('=');
+    if (separator < 1) throw new Error(`Invalid source-lang quota: ${part}`);
+    const lang = part.slice(0, separator).trim();
+    const quota = Number(part.slice(separator + 1));
+    if (!lang || !Number.isInteger(quota) || quota < 0) throw new Error(`Invalid source-lang quota: ${part}`);
+    quotas.set(lang, quota);
+  }
+  return quotas;
 }
 
 function normalize(value) {

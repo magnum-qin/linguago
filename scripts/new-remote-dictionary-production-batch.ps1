@@ -9,6 +9,8 @@ param(
   [int]$NativeMaxRank = 2000000,
   [int]$NativeScanLimit = 2000000,
   [string]$NativeTargets = 'zh=30000,ja=10000,pt-BR=5000,en=5000',
+  [string]$NativeLangQuotas = '',
+  [bool]$ExcludePreviouslyAttemptedSourceEntries = $true,
   [switch]$IncludeCompletedRunBatches = $true,
   [switch]$SkipVerify
 )
@@ -117,8 +119,9 @@ $ExcludeArgument = $ExcludePaths -join ','
   --exclude $ExcludeArgument `
   --product-db $ProductDb `
   --limit $Limit `
+  --source-lang-quotas $NativeLangQuotas `
   --one-per-source-entry true `
-  --exclude-source-entries true `
+  --exclude-source-entries $($ExcludePreviouslyAttemptedSourceEntries.ToString().ToLowerInvariant()) `
   --out $OutPath
 if ($LASTEXITCODE -ne 0) { throw "Candidate selection failed with exit code $LASTEXITCODE" }
 
