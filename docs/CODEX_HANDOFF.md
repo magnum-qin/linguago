@@ -1,5 +1,37 @@
 # Codex Handoff
 
+## 2026-08-24 v176 production and v143 Cloudflare release
+
+- `v176-native-daily-latin-production5000` completed the approximately
+  5,000-sense release cohort. Its strict funnel accepted 154 final records;
+  controlled replay inserted 154 entries/senses and 616 localizations, the
+  idempotent replay wrote zero rows, and deterministic promotion accepted all
+  154. Fast audit, published-risk, and full native export/import audit passed
+  with every blocking counter at zero.
+- The authoritative product DB SHA-256 is
+  `F2566BACC446EA5910CFBDCDC370E13F22D274F986C811C1745A3E7523BC6BE5`.
+  Internal product counts are `entries=45771`, `senses=53184`, and
+  `sense_localizations=212728`; relative to the former v142 baseline this is
+  `4,998` additional product senses. The pre-commit rollback DB is
+  `D:\linguago-runner\backups\v176-native-daily-latin-production5000-main-before-commit-20260824-195313.db`.
+- The publishable D1 export has `entries=44549`, `senses=51738`,
+  `sense_localizations=206952`, `examples=3030`, and
+  `example_localizations=11898` in 27 data chunks. D1 `published_at` is
+  `2026-08-24T11:33:21.453Z`. The pre-import Time Travel bookmark is
+  `00000236-00000000-000050d1-2dac362082a671df6a0af918af5689d0`.
+- Worker cache `v143-native4998-44549` is deployed from immutable commit
+  `44c1b220b041b3904f13f3bb165ca902b5061ba6` and archive SHA-256
+  `DF440F0F411CD876C0CD72B5E3347D758980DF23282BF61AE4B2F4C502B6B2DF`.
+  Deployment returned Worker version `9cd15fb6-833a-438a-b834-aedb8c6a77b0`.
+  General API, focused API, and mobile/desktop render checks all passed with
+  no horizontal overflow.
+- The first Worker attempt correctly auto-rolled back because the focused
+  check still expected v142 counts. Updating only the three manifest counts
+  fixed the false failure; no validation rule was relaxed. The D1 release now
+  supports resuming a validated export and retries transient Cloudflare
+  authentication/list/bookmark calls. This was needed after a jump-host
+  `wrangler whoami` timeout interrupted the first release before any D1 write.
+
 ## 2026-08-24 v145 native daily production completed
 
 - `v145-native-daily-production5000` completed from 5,000 frozen Chinese and

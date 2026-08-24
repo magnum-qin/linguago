@@ -2,18 +2,23 @@
 
 ## Current jump-host baseline and online release (2026-08-24)
 
-The authoritative jump-host product database has advanced beyond the online
-release through `v145-native-daily-production5000`. It has SHA-256
-`A1782F15D3B1506996B6A784CE7A605D92341BECA710E3ECBDE7D3250B95AF3A`
-and audited counts `entries=42829`, `senses=49141`,
-`sense_localizations=196564`, `examples=3030`, and
-`example_localizations=11898`. Its rollback copy is
-`D:\linguago-runner\backups\v145-native-daily-production5000-main-before-commit-20260824-002405.db`.
-Production D1 remains the v142 Worker release described below while additional
-audited senses accumulate toward the next approximately 5,000-sense release.
-The unpublished cohort currently contains `955` senses and needs `4,045` more
-before that release gate. v145 promoted `340/340` controlled replay senses;
-published-risk and all blocking export counters are zero.
+The authoritative jump-host product database and Cloudflare release are now
+the v176/v143 baseline. The product DB SHA-256 is
+`F2566BACC446EA5910CFBDCDC370E13F22D274F986C811C1745A3E7523BC6BE5`;
+its internal product counts are `entries=45771`, `senses=53184`, and
+`sense_localizations=212728`. The publishable D1 subset has `entries=44549`,
+`senses=51738`, `sense_localizations=206952`, `examples=3030`, and
+`example_localizations=11898`. Published-risk and every blocking full-export
+counter are zero.
+
+Cloudflare D1 reports `published_at=2026-08-24T11:33:21.453Z`. Worker cache
+`v143-native4998-44549` was deployed from commit
+`44c1b220b041b3904f13f3bb165ca902b5061ba6` as Worker version
+`9cd15fb6-833a-438a-b834-aedb8c6a77b0`. The D1 pre-import Time Travel bookmark
+is `00000236-00000000-000050d1-2dac362082a671df6a0af918af5689d0`.
+General/focused API checks and mobile/desktop focused render checks passed.
+The v142 section below is retained as historical rollback context, not the
+current production state.
 
 ## Current online baseline (v142 Worker / v141 data, 2026-08-23)
 
