@@ -21,16 +21,16 @@ const runDir = path.resolve(args['run-dir'] || path.join('runs', runId));
 const sourceRunDir = args['source-run-dir'] ? requiredPath(args['source-run-dir'], 'source-run-dir') : null;
 const resume = args.resume !== 'false';
 const qwenEndpoints = String(
-  args['qwen-endpoints'] || 'http://127.0.0.1:11441,http://127.0.0.1:11448,http://127.0.0.1:11447'
+  args['qwen-endpoints'] || 'http://127.0.0.1:11441,http://127.0.0.1:11442,http://127.0.0.1:11443,http://127.0.0.1:11444,http://127.0.0.1:11445,http://127.0.0.1:11446,http://127.0.0.1:11447,http://127.0.0.1:11448'
 );
 const gemmaEndpoints = String(
-  args['gemma-endpoints'] || 'http://127.0.0.1:11442,http://127.0.0.1:11445,http://127.0.0.1:11446'
+  args['gemma-endpoints'] || 'http://127.0.0.1:11441,http://127.0.0.1:11442,http://127.0.0.1:11443,http://127.0.0.1:11444,http://127.0.0.1:11445,http://127.0.0.1:11446,http://127.0.0.1:11447,http://127.0.0.1:11448'
 );
 const qwenVariants = String(
-  args['qwen-variants'] || '11441=UD-Q4_K_XL,11448=UD-IQ4_NL,11447=UD-IQ4_NL'
+  args['qwen-variants'] || '11441=UD-Q4_K_XL,11442=UD-Q4_K_XL,11443=UD-Q4_K_XL,11444=UD-Q4_K_XL,11445=UD-Q4_K_XL,11446=UD-IQ4_NL,11447=UD-IQ4_NL,11448=UD-IQ4_NL'
 );
 const gemmaVariants = String(
-  args['gemma-variants'] || '11442=UD-Q4_K_XL,11445=UD-Q4_K_XL,11446=UD-Q4_K_XL'
+  args['gemma-variants'] || '11441=UD-Q4_K_XL,11442=UD-Q4_K_XL,11443=UD-Q4_K_XL,11444=UD-Q4_K_XL,11445=UD-Q4_K_XL,11446=UD-Q4_K_XL,11447=UD-Q4_K_XL,11448=UD-Q4_K_XL'
 );
 const qwenModel = String(args['qwen-model'] || 'unsloth/Qwen3.6-35B-A3B-MTP-GGUF');
 const gemmaModel = String(args['gemma-model'] || 'unsloth/gemma-4-31B-it-qat-GGUF');
