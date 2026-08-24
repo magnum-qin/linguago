@@ -1,5 +1,31 @@
 # Codex Handoff
 
+## 2026-08-24 v178 Spring Festival sense-isolation repair
+
+- Querying `春节` previously selected the Japanese headword entry `春` through
+  a localized form, then returned every sense under that fused entry. This
+  exposed unrelated `青春 / prime (of life)` data and a weak `New Year` sense.
+- Worker dictionary lookup now records the matched form type. A
+  `localized_term` match returns only senses whose normalized localization is
+  the query; exact headword matches still return all valid senses.
+- Stable localization overrides now define `春节` as `Spring Festival; Chinese
+  New Year`, `Festival da Primavera; Ano-Novo Chinês`, and `春節`, with readings
+  `chūn jié` and `しゅんせつ`. The remote controlled replay resolved all 64
+  overrides, skipped none, matched the main DB logical SHA-256
+  `1323B5D8572DECA970492BF25E4B0083352D72E896B593ED039D143B0A21FEEA`,
+  and passed fast, published-risk, and full export/import audits.
+- Authoritative DB SHA-256 is
+  `3F352A9E60BFCDA387C426CF3EB074B1FD09043783661DE364D3C8A3FC2F0CA3`.
+  Publishable counts remain `entries=44549`, `senses=51738`,
+  `sense_localizations=206952`, `examples=3030`, and
+  `example_localizations=11898`; D1 `published_at` is
+  `2026-08-24T12:43:18.343Z`.
+- Cache `v144-localized-sense-isolation` was deployed from commit
+  `ae12fdf3f4437a697bc15596858b4ebc9beec316` as Worker version
+  `16249a94-40ca-4a27-b3cb-3b4ffb4a58db`. General, focused, and mobile/desktop
+  render regressions passed. `春节` now returns one sense and no `青春` or
+  `prime (of life)` text.
+
 ## 2026-08-24 v176 production and v143 Cloudflare release
 
 - `v176-native-daily-latin-production5000` completed the approximately

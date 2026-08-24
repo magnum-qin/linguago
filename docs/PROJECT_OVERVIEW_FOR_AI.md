@@ -3,20 +3,22 @@
 ## Current jump-host baseline and online release (2026-08-24)
 
 The authoritative jump-host product database and Cloudflare release are now
-the v176/v143 baseline. The product DB SHA-256 is
-`F2566BACC446EA5910CFBDCDC370E13F22D274F986C811C1745A3E7523BC6BE5`;
+the v178/v144 baseline. The product DB SHA-256 is
+`3F352A9E60BFCDA387C426CF3EB074B1FD09043783661DE364D3C8A3FC2F0CA3`;
 its internal product counts are `entries=45771`, `senses=53184`, and
 `sense_localizations=212728`. The publishable D1 subset has `entries=44549`,
 `senses=51738`, `sense_localizations=206952`, `examples=3030`, and
 `example_localizations=11898`. Published-risk and every blocking full-export
 counter are zero.
 
-Cloudflare D1 reports `published_at=2026-08-24T11:33:21.453Z`. Worker cache
-`v143-native4998-44549` was deployed from commit
-`44c1b220b041b3904f13f3bb165ca902b5061ba6` as Worker version
-`9cd15fb6-833a-438a-b834-aedb8c6a77b0`. The D1 pre-import Time Travel bookmark
-is `00000236-00000000-000050d1-2dac362082a671df6a0af918af5689d0`.
+Cloudflare D1 reports `published_at=2026-08-24T12:43:18.343Z`. Worker cache
+`v144-localized-sense-isolation` was deployed from commit
+`ae12fdf3f4437a697bc15596858b4ebc9beec316` as Worker version
+`16249a94-40ca-4a27-b3cb-3b4ffb4a58db`. The D1 pre-import Time Travel bookmark
+is `0000023d-00000000-000050d1-9cd81d0adb0a033ec9b49ea35f5ee806`.
 General/focused API checks and mobile/desktop focused render checks passed.
+Localized-form lookup now isolates the matching senses instead of returning
+unrelated senses from a fused entry; `春节` is the regression case.
 The v142 section below is retained as historical rollback context, not the
 current production state.
 
