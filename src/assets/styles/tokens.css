@@ -252,6 +252,7 @@
   }
 
   html {
+    overflow-y: scroll !important;
     scrollbar-gutter: stable;
     scroll-padding-top: calc(env(safe-area-inset-top) + 12px);
   }
