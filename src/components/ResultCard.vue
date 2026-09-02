@@ -400,9 +400,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.fade-enter-active,
+.fade-enter-active {
+  transition: opacity 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.15s ease-out;
 }
 .fade-enter-from,
 .fade-leave-to {

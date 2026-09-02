@@ -138,7 +138,7 @@ const toggleSourceLang = async () => {
 
 const handleClear = () => {
   clear();
-  textareaRef.value?.focus();
+  textareaRef.value?.focus({ preventScroll: true });
 };
 
 const usesMobileKeyboard = () => {

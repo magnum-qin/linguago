@@ -14,46 +14,6 @@ const { resultData, isTranslating } = useTranslation();
 
 const hasResult = computed(() => !!resultData.value || isTranslating.value);
 const mainRef = ref<HTMLElement | null>(null);
-let layoutMotion: Animation | null = null;
-let layoutMotionRun = 0;
-
-watch(hasResult, async () => {
-  const main = mainRef.value;
-  if (!main) return;
-
-  // Preserve the current visual position while Vue applies the final layout.
-  // Only the compositor animates afterwards; the spacer height no longer changes frame by frame.
-  const previousTop = main.getBoundingClientRect().top;
-  const run = ++layoutMotionRun;
-  layoutMotion?.cancel();
-  layoutMotion = null;
-
-  await nextTick();
-  if (run !== layoutMotionRun || main !== mainRef.value) return;
-
-  const offsetY = previousTop - main.getBoundingClientRect().top;
-  if (Math.abs(offsetY) < 0.5 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-  main.style.willChange = 'transform';
-  const animation = main.animate(
-    [{ transform: `translate3d(0, ${offsetY}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
-    {
-      duration: 700,
-      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
-      fill: 'both'
-    }
-  );
-  layoutMotion = animation;
-
-  animation.finished
-    .catch(() => {})
-    .finally(() => {
-      if (layoutMotion !== animation) return;
-      layoutMotion = null;
-      main.style.willChange = '';
-      animation.cancel();
-    });
-});
 
 // PWA Update Banner State
 const showUpdateBanner = ref(false);
@@ -104,10 +64,13 @@ onUnmounted(() => {
 <template>
   <v-app class="!bg-transparent !font-sans transition-colors duration-300">
     <div class="min-h-dvh flex flex-col items-center w-full relative">
-      <!-- The spacer switches layout immediately; main keeps the same visual motion through FLIP. -->
+      <!-- Smooth layout spacer: shifts main container with native continuous easing -->
       <div
-        class="w-full shrink-0"
-        :style="{ height: hasResult ? 'env(safe-area-inset-top, 24px)' : '12vh' }"
+        class="w-full shrink-0 will-change-[height]"
+        :style="{
+          height: hasResult ? 'env(safe-area-inset-top, 24px)' : '12vh',
+          transition: 'height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)'
+        }"
       ></div>
 
       <main
