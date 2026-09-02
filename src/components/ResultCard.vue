@@ -124,6 +124,27 @@ const hasDictionarySenses = computed(() => {
   return resultData.value?.provider === 'dictionary' && currentSenses.value.length > 0;
 });
 
+const headwordPhonetic = computed(() => {
+  if (currentTranslation.value?.phonetic) {
+    return currentTranslation.value.phonetic;
+  }
+  if (currentSenses.value.length > 0) {
+    const first = currentSenses.value[0];
+    const loc = first?.localizations?.[activeLang.value];
+    return loc?.pronunciation || loc?.reading || '';
+  }
+  return '';
+});
+
+const headwordPhoneticSystem = computed(() => {
+  if (currentSenses.value.length > 0) {
+    const first = currentSenses.value[0];
+    const loc = first?.localizations?.[activeLang.value];
+    return loc?.pronunciation_system || loc?.reading_system || '';
+  }
+  return '';
+});
+
 const copyAllResult = () => {
   if (!resultData.value) return;
   if (typeof resultData.value === 'string') {
@@ -309,16 +330,30 @@ onUnmounted(() => {
 
         <!-- Translation Main Result -->
         <div class="mt-6 flex flex-col">
-          <!-- Header Text / Query Word -->
-          <div class="flex items-center justify-between gap-4 mb-4" v-if="currentWord">
+          <!-- Header Text / Query Word with Phonetics -->
+          <div class="flex flex-wrap items-center gap-3 mb-4" v-if="currentWord">
             <h1
-              class="text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] font-display font-black text-m3-on-surface tracking-tight break-words flex-1"
+              class="text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] font-display font-black text-m3-on-surface tracking-tight break-words"
             >
               <FuriganaText :text="currentWord" />
             </h1>
-            <div class="flex items-center gap-1 shrink-0">
+            <button
+              v-if="headwordPhonetic"
+              @click="speak(currentTranslation?.audio_text || currentWord, activeLang)"
+              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-m3-primary/10 text-m3-primary text-[0.85rem] font-bold tracking-wide hover:bg-m3-primary hover:text-m3-on-primary transition-all shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-m3-primary active:scale-95"
+              title="朗读发音 / Pronunciar"
+              aria-label="朗读发音"
+            >
+              <Volume2 class="w-3.5 h-3.5 opacity-80" />
+              {{ headwordPhonetic }}
+              <span v-if="headwordPhoneticSystem" class="text-[0.58rem] uppercase tracking-widest opacity-70">
+                {{ headwordPhoneticSystem }}
+              </span>
+            </button>
+            <div class="flex items-center gap-1 shrink-0 ml-auto">
               <button
-                @click="speak(currentWord, sourceLanguageCode)"
+                v-if="!headwordPhonetic"
+                @click="speak(currentWord, activeLang)"
                 class="inline-flex items-center justify-center w-9 h-9 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
                 title="朗读词条 / Pronunciar"
                 aria-label="朗读词条"
@@ -335,18 +370,6 @@ onUnmounted(() => {
                 <Copy v-else class="w-5 h-5 opacity-80" />
               </button>
             </div>
-          </div>
-
-          <!-- Phonetics -->
-          <div v-if="!hasDictionarySenses && currentTranslation?.phonetic" class="flex flex-wrap gap-2 mb-6">
-            <button
-              @click="speak(currentTranslation.audio_text || currentTranslation.text, activeLang)"
-              class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-m3-outline-variant/30 bg-m3-surface text-m3-on-surface-variant text-[0.95rem] font-medium tracking-wide shadow-sm cursor-pointer hover:bg-m3-primary hover:text-m3-on-primary hover:border-transparent hover:shadow-md transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-m3-primary active:scale-95"
-              aria-label="朗读音标发音 / Pronunciar"
-            >
-              <Volume2 class="w-3.5 h-3.5 opacity-70" />
-              {{ currentTranslation.phonetic }}
-            </button>
           </div>
 
           <!-- Content Area Component Routing -->
