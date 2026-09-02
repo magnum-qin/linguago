@@ -252,7 +252,24 @@
   }
 
   html {
+    scrollbar-gutter: stable;
     scroll-padding-top: calc(env(safe-area-inset-top) + 12px);
+  }
+
+  /* Custom thin M3 scrollbar for desktop to prevent layout shift */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-m3-outline-variant) 40%, transparent);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-m3-outline-variant);
   }
 
   body {
