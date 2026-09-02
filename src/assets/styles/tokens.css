@@ -296,9 +296,14 @@
 
   button:focus-visible,
   select:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible {
+  input:focus-visible {
     @apply outline-none;
-    box-shadow: 0 0 0 4px var(--glow);
+  }
+
+  textarea,
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
   }
 }

@@ -258,7 +258,7 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
         autocomplete="off"
         enterkeyhint="go"
         :placeholder="'单词或句子...\nPalavra ou frase...'"
-        class="w-full resize-none border-0 outline-none min-h-[56px] bg-transparent text-m3-on-surface !text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] placeholder:text-m3-on-surface-variant/50 overflow-hidden font-display font-medium"
+        class="w-full resize-none border-0 outline-none !outline-none !ring-0 !shadow-none focus:!outline-none focus:!ring-0 focus:!shadow-none focus-visible:!outline-none focus-visible:!ring-0 focus-visible:!shadow-none min-h-[56px] bg-transparent text-m3-on-surface !text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] placeholder:text-m3-on-surface-variant/50 overflow-hidden font-display font-medium"
         @keydown="handleTextareaKeydown"
         @compositionstart="isComposingText = true"
         @compositionend="isComposingText = false"
