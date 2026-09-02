@@ -90,11 +90,15 @@ watch(
         />
       </div>
 
-      <p v-if="reportError" class="feedback-error" role="alert">{{ reportError }}</p>
-      <div v-if="isReported" class="feedback-success" role="status">
-        <Check class="h-4 w-4" aria-hidden="true" />
-        感谢反馈 / Obrigado!
-      </div>
+      <Transition name="m3-expand">
+        <p v-if="reportError" class="feedback-error" role="alert">{{ reportError }}</p>
+      </Transition>
+      <Transition name="m3-expand">
+        <div v-if="isReported" class="feedback-success" role="status">
+          <Check class="h-4 w-4" aria-hidden="true" />
+          感谢反馈 / Obrigado!
+        </div>
+      </Transition>
     </div>
 
     <template #actions>

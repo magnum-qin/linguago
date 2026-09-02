@@ -26,40 +26,42 @@ const loadWord = (word: string) => {
       <Bookmark class="h-5 w-5 shrink-0 text-m3-primary" aria-hidden="true" />
     </template>
 
-    <div v-if="bookmarks.length === 0" class="drawer-empty-state">
-      <Bookmark class="mb-4 h-12 w-12 text-m3-outline-variant/60" aria-hidden="true" />
-      <p class="text-sm font-medium text-m3-on-surface-variant">
-        还没有收藏任何单词<br />
-        <span class="mt-0.5 inline-block text-[0.8rem] text-m3-outline">Nenhuma palavra salva</span>
-      </p>
-      <p class="mt-5 text-xs leading-relaxed text-m3-outline">
-        点击结果旁的星标加入生词本<br />Clique na estrela ao lado para salvar
-      </p>
-    </div>
+    <Transition name="m3-fade-scale" mode="out-in">
+      <div v-if="bookmarks.length === 0" key="empty" class="drawer-empty-state">
+        <Bookmark class="mb-4 h-12 w-12 text-m3-outline-variant/60" aria-hidden="true" />
+        <p class="text-sm font-medium text-m3-on-surface-variant">
+          还没有收藏任何单词<br />
+          <span class="mt-0.5 inline-block text-[0.8rem] text-m3-outline">Nenhuma palavra salva</span>
+        </p>
+        <p class="mt-5 text-xs leading-relaxed text-m3-outline">
+          点击结果旁的星标加入生词本<br />Clique na estrela ao lado para salvar
+        </p>
+      </div>
 
-    <div v-else class="drawer-list">
-      <article
-        v-for="word in bookmarks"
-        :key="word"
-        class="drawer-item"
-        tabindex="0"
-        role="button"
-        @click="loadWord(word)"
-        @keydown.enter="loadWord(word)"
-        @keydown.space.prevent="loadWord(word)"
-      >
-        <span class="min-w-0 flex-1 truncate text-lg font-bold text-m3-on-surface">{{ word }}</span>
-        <button
-          type="button"
-          class="drawer-item-action"
-          :aria-label="`移除收藏 ${word} / Remover ${word}`"
-          @click.stop="removeBookmark(word)"
+      <TransitionGroup v-else key="list" tag="div" name="m3-list" class="drawer-list relative">
+        <article
+          v-for="word in bookmarks"
+          :key="word"
+          class="drawer-item"
+          tabindex="0"
+          role="button"
+          @click="loadWord(word)"
+          @keydown.enter="loadWord(word)"
+          @keydown.space.prevent="loadWord(word)"
         >
-          <Trash2 class="h-4 w-4" aria-hidden="true" />
-        </button>
-        <ArrowRight class="h-5 w-5 shrink-0 text-m3-outline-variant/60" aria-hidden="true" />
-      </article>
-    </div>
+          <span class="min-w-0 flex-1 truncate text-lg font-bold text-m3-on-surface">{{ word }}</span>
+          <button
+            type="button"
+            class="drawer-item-action"
+            :aria-label="`移除收藏 ${word} / Remover ${word}`"
+            @click.stop="removeBookmark(word)"
+          >
+            <Trash2 class="h-4 w-4" aria-hidden="true" />
+          </button>
+          <ArrowRight class="h-5 w-5 shrink-0 text-m3-outline-variant/60" aria-hidden="true" />
+        </article>
+      </TransitionGroup>
+    </Transition>
   </M3DrawerShell>
 </template>
 

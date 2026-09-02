@@ -35,8 +35,10 @@ const currentExplanation = computed(() => {
         :title="isCopied('raw-result') ? '已复制' : '复制结果'"
         :aria-label="isCopied('raw-result') ? '已复制' : '复制结果'"
       >
-        <Check v-if="isCopied('raw-result')" class="w-4 h-4 text-green-600 dark:text-green-400" />
-        <Copy v-else class="w-4 h-4 opacity-80" />
+        <Transition name="m3-icon-swap" mode="out-in">
+          <Check v-if="isCopied('raw-result')" key="check" class="w-4 h-4 text-green-600 dark:text-green-400" />
+          <Copy v-else key="copy" class="w-4 h-4 opacity-80" />
+        </Transition>
       </button>
     </div>
 
@@ -67,8 +69,10 @@ const currentExplanation = computed(() => {
             :title="isCopied('sentence-explanation') ? '已复制' : '复制解析'"
             :aria-label="isCopied('sentence-explanation') ? '已复制' : '复制解析'"
           >
-            <Check v-if="isCopied('sentence-explanation')" class="w-4 h-4 text-green-600 dark:text-green-400" />
-            <Copy v-else class="w-4 h-4 opacity-80" />
+            <Transition name="m3-icon-swap" mode="out-in">
+              <Check v-if="isCopied('sentence-explanation')" key="check" class="w-4 h-4 text-green-600 dark:text-green-400" />
+              <Copy v-else key="copy" class="w-4 h-4 opacity-80" />
+            </Transition>
           </button>
         </div>
       </div>

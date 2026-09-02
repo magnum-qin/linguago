@@ -266,7 +266,13 @@ onUnmounted(() => {
           <strong>{{ providerOptions.find((item) => item.value === settings.provider)?.label }}</strong>
         </div>
 
-        <div class="model-list" role="list" aria-label="模型列表 / Lista de modelos">
+        <TransitionGroup
+          tag="div"
+          name="m3-list"
+          class="model-list relative"
+          role="list"
+          aria-label="模型列表 / Lista de modelos"
+        >
           <div v-for="model in editableModels" :key="model" class="model-row" role="listitem">
             <span class="model-row-name" :title="model">{{ model }}</span>
             <button
@@ -278,7 +284,7 @@ onUnmounted(() => {
               <Trash2 class="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
-        </div>
+        </TransitionGroup>
 
         <form class="model-add-form" @submit.prevent="addModel">
           <label class="setting-label" for="new-model-name">添加模型 / Adicionar modelo</label>

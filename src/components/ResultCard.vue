@@ -245,10 +245,12 @@ onUnmounted(() => {
               class="w-9 h-9 inline-flex items-center justify-center bg-transparent hover:bg-m3-surface-variant/50 rounded-full text-m3-on-surface-variant transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-m3-primary"
               @click="copyAllResult"
               :aria-label="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
-              :title="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
+              @title="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
             >
-              <Check v-if="isCopied('all-result')" class="w-4.5 h-4.5 text-green-600 dark:text-green-400" />
-              <Copy v-else class="w-4.5 h-4.5" />
+              <Transition name="m3-icon-swap" mode="out-in">
+                <Check v-if="isCopied('all-result')" key="check" class="w-4.5 h-4.5 text-green-600 dark:text-green-400" />
+                <Copy v-else key="copy" class="w-4.5 h-4.5" />
+              </Transition>
             </button>
             <button
               v-if="currentWord && resultData?.type !== 'sentence'"
@@ -343,8 +345,10 @@ onUnmounted(() => {
                 :title="isCopied('main-word') ? '已复制' : '复制词条'"
                 :aria-label="isCopied('main-word') ? '已复制' : '复制词条'"
               >
-                <Check v-if="isCopied('main-word')" class="w-5 h-5 text-green-600 dark:text-green-400" />
-                <Copy v-else class="w-5 h-5 opacity-80" />
+                <Transition name="m3-icon-swap" mode="out-in">
+                  <Check v-if="isCopied('main-word')" key="check" class="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <Copy v-else key="copy" class="w-5 h-5 opacity-80" />
+                </Transition>
               </button>
             </div>
           </div>
@@ -378,45 +382,53 @@ onUnmounted(() => {
 
 <style scoped>
 .fade-enter-active {
-  transition: opacity 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition:
+    opacity 280ms var(--m3-ease-emphasized-decelerate),
+    transform 280ms var(--m3-ease-emphasized-decelerate);
 }
 .fade-leave-active {
-  transition: opacity 0.15s ease-out;
+  transition:
+    opacity 160ms var(--m3-ease-emphasized-accelerate),
+    transform 160ms var(--m3-ease-emphasized-accelerate);
 }
-.fade-enter-from,
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+}
 .fade-leave-to {
   opacity: 0;
+  transform: translateY(-4px) scale(0.99);
 }
 
 /* Tab Slide Transitions */
 .slide-left-enter-active,
 .slide-right-enter-active {
   transition:
-    opacity 0.2s cubic-bezier(0.1, 0.9, 0.2, 1),
-    transform 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+    opacity 240ms var(--m3-ease-emphasized-decelerate),
+    transform 240ms var(--m3-ease-emphasized-decelerate);
 }
 .slide-left-leave-active,
 .slide-right-leave-active {
   transition:
-    opacity 0.1s ease-in,
-    transform 0.1s ease-in;
+    opacity 140ms var(--m3-ease-emphasized-accelerate),
+    transform 140ms var(--m3-ease-emphasized-accelerate);
 }
 
 .slide-left-enter-from {
   opacity: 0;
-  transform: translateX(10px);
+  transform: translateX(12px) scale(0.99);
 }
 .slide-left-leave-to {
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(-12px) scale(0.99);
 }
 
 .slide-right-enter-from {
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(-12px) scale(0.99);
 }
 .slide-right-leave-to {
   opacity: 0;
-  transform: translateX(10px);
+  transform: translateX(12px) scale(0.99);
 }
 </style>

@@ -186,7 +186,7 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
 <template>
   <section class="flex flex-col gap-3 enter">
     <div class="flex items-center justify-between gap-2 px-1 mb-1 min-h-10">
-      <Transition name="fade-up">
+      <Transition name="m3-fade-scale">
         <button
           v-if="sourceToggleVisible"
           type="button"
@@ -214,8 +214,10 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
           @click="toggleTheme"
           aria-label="Toggle Theme"
         >
-          <Sun v-if="currentTheme === 'dark'" class="w-5 h-5" />
-          <Moon v-else class="w-5 h-5" />
+          <Transition name="m3-icon-swap" mode="out-in">
+            <Sun v-if="currentTheme === 'dark'" key="sun" class="w-5 h-5" />
+            <Moon v-else key="moon" class="w-5 h-5" />
+          </Transition>
         </button>
 
         <button
@@ -265,7 +267,7 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
       ></textarea>
 
       <div class="flex items-center relative min-h-[44px] mt-3 w-full">
-        <Transition name="fade-up">
+        <Transition name="m3-fade-scale">
           <button
             v-if="inputText.length > 0"
             data-testid="clear-button"
@@ -289,16 +291,18 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
           @click="handlePrimaryAction"
           :disabled="!isTranslating && !inputText.trim()"
         >
-          <template v-if="isTranslating">
-            <Square class="w-3.5 h-3.5 mr-1.5 fill-current shrink-0" />
-            <span class="font-bold">中止</span>
-            <span class="text-[0.72rem] opacity-70 font-normal ml-1">Parar</span>
-          </template>
-          <template v-else>
-            <Languages class="w-3.5 h-3.5 mr-1.5 shrink-0" />
-            <span class="font-bold">翻译</span>
-            <span class="text-[0.72rem] opacity-70 font-normal ml-1">Traduzir</span>
-          </template>
+          <Transition name="m3-icon-swap" mode="out-in">
+            <span v-if="isTranslating" key="stop" class="inline-flex items-center">
+              <Square class="w-3.5 h-3.5 mr-1.5 fill-current shrink-0" />
+              <span class="font-bold">中止</span>
+              <span class="text-[0.72rem] opacity-70 font-normal ml-1">Parar</span>
+            </span>
+            <span v-else key="translate" class="inline-flex items-center">
+              <Languages class="w-3.5 h-3.5 mr-1.5 shrink-0" />
+              <span class="font-bold">翻译</span>
+              <span class="text-[0.72rem] opacity-70 font-normal ml-1">Traduzir</span>
+            </span>
+          </Transition>
         </button>
       </div>
     </div>

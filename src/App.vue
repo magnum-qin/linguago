@@ -114,15 +114,19 @@ onUnmounted(() => {
 
 <style scoped>
 /* Slide-Y Transition for update/error toast */
-.slide-y-enter-active,
+.slide-y-enter-active {
+  transition:
+    transform 320ms var(--m3-ease-emphasized-decelerate),
+    opacity 320ms var(--m3-ease-emphasized-decelerate);
+}
 .slide-y-leave-active {
   transition:
-    transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 0.4s ease;
+    transform 200ms var(--m3-ease-emphasized-accelerate),
+    opacity 200ms var(--m3-ease-emphasized-accelerate);
 }
 .slide-y-enter-from,
 .slide-y-leave-to {
-  transform: translate(-50%, 20px) scale(0.95);
+  transform: translate(-50%, 16px) scale(0.96);
   opacity: 0;
 }
 .slide-y-enter-to,

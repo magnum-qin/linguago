@@ -2,6 +2,10 @@
   --font-sans: 'Avenir Next', 'PingFang SC', 'Helvetica Neue', sans-serif;
   --font-display: 'Outfit', 'Inter', 'PingFang SC', sans-serif;
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --m3-ease-emphasized: cubic-bezier(0.2, 0.0, 0, 1.0);
+  --m3-ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1.0);
+  --m3-ease-emphasized-accelerate: cubic-bezier(0.3, 0.0, 0.8, 0.15);
+  --m3-ease-standard: cubic-bezier(0.2, 0.0, 0, 1.0);
   --color-m3-surface: var(--m3-surface);
   --color-m3-surface-container: var(--m3-surface-container);
   --color-m3-surface-container-high: var(--m3-surface-container-high);
@@ -322,4 +326,88 @@
     outline: none !important;
     box-shadow: none !important;
   }
+}
+
+/* ==========================================================================
+   Material 3 Motion Transitions System
+   ========================================================================== */
+
+/* 1. M3 Fade-Scale: Micro-elements (Clear buttons, Badges, Capsules) */
+.m3-fade-scale-enter-active,
+.fade-up-enter-active {
+  transition:
+    opacity 220ms var(--m3-ease-emphasized-decelerate),
+    transform 220ms var(--m3-ease-emphasized-decelerate);
+}
+.m3-fade-scale-leave-active,
+.fade-up-leave-active {
+  transition:
+    opacity 160ms var(--m3-ease-emphasized-accelerate),
+    transform 160ms var(--m3-ease-emphasized-accelerate);
+}
+.m3-fade-scale-enter-from,
+.fade-up-enter-from,
+.m3-fade-scale-leave-to,
+.fade-up-leave-to {
+  opacity: 0;
+  transform: scale(0.86) translateY(4px);
+}
+
+/* 2. M3 List Transition: TransitionGroup with FLIP auto-reordering */
+.m3-list-enter-active {
+  transition:
+    opacity 260ms var(--m3-ease-emphasized-decelerate),
+    transform 260ms var(--m3-ease-emphasized-decelerate);
+}
+.m3-list-leave-active {
+  transition:
+    opacity 200ms var(--m3-ease-emphasized-accelerate),
+    transform 200ms var(--m3-ease-emphasized-accelerate);
+  position: absolute;
+  width: 100%;
+}
+.m3-list-enter-from {
+  opacity: 0;
+  transform: translateY(12px) scale(0.96);
+}
+.m3-list-leave-to {
+  opacity: 0;
+  transform: translateX(30px) scale(0.94);
+}
+.m3-list-move {
+  transition: transform 300ms var(--m3-ease-emphasized);
+}
+
+/* 3. M3 Icon Swap: Springy rotation & scale for state toggle (Copy/Check, Sun/Moon) */
+.m3-icon-swap-enter-active {
+  transition:
+    opacity 180ms ease-out,
+    transform 220ms var(--ease-spring);
+}
+.m3-icon-swap-leave-active {
+  transition:
+    opacity 120ms ease-in,
+    transform 120ms ease-in;
+}
+.m3-icon-swap-enter-from {
+  opacity: 0;
+  transform: scale(0.5) rotate(-20deg);
+}
+.m3-icon-swap-leave-to {
+  opacity: 0;
+  transform: scale(0.5) rotate(20deg);
+}
+
+/* 4. M3 Expand / Collapse: Alerts, Hints & Errors */
+.m3-expand-enter-active,
+.m3-expand-leave-active {
+  transition:
+    opacity 220ms ease,
+    transform 220ms var(--m3-ease-emphasized-decelerate);
+  overflow: hidden;
+}
+.m3-expand-enter-from,
+.m3-expand-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
 }
