@@ -6,7 +6,7 @@ import { useHistory } from './useHistory';
 const inputText = ref('');
 const resultData = shallowRef<any>(null);
 const isTranslating = ref(false);
-const sourceLangPreference = ref<'auto' | 'zh' | 'ja'>('auto');
+const sourceLangPreference = ref<'auto' | 'zh' | 'ja' | 'en' | 'pt-BR'>('auto');
 let activeController: AbortController | null = null;
 let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 let activeRequestId = 0;

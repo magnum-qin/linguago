@@ -35,7 +35,23 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
 
     try {
       type EntryMatch = { id: number; matched_lang: string; matched_form_type: string };
+      // Controlled traditional aliases must win over legacy exact traditional
+      // headwords so Chinese queries consistently resolve to the Mainland-first
+      // simplified canonical entry.
       let match = await input.env.DB.prepare(
+        `SELECT e.id, ef.lang AS matched_lang, ef.form_type AS matched_form_type
+         FROM v2_entry_forms ef
+         JOIN v2_entries e ON e.id = ef.entry_id
+         WHERE ef.normalized_form = ?
+           AND ef.form_type = 'traditional_alias'
+         ORDER BY CASE WHEN e.source_lang = ? THEN 0 ELSE 1 END,
+           e.frequency_rank IS NULL, e.frequency_rank, e.id
+         LIMIT 1`
+      )
+        .bind(normalized, preferredSourceLang)
+        .first<EntryMatch>();
+      if (!match) {
+        match = await input.env.DB.prepare(
         `SELECT id, source_lang AS matched_lang, 'headword' AS matched_form_type
          FROM v2_entries
          WHERE normalized_key = ?
@@ -45,6 +61,7 @@ export class CloudflareD1V2Adapter implements DictionaryAdapter {
       )
         .bind(normalized, preferredSourceLang)
         .first<EntryMatch>();
+      }
       if (!match) {
         match = await input.env.DB.prepare(
           `SELECT e.id, ef.lang AS matched_lang, ef.form_type AS matched_form_type

@@ -3,6 +3,9 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import OpenCC from 'opencc-js';
+
+const traditionalToSimplified = OpenCC.Converter({ from: 'tw', to: 'cn' });
 
 const args = parseArgs(process.argv.slice(2));
 const sourceDbPath = path.resolve(
@@ -95,10 +98,21 @@ let represented = 0;
 let scriptMismatch = 0;
 let lowValueCandidate = 0;
 let scanned = 0;
+let excluded = 0;
+function writeProgress(stage) {
+  if (!args['progress-out']) return;
+  const file = path.resolve(args['progress-out']);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temporary = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify({ stage, updated_at: new Date().toISOString(), scanned, represented, excluded, script_mismatch: scriptMismatch, low_value: lowValueCandidate, selected: selected.length, selected_by_lang: counts }), 'utf8');
+  fs.renameSync(temporary, file);
+}
+writeProgress('native_scan_started');
 for (const row of nativeEntries.iterate(minRank, maxRank, scanLimit)) {
   scanned += 1;
+  if (scanned % 10000 === 0) writeProgress('native_scanning');
   if (counts[row.source_lang] >= targets[row.source_lang]) continue;
-  if (excludedCandidateIds.has(String(row.source_entry_id))) continue;
+  if (excludedCandidateIds.has(String(row.source_entry_id))) { excluded += 1; continue; }
   if (!sourceScriptOk(row.word, row.source_lang)) {
     scriptMismatch += 1;
     continue;
@@ -107,7 +121,13 @@ for (const row of nativeEntries.iterate(minRank, maxRank, scanLimit)) {
     lowValueCandidate += 1;
     continue;
   }
-  const normalized = normalize(row.normalized_key || row.word);
+  const sourceWord = String(row.word || '').trim();
+  const canonicalWord = row.source_lang === 'zh' ? traditionalToSimplified(sourceWord) : sourceWord;
+  if (isLowValueCjkCandidate(canonicalWord, row.source_lang)) {
+    lowValueCandidate += 1;
+    continue;
+  }
+  const normalized = normalize(row.source_lang === 'zh' ? canonicalWord : row.normalized_key || canonicalWord);
   if (
     productCoverage.has(coverageKey(row.source_lang, normalized)) ||
     productCoverage.has(coverageKey(row.source_lang, normalize(row.word)))
@@ -117,6 +137,9 @@ for (const row of nativeEntries.iterate(minRank, maxRank, scanLimit)) {
   }
   selected.push({
     ...row,
+    word: canonicalWord,
+    source_word: sourceWord,
+    traditional_alias: row.source_lang === 'zh' && sourceWord !== canonicalWord ? sourceWord : null,
     normalized_key: normalized,
     candidate_key: String(row.source_entry_id),
     selection_reason: 'uncovered_native_daily_dictionary_entry',
@@ -126,6 +149,7 @@ for (const row of nativeEntries.iterate(minRank, maxRank, scanLimit)) {
   if (targetsSatisfied(counts, targets)) break;
 }
 sourceDb.close();
+writeProgress('native_scan_complete');
 
 const report = {
   ok: true,
@@ -252,6 +276,13 @@ function isLowValueCandidate(word, lang) {
   // Title-case Latin forms are overwhelmingly names, brands, places, or
   // sentence-derived variants and should not consume the LLM production lane.
   return /^(?:\p{Lu}[\p{Ll}\p{M}'-]+)(?: \p{Lu}[\p{Ll}\p{M}'-]+)*$/u.test(text);
+}
+
+function isLowValueCjkCandidate(word, lang) {
+  const text = String(word || '').trim();
+  if (lang === 'zh') return [...text].length < 2 || [...text].length > 8;
+  if (lang === 'ja') return [...text].length > 12;
+  return false;
 }
 
 function nativeSourceFamily(lang) {

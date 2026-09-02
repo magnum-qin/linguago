@@ -1,11 +1,10 @@
 <script setup lang="ts">
+import { ArrowRight, Bookmark, Trash2 } from 'lucide-vue-next';
+import M3DrawerShell from './M3DrawerShell.vue';
 import { useBookmarks } from '../composables/useBookmarks';
 import { useTranslation } from '../composables/useTranslation';
-import { Bookmark, Trash2, ArrowRight, X } from 'lucide-vue-next';
 
-import { onMounted, onUnmounted } from 'vue';
-
-const { bookmarks, isBookmarksOpen, removeBookmark, clearBookmarks } = useBookmarks();
+const { bookmarks, isBookmarksOpen, removeBookmark } = useBookmarks();
 const { inputText, translate } = useTranslation();
 
 const loadWord = (word: string) => {
@@ -14,104 +13,112 @@ const loadWord = (word: string) => {
   isBookmarksOpen.value = false;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
-
-const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && isBookmarksOpen.value) {
-    isBookmarksOpen.value = false;
-  }
-};
-
-onMounted(() => window.addEventListener('keydown', handleKeydown));
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="fade">
-      <div
-        v-if="isBookmarksOpen"
-        class="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity"
-        @click="isBookmarksOpen = false"
-      ></div>
-    </Transition>
+  <M3DrawerShell
+    v-model="isBookmarksOpen"
+    title="生词本 / Caderno"
+    title-id="bookmarks-drawer-title"
+    close-label="关闭生词本 / Fechar caderno"
+  >
+    <template #icon>
+      <Bookmark class="h-5 w-5 shrink-0 text-m3-primary" aria-hidden="true" />
+    </template>
 
-    <Transition name="slide-right">
-      <aside
-        v-if="isBookmarksOpen"
-        class="fixed top-0 right-0 z-50 h-full w-[400px] max-w-[90vw] bg-m3-surface shadow-2xl flex flex-col p-6 overflow-y-auto"
+    <div v-if="bookmarks.length === 0" class="drawer-empty-state">
+      <Bookmark class="mb-4 h-12 w-12 text-m3-outline-variant/60" aria-hidden="true" />
+      <p class="text-sm font-medium text-m3-on-surface-variant">
+        还没有收藏任何单词<br />
+        <span class="mt-0.5 inline-block text-[0.8rem] text-m3-outline">Nenhuma palavra salva</span>
+      </p>
+      <p class="mt-5 text-xs leading-relaxed text-m3-outline">
+        点击结果旁的星标加入生词本<br />Clique na estrela ao lado para salvar
+      </p>
+    </div>
+
+    <div v-else class="drawer-list">
+      <article
+        v-for="word in bookmarks"
+        :key="word"
+        class="drawer-item"
+        tabindex="0"
+        role="button"
+        @click="loadWord(word)"
+        @keydown.enter="loadWord(word)"
+        @keydown.space.prevent="loadWord(word)"
       >
-        <div class="flex items-center justify-between mb-4 pb-4 border-b border-m3-outline-variant/20">
-          <div class="flex items-center gap-2">
-            <Bookmark class="w-5 h-5 text-m3-primary" />
-            <h2 class="text-lg font-bold font-display text-m3-on-surface">生词本 / Caderno</h2>
-          </div>
-          <button
-            @click="isBookmarksOpen = false"
-            class="w-10 h-10 rounded-full bg-transparent hover:bg-m3-surface-container-highest flex items-center justify-center text-m3-on-surface-variant transition-colors outline-none"
-            aria-label="关闭 / Fechar"
-          >
-            <ArrowRight class="w-5 h-5" />
-          </button>
-        </div>
-
-        <div v-if="bookmarks.length === 0" class="flex-1 flex flex-col items-center justify-center py-12 text-center">
-          <Bookmark class="w-12 h-12 text-m3-outline-variant/60 mb-4" />
-          <p class="text-m3-on-surface-variant text-sm text-center font-medium">
-            还没有收藏任何单词<br /><span class="text-[0.8rem] text-m3-outline mt-0.5 inline-block"
-              >Nenhuma palavra salva</span
-            >
-            <br /><br />
-            点击结果旁的星标加入生词本<br /><span class="text-[0.8rem] text-m3-outline mt-0.5 inline-block"
-              >Clique na estrela ao lado para salvar</span
-            >
-          </p>
-        </div>
-
-        <div v-else class="flex flex-col gap-3">
-          <div
-            v-for="word in bookmarks"
-            :key="word"
-            class="flex items-center justify-between group bg-m3-surface-container hover:bg-m3-surface-container-high rounded-[20px] p-3 pl-4 border border-m3-outline-variant/10 shadow-sm transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5"
-            @click="loadWord(word)"
-          >
-            <div class="flex items-center gap-3 overflow-hidden flex-1">
-              <span class="text-m3-on-surface font-display font-bold text-lg truncate">{{ word }}</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <button
-                @click.stop="removeBookmark(word)"
-                class="flex items-center justify-center w-10 h-10 rounded-full text-m3-outline-variant hover:text-m3-error hover:bg-m3-error/10 transition-colors shrink-0"
-                aria-label="移除收藏 / Remover"
-              >
-                <Trash2 class="w-4 h-4" />
-              </button>
-              <ArrowRight
-                class="w-5 h-5 text-m3-outline-variant/50 group-hover:text-m3-primary transition-colors shrink-0"
-              />
-            </div>
-          </div>
-        </div>
-      </aside>
-    </Transition>
-  </Teleport>
+        <span class="min-w-0 flex-1 truncate text-lg font-bold text-m3-on-surface">{{ word }}</span>
+        <button
+          type="button"
+          class="drawer-item-action"
+          :aria-label="`移除收藏 ${word} / Remover ${word}`"
+          @click.stop="removeBookmark(word)"
+        >
+          <Trash2 class="h-4 w-4" aria-hidden="true" />
+        </button>
+        <ArrowRight class="h-5 w-5 shrink-0 text-m3-outline-variant/60" aria-hidden="true" />
+      </article>
+    </div>
+  </M3DrawerShell>
 </template>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.drawer-empty-state {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+  text-align: center;
 }
 
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+.drawer-list {
+  display: grid;
+  gap: 12px;
 }
-.slide-right-enter-from,
-.slide-right-leave-to {
-  transform: translateX(100%);
+
+.drawer-item {
+  min-height: 68px;
+  padding: 10px 10px 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-m3-outline-variant) 18%, transparent);
+  border-radius: 18px;
+  background: var(--color-m3-surface-container);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.drawer-item:hover {
+  background: var(--color-m3-surface-container-high);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.08);
+}
+
+.drawer-item:focus-visible,
+.drawer-item-action:focus-visible {
+  outline: 2px solid var(--color-m3-primary);
+  outline-offset: 2px;
+}
+
+.drawer-item-action {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: var(--color-m3-outline);
+}
+
+.drawer-item-action:hover {
+  color: var(--color-m3-error);
+  background: color-mix(in srgb, var(--color-m3-error) 10%, transparent);
 }
 </style>

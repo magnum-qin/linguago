@@ -1,12 +1,12 @@
 ﻿{
     "version":  1,
-    "generated_at":  "2026-08-23T20:29:16.2959336Z",
-    "root":  "D:\\linguago-runner",
+    "generated_at":  "2026-08-25T14:45:38.1306113Z",
+    "root":  "D:\\Projects\\linguago",
     "files":  [
                   {
                       "path":  "package.json",
-                      "bytes":  18173,
-                      "sha256":  "9E921D331D6214C39F4A8F60B699B101EAFB12E9900817F73A5C8A97FB598584"
+                      "bytes":  20855,
+                      "sha256":  "41AC44B201EE4A953F82C073AF47FA1EE4EB5CD66D8B08D58AB87B7BD59A966F"
                   },
                   {
                       "path":  "package-lock.json",
@@ -15,8 +15,8 @@
                   },
                   {
                       "path":  "scripts\\run-dictionary-v2-remote-pipeline.mjs",
-                      "bytes":  55385,
-                      "sha256":  "6DE82EB809A29E9DDC0AC98E66BFAF6ED2FF0E8C1ED679C9DD7C50209A44F24D"
+                      "bytes":  56002,
+                      "sha256":  "BDB4ADCD3A04544E4D7B2B22B9217BBC0E4335BBB845AD844512FC696F534411"
                   },
                   {
                       "path":  "scripts\\lib\\dictionary-pipeline-stage-recovery.mjs",
@@ -25,8 +25,8 @@
                   },
                   {
                       "path":  "scripts\\lib\\run-child-process-with-log.mjs",
-                      "bytes":  1487,
-                      "sha256":  "A6DEAC21B204C7C3EDA5A6F3A8CDD3F2AB8E820A1A4FF09EB849F945F0943C86"
+                      "bytes":  1663,
+                      "sha256":  "FD9C8A0440981FCA79EC63FDB20E4DDD3430BC867CE0F51CF355F0BCA7BA2B9B"
                   },
                   {
                       "path":  "scripts\\lib\\unsloth-cluster-discovery.mjs",
@@ -60,13 +60,23 @@
                   },
                   {
                       "path":  "scripts\\find-dictionary-v2-native-daily-coverage-gaps.mjs",
-                      "bytes":  9801,
-                      "sha256":  "CB49209FFCFE3E875A121FBA8E2224CFBB435BD3AEB2342F71E79B05EE1070F4"
+                      "bytes":  10689,
+                      "sha256":  "524545CBE4EEC7C40274D23CD306ECFEBFFD491F52339EC8172EA9DCEF1D0719"
+                  },
+                  {
+                      "path":  "scripts\\find-dictionary-v2-product-additional-sense-entries.mjs",
+                      "bytes":  6871,
+                      "sha256":  "ADC988316197E20F8496C4979D17CC6D8F5E101EF3258E2916B66B27B6A3646B"
                   },
                   {
                       "path":  "scripts\\select-dictionary-v2-product-daily-primary-senses.mjs",
-                      "bytes":  13325,
-                      "sha256":  "2BBEC7D12B56863749392EE66B17D61DC817B43655FC67AD210B5D90549E71FF"
+                      "bytes":  13882,
+                      "sha256":  "6ECD8FC48225D9C201BBDD168A1B1DDE7E67DFD0D614597ACAD68FDE0A94C4DF"
+                  },
+                  {
+                      "path":  "scripts\\test-dictionary-v2-additional-sense-selection.mjs",
+                      "bytes":  9034,
+                      "sha256":  "9A7B15BD2DC6003417E335860FBBDF9BDBB2CEE5FE564E5F3D17886B85BAA925"
                   },
                   {
                       "path":  "scripts\\align-dictionary-v2-product-source-gap-candidate-senses.mjs",
@@ -155,18 +165,18 @@
                   },
                   {
                       "path":  "scripts\\review-dictionary-v2-product-source-gap-candidates-unsloth.mjs",
-                      "bytes":  63593,
-                      "sha256":  "B433386E204F5CA36C4BD6F7B7A1FF1967DDCB6AFFD9BE6F869F02E32710A1A6"
+                      "bytes":  63842,
+                      "sha256":  "C4CB427CBBF472334D2F673C78F06D5F7D694CB327C66E144E0E1B6CB988CE0B"
                   },
                   {
                       "path":  "scripts\\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs",
-                      "bytes":  35999,
-                      "sha256":  "EDBDE72E795FB97C43323210B3C9D3306906633E9FBBBD2C1EFB823C8D2E7628"
+                      "bytes":  35790,
+                      "sha256":  "71103A8C9AD1FA9D7355AF1598AE2449A74BCE5E4774324C0C28B0B8978BCA7B"
                   },
                   {
                       "path":  "scripts\\build-dictionary-v2-product-source-gap-controlled-consensus-input.mjs",
-                      "bytes":  17103,
-                      "sha256":  "C36CA79437DDD7F5A418EE6848999857AB6AE8A420293F6B90E4937CD1593326"
+                      "bytes":  18125,
+                      "sha256":  "004A620A99EB5BFBD0F88625442683DFD53491F46BD4052BB381BA2B14E152E1"
                   },
                   {
                       "path":  "scripts\\build-dictionary-v2-source-gap-semantic-preview.mjs",
@@ -175,8 +185,108 @@
                   },
                   {
                       "path":  "scripts\\review-dictionary-v2-product-source-gap-consensus-unsloth.mjs",
-                      "bytes":  31121,
-                      "sha256":  "C63994B76AFB101DA18032662D8B1D3B6492D81A1A3088CBF023A5C141F4A5AB"
+                      "bytes":  31061,
+                      "sha256":  "24BB4F466FE5241C46D9DED786A84390C78927B39D70E461344DD8897B58A132"
+                  },
+                  {
+                      "path":  "scripts\\report-dictionary-v2-localized-sense-isolation-risk.mjs",
+                      "bytes":  5795,
+                      "sha256":  "56ED80DDB350A56CF868C074E5C2E008BBC3FEAEF79FA738F446A0921653B574"
+                  },
+                  {
+                      "path":  "scripts\\review-dictionary-v2-localized-sense-isolation-unsloth.mjs",
+                      "bytes":  15393,
+                      "sha256":  "F33B0638AAA8F88A1E007C983AD027440C5E9670AA209E7F94985A71975FD281"
+                  },
+                  {
+                      "path":  "scripts\\lib\\localized-sense-review-contract.mjs",
+                      "bytes":  2892,
+                      "sha256":  "6480370E9C20836818107A8B03A32DD669B83AF41F6E1C665836B5A756177AEE"
+                  },
+                  {
+                      "path":  "scripts\\test-localized-sense-review-contract.mjs",
+                      "bytes":  2234,
+                      "sha256":  "5F59A069E5D81744119E809FAC669C4CBF4461F0726A63D5C3A217F8FEE88964"
+                  },
+                  {
+                      "path":  "scripts\\run-remote-localized-sense-review.ps1",
+                      "bytes":  4437,
+                      "sha256":  "72BD5EC33D0A6131101E77DB819861B300CAB99EDD3D5D9C7CBAD2EF6F973099"
+                  },
+                  {
+                      "path":  "scripts\\run-remote-localized-sense-review-job.ps1",
+                      "bytes":  791,
+                      "sha256":  "23B1520BB084526D36BB0917B9DFD62DA35ECADD9A61C4B2FC14B5945821EE6F"
+                  },
+                  {
+                      "path":  "scripts\\start-remote-localized-sense-review.ps1",
+                      "bytes":  3888,
+                      "sha256":  "901EDA654640EB2EBB85C3E07EC88CA49404864E3F479FACE35278E68D085D10"
+                  },
+                  {
+                      "path":  "scripts\\run-remote-localized-sense-fixed-calibration.ps1",
+                      "bytes":  1465,
+                      "sha256":  "90471ECC6A5A4D87085135259D6FC56EC4BB69391F7D1D4C4070EACF5B42781E"
+                  },
+                  {
+                      "path":  "scripts\\adjudicate-dictionary-v2-localized-sense-reviews.mjs",
+                      "bytes":  4544,
+                      "sha256":  "D866ACDC8F80ACE4FDF4881DDA18BD5824229CCEF2CDA281BC45619B066242A2"
+                  },
+                  {
+                      "path":  "scripts\\create-localized-sense-consensus-repair-plan.mjs",
+                      "bytes":  5834,
+                      "sha256":  "25FF379A69845BB8EA41C909879E0DFED1CD07A67C08DCD7AFC1EE5411E66240"
+                  },
+                  {
+                      "path":  "scripts\\discover-localized-sense-repair-evidence.mjs",
+                      "bytes":  7067,
+                      "sha256":  "8264994F8C89C9DD5CF68334673AEDC9261197FD20375BE16729E4EF9FFED94F"
+                  },
+                  {
+                      "path":  "scripts\\create-localized-sense-repair-source-link-plan.mjs",
+                      "bytes":  8671,
+                      "sha256":  "D64F3905B07D004BA75F18485782EEC89579A075D5EB249F29578342178CA30F"
+                  },
+                  {
+                      "path":  "scripts\\apply-localized-sense-repair-source-link-plan.mjs",
+                      "bytes":  3650,
+                      "sha256":  "D188C1C34DB07DAFE830B7D92320D0B29CC735B66937C503BD892B063678AC71"
+                  },
+                  {
+                      "path":  "scripts\\build-localized-sense-repair-evidence.mjs",
+                      "bytes":  8251,
+                      "sha256":  "A59E359442D2446A4CCD78AA084372F1B1ECE9EFC69C3DB3B7CC55F17180414F"
+                  },
+                  {
+                      "path":  "scripts\\propose-localized-sense-repair-patches-unsloth.mjs",
+                      "bytes":  14166,
+                      "sha256":  "B8E368EFF3A9A94244E7F728797E2BE92890713D9B6E9916280A6E5F16BE5FE4"
+                  },
+                  {
+                      "path":  "scripts\\create-localized-sense-exact-repair-plan.mjs",
+                      "bytes":  6173,
+                      "sha256":  "B1C70068C5779F0C78564091FE5E9D4E5C03573863F663E5606856600EED5894"
+                  },
+                  {
+                      "path":  "scripts\\apply-localized-sense-exact-repair-plan.mjs",
+                      "bytes":  2865,
+                      "sha256":  "FE14BA1FE9CB3310A2BB47255386376F4BB357C819A8C47985FE9F147C9EAF4C"
+                  },
+                  {
+                      "path":  "scripts\\test-localized-sense-exact-repair-plan.mjs",
+                      "bytes":  2946,
+                      "sha256":  "CCF1291644DE7E92D1263FF7DA3376368016174CCB46E1C5388D50A16183C347"
+                  },
+                  {
+                      "path":  "scripts\\create-localized-sense-review-human-label-set.mjs",
+                      "bytes":  3458,
+                      "sha256":  "9DE4E41C6FE92B2838406BD78427869CC9649D135BA415FE9ADC92906F5BAE0A"
+                  },
+                  {
+                      "path":  "scripts\\score-localized-sense-review-human-labels.mjs",
+                      "bytes":  4339,
+                      "sha256":  "C0D9EEE3E42D38C3397A85B9B9ADDDBE312A3A79AC88DFF94E303A58313D04DF"
                   },
                   {
                       "path":  "scripts\\select-dictionary-v2-source-gap-candidates-by-review.mjs",
@@ -185,13 +295,13 @@
                   },
                   {
                       "path":  "scripts\\filter-dictionary-v2-source-gap-jmdict-generation-preflight.mjs",
-                      "bytes":  9669,
-                      "sha256":  "C33F45B6B4FAD9DCDB82D5201A3D4E98CF4E19B6750ED86E428322B4EBCC696A"
+                      "bytes":  10292,
+                      "sha256":  "3932223050392B470A20DAC19D912B49F402903D9D898C53378F3878A3991BF5"
                   },
                   {
                       "path":  "scripts\\supplement-dictionary-v2-product-source-gaps-unsloth.mjs",
-                      "bytes":  171061,
-                      "sha256":  "D9940FDA8E9CFEBCD8D1BDE6AA3E7F88E3C29EAFEAF02B5168BD14D5E33E3F8F"
+                      "bytes":  172159,
+                      "sha256":  "BF0D62E05962F246BF87C876237F20CEEDAFB6E790118C7CCA903FCBEC8F7B86"
                   },
                   {
                       "path":  "scripts\\invoke-dictionary-control.ps1",
@@ -200,8 +310,8 @@
                   },
                   {
                       "path":  "scripts\\manage-remote-dictionary-runner.ps1",
-                      "bytes":  16837,
-                      "sha256":  "0BCD136CB06F3AB7684B654EEB9F3AA75693B01A30A0D7CD1CB72F8151C752B5"
+                      "bytes":  17236,
+                      "sha256":  "452F58DFB75EBAF2C0330EFC6EBDCF37FE318D7E545F708187FF9AEC43EDBF60"
                   },
                   {
                       "path":  "scripts\\run-remote-dictionary-runner-job.ps1",
@@ -230,8 +340,8 @@
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-runner-manifest.ps1",
-                      "bytes":  5775,
-                      "sha256":  "244ED691CDC2414B043F9C10872CDF226BD279F5F26D4BB96838FACDEAE0E9E2"
+                      "bytes":  7648,
+                      "sha256":  "7EA795283C8031019833D13F8F1ED95D1D8B363CDD94E537FD310E165D7E482D"
                   },
                   {
                       "path":  "scripts\\validate-remote-dictionary-controlled-replay.ps1",
@@ -244,9 +354,19 @@
                       "sha256":  "24C125A5D6AC69855EC63904BA41AEDDEF57AF406093AFBB69EFF64422FF38BC"
                   },
                   {
+                      "path":  "scripts\\publish-remote-dictionary-manual-override.ps1",
+                      "bytes":  5913,
+                      "sha256":  "808D18261F3BBB1C3D240FB43691B476FB6D63AAF6A68A0ADE797C19AF657967"
+                  },
+                  {
                       "path":  "scripts\\checkpoint-sqlite-db.mjs",
                       "bytes":  653,
                       "sha256":  "30AA5ACB2DC8B34E6290FE7B43FB5E67C59E371B4FFCAD395CFBB54C78FBD631"
+                  },
+                  {
+                      "path":  "scripts\\fingerprint-sqlite-logical.mjs",
+                      "bytes":  2043,
+                      "sha256":  "3627C284417E096FF1276671D0E48AB23B38D9E1094A09AA8B8924F24B99F466"
                   },
                   {
                       "path":  "scripts\\check-remote-cloudflare-auth.ps1",
@@ -255,13 +375,18 @@
                   },
                   {
                       "path":  "scripts\\release-remote-dictionary-d1.ps1",
-                      "bytes":  7772,
-                      "sha256":  "6B721B606060DFA8A0A586F8964D30FE890F72EE1B506A73D642B6CDD95EC8FD"
+                      "bytes":  10290,
+                      "sha256":  "D9EDB37EF288D14B064865EB1686E98D6D5252D8D7E913535632D00A0D484C82"
+                  },
+                  {
+                      "path":  "scripts\\new-dictionary-maintenance-release-report.ps1",
+                      "bytes":  4099,
+                      "sha256":  "9BE652484A281C51610A808F6E29E3F9C9A3B5CA8F541EC9F33FAE2DC628F5B4"
                   },
                   {
                       "path":  "scripts\\push-dictionary-v2-native-to-d1.ps1",
-                      "bytes":  3235,
-                      "sha256":  "6A2C317FC9929F41748E370041811A34C3902D07B131A999B41F8193CE477DEB"
+                      "bytes":  3588,
+                      "sha256":  "7FF44E5801BAA833A8BC228CDFFA2D0C5A9711BB09D41309617F0D2E365B3F32"
                   },
                   {
                       "path":  "scripts\\stage-remote-worker-source.ps1",
@@ -275,18 +400,18 @@
                   },
                   {
                       "path":  "scripts\\new-remote-dictionary-production-batch.ps1",
-                      "bytes":  5915,
-                      "sha256":  "18A8F7FE43FE4A26E26E62144FFEB076A9259DC8D13DB6E2B530FBE7F42A2864"
+                      "bytes":  6119,
+                      "sha256":  "5E626C8B7E911B4BF9664D5FDF6F4EF958F54441130CF7B505B022AB0CCB1557"
                   },
                   {
                       "path":  "scripts\\select-dictionary-v2-source-gap-fresh-cohort.mjs",
-                      "bytes":  10911,
-                      "sha256":  "2DA5F4661CE6F42EBD50BD96CED84D5635C31B7D2C4EACF7A1D8D3878829417E"
+                      "bytes":  11931,
+                      "sha256":  "B6A1F4D52B4BCD58B390FB11F2ACB998906E2EFA25BB6E79D8E9AAB09B17F8A9"
                   },
                   {
                       "path":  "scripts\\promote-dictionary-v2-product-source-gap-drafts.mjs",
-                      "bytes":  32269,
-                      "sha256":  "5BFE50E20A9AE3542A54064F0C782A5E65908A8C27475A33B8E0EFA070821918"
+                      "bytes":  33119,
+                      "sha256":  "B8F2C8CA1643B43D5AB9493B6CDE2D5DCE3764BB5E22B8B7A8B9103247CF7356"
                   },
                   {
                       "path":  "scripts\\audit-dictionary-v2-product-export.mjs",
@@ -297,6 +422,31 @@
                       "path":  "scripts\\audit-dictionary-v2-product-published-risk.mjs",
                       "bytes":  11334,
                       "sha256":  "728E6771824D8135F036EF763CAFE9995C36D56593044903C1703B93A8E65D56"
+                  },
+                  {
+                      "path":  "scripts\\audit-dictionary-v2-product-mainland-chinese.mjs",
+                      "bytes":  5823,
+                      "sha256":  "DB9F70C457B10FF61C595B119559888B10B26DEA3094CA3026AB01AB3E046340"
+                  },
+                  {
+                      "path":  "scripts\\create-dictionary-v2-product-mainland-chinese-plan.mjs",
+                      "bytes":  7099,
+                      "sha256":  "7F3B19B51EE11DEA0A89C404AD7087E5026A2A33C4C7A7DE54EC7EFED84914CF"
+                  },
+                  {
+                      "path":  "scripts\\apply-dictionary-v2-product-mainland-chinese-plan.mjs",
+                      "bytes":  5836,
+                      "sha256":  "DA4FD911A67096FA79CF4683496DE17F86CD904871BF38BA76B588865F13EC8D"
+                  },
+                  {
+                      "path":  "scripts\\test-dictionary-v2-product-mainland-chinese-plan.mjs",
+                      "bytes":  3495,
+                      "sha256":  "996A44C570FBA982CCBF91828A44FCE3A6432A84F13599A10D062E23F87BF562"
+                  },
+                  {
+                      "path":  "scripts\\test-worker-dictionary-localized-term-filter.mjs",
+                      "bytes":  5787,
+                      "sha256":  "E6877B5224F4B20D2B67D452A6C8D7F3658E540B378853474EC6D71D850E88E3"
                   },
                   {
                       "path":  "scripts\\export-dictionary-v2-product-native-d1-sql.mjs",
@@ -310,13 +460,13 @@
                   },
                   {
                       "path":  "config\\dictionary-v2-online-baseline.json",
-                      "bytes":  782,
-                      "sha256":  "5F47314F296D3645913E09010B6004B7460C5669AF60AC6CF1578261AA04FD71"
+                      "bytes":  800,
+                      "sha256":  "783093D25FF7A3D6A9EB608AFBCD46702FF47B29D7B16A528D8B58E4BB89D012"
                   },
                   {
                       "path":  "config\\dictionary-overrides\\product-entry-form-aliases.json",
-                      "bytes":  738,
-                      "sha256":  "06A49596096096957AFC1A01EBACB873D443798B6B1CB20CA258E953DBA8B2FE"
+                      "bytes":  230997,
+                      "sha256":  "0481077791CE8ED80AC7F070A3AD5649424FAD4CEEBDFDB87A68DCA5C1CD1622"
                   },
                   {
                       "path":  "config\\remote-candidate-sources.json",

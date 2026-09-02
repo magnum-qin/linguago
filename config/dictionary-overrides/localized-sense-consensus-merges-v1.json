@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "evidence_note": "Verified against JMdict and OMW; apply only after localized-sense-consensus-verified-v1 overrides.",
+  "candidates": [
+    {
+      "entry_id": 162,
+      "keep_sense_id": 162,
+      "remove_sense_id": 163,
+      "reason": "JMdict treats right/you know as uses of the same sentence-final particle sense."
+    },
+    {
+      "entry_id": 37611,
+      "keep_sense_id": 38257,
+      "remove_sense_id": 39183,
+      "reason": "OMW synset 14030435-n aligns drowsiness, sleepiness and sonolencia as one concept."
+    }
+  ]
+}

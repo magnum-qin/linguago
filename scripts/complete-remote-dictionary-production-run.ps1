@@ -13,16 +13,31 @@ $RunDir = [IO.Path]::GetFullPath((Join-Path $Root (Join-Path 'runs' $RunId)))
 $StatusPath = Join-Path $RunDir 'production-supervisor.json'
 $ManifestPath = Join-Path $RunDir 'manifest.json'
 
+# The rolling orchestrator can start this supervisor before the pipeline has
+# created its run directory. Own the status directory here to avoid that race.
+New-Item -ItemType Directory -Path $RunDir -Force | Out-Null
+
 function Write-Status([string]$Status, [object]$Details) {
   $Payload = [ordered]@{ run_id = $RunId; status = $Status; updated_at = [DateTime]::UtcNow.ToString('o'); details = $Details }
   [IO.File]::WriteAllText($StatusPath, ($Payload | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
+}
+
+function Read-JsonWithRetry([string]$Path, [int]$Attempts = 5) {
+  for ($Attempt = 1; $Attempt -le $Attempts; $Attempt++) {
+    try {
+      return [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8) | ConvertFrom-Json
+    } catch {
+      if ($Attempt -eq $Attempts) { throw }
+      Start-Sleep -Milliseconds 500
+    }
+  }
 }
 
 try {
   Write-Status 'waiting_for_pipeline' @{}
   while ($true) {
     if (-not (Test-Path -LiteralPath $ManifestPath)) { Start-Sleep -Seconds $PollSeconds; continue }
-    $Manifest = [IO.File]::ReadAllText($ManifestPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+    $Manifest = Read-JsonWithRetry $ManifestPath
     if ([string]$Manifest.status -in @('complete', 'completed', 'succeeded')) { break }
     if ([string]$Manifest.status -in @('failed', 'error', 'stopped', 'cancelled')) {
       throw "Pipeline ended with status=$($Manifest.status)"
@@ -32,6 +47,18 @@ try {
 
   while (Test-Path -LiteralPath (Join-Path $Root 'state\remote-pipeline.lock.json')) {
     Start-Sleep -Seconds 5
+  }
+
+  $SummaryPath = Join-Path $RunDir 'summary.json'
+  $Summary = Read-JsonWithRetry $SummaryPath
+  $FinalAccepted = [int64]$Summary.summary.final_accepted
+  if ($FinalAccepted -le 0) {
+    Write-Status 'candidate_exhausted' @{
+      final_accepted = $FinalAccepted
+      summary = $SummaryPath
+      database_write_attempted = $false
+    }
+    return
   }
 
   Write-Status 'validating_and_committing' @{}

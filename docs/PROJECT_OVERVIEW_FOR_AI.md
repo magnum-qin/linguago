@@ -1,5 +1,12 @@
 # LinguaGo Project Overview For AI
 
+## v219 recovery checkpoint
+
+Read [V219_DAILY_RECOVERY.md](V219_DAILY_RECOVERY.md) for the latest recovery
+work. The 100-candidate deterministic check passed, but spot review did not.
+Mixed-lane production remains on a quality hold, with no new DB writes or D1
+release from this validation. Older baseline sections below are historical.
+
 ## Current jump-host baseline and online release (2026-08-24)
 
 The authoritative jump-host product database and Cloudflare release are now
@@ -1732,3 +1739,15 @@ isolated replay and full audit. The authoritative DB is now `entries=43579`,
 Published-risk remains zero. Since v142, 1,705 senses have accumulated and
 3,295 remain before the next D1 release. The next task is evidence-backed
 candidate acquisition, not relaxing publication gates.
+
+### v147 localized-sense repair release
+
+The current production D1 baseline is 44,549 entries, 51,703 senses, 206,812
+sense localizations, 3,030 examples, and 11,898 example localizations, with
+`published_at=2026-08-26T06:44:47.662Z`. The release applied eight exact,
+authoritative-source-backed localization repairs; blocked 21 structurally dirty
+composite localizations; and retained 12 ambiguous cases for manual review.
+Published-risk and all full-export blocking counters are zero. Worker cache
+`v147-localized-sense-repair` is live as Version ID
+`d4a42a8a-5504-450a-a3da-318ab6613aa2`; general and focused online regressions
+passed.

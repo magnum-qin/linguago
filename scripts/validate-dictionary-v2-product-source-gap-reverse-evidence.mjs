@@ -53,6 +53,14 @@ const supportedReportPath = path.resolve(args["supported-report"] || defaultSupp
 const includeInvalid = args["include-invalid"] === "true";
 const inputMode = args["input-mode"] || "generated";
 const requireSourceReverseEvidence = args["require-source-reverse-evidence"] === "true";
+const maxManualTargetLanguages = Math.max(
+  0,
+  Number.parseInt(args["max-manual-target-langs"] || "0", 10)
+);
+const minSupportedTargetLanguages = Math.max(
+  0,
+  Number.parseInt(args["min-supported-target-langs"] || "0", 10)
+);
 const evidenceFamilyPolicy = args["evidence-family-policy"] || "wiktionary";
 const progressEvery = Math.max(1, Number.parseInt(args["progress-every"] || "100", 10));
 const allowedReviewedSupplementalSourceKeys = new Set(
@@ -214,6 +222,8 @@ const output = {
     omw_only_auto_pass: false,
     source_language_exact_term_auto_pass: !requireSourceReverseEvidence,
     require_source_reverse_evidence: requireSourceReverseEvidence,
+    max_manual_target_languages: maxManualTargetLanguages,
+    min_supported_target_languages: minSupportedTargetLanguages,
     evidence_family_policy: evidenceFamilyPolicy,
     blocked_supplemental_source_keys: [...blockedSupplementalSourceKeys].sort(),
     blocked_supplemental_families: [...blockedSupplementalFamilies].sort(),
@@ -420,9 +430,16 @@ function validateGeneratedRow(row) {
   const targetDecisions = Object.entries(languages)
     .filter(([lang]) => lang !== sourceLang || (requireSourceReverseEvidence && sourceLang !== "en"))
     .map(([, value]) => value.decision);
+  const supportedTargetLanguages = targetDecisions.filter((value) => value === "supported").length;
+  const manualTargetLanguages = targetDecisions.filter((value) => value === "manual_review").length;
+  const manualEvidenceQualified =
+    !targetDecisions.includes("unsupported") &&
+    manualTargetLanguages > 0 &&
+    manualTargetLanguages <= maxManualTargetLanguages &&
+    supportedTargetLanguages >= minSupportedTargetLanguages;
   const decision = targetDecisions.includes("unsupported")
     ? "unsupported"
-    : targetDecisions.includes("manual_review")
+    : targetDecisions.includes("manual_review") && !manualEvidenceQualified
       ? "manual_review"
       : "supported";
 
@@ -436,6 +453,13 @@ function validateGeneratedRow(row) {
     anchor,
     generation_valid: row.valid === true,
     decision,
+    evidence_qualification: manualEvidenceQualified
+      ? {
+          mode: "supported_with_limited_manual_evidence",
+          supported_target_languages: supportedTargetLanguages,
+          manual_target_languages: manualTargetLanguages
+        }
+      : null,
     languages
   };
 }

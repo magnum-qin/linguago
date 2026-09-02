@@ -61,6 +61,9 @@ const dailyPrimarySenseSelection =
     : pipelineMode === 'simplified';
 const allowLinkedPrimaryForAdditionalSense =
   args['allow-linked-primary-for-additional-sense'] === 'true';
+const additionalSenseReverseEvidenceArgs = allowLinkedPrimaryForAdditionalSense
+  ? ['--max-manual-target-langs', '1', '--min-supported-target-langs', '3']
+  : [];
 const sourceSenseAlignment = args['source-sense-alignment'] === 'true';
 const allowNativeSourceFallback = args['allow-native-source-fallback'] === 'true';
 const reverseEvidencePrefilter = args['reverse-evidence-prefilter'] === 'true';
@@ -573,7 +576,10 @@ async function runSimplifiedPipeline() {
         '--rejected-out', files.dailyPrimaryRejected,
         '--min-score', args['daily-primary-min-score'] || '2500',
         '--allow-linked-primary-for-additional-sense',
-        String(allowLinkedPrimaryForAdditionalSense)
+        String(allowLinkedPrimaryForAdditionalSense),
+        ...(args['daily-primary-attempt-index']
+          ? ['--attempt-index', args['daily-primary-attempt-index']]
+          : [])
       ],
       [files.dailyPrimary, files.dailyPrimaryRejected]
     );
@@ -601,7 +607,7 @@ async function runSimplifiedPipeline() {
         '--out', files.senseAligned,
         '--rejected-out', files.senseAlignmentRejected,
         '--min-langs', '2',
-        '--max-langs', '3',
+        '--max-langs', args['source-sense-alignment-max-langs'] || '3',
         '--prefer-current-sense', 'true',
         '--allow-native-source-fallback', String(allowNativeSourceFallback)
       ],
@@ -734,6 +740,7 @@ async function runSimplifiedPipeline() {
       '--input-mode', 'reviewed-suggested',
       '--require-source-reverse-evidence', 'true',
       '--evidence-family-policy', 'wiktionary',
+      ...additionalSenseReverseEvidenceArgs,
       ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
       ...supplementalValidationArgs
     ],
@@ -847,6 +854,7 @@ async function runSimplifiedPipeline() {
     '--input-mode', 'generated',
     '--require-source-reverse-evidence', 'true',
     '--evidence-family-policy', 'wiktionary',
+    ...additionalSenseReverseEvidenceArgs,
     ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
     ...supplementalValidationArgs
   ], [files.reverse, files.reverseSupported]);

@@ -11,7 +11,11 @@ param(
   [object]$ProductionPrefilter = $true,
   [object]$RequireAuthoritativeSourceSense = $true,
   [object]$DailyPrimarySenseSelection = $false,
+  [object]$AllowLinkedPrimaryForAdditionalSense = $false,
+  [string]$DailyPrimaryAttemptIndex = '',
   [object]$SourceSenseAlignment = $false,
+  [ValidateRange(1, 4)]
+  [int]$SourceSenseAlignmentMaxLangs = 3,
   [object]$AllowNativeSourceFallback = $false,
   [object]$ReverseEvidencePrefilter = $false,
   [int]$ReverseEvidenceMinTargetLangs = 2,
@@ -45,6 +49,7 @@ function ConvertTo-RunnerBoolean([object]$Value, [string]$Name) {
 $ProductionPrefilter = ConvertTo-RunnerBoolean $ProductionPrefilter 'ProductionPrefilter'
 $RequireAuthoritativeSourceSense = ConvertTo-RunnerBoolean $RequireAuthoritativeSourceSense 'RequireAuthoritativeSourceSense'
 $DailyPrimarySenseSelection = ConvertTo-RunnerBoolean $DailyPrimarySenseSelection 'DailyPrimarySenseSelection'
+$AllowLinkedPrimaryForAdditionalSense = ConvertTo-RunnerBoolean $AllowLinkedPrimaryForAdditionalSense 'AllowLinkedPrimaryForAdditionalSense'
 $SourceSenseAlignment = ConvertTo-RunnerBoolean $SourceSenseAlignment 'SourceSenseAlignment'
 $AllowNativeSourceFallback = ConvertTo-RunnerBoolean $AllowNativeSourceFallback 'AllowNativeSourceFallback'
 $ReverseEvidencePrefilter = ConvertTo-RunnerBoolean $ReverseEvidencePrefilter 'ReverseEvidencePrefilter'
@@ -201,7 +206,9 @@ $Arguments = @(
   '--production-prefilter', $ProductionPrefilter.ToString().ToLowerInvariant(),
   '--require-authoritative-source-sense', $RequireAuthoritativeSourceSense.ToString().ToLowerInvariant(),
   '--daily-primary-sense-selection', $DailyPrimarySenseSelection.ToString().ToLowerInvariant(),
+  '--allow-linked-primary-for-additional-sense', $AllowLinkedPrimaryForAdditionalSense.ToString().ToLowerInvariant(),
   '--source-sense-alignment', $SourceSenseAlignment.ToString().ToLowerInvariant(),
+  '--source-sense-alignment-max-langs', [string]$SourceSenseAlignmentMaxLangs,
   '--allow-native-source-fallback', $AllowNativeSourceFallback.ToString().ToLowerInvariant(),
   '--reverse-evidence-prefilter', $ReverseEvidencePrefilter.ToString().ToLowerInvariant(),
   '--reverse-evidence-min-target-langs', [string]$ReverseEvidenceMinTargetLangs,
@@ -222,6 +229,20 @@ $Arguments = @(
   '--cluster-status-url', $ClusterStatusUrl,
   '--cluster-service-user', $ClusterServiceUser
 )
+if (-not [string]::IsNullOrWhiteSpace($DailyPrimaryAttemptIndex)) {
+  $ResolvedDailyPrimaryAttemptIndex = if ([IO.Path]::IsPathRooted($DailyPrimaryAttemptIndex)) {
+    [IO.Path]::GetFullPath($DailyPrimaryAttemptIndex)
+  } else {
+    [IO.Path]::GetFullPath((Join-Path $Root $DailyPrimaryAttemptIndex))
+  }
+  if (-not $ResolvedDailyPrimaryAttemptIndex.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Daily primary attempt index must stay under D:\linguago-runner'
+  }
+  if (-not (Test-Path -LiteralPath $ResolvedDailyPrimaryAttemptIndex)) {
+    throw "Daily primary attempt index not found: $ResolvedDailyPrimaryAttemptIndex"
+  }
+  $Arguments += @('--daily-primary-attempt-index', $ResolvedDailyPrimaryAttemptIndex)
+}
 if (-not [string]::IsNullOrWhiteSpace($SourceRunDir)) {
   $ResolvedSourceRunDir = [IO.Path]::GetFullPath((Join-Path $Root $SourceRunDir))
   if (-not $ResolvedSourceRunDir.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase)) {
@@ -278,7 +299,9 @@ $Launch = [ordered]@{
   ProductionPrefilter = $ProductionPrefilter
   RequireAuthoritativeSourceSense = $RequireAuthoritativeSourceSense
   DailyPrimarySenseSelection = $DailyPrimarySenseSelection
+  AllowLinkedPrimaryForAdditionalSense = $AllowLinkedPrimaryForAdditionalSense
   SourceSenseAlignment = $SourceSenseAlignment
+  SourceSenseAlignmentMaxLangs = $SourceSenseAlignmentMaxLangs
   AllowNativeSourceFallback = $AllowNativeSourceFallback
   ReverseEvidencePrefilter = $ReverseEvidencePrefilter
   ReverseEvidenceMinTargetLangs = $ReverseEvidenceMinTargetLangs

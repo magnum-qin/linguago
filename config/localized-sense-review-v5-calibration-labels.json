@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "reviewer": "codex-independent-semantic-review",
+  "reviewed_at": "2026-08-24T15:15:00+09:00",
+  "labels": {
+    "1:ja:あの": { "label": "correct_isolate", "sense_ids": [1], "note": "あの and それ are distinct Japanese demonstratives." },
+    "4:en:stubbornly hold to one's own opinion": { "label": "correct_isolate", "sense_ids": [4], "note": "The English phrase expresses only the stubborn-opinion sense." },
+    "37611:zh:嗜睡": { "label": "correct_isolate", "sense_ids": [38257], "note": "嗜睡 is stronger and more pathological than ordinary 睡意." },
+    "38302:zh:给": { "label": "should_keep", "sense_ids": [], "note": "Both senses describe near-duplicate くれる/give concepts; 给 can cover both." },
+    "38305:zh:模式": { "label": "needs_repair", "sense_ids": [], "note": "模式 is not the correct Mainland linguistic term for grammatical modality; use 模态." },
+    "7:en:of; possessive particle": { "label": "correct_isolate", "sense_ids": [7], "note": "The English grammatical gloss cannot identify the archaic lexical senses." },
+    "12:en:adds emphasis": { "label": "correct_isolate", "sense_ids": [12], "note": "This gloss targets the emphasis function, not topic or contrast generally." },
+    "37579:pt-BR:varejo": { "label": "needs_repair", "sense_ids": [], "note": "The senses are duplicates; retalho is not the neutral Brazilian term for retail." },
+    "16:en:(and) then": { "label": "correct_isolate", "sense_ids": [19], "note": "The query explicitly selects sequential use." },
+    "20:en:了 (perfective aspect marker)": { "label": "correct_isolate", "sense_ids": [20], "note": "The query explicitly names perfective aspect rather than sentence-final change." },
+    "38522:pt-BR:bobina": { "label": "uncertain", "sense_ids": [], "note": "Bobina may denote a coil/spool, while both source senses are underspecified shapes." },
+    "38447:ja:調節": { "label": "should_keep", "sense_ids": [], "note": "調節 and 調整 overlap for adjustment; the Chinese 适应 localization needs separate repair." },
+    "28:en:at (place, time)": { "label": "correct_isolate", "sense_ids": [28], "note": "The parenthetical scope uniquely identifies the locative/temporal function." },
+    "30:ja:それ": { "label": "correct_isolate", "sense_ids": [30], "note": "それ is a demonstrative pronoun and not the IT abbreviation senses." },
+    "27:en:not": { "label": "correct_isolate", "sense_ids": [27], "note": "Adverbial not differs from a standalone polar-answer function." },
+    "38:en:don't": { "label": "correct_isolate", "sense_ids": [42], "note": "The query selects the prohibitive sentence-final use." },
+    "37574:ja:テレコミュニケーション": { "label": "should_keep", "sense_ids": [], "note": "テレコミュニケーション and 電気通信 denote the same telecommunication concept here." },
+    "37620:ja:写し": { "label": "should_keep", "sense_ids": [], "note": "写し and 複製 are ordinary synonyms under the duplicate senses." },
+    "37655:en:nerve cell": { "label": "should_keep", "sense_ids": [], "note": "Nerve cell and neuron are exact synonyms in these senses." },
+    "37741:zh:选举人": { "label": "should_keep", "sense_ids": [], "note": "选举人 and 选民 overlap for a voter in the supplied definitions." },
+    "37764:zh:发泡": { "label": "should_keep", "sense_ids": [], "note": "发泡 and 起泡 are synonymous for the duplicated foam sense." },
+    "38471:pt-BR:alcedo": { "label": "needs_repair", "sense_ids": [], "note": "Alcedo is taxonomically narrower and not a neutral generic pt-BR equivalent of kingfisher." },
+    "38561:ja:同質": { "label": "should_keep", "sense_ids": [], "note": "同質 and 均質 overlap for homogeneous in the duplicated broad definitions." },
+    "4:ja:我": { "label": "correct_isolate", "sense_ids": [5], "note": "Japanese 我 appears only in the pronoun sense, not the stubbornness localization." },
+    "37574:ja:電気通信": { "label": "should_keep", "sense_ids": [], "note": "電気通信 and テレコミュニケーション denote the same concept in these duplicate senses." }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "generated_at": "2026-08-29T06:28:49.490Z",
+  "product_db": "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
+  "runs_root": "runs",
+  "policy": {
+    "exact_source_sense_dedupe": true,
+    "linked_source_senses_excluded": true,
+    "previously_final_accepted_excluded": true,
+    "one_recovery_attempt_per_source_sense": true,
+    "reverse_evidence_gate_unchanged": true,
+    "final_gemma_gate_unchanged": true,
+    "automatic_database_write": false
+  },
+  "summary": {
+    "runs_read": 0,
+    "historical_source_senses": 0,
+    "linked_source_senses": 49342,
+    "final_accepted_source_senses": 0,
+    "previously_retried_source_senses": 0,
+    "non_authoritative_excluded": 0,
+    "unattempted_report": null,
+    "eligible": 0,
+    "selected": 0,
+    "selected_by_lang": {},
+    "selected_by_lane": {}
+  },
+  "selected_count": 0,
+  "selected": []
+}

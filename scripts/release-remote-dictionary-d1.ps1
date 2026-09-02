@@ -157,12 +157,31 @@ try {
   if ($Execute) {
     $MainDb = [IO.Path]::GetFullPath((Join-Path $Root 'data\processed\linguago_v2_product_top5000_freedict_filtered_candidate.db'))
     if ($ResolvedDb -ne $MainDb) { throw 'Execute=true requires the main product DB' }
-    $Controller = Read-JsonFile (Join-Path $RunDir 'release-controller.json')
-    if (-not $Controller.ok -or -not $Controller.main_replaced) {
-      throw 'Execute=true requires a successful committed database release-controller report'
+    $ReleaseControllerPath = Join-Path $RunDir 'release-controller.json'
+    $MaintenanceControllerPath = Join-Path $RunDir 'maintenance-release-controller.json'
+    if (Test-Path -LiteralPath $ReleaseControllerPath) {
+      $Controller = Read-JsonFile $ReleaseControllerPath
+      if (-not $Controller.ok -or -not $Controller.main_replaced) {
+        throw 'Database replacement release-controller report is not successful'
+      }
+    } elseif (Test-Path -LiteralPath $MaintenanceControllerPath) {
+      $Controller = Read-JsonFile $MaintenanceControllerPath
+      if (-not $Controller.ok -or -not $Controller.maintenance_applied -or
+          [string]$Controller.kind -ne 'main_in_place_maintenance') {
+        throw 'Database maintenance release-controller report is not successful'
+      }
+      if (-not (Test-Path -LiteralPath ([string]$Controller.rollback_backup))) {
+        throw 'Maintenance rollback backup no longer exists'
+      }
+      $RecordedBackupHash = (Get-FileHash -LiteralPath ([string]$Controller.rollback_backup) -Algorithm SHA256).Hash.ToUpperInvariant()
+      if ($RecordedBackupHash -ne ([string]$Controller.rollback_backup_sha256).ToUpperInvariant()) {
+        throw 'Maintenance rollback backup hash mismatch'
+      }
+    } else {
+      throw 'Execute=true requires a database replacement or maintenance release-controller report'
     }
     if ([string]$Controller.main_sha256_after -ne $ActualHash) {
-      throw 'Committed database hash does not match the release-controller report'
+      throw 'Current database hash does not match the release-controller report'
     }
 
     $env:CLOUDFLARE_API_TOKEN = [Environment]::GetEnvironmentVariable('CLOUDFLARE_API_TOKEN', 'User')

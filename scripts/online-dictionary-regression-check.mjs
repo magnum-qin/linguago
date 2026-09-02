@@ -120,11 +120,12 @@ const cases = [
     id: 'zh-bi-overrides',
     text: '\u9589',
     source_lang: 'zh',
+    minSenses: 1,
+    maxSenses: 1,
     expectedTermsByOrder: {
-      1: { en: 'close', ja: '\u9589\u3058\u308b' },
-      2: { en: 'obstruct; block up', ja: '\u585e\u3050' },
-      3: { en: 'shut; close', ja: '\u9589\u3058\u308b' }
-    }
+      1: { en: 'to close', zh: '\u95ed', ja: '\u9589\u3058\u308b', 'pt-BR': 'fechar' }
+    },
+    forbiddenTerms: ['obstruct; block up', 'shut; close']
   },
   {
     id: 'zh-secret-disambiguation',

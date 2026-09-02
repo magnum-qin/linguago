@@ -236,6 +236,7 @@ const output = {
   ok: rejected.length === 0,
   generated_at: new Date().toISOString(),
   stats,
+  accepted_sense_ids: accepted.map((item) => Number(item.candidate.sense_id)),
   accepted_preview: accepted.slice(0, 50).map(compactReviewed),
   rejected: rejected.map(compactReviewed)
 };
@@ -342,8 +343,8 @@ function reportContainsAdditionalSenseLane(filePath) {
   return rows.some(
     (row) =>
       row?.candidate_lane === 'additional_unlinked_source_sense' &&
-      row?.daily_sense_selection?.policy === 'native_dictionary_additional_unlinked_sense' &&
-      Number.isInteger(Number(row?.product_entry_id))
+      Number.isInteger(Number(row?.product_entry_id)) &&
+      Number.isInteger(Number(row?.first_sense_id ?? row?.source_sense_id ?? row?.output?.source_sense_id))
   );
 }
 

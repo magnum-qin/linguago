@@ -62,6 +62,7 @@ const unloadBeforeLoad = args['unload-before-load'] === 'true';
 const loadTimeoutMs = boundedInteger(args['load-timeout-ms'], 300_000, 1_000);
 const maxSeqLength = boundedInteger(args['max-seq-length'], 1024, 512);
 const speculativeType = String(args['speculative-type'] || 'off');
+const specDraftNMax = boundedInteger(args['spec-draft-n-max'], 2, 1, 16);
 const promptMode = String(args['prompt-mode'] || 'compact');
 const variants = { ...DEFAULT_VARIANTS, ...parseEndpointVariants(args['endpoint-gguf-variants']) };
 const debugPromptPath = args['debug-prompt-out'] ? path.resolve(args['debug-prompt-out']) : null;
@@ -956,9 +957,9 @@ When accepting, preferred_terms must copy the exact matching supplied hint form;
     ? `This batch is for everyday high-frequency vocabulary. Accept only when proposed_gloss is a common modern daily sense of the headword. Compare daily_sense_selection.alternatives when present. Reject a merely valid but technical, historical, proper-name, metalinguistic, rare-homograph, or non-primary sense when a clearly more common everyday sense exists. Do not invent or switch source_sense_id; rejection sends the entry back for alternate-sense selection.`
     : '';
   return `Conservative source-sense review. Decide only whether proposed_gloss is a real sense of the source-language headword.
-accept=genuine primary/secondary, inflected, figurative, regional, archaic, transliterated, or close-synonym sense.
+${requireDailyPrimary ? 'accept=well-supported common modern everyday sense; reject a non-primary sense when a clearly more common everyday sense exists; manual_review=uncertain everyday priority.' : 'accept=genuine primary/secondary, inflected, figurative, regional, archaic, transliterated, or close-synonym sense.'}
 reject=another word/language/homograph/name/spelling or unrelated concept. manual_review=ambiguous or thin evidence.
-Use source_sense_evidence as lexical evidence; JMdict/FreeDict/CC-CEDICT/ECDICT entries are authoritative when present.
+${requireDailyPrimary ? 'Use source_sense_evidence as evidence, not a guarantee of correctness or everyday priority. Source ordering and heuristic scores do not establish the most common sense. Do not switch the locked source_sense_id.' : 'Use source_sense_evidence as lexical evidence; JMdict/FreeDict/CC-CEDICT/ECDICT entries are authoritative when present.'}
 ${dailyPrimaryRule}
 ${strictHintRules}
 Hints passed reverse-dictionary lookup but may reflect the wrong sense of a polysemous English anchor. Use a hinted preferred term only when it matches the exact gloss.
@@ -1065,6 +1066,7 @@ function buildOutput() {
     stream,
     response_format: responseFormat,
     prompt_mode: promptMode,
+    spec_draft_n_max: speculativeType.includes('mtp') ? specDraftNMax : null,
     blind_source_anchor: blindSourceAnchor,
     blind_semantic_match: blindSemanticMatch,
     require_daily_primary: requireDailyPrimary,
@@ -1339,6 +1341,7 @@ async function prewarmEndpoints() {
         variant,
         maxSeqLength,
         speculativeType,
+        loadOptions: speculativeType.includes('mtp') ? { spec_draft_n_max: specDraftNMax } : {},
         loadTimeoutMs,
         forceReload,
         unloadBeforeLoad

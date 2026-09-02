@@ -2,7 +2,7 @@ param(
   [string]$Root = 'D:\linguago-runner',
   [int]$Limit = 100,
   [string]$Out = '',
-  [ValidateSet('authoritative-pool', 'native-daily')]
+  [ValidateSet('authoritative-pool', 'native-daily', 'additional-sense')]
   [string]$CandidateMode = 'native-daily',
   [string]$Pool = 'data\candidates\v123-authoritative-pool.json',
   [string]$History = 'data\candidates\v123-attempted-source-history.json',
@@ -10,6 +10,9 @@ param(
   [int]$NativeScanLimit = 2000000,
   [string]$NativeTargets = 'zh=30000,ja=10000,pt-BR=5000,en=5000',
   [string]$NativeLangQuotas = '',
+  [string]$AdditionalSenseAttemptIndex = 'state\additional-sense-attempt-index.json',
+  [ValidateRange(1, 100)]
+  [int]$AdditionalSenseMaxEntryAttempts = 3,
   [bool]$ExcludePreviouslyAttemptedSourceEntries = $true,
   [switch]$IncludeCompletedRunBatches = $true,
   [switch]$SkipVerify
@@ -46,6 +49,7 @@ foreach ($Path in @($HistoryPath, $ProductDb)) {
 }
 
 $PoolPath = $null
+$ResolvedAttemptIndex = $null
 if ($CandidateMode -eq 'authoritative-pool') {
   $PoolPath = [IO.Path]::GetFullPath((Join-Path $Root $Pool))
   $SourceManifestPath = Join-Path $Root 'config\remote-candidate-sources.json'
@@ -75,23 +79,6 @@ if (-not $OutPath.StartsWith($BatchRoot, [StringComparison]::OrdinalIgnoreCase))
 }
 New-Item -ItemType Directory -Path (Split-Path -Parent $OutPath) -Force | Out-Null
 
-if ($CandidateMode -eq 'native-daily') {
-  $NativeSourceDb = Join-Path $Root 'data\processed\linguago_v2_full.db'
-  if (-not (Test-Path -LiteralPath $NativeSourceDb)) {
-    throw "Native source database not found: $NativeSourceDb"
-  }
-  $OutBaseName = [IO.Path]::GetFileNameWithoutExtension($OutPath)
-  $PoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-coverage.json"
-  & node.exe (Join-Path $Root 'scripts\find-dictionary-v2-native-daily-coverage-gaps.mjs') `
-    --source-db $NativeSourceDb `
-    --product-db $ProductDb `
-    --max-rank $NativeMaxRank `
-    --scan-limit $NativeScanLimit `
-    --targets $NativeTargets `
-    --out $PoolPath
-  if ($LASTEXITCODE -ne 0) { throw "Native coverage scan failed with exit code $LASTEXITCODE" }
-}
-
 $ExcludePaths = [Collections.Generic.List[string]]::new()
 $ExcludePaths.Add($HistoryPath)
 if ($IncludeCompletedRunBatches) {
@@ -113,29 +100,225 @@ if ($IncludeCompletedRunBatches) {
 }
 $ExcludePaths = @($ExcludePaths | Sort-Object -Unique)
 $ExcludeArgument = $ExcludePaths -join ','
+$NativeExclusionIndex = Join-Path $StateRoot 'native-daily-source-entry-exclusions.json'
+$NativeExclusionClassification = Join-Path $StateRoot 'native-daily-source-entry-exclusion-classification.json'
+$NativeBlockedExclusions = Join-Path $StateRoot 'native-daily-source-entry-blocked.json'
 
-& node.exe (Join-Path $Root 'scripts\select-dictionary-v2-source-gap-fresh-cohort.mjs') `
-  --pool $PoolPath `
-  --exclude $ExcludeArgument `
-  --product-db $ProductDb `
-  --limit $Limit `
-  --source-lang-quotas $NativeLangQuotas `
-  --one-per-source-entry true `
-  --exclude-source-entries $($ExcludePreviouslyAttemptedSourceEntries.ToString().ToLowerInvariant()) `
-  --out $OutPath
-if ($LASTEXITCODE -ne 0) { throw "Candidate selection failed with exit code $LASTEXITCODE" }
+if ($CandidateMode -eq 'native-daily') {
+  & node.exe (Join-Path $Root 'scripts\build-dictionary-v2-source-entry-exclusion-index.mjs') `
+    --root $Root `
+    --history $History `
+    --runs-root 'runs' `
+    --batch-root 'batches' `
+    --out $NativeExclusionIndex
+  if ($LASTEXITCODE -ne 0) { throw "Native exclusion index build failed with exit code $LASTEXITCODE" }
+  & node.exe (Join-Path $Root 'scripts\build-dictionary-v2-additional-sense-attempt-index.mjs') `
+    --root $Root --runs-root 'runs' --out 'state\additional-sense-attempt-index.json'
+  if ($LASTEXITCODE -ne 0) { throw 'Native exact-sense attempt index build failed' }
+  & node.exe (Join-Path $Root 'scripts\classify-dictionary-v2-native-daily-exclusions.mjs') `
+    --source-db (Join-Path $Root 'data\processed\linguago_v2_full.db') `
+    --product-db $ProductDb `
+    --exclusions $NativeExclusionIndex `
+    --attempt-index (Join-Path $StateRoot 'additional-sense-attempt-index.json') `
+    --out $NativeExclusionClassification `
+    --blocked-out $NativeBlockedExclusions
+  if ($LASTEXITCODE -ne 0) { throw "Native exclusion classification failed with exit code $LASTEXITCODE" }
+  # The compact index preserves every attempted source entry without exceeding
+  # the Windows command-line limit with dozens of historical report paths.
+  $ExcludeArgument = $NativeBlockedExclusions
+}
 
-$Batch = [IO.File]::ReadAllText($OutPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+if ($CandidateMode -eq 'additional-sense') {
+  $NativeSourceDb = Join-Path $Root 'data\processed\linguago_v2_full.db'
+  if (-not (Test-Path -LiteralPath $NativeSourceDb)) {
+    throw "Native source database not found: $NativeSourceDb"
+  }
+  $OutBaseName = [IO.Path]::GetFileNameWithoutExtension($OutPath)
+  $PoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-additional-sense-pool.json"
+  # Scan every represented source entry. A smaller entry-level prefix is
+  # dominated by exhausted or Wiktionary-only senses after long production
+  # runs and can hide authoritative additional senses later in rank order.
+  $PoolLimit = 50000
+  & node.exe (Join-Path $Root 'scripts\find-dictionary-v2-product-additional-sense-entries.mjs') `
+    --source-db $NativeSourceDb `
+    --product-db $ProductDb `
+    --max-rank $NativeMaxRank `
+    --limit $PoolLimit `
+    --out $PoolPath
+  if ($LASTEXITCODE -ne 0) { throw "Additional-sense scan failed with exit code $LASTEXITCODE" }
+
+  $ResolvedAttemptIndex = if ([IO.Path]::IsPathRooted($AdditionalSenseAttemptIndex)) {
+    [IO.Path]::GetFullPath($AdditionalSenseAttemptIndex)
+  } else {
+    [IO.Path]::GetFullPath((Join-Path $Root $AdditionalSenseAttemptIndex))
+  }
+  if (-not $ResolvedAttemptIndex.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Additional-sense attempt index must stay under the runner root'
+  }
+  if (-not (Test-Path -LiteralPath $ResolvedAttemptIndex)) {
+    throw "Additional-sense attempt index not found: $ResolvedAttemptIndex"
+  }
+
+  # Bind a concrete, unlinked and unattempted source sense before allocating
+  # batch quota. This prevents exhausted entries from filling the outer cohort.
+  $SensePoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-additional-sense-eligible.json"
+  $SenseRejectedPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-additional-sense-ineligible.json"
+  & node.exe (Join-Path $Root 'scripts\select-dictionary-v2-product-daily-primary-senses.mjs') `
+    --report $PoolPath `
+    --source-db $NativeSourceDb `
+    --product-db $ProductDb `
+    --out $SensePoolPath `
+    --rejected-out $SenseRejectedPath `
+    --min-score 2500 `
+    --allow-linked-primary-for-additional-sense true `
+    --attempt-index $ResolvedAttemptIndex
+  if ($LASTEXITCODE -ne 0) { throw "Additional-sense eligibility scan failed with exit code $LASTEXITCODE" }
+
+  # Apply the same authoritative-source gate used by the production pipeline,
+  # so an OMW-only fallback cannot consume a batch slot and fail immediately.
+  $TrustedPoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-additional-sense-trusted.json"
+  $TrustedRejectedPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-additional-sense-untrusted.json"
+  & node.exe (Join-Path $Root 'scripts\filter-dictionary-v2-production-batch.mjs') `
+    --report $SensePoolPath `
+    --out $TrustedPoolPath `
+    --rejected-out $TrustedRejectedPath `
+    --enabled true `
+    --require-authoritative-source-sense true `
+    --allow-english-omw-source false
+  if ($LASTEXITCODE -ne 0) { throw "Additional-sense trust filter failed with exit code $LASTEXITCODE" }
+  $PoolPath = $TrustedPoolPath
+  # Entry-level history is intentionally not applied here. A represented entry
+  # may be revisited while it still has a different unlinked source sense; the
+  # daily-primary selector and product source links choose the next sense.
+  $ExcludeArgument = ''
+  $ExcludePreviouslyAttemptedSourceEntries = $false
+}
+
+if ($CandidateMode -eq 'native-daily') {
+  $NativeSourceDb = Join-Path $Root 'data\processed\linguago_v2_full.db'
+  if (-not (Test-Path -LiteralPath $NativeSourceDb)) {
+    throw "Native source database not found: $NativeSourceDb"
+  }
+  $OutBaseName = [IO.Path]::GetFileNameWithoutExtension($OutPath)
+  $PoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-coverage.json"
+  & node.exe (Join-Path $Root 'scripts\find-dictionary-v2-native-daily-coverage-gaps.mjs') `
+    --source-db $NativeSourceDb `
+    --product-db $ProductDb `
+    --max-rank $NativeMaxRank `
+    --scan-limit $NativeScanLimit `
+    --targets $NativeTargets `
+    --exclude-reports $NativeBlockedExclusions `
+    --progress-out (Join-Path $StateRoot 'native-scan-progress.json') `
+    --out $PoolPath
+  if ($LASTEXITCODE -ne 0) { throw "Native coverage scan failed with exit code $LASTEXITCODE" }
+
+  # Bind an exact native sense before the production batch is allocated. Raw
+  # entry-only rows cannot pass the authoritative source-sense prefilter.
+  $NativeSensePoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-native-daily-senses.json"
+  $NativeSenseRejectedPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-native-daily-senses-rejected.json"
+  & node.exe (Join-Path $Root 'scripts\select-dictionary-v2-product-daily-primary-senses.mjs') `
+    --report $PoolPath `
+    --source-db $NativeSourceDb `
+    --product-db $ProductDb `
+    --out $NativeSensePoolPath `
+    --rejected-out $NativeSenseRejectedPath `
+    --attempt-index (Join-Path $StateRoot 'additional-sense-attempt-index.json') `
+    --min-score 2500
+  if ($LASTEXITCODE -ne 0) { throw "Native daily sense binding failed with exit code $LASTEXITCODE" }
+
+  $NativeTrustedPoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-native-daily-trusted.json"
+  $NativeTrustedRejectedPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-native-daily-untrusted.json"
+  & node.exe (Join-Path $Root 'scripts\filter-dictionary-v2-production-batch.mjs') `
+    --report $NativeSensePoolPath `
+    --out $NativeTrustedPoolPath `
+    --rejected-out $NativeTrustedRejectedPath `
+    --enabled true `
+    --require-authoritative-source-sense true `
+    --allow-english-omw-source false
+  if ($LASTEXITCODE -ne 0) { throw "Native daily trust filter failed with exit code $LASTEXITCODE" }
+  $PoolPath = $NativeTrustedPoolPath
+}
+
+if ($CandidateMode -in @('native-daily', 'additional-sense')) {
+  $DailyPoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-daily-quality.json"
+  $Lane = if ($CandidateMode -eq 'native-daily') { 'new_headword' } else { 'additional_sense' }
+  & node.exe (Join-Path $Root 'scripts\filter-dictionary-v2-daily-recovery-candidates.mjs') `
+    --report $PoolPath --out $DailyPoolPath --lane $Lane
+  if ($LASTEXITCODE -ne 0) { throw 'Daily recovery quality filter failed' }
+  $PoolPath = $DailyPoolPath
+}
+
+$SelectorArgs = @(
+  '--pool', $PoolPath,
+  '--product-db', $ProductDb,
+  '--limit', [string]$Limit,
+  '--one-per-source-entry', 'true',
+  '--exclude-source-entries', $ExcludePreviouslyAttemptedSourceEntries.ToString().ToLowerInvariant(),
+  '--out', $OutPath
+)
+if (-not [string]::IsNullOrWhiteSpace($ExcludeArgument)) {
+  $SelectorArgs += @('--exclude', $ExcludeArgument)
+}
+if (-not [string]::IsNullOrWhiteSpace($NativeLangQuotas)) {
+  $SelectorArgs += @('--source-lang-quotas', $NativeLangQuotas)
+}
+if ($CandidateMode -eq 'additional-sense' -and -not [string]::IsNullOrWhiteSpace($AdditionalSenseAttemptIndex)) {
+  $SelectorArgs += @('--attempt-index', $ResolvedAttemptIndex)
+  # The preselection above binds an exact source sense, so history exclusion is
+  # now sense-level. Do not reject a polysemous entry merely because other
+  # senses from that entry have already been attempted.
+}
+& node.exe (Join-Path $Root 'scripts\select-dictionary-v2-source-gap-fresh-cohort.mjs') @SelectorArgs
+$SelectorExitCode = $LASTEXITCODE
+if (-not (Test-Path -LiteralPath $OutPath)) {
+  throw "Candidate selection did not create output; exit code $SelectorExitCode"
+}
+$SummaryScript = @'
+const fs = require('fs');
+const batch = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+process.stdout.write(JSON.stringify({
+  selected_count: Number(batch.selected_count || 0),
+  pool_sha256: batch.pool_sha256 || null,
+  history_sha256: batch.excluded_reports?.[0]?.sha256 || null,
+  excluded_report_count: batch.excluded_reports?.length || 0,
+  selected_by_source_lang: batch.summary?.selected_by_source_lang || {}
+}));
+'@
+$BatchSummaryJson = & node.exe -e $SummaryScript $OutPath
+if ($LASTEXITCODE -ne 0) { throw "Candidate output summary failed with exit code $LASTEXITCODE" }
+$BatchSummary = $BatchSummaryJson | ConvertFrom-Json
+if ([int]$BatchSummary.selected_count -lt 1) {
+  [pscustomobject]@{
+    Ok = $true
+    Status = 'candidate_exhausted'
+    Out = $OutPath
+    Selected = 0
+    Requested = $Limit
+    Partial = $true
+    SelectorExitCode = $SelectorExitCode
+    PoolSha256 = $BatchSummary.pool_sha256
+    HistorySha256 = $BatchSummary.history_sha256
+    ExcludedReportCount = $BatchSummary.excluded_report_count
+    CandidateMode = $CandidateMode
+    CoveragePool = $PoolPath
+    SelectedBySourceLang = $BatchSummary.selected_by_source_lang
+  } | ConvertTo-Json -Depth 6
+  exit 0
+}
 [pscustomobject]@{
   Ok = $true
+  Status = 'ready'
   Out = $OutPath
-  Selected = $Batch.selected_count
-  PoolSha256 = $Batch.pool_sha256
-  HistorySha256 = $Batch.excluded_reports[0].sha256
-  ExcludedReportCount = @($Batch.excluded_reports).Count
+  Selected = $BatchSummary.selected_count
+  Requested = $Limit
+  Partial = [int]$BatchSummary.selected_count -lt $Limit
+  SelectorExitCode = $SelectorExitCode
+  PoolSha256 = $BatchSummary.pool_sha256
+  HistorySha256 = $BatchSummary.history_sha256
+  ExcludedReportCount = $BatchSummary.excluded_report_count
   CandidateMode = $CandidateMode
   CoveragePool = $PoolPath
-  SelectedBySourceLang = $Batch.summary.selected_by_source_lang
+  SelectedBySourceLang = $BatchSummary.selected_by_source_lang
 } | ConvertTo-Json -Depth 6
 } finally {
   if ($null -ne $BuildLock) { $BuildLock.Dispose() }

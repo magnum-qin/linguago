@@ -6,8 +6,8 @@ const outDir = path.resolve('output/online-dictionary-focused-check');
 const langs = ['zh', 'en', 'pt-BR', 'ja'];
 const expectedCounts = {
   entries: 44549,
-  senses: 51738,
-  sense_localizations: 206952,
+  senses: 51703,
+  sense_localizations: 206812,
   examples: 3030,
   example_localizations: 11898
 };
@@ -52,6 +52,14 @@ const cases = [
     requirePronunciationGroups: true,
     expectedTerms: ['visitor', 'visiting team']
   },
+  { id: 'v147-fanyi', term: '\u7ffb\u8bd1', minSenses: 1, expectedTerms: ['\u7ffb\u8bd1'] },
+  { id: 'v147-gift', term: 'gift', minSenses: 1, expectedTerms: ['\u793c\u7269'] },
+  { id: 'v147-grade', term: 'grade', minSenses: 1, expectedTerms: ['\u7b49\u7ea7'] },
+  { id: 'v147-ghost', term: 'ghost', minSenses: 1, expectedTerms: ['\u5e7d\u7075\uff1b\u6b7b\u8005\u7684\u7075\u9b42'] },
+  { id: 'v147-crew', term: 'crew', minSenses: 1, expectedTerms: ['\u5168\u4f53\u673a\u52a1\u4eba\u5458'] },
+  { id: 'v147-treatment', term: 'treatment', minSenses: 1, expectedTerms: ['\u5904\u7406'] },
+  { id: 'v147-agency', term: 'agency', minSenses: 1, expectedTerms: ['\u4ee3\u7406\u884c'] },
+  { id: 'v147-honnin', term: '\u672c\u4eba', minSenses: 1, expectedTerms: ['\u6211'] },
   { id: 'pt-maremoto', term: 'maremoto', minSenses: 1, expectedTerms: ['seaquake', '\u6d77\u9707'] },
   { id: 'pt-isomero', term: 'is\u00f4mero', minSenses: 1, expectedTerms: ['isomer', '\u5f02\u6784\u4f53'] },
   { id: 'pt-eucarionte', term: 'eucarionte', minSenses: 1, expectedTerms: ['eukaryote', '\u771f\u6838\u751f\u7269'] },

@@ -39,6 +39,12 @@ $Generation = Join-Path $RunDir '05-qwen-generation.json'
 $Reverse = Join-Path $RunDir '06-reverse-evidence.json'
 $Consensus = Join-Path $RunDir '07-final-gemma.json'
 $Controlled = Join-Path $RunDir '08-controlled-replay.json'
+$PromoteScope = Join-Path $RunDir '08b-controlled-promote-scope.json'
+$HistoricalNewControlled = Join-Path $RunDir '08c-historical-new-draft-replay.json'
+$HistoricalExistingApply = Join-Path $RunDir '09a-historical-existing-draft-scope.json'
+$HistoricalExistingIdempotent = Join-Path $RunDir '10a-historical-existing-draft-idempotent.json'
+$HistoricalNewApply = Join-Path $RunDir '09b-historical-new-draft-apply.json'
+$HistoricalNewIdempotent = Join-Path $RunDir '10b-historical-new-draft-idempotent.json'
 $ApplyReport = Join-Path $RunDir '09-isolated-controlled-apply.json'
 $IdempotentReport = Join-Path $RunDir '10-isolated-controlled-idempotent.json'
 $PromoteDry = Join-Path $RunDir '11-isolated-promote-dry-run.json'
@@ -49,6 +55,10 @@ $ExportDir = Join-Path $RunDir '15-isolated-full-audit'
 foreach ($Path in @($GenerationReady, $Generation, $Reverse, $Consensus)) {
   if (-not (Test-Path -LiteralPath $Path)) { throw "Required run report not found: $Path" }
 }
+
+$GenerationReadyReport = [IO.File]::ReadAllText($GenerationReady, [Text.Encoding]::UTF8) | ConvertFrom-Json
+$HistoricalDraftRecovery = [bool]$GenerationReadyReport.selection_policy.historical_current_contract_recovery -or
+  ([string]$GenerationReadyReport.selection_policy.lane -eq 'historical_current-contract_recovery')
 
 Invoke-Node 'scripts\build-dictionary-v2-product-source-gap-controlled-consensus-input.mjs' @(
   '--review', $GenerationReady, '--generation', $Generation, '--evidence', $Reverse,
@@ -65,11 +75,45 @@ $ReplayArgs = @(
   '--source-db', (Join-Path $Root 'data\processed\linguago_v2_full.db'),
   '--pt-pronunciation-db', (Join-Path $Root 'data\processed\kaikki_portuguese_pronunciations.db')
 )
-Invoke-Node 'scripts\supplement-dictionary-v2-product-source-gaps-unsloth.mjs' ($ReplayArgs + @('--out', $ApplyReport))
-Invoke-Node 'scripts\supplement-dictionary-v2-product-source-gaps-unsloth.mjs' ($ReplayArgs + @('--out', $IdempotentReport))
+if ($HistoricalDraftRecovery) {
+  Invoke-Node 'scripts\build-dictionary-v2-historical-draft-recovery-scope.mjs' @(
+    '--db', $IsolatedDb, '--controlled', $Controlled, '--out', $PromoteScope,
+    '--apply-out', $HistoricalExistingApply, '--idempotent-out', $HistoricalExistingIdempotent,
+    '--new-controlled-out', $HistoricalNewControlled
+  )
+  $HistoricalNewReport = [IO.File]::ReadAllText($HistoricalNewControlled, [Text.Encoding]::UTF8) | ConvertFrom-Json
+  if ([int64]$HistoricalNewReport.selected_count -gt 0) {
+    $HistoricalReplayArgs = @($ReplayArgs)
+    for ($Index = 0; $Index -lt $HistoricalReplayArgs.Count; $Index++) {
+      if ($HistoricalReplayArgs[$Index] -eq '--report' -or $HistoricalReplayArgs[$Index] -eq '--replay-report') {
+        $HistoricalReplayArgs[$Index + 1] = $HistoricalNewControlled
+      }
+    }
+    Invoke-Node 'scripts\supplement-dictionary-v2-product-source-gaps-unsloth.mjs' ($HistoricalReplayArgs + @('--out', $HistoricalNewApply))
+    Invoke-Node 'scripts\supplement-dictionary-v2-product-source-gaps-unsloth.mjs' ($HistoricalReplayArgs + @('--out', $HistoricalNewIdempotent))
+  } else {
+    Copy-Item -LiteralPath $HistoricalExistingIdempotent -Destination $HistoricalNewApply -Force
+    Copy-Item -LiteralPath $HistoricalExistingIdempotent -Destination $HistoricalNewIdempotent -Force
+  }
+  Invoke-Node 'scripts\merge-dictionary-v2-historical-controlled-apply-reports.mjs' @(
+    '--existing', $HistoricalExistingApply, '--inserted', $HistoricalNewApply, '--out', $ApplyReport
+  )
+  Invoke-Node 'scripts\merge-dictionary-v2-historical-controlled-apply-reports.mjs' @(
+    '--existing', $HistoricalExistingIdempotent, '--inserted', $HistoricalNewIdempotent, '--out', $IdempotentReport
+  )
+  Invoke-Node 'scripts\filter-dictionary-v2-controlled-replay-to-writes.mjs' @(
+    '--controlled', $Controlled, '--apply', $ApplyReport, '--out', $PromoteScope
+  )
+} else {
+  Invoke-Node 'scripts\supplement-dictionary-v2-product-source-gaps-unsloth.mjs' ($ReplayArgs + @('--out', $ApplyReport))
+  Invoke-Node 'scripts\supplement-dictionary-v2-product-source-gaps-unsloth.mjs' ($ReplayArgs + @('--out', $IdempotentReport))
+  Invoke-Node 'scripts\filter-dictionary-v2-controlled-replay-to-writes.mjs' @(
+    '--controlled', $Controlled, '--apply', $ApplyReport, '--out', $PromoteScope
+  )
+}
 
 $PromoteArgs = @(
-  '--db', $IsolatedDb, '--limit', '1000000', '--report', $Controlled,
+  '--db', $IsolatedDb, '--limit', '1000000', '--report', $PromoteScope,
   '--restrict-to-report', 'true', '--semantic-review', $Consensus,
   '--reverse-evidence', $Reverse, '--verification-level', 'ai_reviewed',
   '--review-model', 'gemma-4-31b-independent-review',

@@ -27,12 +27,15 @@ const excludePaths = String(args.exclude || '')
   .filter(Boolean)
   .map((value) => requiredPath(value, 'exclude'));
 const attemptIndexPath = args['attempt-index'] ? requiredPath(args['attempt-index'], 'attempt-index') : null;
+const attemptIndexEntryLevel = args['attempt-index-entry-level'] === 'true';
+const attemptIndexMaxEntryAttempts = nonNegativeInteger(args['attempt-index-max-entry-attempts'], 0);
 
 const pool = readJson(poolPath);
 const rows = candidateRows(pool);
 const excluded = new Set();
 const excludedSourceEntryIds = new Set();
 const attempted = new Set();
+const attemptedEntryCounts = new Map();
 for (const reportPath of excludePaths) {
   for (const row of candidateRows(readJson(reportPath))) {
     excluded.add(candidateKey(row));
@@ -47,6 +50,8 @@ if (attemptIndexPath) {
     const entryId = Number(row?.source_entry_id);
     const senseId = Number(row?.source_sense_id);
     if (!Number.isInteger(entryId)) continue;
+    attemptedEntryCounts.set(entryId, (attemptedEntryCounts.get(entryId) || 0) + 1);
+    if (attemptIndexEntryLevel) attempted.add(`${entryId}:*`);
     attempted.add(`${entryId}:${Number.isInteger(senseId) && senseId > 0 ? senseId : '*'}`);
   }
 }
@@ -99,8 +104,18 @@ for (const row of rows) {
   const key = candidateKey(row);
   if (excluded.has(key) || seen.has(key)) continue;
   const sourceEntryId = Number(row?.source_entry_id);
-  const sourceSenseId = Number(row?.first_sense_id ?? row?.source_sense_id ?? row?.source_entry_id);
-  if (attempted.has(`${sourceEntryId}:${sourceSenseId}`) || attempted.has(`${sourceEntryId}:*`)) {
+  const sourceSenseId = Number(row?.first_sense_id ?? row?.source_sense_id);
+  if (
+    attemptIndexMaxEntryAttempts > 0 &&
+    (attemptedEntryCounts.get(sourceEntryId) || 0) >= attemptIndexMaxEntryAttempts
+  ) {
+    excludedByHistoricalAttempt += 1;
+    continue;
+  }
+  if (
+    attempted.has(`${sourceEntryId}:*`) ||
+    (Number.isInteger(sourceSenseId) && attempted.has(`${sourceEntryId}:${sourceSenseId}`))
+  ) {
     excludedByHistoricalAttempt += 1;
     continue;
   }
@@ -117,7 +132,7 @@ for (const row of rows) {
     excludedBySourceEntryDeduplication += 1;
     continue;
   }
-  if (Number.isFinite(sourceSenseId) && linkedProductSense.get(sourceSenseId)) {
+  if (Number.isInteger(sourceSenseId) && sourceSenseId > 0 && linkedProductSense.get(sourceSenseId)) {
     excludedByProduct += 1;
     continue;
   }
@@ -163,6 +178,8 @@ const output = {
     require_all_hint_languages: requireAllHintLanguages,
     source_lang_quotas: Object.fromEntries(sourceLangQuotas),
     attempt_index: attemptIndexPath ? relative(attemptIndexPath) : null,
+    attempt_index_entry_level: attemptIndexEntryLevel,
+    attempt_index_max_entry_attempts: attemptIndexMaxEntryAttempts || null,
     selected_by_source_lang: countBy(selected, (row) => row.source_lang),
     selected_by_lane: countBy(selected, (row) => row.scale_review_lane)
   },
@@ -183,7 +200,8 @@ function candidateRows(report) {
 }
 
 function candidateKey(row) {
-  return `${Number(row?.source_entry_id)}:${Number(row?.first_sense_id ?? row?.source_sense_id ?? row?.source_entry_id)}`;
+  const sourceSenseId = Number(row?.first_sense_id ?? row?.source_sense_id);
+  return `${Number(row?.source_entry_id)}:${Number.isInteger(sourceSenseId) && sourceSenseId > 0 ? sourceSenseId : '*'}`;
 }
 
 function countBy(rowsToCount, selector) {

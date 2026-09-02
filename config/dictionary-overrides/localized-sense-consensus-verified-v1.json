@@ -1,0 +1,67 @@
+[
+  {
+    "target": { "sense_id": 12 },
+    "source": "manual:localized-sense-consensus-verified-v1",
+    "confidence": 0.98,
+    "localizations": {
+      "zh": {
+        "term": "强调助词",
+        "reading": "qiáng diào zhù cí",
+        "reading_system": "pinyin",
+        "definition": "用于强调前面的成分，使其成为句中的焦点。"
+      }
+    }
+  },
+  {
+    "target": { "sense_id": 13 },
+    "source": "manual:localized-sense-consensus-verified-v1",
+    "confidence": 0.98,
+    "localizations": {
+      "zh": {
+        "term": "对比助词",
+        "reading": "duì bǐ zhù cí",
+        "reading_system": "pinyin",
+        "definition": "用于将前面的成分与明示或未明示的其他选项作对比。"
+      }
+    }
+  },
+  {
+    "target": { "sense_id": 14 },
+    "source": "manual:localized-sense-consensus-verified-v1",
+    "confidence": 0.99,
+    "localizations": {
+      "zh": {
+        "term": "主题标记助词",
+        "reading": "zhǔ tí biāo jì zhù cí",
+        "reading_system": "pinyin",
+        "definition": "用于标示句子的主题或话题，相当于“至于……”或“说到……”。"
+      }
+    }
+  },
+  {
+    "target": { "sense_id": 38257 },
+    "source": "manual:localized-sense-consensus-verified-v1",
+    "confidence": 0.99,
+    "localizations": {
+      "zh": {
+        "term": "睡意",
+        "reading": "shuì yì",
+        "reading_system": "pinyin",
+        "definition": "想睡觉的感觉；困倦。"
+      }
+    }
+  },
+  {
+    "target": { "sense_id": 39810 },
+    "source": "manual:localized-sense-consensus-verified-v1",
+    "confidence": 0.97,
+    "localizations": {
+      "zh": {
+        "term": "微调",
+        "reading": "wēi tiáo",
+        "reading_system": "pinyin",
+        "definition": "为改进某物而作出的轻微调整。"
+      }
+    }
+  }
+]

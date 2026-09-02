@@ -102,20 +102,79 @@ try {
   $Cadence = Read-JsonFile (Join-Path $RunDir 'production-cadence-audit.json')
   $Gate = Read-JsonFile (Join-Path $RunDir 'production-gate.json')
 
+  $HistoricalRecovered = 0
+  if ($null -ne $Apply.stats.PSObject.Properties['historical_existing_drafts_recovered']) {
+    $HistoricalRecovered = [int64]$Apply.stats.historical_existing_drafts_recovered
+  }
+  $HistoricalRecovery = $HistoricalRecovered -gt 0
+
   if (-not $Apply.ok -or -not $Risk.ok -or -not $Audit.ok -or -not $Cadence.ok -or -not $Gate.ok) {
     throw 'One or more release reports are not ok'
   }
-  if ([int64]$Apply.stats.senses_inserted -le 0) { throw 'Controlled replay inserted no senses' }
   Assert-Zero $Idempotent.stats.senses_inserted 'idempotent senses_inserted'
   Assert-Zero $Idempotent.stats.localizations_upserted 'idempotent localizations_upserted'
-  if ([int64]$PromoteDry.stats.accepted -le 0) {
-    throw 'Promote dry-run accepted no controlled replay senses'
-  }
+  $CandidateExhausted = [int64]$PromoteDry.stats.accepted -le 0
   if ([int64]$PromoteDry.stats.accepted -ne [int64]$PromoteApply.stats.senses_promoted) {
     throw 'Promote apply count does not match promote dry-run acceptance count'
   }
-  if (([int64]$PromoteDry.stats.accepted + [int64]$PromoteDry.stats.rejected) -ne [int64]$Apply.stats.senses_inserted) {
+  $InsertedSenseIds = @($Apply.writes | ForEach-Object { [int64]$_.product_sense_id })
+  $ExpectedWriteCount = [int64]$Apply.stats.senses_inserted + $HistoricalRecovered
+  if ($InsertedSenseIds.Count -ne $ExpectedWriteCount) {
+    throw 'Controlled replay write IDs do not match inserted plus recovered senses'
+  }
+  $DryAcceptedSenseIds = [Collections.Generic.HashSet[int64]]::new()
+  $AcceptedSenseIdRows = @()
+  if ($null -ne $PromoteDry.PSObject.Properties['accepted_sense_ids']) {
+    $AcceptedSenseIdRows = @($PromoteDry.accepted_sense_ids)
+  } elseif (@($PromoteDry.accepted_preview).Count -eq [int64]$PromoteDry.stats.accepted) {
+    # Backward compatibility for older, non-truncated reports only.
+    $AcceptedSenseIdRows = @($PromoteDry.accepted_preview | ForEach-Object { $_.sense_id })
+  } else {
+    throw 'Promote dry-run report lacks a complete accepted sense ID set'
+  }
+  foreach ($SenseId in $AcceptedSenseIdRows) {
+    [void]$DryAcceptedSenseIds.Add([int64]$SenseId)
+  }
+  if ($DryAcceptedSenseIds.Count -ne [int64]$PromoteDry.stats.accepted) {
+    throw 'Promote dry-run accepted sense ID count does not match accepted stats'
+  }
+  $ExistingDraftSenseIds = [Collections.Generic.HashSet[int64]]::new()
+  foreach ($Write in @($Apply.writes)) {
+    if ([string]$Write.recovery -eq 'existing_draft') {
+      [void]$ExistingDraftSenseIds.Add([int64]$Write.product_sense_id)
+    }
+  }
+  $PromotedExistingDrafts = 0
+  $PromotedNewDrafts = 0
+  foreach ($SenseId in $DryAcceptedSenseIds) {
+    if ($ExistingDraftSenseIds.Contains($SenseId)) { $PromotedExistingDrafts += 1 }
+    else { $PromotedNewDrafts += 1 }
+  }
+  if ($HistoricalRecovery) {
+    $ScopedSenseIds = [Collections.Generic.HashSet[int64]]::new()
+    foreach ($SenseId in $InsertedSenseIds) { [void]$ScopedSenseIds.Add($SenseId) }
+    foreach ($SenseId in $DryAcceptedSenseIds) {
+      if (-not $ScopedSenseIds.Contains($SenseId)) {
+        throw "Promote dry-run accepted sense outside historical recovery scope: $SenseId"
+      }
+    }
+  } else {
+    foreach ($SenseId in $InsertedSenseIds) {
+      if (-not $DryAcceptedSenseIds.Contains($SenseId)) {
+        throw "Controlled replay sense did not pass promote dry-run: $SenseId"
+      }
+    }
+  }
+  if (([int64]$PromoteDry.stats.accepted + [int64]$PromoteDry.stats.rejected) -ne $ExpectedWriteCount) {
     throw 'Promote dry-run did not account for every controlled replay sense'
+  }
+  $ExpectedPromoteCount = if ($HistoricalRecovery) {
+    [int64]$PromoteDry.stats.accepted
+  } else {
+    $ExpectedWriteCount
+  }
+  if ([int64]$PromoteApply.stats.senses_promoted -ne $ExpectedPromoteCount) {
+    throw 'Promoted sense count does not match the controlled replay insert count'
   }
   Assert-Zero $Risk.summary.flagged_senses 'published-risk flagged_senses'
   Assert-Zero $Audit.bad_sense_localization_counts 'bad_sense_localization_counts'
@@ -133,18 +192,24 @@ try {
   $Result = [ordered]@{
     ok = $true
     run_id = $RunId
-    commit = $Commit
+    commit_requested = $Commit
+    commit = $Commit -and -not $CandidateExhausted
+    status = if ($CandidateExhausted) { 'candidate_exhausted' } elseif ($Commit) { 'committed' } else { 'validated' }
+    candidate_exhausted = $CandidateExhausted
     main_sha256_before = $Actual
     validation_base_removed = $true
     isolated_db = $IsolatedDb
     senses_inserted = [int64]$Apply.stats.senses_inserted
+    historical_existing_drafts_scoped = $HistoricalRecovered
+    historical_existing_drafts_recovered = if ($HistoricalRecovery) { $PromotedExistingDrafts } else { 0 }
+    new_drafts_promoted = $PromotedNewDrafts
     senses_promoted = [int64]$PromoteApply.stats.senses_promoted
     flagged_senses = [int64]$Risk.summary.flagged_senses
     audit_counts = $Audit.counts
     main_replaced = $false
   }
 
-  if ($Commit) {
+  if ($Commit -and -not $CandidateExhausted) {
     $Rollback = Join-Path $BackupDir "$RunId-main-before-commit-$Stamp.db"
     $Staged = Join-Path $RunDir 'staged-main-commit.db'
     Copy-Item -LiteralPath $IsolatedDb -Destination $Staged -Force

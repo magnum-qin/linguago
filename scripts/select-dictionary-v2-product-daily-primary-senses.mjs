@@ -17,6 +17,13 @@ const minimumScore = Number(args['min-score'] || 2_500);
 const requireNativeSource = args['require-native-source'] === 'true';
 const allowLinkedPrimaryForAdditionalSense =
   args['allow-linked-primary-for-additional-sense'] === 'true';
+const excludedReportPaths = [args.exclude, args['attempt-index']]
+  .filter(Boolean)
+  .flatMap((value) => String(value).split(','))
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map((value) => requiredPath(value, 'exclude'));
+const attemptedSourceSenses = loadAttemptedSourceSenses(excludedReportPaths);
 
 const report = readJson(reportPath);
 const candidates = Array.isArray(report.selected) ? report.selected : [];
@@ -74,13 +81,22 @@ for (const candidate of candidates) {
     });
     continue;
   }
-  const eligible = alternatives.filter((sense) => !sense.linked_product_sense && !sense.blocked_reason);
+  const otherwiseEligible = alternatives.filter(
+    (sense) => !sense.linked_product_sense && !sense.blocked_reason
+  );
+  const eligible = otherwiseEligible.filter(
+    (sense) => !attemptedSourceSenses.has(sourceSenseKey(candidate.source_entry_id, sense.id))
+  );
   eligible.sort((left, right) => right.daily_sense_score - left.daily_sense_score || left.sense_order - right.sense_order);
   const best = eligible[0];
   if (!best || best.daily_sense_score < minimumScore) {
     rejected.push({
       ...identity(candidate),
-      reason: best ? 'daily_sense_score_below_threshold' : 'no_eligible_source_sense',
+      reason: best
+        ? 'daily_sense_score_below_threshold'
+        : otherwiseEligible.length > 0
+          ? 'all_eligible_source_senses_attempted'
+          : 'no_eligible_source_sense',
       best_score: best?.daily_sense_score ?? null,
       alternatives: alternatives.slice(0, 12).map(compactAlternative)
     });
@@ -128,7 +144,9 @@ const common = {
     automatic_publication: false,
     minimum_score: minimumScore,
     require_native_source: requireNativeSource,
-    allow_linked_primary_for_additional_sense: allowLinkedPrimaryForAdditionalSense
+    allow_linked_primary_for_additional_sense: allowLinkedPrimaryForAdditionalSense,
+    excluded_reports: excludedReportPaths.map(relative),
+    attempted_source_senses: attemptedSourceSenses.size
   },
   summary: {
     input: candidates.length,
@@ -136,6 +154,7 @@ const common = {
     rejected: rejected.length,
     selected_by_lang: countBy(selected, (row) => row.source_lang),
     changed_from_report_first_sense: selected.filter((row) => row.daily_sense_selection.changed).length,
+    excluded_attempted_senses: attemptedSourceSenses.size,
     selected_by_source: countBy(selected, (row) => row.daily_sense_selection.alternatives.find((item) => item.id === row.first_sense_id)?.source)
   }
 };
@@ -296,6 +315,44 @@ function isCleanLocalization(row) {
 function clean(value) {
   const text = String(value || '').normalize('NFKC').trim();
   return text && !/\uFFFD|<[^>]+>/u.test(text) ? text : '';
+}
+
+function loadAttemptedSourceSenses(reportPaths) {
+  const keys = new Set();
+  for (const reportFilePath of reportPaths) collectAttemptedSourceSenses(readJson(reportFilePath), keys);
+  return keys;
+}
+
+function collectAttemptedSourceSenses(value, keys) {
+  if (Array.isArray(value)) {
+    for (const item of value) collectAttemptedSourceSenses(item, keys);
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+
+  const sourceEntryId = value.source_entry_id;
+  const sourceSenseId = value.source_sense_id ?? value.first_sense_id;
+  if (sourceEntryId != null && sourceSenseId != null) {
+    keys.add(sourceSenseKey(sourceEntryId, sourceSenseId));
+  }
+
+  for (const [name, child] of Object.entries(value)) {
+    if (
+      name === 'selected' ||
+      name === 'candidates' ||
+      name === 'rows' ||
+      name === 'accepted' ||
+      name === 'rejected' ||
+      name === 'completed' ||
+      name === 'results'
+    ) {
+      collectAttemptedSourceSenses(child, keys);
+    }
+  }
+}
+
+function sourceSenseKey(sourceEntryId, sourceSenseId) {
+  return `${Number(sourceEntryId)}:${Number(sourceSenseId)}`;
 }
 
 function identity(row) {

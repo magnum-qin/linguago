@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "description": "Repair five source_gap_manual_residual links written with stale canonical IDs.",
+  "repairs": [
+    { "link_id": 29493, "old_source_entry_id": 1079246, "old_source_sense_id": 1079246, "source_lang": "pt-BR", "source_word": "regular", "new_source_entry_id": 1632731, "new_source_sense_id": 1632731, "expected_gloss": "normal" },
+    { "link_id": 29496, "old_source_entry_id": 1115024, "old_source_sense_id": 1115024, "source_lang": "pt-BR", "source_word": "cereal", "new_source_entry_id": 1625458, "new_source_sense_id": 1625458, "expected_gloss": "grain" },
+    { "link_id": 29497, "old_source_entry_id": 798734, "old_source_sense_id": 798734, "source_lang": "zh", "source_word": "组长", "new_source_entry_id": 892978, "new_source_sense_id": 1289671, "expected_gloss": "group leader" },
+    { "link_id": 29511, "old_source_entry_id": 1421479, "old_source_sense_id": 1421479, "source_lang": "ja", "source_word": "ダイナー", "new_source_entry_id": 1528226, "new_source_sense_id": 1528226, "expected_gloss": "diner" },
+    { "link_id": 29512, "old_source_entry_id": 1180990, "old_source_sense_id": 1180990, "source_lang": "pt-BR", "source_word": "genro", "new_source_entry_id": 1628962, "new_source_sense_id": 1628962, "expected_gloss": "son-in-law" }
+  ]
+}

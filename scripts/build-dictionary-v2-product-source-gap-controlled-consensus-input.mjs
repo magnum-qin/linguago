@@ -333,7 +333,7 @@ function loadFinalGate() {
       .filter(
         (row) =>
           row?.decision === 'supported' &&
-          LANGS.every((lang) => row?.languages?.[lang]?.decision === 'supported')
+          finalEvidenceQualificationIsPublishable(row, evidence.policy)
       )
       .map((row) => [candidateKey(row), row])
       .filter(([key]) => key)
@@ -363,6 +363,27 @@ function loadFinalGate() {
     })
   }
   return gate
+}
+
+function finalEvidenceQualificationIsPublishable(row, policy = {}) {
+  const decisions = LANGS.map((lang) => row?.languages?.[lang]?.decision)
+  if (decisions.some((decision) => decision === 'unsupported')) return false
+  const supported = decisions.filter((decision) => decision === 'supported').length
+  const manual = decisions.filter((decision) => decision === 'manual_review').length
+  if (manual === 0) return supported === LANGS.length
+
+  const qualification = row?.evidence_qualification
+  if (qualification?.mode !== 'supported_with_limited_manual_evidence') return false
+  const maxManual = Number(policy?.max_manual_target_languages ?? 1)
+  const minSupported = Number(policy?.min_supported_target_languages ?? 3)
+  return (
+    maxManual > 0 &&
+    minSupported > 0 &&
+    manual <= maxManual &&
+    supported >= minSupported &&
+    Number(qualification.manual_target_languages) === manual &&
+    Number(qualification.supported_target_languages) === supported
+  )
 }
 
 function generationOutputIsComplete(generation, sourceRow) {

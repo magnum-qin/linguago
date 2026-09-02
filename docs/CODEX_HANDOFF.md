@@ -1,5 +1,91 @@
 # Codex Handoff
 
+## v219 daily recovery: candidate quality hold
+
+See [V219_DAILY_RECOVERY.md](V219_DAILY_RECOVERY.md) before restarting production.
+The new 100e cohort passes structural rules but fails semantic/daily-value spot
+review. No v219 LLM generation or product writes occurred in these validations.
+Do not restart 500 until source selection is repaired and the quality hold is
+explicitly resolved. Empty candidates now stop normally; Windows child exit-code
+handling has an integration-tested fix.
+
+## 2026-08-26 high-frequency Chinese semantic-risk review v14
+
+- Added reproducible high-frequency Chinese filters and deterministic artifact
+  routing to `report-dictionary-v2-localized-sense-isolation-risk.mjs`.
+- The authoritative DB scan selected 100 review forms across 59 entries after
+  excluding 21 placeholder/composite forms from model review.
+- Jump-host run `localized-sense-review-v14-zh-high-frequency100` completed
+  read-only: Qwen and Gemma each returned 100/100 contract-valid reviews.
+- Consensus contains 86 query-isolation rows; 14 rows remain manual because of
+  decision, matched-sense-ID, or confidence disagreement. No product DB or D1
+  data was changed.
+- Next safe step: compile the 86 rows into a guarded query-isolation mapping,
+  validate exact query behavior against a copied DB/Worker fixture, and keep
+  all 14 disagreements out of automatic apply.
+- Follow-up comparison showed 79/86 already equal the Worker’s exact
+  `normalized_term` filtering. The remaining seven rows proposed eight added
+  sense bindings, but linked-source audit found zero exact target-term evidence;
+  all eight were rejected from automatic apply.
+- The 14 disagreements and 21 composite/placeholder localizations remain
+  manual/evidence-required. No product DB mutation was made.
+- `localized-sense-review-v15-zh-high-frequency-next500` is the next
+  non-overlapping read-only batch (`offset=100`, 500 forms, 308 entries).
+- v15 completed with 500/500 valid Qwen and Gemma reviews. Triage confirmed
+  384 current bindings, retained 73 manual rows, and audited 47 proposed added
+  senses. Zero proposals met the two-independent-family source gate.
+- Fast audit passed and published-risk remained `flagged_senses=0`; no product
+  or D1 write occurred.
+- v16 completed read-only: Qwen was valid for 1,994/2,000 rows, Gemma for
+  1,997/2,000, and adjudication produced 1,698 consensus rows. Runtime triage
+  confirmed 1,388 existing exact bindings, retained 566 manual rows, and sent
+  46 proposed added bindings to source evidence audit. None had exact linked
+  source evidence, so automatic apply remained zero.
+- The last high-frequency Chinese page is
+  `localized-sense-review-v17-zh-high-frequency-final758` (`offset=2600`),
+  containing 758 forms across 481 entries. It completed through the same
+  read-only checkpointed Scheduled Task. Qwen and Gemma each returned 753/758
+  valid rows; triage confirmed 444 existing bindings, retained 280 manual rows,
+  and sent 17 concrete added-sense proposals to exact evidence audit. None had
+  exact linked-source evidence and automatic apply remained zero. The final
+  count is 758 because the
+  two-forms-per-entry cap leaves 3,358 reviewable forms in total; the report's
+  3,721 eligible count is calculated before that cap.
+- The complete v14-v17 bounded pass reviewed 3,358 forms: 2,295 current Worker
+  bindings were confirmed, 933 rows remain manual, and 118 concrete added-sense
+  proposals were source-audited. Only three proposals had any exact source
+  evidence and none had two independent families. No product DB or D1 write
+  occurred. Product fast audit passed at 51,736 publishable senses and
+  published-risk remained `flagged_senses=0`.
+
+## 2026-08-25 source-link provenance repair
+
+- The production-authoritative product DB remains on the jump host at
+  `D:\linguago-runner\data\processed\linguago_v2_product_top5000_freedict_filtered_candidate.db`.
+  The local product DB is older and must not overwrite it.
+- Product source-link IDs target canonical `entries/senses` in
+  `linguago_v2_full.db`. Do not join them to raw `source_entries/source_senses`.
+- The corrected drift audit found five bad `source_gap_manual_residual` links:
+  `regular`, `cereal`, `组长`, `ダイナー`, and `genro`. They were repaired on the
+  jump host after backup
+  `D:\linguago-runner\backups\before-source-link-drift-repair-v1-20260825.db`.
+- Post-repair provenance is clean: `54041` links, zero missing canonical
+  senses/entries, zero entry-ID mismatches, and zero word/language snapshot
+  mismatches. Counts remain `entries=45771`, `senses=53182`,
+  `localizations=212720`, with `publishable_senses=51736` and
+  `flagged_senses=0`.
+- Fast audit and full native export/in-memory import pass with every blocking
+  counter at zero. This repair was not deployed to D1 because it changes only
+  internal provenance links, which are not part of the public D1 payload.
+- Post-repair authoritative DB SHA256:
+  `6364411ff73a3e23b19ace872846ef0bfebbe87f0b3dc0dcf08ecc8185158aff`.
+  The pre-repair backup SHA256 is
+  `de58a71ec3a4b36416137a3467528e8b0aa6d82ea4ffc8eacc98e792d38d8a61`.
+- New tools: `dict:v2:audit:product-source-link-drift`,
+  `dict:v2:triage:product-source-link-drift`, and
+  `dict:v2:repair:product-source-link-drift`. The repair is dry-run by default
+  and validates both old and replacement identities before changing a row.
+
 ## 2026-08-24 v178 Spring Festival sense-isolation repair (v145 Worker)
 
 - Querying `春节` previously selected the Japanese headword entry `春` through
@@ -6607,3 +6693,158 @@ untracked. The durable extractors are
   than padding the Portuguese quota with weak evidence. It uses dynamic endpoint
   discovery, Qwen generation, Gemma independent review, checkpointed writes,
   circuit breaking, and no automatic database writes.
+
+## 2026-08-25 localized-sense exact-repair hardening
+
+- Do not use Qwen/Gemma agreement as independent dictionary evidence. The
+  fresh100 replay found three agreed repairs, but all failed human/source
+  inspection. The exact compiler now requires both cited source-family diversity
+  and exact replacement-term support from at least two independent families.
+- Strict source-link discovery approved only exact-headword multilingual links
+  for `くれる` and `カワセミ` on a validation DB; `とぐろ` remained manual.
+  Validation fast audit and published-risk passed, but the final rebuilt
+  evidence produced zero model-eligible localization repairs. No fresh100
+  localization repair was committed to the authoritative DB.
+- Active next run: `localized-sense-review-v11-fresh500`, 500 forms across 82
+  entries. Qwen checkpointed at least 210 rows before the Tailscale data path to
+  `100.99.99.99` stopped responding. Resume the same checkpoint after SSH is
+  healthy. The reviewer now uses atomic checkpoint replacement, signal-time
+  checkpoint writes, per-attempt endpoint selection, cross-endpoint retry, and
+  a two-failure/30-second endpoint cooldown.
+- Detailed commands and gate rationale are in
+  `docs/localized-sense-review-pipeline.md`.
+
+## 2026-08-25 localized-sense fresh500 completion
+
+- `localized-sense-review-v11-fresh500` is complete: Qwen 500/500 valid,
+  Gemma 500/500 valid, 409 consensus, and 91 manual review. Consensus decisions
+  are 375 isolate, 33 keep, and 1 repair.
+- The sole repair (`くれる` / Chinese `交给`) still has no exact replacement
+  term supported by two independent source families. No authoritative DB write
+  was made.
+- Long reviews now run through `start-remote-localized-sense-review.ps1` as a
+  Windows Scheduled Task. The launcher uses `$taskAction` to avoid the
+  case-insensitive `$Action` parameter collision; the job wrapper persists a
+  transcript; model retries receive deterministic validation feedback.
+- Active read-only pressure test:
+  `localized-sense-review-v12-fresh2000-background`. It has 2,000 forms across
+  318 entries and reuses the first 500 validated Qwen/Gemma rows, so only 1,500
+  new rows per model are requested. Do not start another localized-sense task
+  while it is active.
+
+## 2026-08-25 fresh2000 completion and first safe automatic repair
+
+- The v12 pressure run completed: Qwen `2000/2000` valid, Gemma `1998/2000`
+  valid, and `1599/2000` model consensus (79.95%). Consensus decisions were
+  1,443 isolate, 149 keep, and seven repair query forms. The two invalid Gemma
+  rows remain manual and were not promoted into decisions.
+- Repair reviews now identify `target_lang` and exact target `fields`. The
+  seven v12 repair rows were rerun as
+  `localized-sense-review-v13-structured-repair`; both models returned 7/7
+  valid and exact decisions. Five repair forms deduplicated to four senses.
+- The source-link compiler now supports guarded cross-language evidence, but
+  counts only native target-language source headwords. LLM-enriched source
+  localizations are not independent dictionary evidence, and the current bad
+  product term is excluded from replacement candidates.
+- Three senses (`talk`, `anyway`, and `嗎`) lacked a corrected native term in
+  two independent source families and remain manual. Only `くれる` qualified:
+  Wiktionary-family data and CC-CEDICT both have native Chinese headword `给`.
+- Qwen proposed and Gemma byte-for-byte accepted `交给 -> 给`, reading `gěi`,
+  definition `交付；送与。`. The exact compiler approved one localization
+  repair and applied it only to
+  `runs\localized-sense-review-v12-fresh2000-validation.db`.
+- Validation fast audit passed and published-risk remained
+  `flagged_senses=0`. The authoritative product DB and D1 were not modified.
+  This validates scalable safe repair orchestration; expected yield remains
+  evidence-bound, so unsupported cases must stay manual.
+
+## 2026-08-25 Mainland Simplified Chinese normalization
+
+- Chinese display policy is now neutral Mainland Simplified Chinese. Traditional
+  forms remain searchable through controlled `v2_entry_forms` aliases; they are
+  not the default display form when a safe Simplified canonical form exists.
+- `audit-dictionary-v2-product-mainland-chinese.mjs` is read-only and uses
+  OpenCC `t -> cn`. A script difference is only a repair candidate; it is never
+  treated as semantic evidence.
+- `create-dictionary-v2-product-mainland-chinese-plan.mjs` produces three
+  separately reviewable sets: canonical headword repairs, publishable
+  Traditional aliases, and Chinese term/definition repairs. Aliases are emitted
+  only for entries that satisfy the same four-language publishability gate as
+  the D1 exporter.
+- `apply-dictionary-v2-product-mainland-chinese-plan.mjs` verifies entry and
+  localization drift before each write. Always run it on a copied validation DB
+  first, then run fast audit, published-risk, native export, and full in-memory
+  import audit before touching the authoritative DB.
+- The validated cohort contains 252 unique Traditional headwords that can be
+  canonicalized, 750 publishable Traditional aliases, 1,148 Chinese term
+  conversions, and 309 Chinese definition conversions. Fourteen aliases are
+  deferred because their entries are not currently publishable.
+- Mainland lexical evidence priority is CC-CEDICT or another Mainland source,
+  followed by a genuinely independent source family. Kaikki and WikDict count
+  as one Wiktionary family. Qwen/Gemma agreement is review evidence, not an
+  independent dictionary source.
+- The `春节 -> 青春` screenshot was a localized-term result-shaping problem,
+  not an OpenCC problem. `worker/dictionary.ts` filters a localized-term hit to
+  only senses whose localization exactly matches the query. The regression
+  `check:worker-dictionary-localized-term` verifies that `春节` returns only
+  `Spring Festival`, never the sibling `青春` sense under the Japanese `春`
+  entry.
+## 2026-08-25 Mainland-first Chinese maintenance
+
+- The authoritative jump-host product DB was backed up before applying the
+  deterministic Mainland Chinese maintenance plan. The post-apply DB SHA-256
+  is `2818CE3E36454FF1E3ED3687EE252803BD7CC9A5DDBA70169B5A0ED87AA95A8F`;
+  the rollback backup SHA-256 is
+  `6E6C8199F72F148083C87DD24B9AE5FFB0099D16CE01924CEFCDA1C7FEC81246`.
+- Applied changes: 750 controlled `traditional_alias` forms, 252 unique
+  canonical headword repairs, and 1,404 localization repairs (1,148 terms and
+  309 definitions overlap by row). Fourteen non-publishable alias candidates
+  remain manual review items.
+- Post-apply Mainland audit reports zero traditional Chinese terms,
+  definitions, source examples, and localized examples. The 512 remaining
+  traditional Chinese headwords all have an existing simplified counterpart
+  and are retained as searchable legacy entries.
+- Product fast audit, published-risk audit, and full native D1 export/import
+  audit passed. Blocking counts remain zero. Export counts are 44,549 entries,
+  51,736 senses, 206,944 sense localizations, and 752 entry-form aliases.
+- `CloudflareD1V2Adapter` now resolves a controlled `traditional_alias` before
+  a legacy exact traditional headword. Localized-term matches continue to
+  filter out sibling senses that do not match the query. The fixture regression
+  verifies `春节 -> Spring Festival` and `節日 -> 节日 -> festival`.
+- The old D1 release controller only accepts a database replacement report.
+  Do not falsify `main_replaced=true` for this in-place maintenance. Add a
+  separately validated maintenance-release gate before publishing the DB
+  changes to D1.
+- The Worker lookup fix and cache `v146-mainland-simplified-alias` were deployed
+  as Version ID `535b66c3-c39b-4d83-928d-96b4d190dd57`. General, focused API,
+  and focused mobile/desktop render regressions passed. The online `春节` case
+  now returns exactly one sense, `Spring Festival; Chinese New Year`, with
+  reading `chūn jié`; it no longer leaks the sibling `青春` sense.
+- Online D1 still reports 51,738 senses and 206,952 localizations, while the
+  audited authoritative post-maintenance export has 51,736 and 206,944.
+  Therefore the Worker fix is live, but the authoritative Mainland maintenance
+  DB must not be described as published to D1 yet.
+- Superseded by the completed maintenance release at
+  `2026-08-25T14:41:16.754Z`: D1 now matches the authoritative manifest at
+  44,549 entries, 51,736 senses, 206,944 localizations, 3,030 examples, and
+  11,898 example localizations. The release captured a D1 Time Travel bookmark
+  and reported `d1_pushed=true`.
+
+## 2026-08-26 localized-sense repair release
+
+- The authoritative product DB was backed up to
+  `D:\linguago-runner\data\processed\linguago_v2_product_top5000_freedict_filtered_candidate.before-localized-sense-v14-v17-20260826.db`.
+- Qwen and Gemma independently agreed on eight exact repairs backed by
+  CC-CEDICT, JMdict, WordNet, or FreeDict evidence. Twenty-one composite or
+  placeholder localizations were blocked structurally, and twelve ambiguous
+  reviewed senses were moved to manual review instead of guessing repairs.
+- Post-apply published-risk reports `flagged_senses=0`. The full native export
+  and in-memory import audit passed with all blocking counters at zero.
+- Remote D1 backup:
+  `D:\linguago-runner\backups\linguago-dictionary-before-localized-sense-v14-v17-20260826.sql`.
+- Published D1 counts: 44,549 entries, 51,703 senses, 206,812 sense
+  localizations, 3,030 examples, and 11,898 example localizations. D1
+  `published_at=2026-08-26T06:44:47.662Z`.
+- Worker cache `v147-localized-sense-repair` was deployed as Version ID
+  `d4a42a8a-5504-450a-a3da-318ab6613aa2`. General and focused online
+  dictionary regressions passed, including the eight repaired terms.

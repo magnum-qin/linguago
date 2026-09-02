@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
 import { ArrowRight, History, Trash2, X } from 'lucide-vue-next';
+import M3DrawerShell from './M3DrawerShell.vue';
 import { useHistory } from '../composables/useHistory';
 import { useTranslation } from '../composables/useTranslation';
 
@@ -24,114 +24,136 @@ const formatTime = (value: string) => {
     minute: '2-digit'
   }).format(date);
 };
-
-const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && isHistoryOpen.value) {
-    isHistoryOpen.value = false;
-  }
-};
-
-onMounted(() => window.addEventListener('keydown', handleKeydown));
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="fade">
-      <div
-        v-if="isHistoryOpen"
-        class="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity"
-        @click="isHistoryOpen = false"
-      ></div>
-    </Transition>
+  <M3DrawerShell
+    v-model="isHistoryOpen"
+    title="搜索历史 / Histórico"
+    title-id="history-drawer-title"
+    close-label="关闭搜索历史 / Fechar histórico"
+  >
+    <template #icon>
+      <History class="h-5 w-5 shrink-0 text-m3-primary" aria-hidden="true" />
+    </template>
 
-    <Transition name="slide-right">
-      <aside
-        v-if="isHistoryOpen"
-        class="fixed top-0 right-0 z-50 h-full w-[400px] max-w-[90vw] bg-m3-surface shadow-2xl flex flex-col p-6 overflow-y-auto"
+    <div v-if="historyItems.length === 0" class="drawer-empty-state">
+      <History class="mb-4 h-12 w-12 text-m3-outline-variant/60" aria-hidden="true" />
+      <p class="text-sm font-medium text-m3-on-surface-variant">
+        还没有搜索记录<br />
+        <span class="mt-0.5 inline-block text-[0.8rem] text-m3-outline">Nenhuma busca recente</span>
+      </p>
+    </div>
+
+    <div v-else class="drawer-list">
+      <div class="flex justify-end">
+        <button type="button" class="drawer-clear-button" @click="clearHistory">
+          <X class="h-3.5 w-3.5" aria-hidden="true" />清空 / Limpar
+        </button>
+      </div>
+
+      <article
+        v-for="item in historyItems"
+        :key="`${item.text}-${item.createdAt}`"
+        class="drawer-item"
+        tabindex="0"
+        role="button"
+        @click="loadHistory(item.text)"
+        @keydown.enter="loadHistory(item.text)"
+        @keydown.space.prevent="loadHistory(item.text)"
       >
-        <div class="flex items-center justify-between mb-4 pb-4 border-b border-m3-outline-variant/20">
-          <div class="flex items-center gap-2">
-            <History class="w-5 h-5 text-m3-primary" />
-            <h2 class="text-lg font-bold font-display text-m3-on-surface">搜索历史 / Histórico</h2>
-          </div>
-          <button
-            @click="isHistoryOpen = false"
-            class="w-10 h-10 rounded-full bg-transparent hover:bg-m3-surface-container-highest flex items-center justify-center text-m3-on-surface-variant transition-colors outline-none"
-            aria-label="关闭 / Fechar"
-          >
-            <ArrowRight class="w-5 h-5" />
-          </button>
+        <div class="min-w-0 flex-1">
+          <div class="truncate text-lg font-bold text-m3-on-surface">{{ item.text }}</div>
+          <div class="truncate text-xs font-semibold text-m3-outline">{{ formatTime(item.createdAt) }}</div>
         </div>
-
-        <div
-          v-if="historyItems.length === 0"
-          class="flex-1 flex flex-col items-center justify-center py-12 text-center"
+        <button
+          type="button"
+          class="drawer-item-action"
+          :aria-label="`移除历史 ${item.text} / Remover ${item.text}`"
+          @click.stop="removeHistory(item.text)"
         >
-          <History class="w-12 h-12 text-m3-outline-variant/60 mb-4" />
-          <p class="text-m3-on-surface-variant text-sm text-center font-medium">
-            还没有搜索记录<br />
-            <span class="text-[0.8rem] text-m3-outline mt-0.5 inline-block">Nenhuma busca recente</span>
-          </p>
-        </div>
-
-        <div v-else class="flex flex-col gap-3">
-          <div class="flex justify-end">
-            <button
-              @click="clearHistory"
-              class="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold text-m3-on-surface-variant hover:text-m3-error hover:bg-m3-error/10 transition-colors"
-            >
-              <X class="w-3.5 h-3.5" /> 清空 / Limpar
-            </button>
-          </div>
-
-          <div
-            v-for="item in historyItems"
-            :key="`${item.text}-${item.createdAt}`"
-            class="flex items-center justify-between group bg-m3-surface-container hover:bg-m3-surface-container-high rounded-[20px] p-3 pl-4 border border-m3-outline-variant/10 shadow-sm transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5"
-            @click="loadHistory(item.text)"
-          >
-            <div class="flex flex-col gap-1 overflow-hidden flex-1">
-              <span class="text-m3-on-surface font-display font-bold text-lg truncate">{{ item.text }}</span>
-              <span class="text-xs font-semibold text-m3-outline truncate">
-                {{ formatTime(item.createdAt) }}
-              </span>
-            </div>
-            <div class="flex items-center gap-1">
-              <button
-                @click.stop="removeHistory(item.text)"
-                class="flex items-center justify-center w-10 h-10 rounded-full text-m3-outline-variant hover:text-m3-error hover:bg-m3-error/10 transition-colors shrink-0"
-                aria-label="移除历史 / Remover"
-              >
-                <Trash2 class="w-4 h-4" />
-              </button>
-              <ArrowRight
-                class="w-5 h-5 text-m3-outline-variant/50 group-hover:text-m3-primary transition-colors shrink-0"
-              />
-            </div>
-          </div>
-        </div>
-      </aside>
-    </Transition>
-  </Teleport>
+          <Trash2 class="h-4 w-4" aria-hidden="true" />
+        </button>
+        <ArrowRight class="h-5 w-5 shrink-0 text-m3-outline-variant/60" aria-hidden="true" />
+      </article>
+    </div>
+  </M3DrawerShell>
 </template>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.drawer-empty-state {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+  text-align: center;
 }
 
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+.drawer-list {
+  display: grid;
+  gap: 12px;
 }
-.slide-right-enter-from,
-.slide-right-leave-to {
-  transform: translateX(100%);
+
+.drawer-clear-button {
+  min-height: 40px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 14px;
+  color: var(--color-m3-on-surface-variant);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.drawer-clear-button:hover {
+  color: var(--color-m3-error);
+  background: color-mix(in srgb, var(--color-m3-error) 10%, transparent);
+}
+
+.drawer-item {
+  min-height: 68px;
+  padding: 10px 10px 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-m3-outline-variant) 18%, transparent);
+  border-radius: 18px;
+  background: var(--color-m3-surface-container);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.drawer-item:hover {
+  background: var(--color-m3-surface-container-high);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.08);
+}
+
+.drawer-item:focus-visible,
+.drawer-clear-button:focus-visible,
+.drawer-item-action:focus-visible {
+  outline: 2px solid var(--color-m3-primary);
+  outline-offset: 2px;
+}
+
+.drawer-item-action {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: var(--color-m3-outline);
+}
+
+.drawer-item-action:hover {
+  color: var(--color-m3-error);
+  background: color-mix(in srgb, var(--color-m3-error) 10%, transparent);
 }
 </style>

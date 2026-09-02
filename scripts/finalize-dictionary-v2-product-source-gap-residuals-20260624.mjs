@@ -4,13 +4,16 @@ import path from 'node:path';
 
 const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 const DEFAULT_DB = 'data/processed/linguago_v2_product_top5000_freedict_filtered_candidate.db';
+const DEFAULT_SOURCE_DB = 'data/processed/linguago_v2_full.db';
 const SOURCE = 'manual:source-gap-residual-finalize-20260624';
 
 const args = parseArgs(process.argv.slice(2));
 const dbPath = path.resolve(args.db || DEFAULT_DB);
+const sourceDbPath = path.resolve(args['source-db'] || DEFAULT_SOURCE_DB);
 const dryRun = args['dry-run'] !== 'false';
 
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
+if (!fs.existsSync(sourceDbPath)) throw new Error(`Source database not found: ${sourceDbPath}`);
 
 const records = [
   rec(608559, 608559, 'en', 'sakes', 6018, 'reasons or purposes', null, {
@@ -47,7 +50,7 @@ const records = [
     zh: reading('捏', 'niē', 'pinyin', '用手指夹住并用力挤压。'),
     ja: reading('つねる', 'つねる', 'kana', '指で皮膚などを強く挟んで押す。')
   }),
-  rec(1079246, 1079246, 'pt-BR', 'regular', 7737, 'normal', 'adjective', {
+  rec(1632731, 1632731, 'pt-BR', 'regular', 7737, 'normal', 'adjective', {
     en: ipa('normal', '/ˈnɔːrməl/', 'Usual, standard, or within the expected pattern.'),
     'pt-BR': ipa('regular', '/ʁe.guˈlaʁ/', 'Que segue um padrão normal, comum ou esperado.'),
     zh: reading('正常', 'zhèng cháng', 'pinyin', '符合通常情况或一般标准。'),
@@ -69,13 +72,13 @@ const records = [
     zh: reading('伤残调整生命年', 'shāng cán tiáo zhěng shēng mìng nián', 'pinyin', '衡量疾病负担的公共卫生指标。'),
     ja: reading('障害調整生存年', 'しょうがいちょうせいせいぞんねん', 'kana', '疾病負担を表す公衆衛生上の指標。')
   }),
-  rec(1115024, 1115024, 'pt-BR', 'cereal', 8124, 'grain', 'noun', {
+  rec(1625458, 1625458, 'pt-BR', 'cereal', 8124, 'grain', 'noun', {
     en: ipa('grain', '/ɡreɪn/', 'A seed or crop such as wheat, rice, or corn used as food.'),
     'pt-BR': ipa('cereal', '/se.ɾeˈaw/', 'Planta ou grão usado como alimento, como arroz, trigo ou milho.'),
     zh: reading('谷物', 'gǔ wù', 'pinyin', '可作粮食的禾本科作物或其籽粒。'),
     ja: reading('穀物', 'こくもつ', 'kana', '米、麦、トウモロコシなど食用になる作物の種子。')
   }),
-  rec(798734, 798734, 'zh', '组长', 8236, 'group leader', 'noun', {
+  rec(892978, 1289671, 'zh', '组长', 8236, 'group leader', 'noun', {
     en: ipa('group leader', '/ˈɡruːp ˌliːdər/', 'A person who leads or supervises a group.'),
     'pt-BR': ipa('líder de grupo', '/ˈli.deʁ dʒi ˈɡɾu.pu/', 'Pessoa que lidera ou coordena um grupo.'),
     zh: reading('组长', 'zǔ zhǎng', 'pinyin', '负责带领或管理一个小组的人。'),
@@ -175,13 +178,13 @@ const records = [
     zh: reading('意识到', 'yì shí dào', 'pinyin', '开始明白或察觉某事；也可指实现。'),
     ja: reading('気づくこと', 'きづくこと', 'kana', '何かを理解したり認識したりすること。')
   }),
-  rec(1421479, 1421479, 'ja', 'ダイナー', 10081, 'diner', 'noun', {
+  rec(1528226, 1528226, 'ja', 'ダイナー', 10081, 'diner', 'noun', {
     en: ipa('diner', '/ˈdaɪnər/', 'A small informal restaurant, especially one serving simple meals.'),
     'pt-BR': ipa('lanchonete', '/lɐ̃.ʃoˈnɛ.tʃi/', 'Pequeno restaurante informal que serve refeições simples.'),
     zh: reading('小餐馆', 'xiǎo cān guǎn', 'pinyin', '供应简餐的非正式小型餐馆。'),
     ja: reading('ダイナー', 'ダイナー', 'kana', '軽食などを出す気軽な小型レストラン。')
   }),
-  rec(1180990, 1180990, 'pt-BR', 'genro', 10332, 'son-in-law', 'noun', {
+  rec(1628962, 1628962, 'pt-BR', 'genro', 10332, 'son-in-law', 'noun', {
     en: ipa('son-in-law', '/ˈsʌn ɪn lɔː/', "The husband of one's daughter."),
     'pt-BR': ipa('genro', '/ˈʒẽ.ɾu/', 'Marido da filha de alguém.'),
     zh: reading('女婿', 'nǚ xu', 'pinyin', '女儿的丈夫。'),
@@ -194,6 +197,28 @@ const records = [
     ja: reading('ビーエムダブリュー', 'ビーエムダブリュー', 'kana', 'ドイツの自動車ブランド BMW の名称。')
   })
 ];
+
+const sourceDb = new Database(sourceDbPath, { readonly: true });
+const sourceIdentity = sourceDb.prepare(`
+  SELECT e.id AS source_entry_id, e.word, e.source_lang, s.id AS source_sense_id, s.gloss_key
+  FROM entries e
+  JOIN senses s ON s.entry_id = e.id
+  WHERE e.id = ? AND s.id = ?
+`);
+for (const item of records) {
+  const source = sourceIdentity.get(item.source_entry_id, item.source_sense_id);
+  if (
+    !source ||
+    normalize(source.word) !== normalize(item.headword) ||
+    normalize(source.source_lang) !== normalize(item.primary_lang)
+  ) {
+    throw new Error(
+      `Source identity mismatch for ${item.primary_lang}:${item.headword} ` +
+        `(${item.source_entry_id}:${item.source_sense_id})`
+    );
+  }
+}
+sourceDb.close();
 
 const db = new Database(dbPath);
 db.pragma('foreign_keys = ON');

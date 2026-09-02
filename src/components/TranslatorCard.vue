@@ -5,6 +5,7 @@ import { useTheme } from '../composables/useTheme';
 import { useTranslation } from '../composables/useTranslation';
 import { useBookmarks } from '../composables/useBookmarks';
 import { useHistory } from '../composables/useHistory';
+import { detectSourceLanguage } from '../utils/detect-source-language.js';
 
 const { currentTheme, toggleTheme } = useTheme();
 const { inputText, sourceLangPreference, translate, stopTranslation, clear, resultData, isTranslating } =
@@ -15,21 +16,34 @@ const { isHistoryOpen } = useHistory();
 const hasResult = computed(() => !!resultData.value || isTranslating.value);
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const lastDetectedCjkMode = ref<'zh' | 'ja' | 'hidden'>('hidden');
+type SourceLanguage = 'zh' | 'ja' | 'en' | 'pt-BR';
+
+const lastDetectedSourceLanguage = ref<SourceLanguage | 'hidden'>('hidden');
 const isComposingText = ref(false);
 
-const detectCjkMode = (text: string): 'zh' | 'ja' | 'hidden' => {
-  const trimmed = text.trim();
-  if (!trimmed) return 'hidden';
-  if (/[\u3040-\u30ff]/u.test(trimmed)) return 'ja';
-
-  const comparable = trimmed.replace(/[\s\p{P}\p{S}]/gu, '');
-  if (!comparable) return 'hidden';
-  return /^\p{Script=Han}+$/u.test(comparable) ? 'zh' : 'hidden';
+const sourceLabels: Record<SourceLanguage, string> = {
+  zh: '中',
+  ja: '日',
+  en: 'EN',
+  'pt-BR': 'PT'
 };
 
-const sourceToggleVisible = computed(() => detectCjkMode(inputText.value) !== 'hidden');
-const sourceToggleLabel = computed(() => (sourceLangPreference.value === 'ja' ? '日' : '中'));
+const sourceNames: Record<SourceLanguage, string> = {
+  zh: 'Chinese',
+  ja: 'Japanese',
+  en: 'English',
+  'pt-BR': 'Portuguese'
+};
+
+const detectedSourceLanguage = computed(() => detectSourceLanguage(inputText.value));
+const sourceToggleVisible = computed(() => detectedSourceLanguage.value !== 'hidden');
+const sourceToggleLabel = computed(() =>
+  sourceLangPreference.value === 'auto' ? '' : sourceLabels[sourceLangPreference.value]
+);
+const sourceToggleAriaLabel = computed(() => {
+  if (sourceLangPreference.value === 'auto') return 'Detected source language';
+  return `${sourceNames[sourceLangPreference.value]} source. Click to switch.`;
+});
 
 const autoResize = () => {
   if (!textareaRef.value) return;
@@ -58,10 +72,10 @@ const autoResize = () => {
 };
 
 watch(inputText, async (value) => {
-  const detected = detectCjkMode(value);
-  if (detected !== lastDetectedCjkMode.value) {
+  const detected = detectSourceLanguage(value);
+  if (detected !== lastDetectedSourceLanguage.value) {
     sourceLangPreference.value = detected === 'hidden' ? 'auto' : detected;
-    lastDetectedCjkMode.value = detected;
+    lastDetectedSourceLanguage.value = detected;
   }
 
   await nextTick();
@@ -112,7 +126,11 @@ const handlePaste = async () => {
 
 const toggleSourceLang = async () => {
   if (!sourceToggleVisible.value) return;
-  sourceLangPreference.value = sourceLangPreference.value === 'ja' ? 'zh' : 'ja';
+  if (sourceLangPreference.value === 'zh' || sourceLangPreference.value === 'ja') {
+    sourceLangPreference.value = sourceLangPreference.value === 'ja' ? 'zh' : 'ja';
+  } else {
+    sourceLangPreference.value = sourceLangPreference.value === 'pt-BR' ? 'en' : 'pt-BR';
+  }
   if (inputText.value.trim() && hasResult.value && !isTranslating.value) {
     await translate();
   }
@@ -169,7 +187,7 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
           variant="flat"
           class="!h-10 !min-w-10 !rounded-full !px-4 !text-[0.9rem] !font-bold !text-m3-on-primary !bg-m3-primary hover:!opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-m3-primary !tracking-normal !normal-case"
           @click="toggleSourceLang"
-          :aria-label="sourceLangPreference === 'ja' ? 'Japanese source' : 'Chinese source'"
+          :aria-label="sourceToggleAriaLabel"
         >
           {{ sourceToggleLabel }}
         </v-btn>

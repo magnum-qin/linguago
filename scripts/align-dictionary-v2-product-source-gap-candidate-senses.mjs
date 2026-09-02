@@ -28,7 +28,6 @@ if (!fs.existsSync(productDbPath)) throw new Error(`Product DB not found: ${prod
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const candidates = Array.isArray(report.selected) ? report.selected : [];
-if (!candidates.length) throw new Error('Coverage report has no selected rows');
 
 const db = new Database(sourceDbPath, { readonly: true, fileMustExist: true });
 const productDb = new Database(productDbPath, { readonly: true, fileMustExist: true });
@@ -188,7 +187,12 @@ function alignCandidate(candidate) {
   const currentSense = preferCurrentSense
     ? eligible.find((sense) => Number(sense.id) === currentSenseId)
     : null;
-  if (currentSense) return alignedResult(candidate, currentSense, senses, eligible, 'current_candidate_sense');
+  if (currentSense) {
+    if (currentSense.clean_lang_count > maxLangs) {
+      return rejectedResult('already_complete_aligned_sense', candidate, senses, [currentSense]);
+    }
+    return alignedResult(candidate, currentSense, senses, eligible, 'current_candidate_sense');
+  }
 
   if (expandAllEligible) {
     const expandable = eligible.filter((sense) => sense.clean_lang_count <= maxLangs);

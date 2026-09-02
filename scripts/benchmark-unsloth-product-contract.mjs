@@ -26,6 +26,7 @@ const maxSeqLength = Number(args['max-seq-length'] || 4096);
 const repeat = Math.max(1, Number(args.repeat || 1));
 const nParallel = Math.max(1, Number(args['n-parallel'] || 1));
 const cacheTypeKv = args['cache-type-kv'] || 'q8_0';
+const specDraftNMax = Math.max(1, Number(args['spec-draft-n-max'] || 2));
 const promptSource = fs.readFileSync(path.resolve('worker/prompts.ts'), 'utf8');
 const systemPrompt = promptSource.match(/export const ACTIVE_SYSTEM_PROMPT = `([\s\S]*?)`;/)?.[1];
 const previewSystemPrompt = promptSource.match(/export const PREVIEW_SYSTEM_PROMPT = `([\s\S]*?)`;/)?.[1];
@@ -83,6 +84,7 @@ const report = {
   n_parallel: nParallel,
   cache_type_kv: cacheTypeKv,
   speculative_type: speculativeType,
+  spec_draft_n_max: speculativeType.includes('mtp') ? specDraftNMax : null,
   models: []
 };
 
@@ -98,7 +100,7 @@ for (const model of models) {
     n_parallel: nParallel,
     cache_type_kv: cacheTypeKv,
     force_cancel_active: true,
-    ...(speculativeType.includes('mtp') ? { spec_draft_n_max: 2 } : {})
+    ...(speculativeType.includes('mtp') ? { spec_draft_n_max: specDraftNMax } : {})
   }, 900_000);
   const loadSeconds = seconds(loadStarted);
   const rows = [];

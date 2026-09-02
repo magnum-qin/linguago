@@ -51,7 +51,12 @@ for (const row of report.selected || []) {
     rejected.push(reject(row, 'missing_reviewed_ja_term', '', []));
     continue;
   }
-  const attempts = candidates.map(({ term, source }) => resolveGenerationContract(term, source, readings));
+  const englishAnchor = String(
+    row?.candidate_evidence_review?.english_anchor || row?.gloss_preview || ''
+  ).trim();
+  const attempts = candidates.map(({ term, source }) =>
+    resolveGenerationContract(term, source, readings, englishAnchor)
+  );
   const resolved = attempts.find((attempt) => attempt.ok);
   if (resolved) selected.push(withGenerationContract(row, resolved.contract));
   else {
@@ -110,6 +115,7 @@ async function loadReadings(filePath) {
 }
 function addEntry(map, entry) {
   const terms = [...entry.matchAll(/<keb>([\s\S]*?)<\/keb>/gu)].map((match) => decodeXml(match[1]).trim());
+  const readingRows = [];
   for (const readingMatch of entry.matchAll(/<r_ele>([\s\S]*?)<\/r_ele>/gu)) {
     const block = readingMatch[1];
     const reb = block.match(/<reb>([\s\S]*?)<\/reb>/u);
@@ -119,30 +125,143 @@ function addEntry(map, entry) {
       .map((match) => decodeXml(match[1]).trim())
       .filter(Boolean);
     const restrictions = [...block.matchAll(/<re_restr>([\s\S]*?)<\/re_restr>/gu)].map((match) => decodeXml(match[1]).trim());
+    readingRows.push({ reading, priorities, restrictions });
     for (const term of restrictions.length ? restrictions : terms) {
-      if (!map.has(term)) map.set(term, new Map());
-      if (!map.get(term).has(reading)) map.get(term).set(reading, new Set());
-      for (const priority of priorities) map.get(term).get(reading).add(priority);
+      const record = ensureReadingRecord(map, term, reading);
+      for (const priority of priorities) record.priorities.add(priority);
+    }
+  }
+  for (const senseMatch of entry.matchAll(/<sense>([\s\S]*?)<\/sense>/gu)) {
+    const block = senseMatch[1];
+    const termRestrictions = new Set(
+      [...block.matchAll(/<stagk>([\s\S]*?)<\/stagk>/gu)].map((match) => decodeXml(match[1]).trim())
+    );
+    const readingRestrictions = new Set(
+      [...block.matchAll(/<stagr>([\s\S]*?)<\/stagr>/gu)].map((match) => normalizeReading(decodeXml(match[1])))
+    );
+    const glosses = [...block.matchAll(/<gloss(?:\s[^>]*)?>([\s\S]*?)<\/gloss>/gu)]
+      .map((match) => decodeXml(match[1]).trim())
+      .filter(Boolean);
+    if (!glosses.length) continue;
+    for (const term of terms) {
+      if (termRestrictions.size && !termRestrictions.has(term)) continue;
+      for (const row of readingRows) {
+        if (row.restrictions.length && !row.restrictions.includes(term)) continue;
+        if (readingRestrictions.size && !readingRestrictions.has(row.reading)) continue;
+        const record = ensureReadingRecord(map, term, row.reading);
+        for (const gloss of glosses) record.glosses.add(gloss);
+      }
     }
   }
 }
 function reject(row, reason, term, expected) { return { source_entry_id: row.source_entry_id, source_sense_id: row.first_sense_id, word: row.word, reason, ja_term: term, expected_readings: expected }; }
-function resolveGenerationContract(term, termSource, readingIndex) {
+function ensureReadingRecord(index, term, reading) {
+  if (!index.has(term)) index.set(term, new Map());
+  if (!index.get(term).has(reading)) {
+    index.get(term).set(reading, { priorities: new Set(), glosses: new Set() });
+  }
+  return index.get(term).get(reading);
+}
+function resolveGenerationContract(term, termSource, readingIndex, englishAnchor) {
   if (kanaOnly(term)) {
     return { ok: true, contract: { term, termSource, reading: katakanaToHiragana(normalizeReading(term)), readingVariants: [term], readingSource: 'deterministic:kana-self', priorityTags: [] } };
   }
-  const readingRecords = readingIndex.get(term) || new Map();
+  let readingRecords = readingIndex.get(term) || new Map();
+  let readingSuffix = '';
+  let readingSourceSuffix = '';
+  if (!readingRecords.size && term.endsWith('する')) {
+    readingRecords = readingIndex.get(term.slice(0, -2)) || new Map();
+    if (readingRecords.size) {
+      readingSuffix = 'する';
+      readingSourceSuffix = '-suru-base';
+    }
+  }
   const expected = [...readingRecords.keys()];
   if (!expected.length) return { ok: false, reason: 'ja_term_not_in_jmdict', term, expected };
   const canonicalReadings = uniqueCanonicalReadings(expected);
-  const prioritizedReadings = uniqueCanonicalReadings([...readingRecords.entries()].filter(([, priorities]) => priorities.size > 0).map(([reading]) => reading));
-  const selectedReadings = canonicalReadings.length === 1 ? canonicalReadings : prioritizedReadings.length === 1 ? prioritizedReadings : [];
+  const prioritizedReadings = uniqueCanonicalReadings(
+    [...readingRecords.entries()]
+      .filter(([, record]) => record.priorities.size > 0)
+      .map(([reading]) => reading)
+  );
+  const senseMatchedReadings = bestSenseMatchedReadings(readingRecords, englishAnchor);
+  const sensePriorityReadings = bestPriorityReadings(readingRecords, senseMatchedReadings);
+  const generalPriorityReadings = bestPriorityReadings(readingRecords, canonicalReadings);
+  const selectedReadings = canonicalReadings.length === 1
+    ? canonicalReadings
+    : senseMatchedReadings.length === 1
+      ? senseMatchedReadings
+      : sensePriorityReadings.length === 1
+        ? sensePriorityReadings
+      : prioritizedReadings.length === 1
+        ? prioritizedReadings
+        : generalPriorityReadings.length === 1
+          ? generalPriorityReadings
+        : [];
   if (selectedReadings.length !== 1) return { ok: false, reason: 'ja_reading_not_unique', term, expected };
+  const selectedReading = `${selectedReadings[0]}${readingSuffix}`;
+  const senseMatched = senseMatchedReadings.length === 1 && senseMatchedReadings[0] === selectedReadings[0];
   return { ok: true, contract: {
-    term, termSource, reading: selectedReadings[0], readingVariants: expected,
-    readingSource: canonicalReadings.length === 1 ? expected.length === 1 ? 'deterministic:jmdict-unique' : 'deterministic:jmdict-unique-kana-normalized' : 'deterministic:jmdict-unique-priority',
-    priorityTags: canonicalReadings.length === 1 ? [] : [...new Set([...readingRecords.entries()].filter(([reading]) => katakanaToHiragana(reading) === selectedReadings[0]).flatMap(([, priorities]) => [...priorities]))].sort()
+    term, termSource, reading: selectedReading, readingVariants: expected.map((reading) => `${reading}${readingSuffix}`),
+    readingSource: senseMatched
+      ? `deterministic:jmdict-sense-gloss${readingSourceSuffix}`
+      : canonicalReadings.length === 1
+        ? expected.length === 1
+          ? `deterministic:jmdict-unique${readingSourceSuffix}`
+          : `deterministic:jmdict-unique-kana-normalized${readingSourceSuffix}`
+        : `deterministic:jmdict-unique-priority${readingSourceSuffix}`,
+    priorityTags: canonicalReadings.length === 1 ? [] : [...new Set(
+      [...readingRecords.entries()]
+        .filter(([reading]) => katakanaToHiragana(reading) === selectedReadings[0])
+        .flatMap(([, record]) => [...record.priorities])
+    )].sort()
   } };
+}
+function bestPriorityReadings(readingRecords, candidates) {
+  const allowed = new Set(candidates || []);
+  if (!allowed.size) return [];
+  const scored = [...readingRecords.entries()]
+    .map(([reading, record]) => ({
+      reading: katakanaToHiragana(reading),
+      score: [...record.priorities].reduce((total, tag) => total + priorityScore(tag), 0)
+    }))
+    .filter((row) => allowed.has(row.reading));
+  const best = Math.max(0, ...scored.map((row) => row.score));
+  if (best <= 0) return [];
+  return uniqueCanonicalReadings(scored.filter((row) => row.score === best).map((row) => row.reading));
+}
+function priorityScore(tag) {
+  if (/^(?:news|ichi|spec|gai)1$/u.test(tag)) return 100;
+  if (/^(?:news|ichi|spec|gai)2$/u.test(tag)) return 50;
+  const frequency = /^nf(\d{2})$/u.exec(tag);
+  return frequency ? Math.max(1, 50 - Number(frequency[1])) : 1;
+}
+function bestSenseMatchedReadings(readingRecords, englishAnchor) {
+  const anchor = normalizeEnglishGloss(englishAnchor);
+  if (!anchor) return [];
+  const scored = [...readingRecords.entries()].map(([reading, record]) => ({
+    reading: katakanaToHiragana(reading),
+    score: Math.max(0, ...[...record.glosses].map((gloss) => englishGlossScore(anchor, normalizeEnglishGloss(gloss))))
+  }));
+  const best = Math.max(0, ...scored.map((row) => row.score));
+  if (best < 0.6) return [];
+  return uniqueCanonicalReadings(scored.filter((row) => row.score === best).map((row) => row.reading));
+}
+function normalizeEnglishGloss(value) {
+  return String(value).normalize('NFKC').toLowerCase()
+    .replace(/\([^)]*\)/gu, ' ')
+    .replace(/[^a-z0-9]+/gu, ' ')
+    .trim();
+}
+function englishGlossScore(anchor, gloss) {
+  if (!anchor || !gloss) return 0;
+  if (anchor === gloss) return 1;
+  if (` ${gloss} `.includes(` ${anchor} `) || ` ${anchor} `.includes(` ${gloss} `)) return 0.9;
+  const anchorTokens = new Set(anchor.split(' ').filter((token) => token.length > 1));
+  const glossTokens = new Set(gloss.split(' ').filter((token) => token.length > 1));
+  if (!anchorTokens.size || !glossTokens.size) return 0;
+  const shared = [...anchorTokens].filter((token) => glossTokens.has(token)).length;
+  return shared / Math.max(anchorTokens.size, glossTokens.size);
 }
 function withGenerationContract(row, contract) {
   return {
