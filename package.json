@@ -9,7 +9,7 @@
     "dev:worker": "wrangler dev",
     "build": "vite build",
     "deploy": "npm run build && wrangler deploy",
-    "check": "tsc --noEmit",
+    "check": "tsc -b",
     "check:all": "node scripts/check-all.mjs",
     "check:api": "node scripts/api-smoke.mjs",
     "check:online-ui": "node scripts/online-ui-smoke.mjs",

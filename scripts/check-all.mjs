@@ -6,7 +6,7 @@ const checks = [
   {
     name: 'TypeScript',
     command: node,
-    args: ['node_modules/typescript/bin/tsc', '--noEmit']
+    args: ['node_modules/typescript/bin/tsc', '-b']
   },
   {
     name: 'Service Worker cache',

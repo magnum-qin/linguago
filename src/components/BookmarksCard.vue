@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ArrowRight, Bookmark, Trash2 } from 'lucide-vue-next';
-import M3DrawerShell from './M3DrawerShell.vue';
-import { useBookmarks } from '../composables/useBookmarks';
-import { useTranslation } from '../composables/useTranslation';
+import M3DrawerShell from '@/components/M3DrawerShell.vue';
+import { useBookmarks } from '@/composables/useBookmarks';
+import { useTranslation } from '@/composables/useTranslation';
 
 const { bookmarks, isBookmarksOpen, removeBookmark } = useBookmarks();
 const { inputText, translate } = useTranslation();

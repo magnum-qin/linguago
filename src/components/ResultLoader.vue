@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Sparkles, Loader2 } from 'lucide-vue-next';
 
-defineProps<{
+const { isTranslating, colorScheme = 'blue' } = defineProps<{
   isTranslating: boolean;
-  colorScheme: string;
+  colorScheme?: string;
 }>();
 </script>
 

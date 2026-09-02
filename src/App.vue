@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
-import { useTheme } from './composables/useTheme';
-import { useTranslation } from './composables/useTranslation';
-import TranslatorCard from './components/TranslatorCard.vue';
-import ResultCard from './components/ResultCard.vue';
-import BookmarksCard from './components/BookmarksCard.vue';
-import HistoryCard from './components/HistoryCard.vue';
-import SettingsOverlay from './components/SettingsOverlay.vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch, useTemplateRef } from 'vue';
+import { useTheme } from '@/composables/useTheme';
+import { useTranslation } from '@/composables/useTranslation';
+import TranslatorCard from '@/components/TranslatorCard.vue';
+import ResultCard from '@/components/ResultCard.vue';
+import BookmarksCard from '@/components/BookmarksCard.vue';
+import HistoryCard from '@/components/HistoryCard.vue';
+import SettingsOverlay from '@/components/SettingsOverlay.vue';
 import { Loader2, AlertTriangle } from 'lucide-vue-next';
 
 const { currentTheme } = useTheme();
 const { resultData, isTranslating } = useTranslation();
 
 const hasResult = computed(() => !!resultData.value || isTranslating.value);
-const mainRef = ref<HTMLElement | null>(null);
+const mainRef = useTemplateRef<HTMLElement>('mainRef');
 
 // PWA Update Banner State
 const showUpdateBanner = ref(false);

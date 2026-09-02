@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, useId } from 'vue';
 import { ArrowLeft, Check, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
-import M3ModalShell from './M3ModalShell.vue';
-import M3Select from './M3Select.vue';
-import { EDITABLE_PROVIDERS, getModelsForProvider, settings } from '../composables/useSettings';
-import { verifyTranslation } from '../utils/api';
-import { checkForPwaUpdate } from '../utils/pwa-update';
+import M3ModalShell from '@/components/M3ModalShell.vue';
+import M3Select from '@/components/M3Select.vue';
+import { EDITABLE_PROVIDERS, getModelsForProvider, settings } from '@/composables/useSettings';
+import { verifyTranslation } from '@/utils/api';
+import { checkForPwaUpdate } from '@/utils/pwa-update';
 
 const isOpen = ref(false);
 const isVerifying = ref(false);
@@ -13,6 +13,7 @@ const verifyStatus = ref<'idle' | 'loading' | 'success' | 'error'>('idle');
 const activePage = ref<'settings' | 'models'>('settings');
 const updateStatus = ref<'idle' | 'checking' | 'current' | 'updating' | 'error'>('idle');
 const newModelName = ref('');
+const modelInputId = useId();
 
 let originalSettings = {
   provider: settings.provider,
@@ -287,10 +288,10 @@ onUnmounted(() => {
         </TransitionGroup>
 
         <form class="model-add-form" @submit.prevent="addModel">
-          <label class="setting-label" for="new-model-name">添加模型 / Adicionar modelo</label>
+          <label class="setting-label" :for="modelInputId">添加模型 / Adicionar modelo</label>
           <div class="model-add-row">
             <input
-              id="new-model-name"
+              :id="modelInputId"
               v-model="newModelName"
               type="text"
               autocomplete="off"

@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
-import { useTranslation } from '../composables/useTranslation';
-import { useBookmarks } from '../composables/useBookmarks';
-import FuriganaText from './FuriganaText.vue';
-import ResultLoader from './ResultLoader.vue';
-import FeedbackModal from './FeedbackModal.vue';
-import WordResultView from './WordResultView.vue';
-import SentenceResultView from './SentenceResultView.vue';
+import { ref, onMounted, onUnmounted, watch, computed, nextTick, useTemplateRef } from 'vue';
+import { useTranslation } from '@/composables/useTranslation';
+import { useBookmarks } from '@/composables/useBookmarks';
+import FuriganaText from '@/components/FuriganaText.vue';
+import ResultLoader from '@/components/ResultLoader.vue';
+import FeedbackModal from '@/components/FeedbackModal.vue';
+import WordResultView from '@/components/WordResultView.vue';
+import SentenceResultView from '@/components/SentenceResultView.vue';
 import { Star, Flag, Volume2, Loader2, Copy, Check } from 'lucide-vue-next';
-import { settings } from '../composables/useSettings';
-import { speak } from '../utils/speech';
-import { useCopy } from '../composables/useCopy';
-import { splitTranslations, splitPhonetics } from '../utils/text-utils';
-import type { WordResponse, SentenceResponse, WordSense, LocalizedText, WordDetail } from '../types/translation';
+import { settings } from '@/composables/useSettings';
+import { speak } from '@/utils/speech';
+import { useCopy } from '@/composables/useCopy';
+import { splitTranslations, splitPhonetics } from '@/utils/text-utils';
+import type { WordResponse, SentenceResponse, WordSense, LocalizedText, WordDetail } from '@/types/translation';
 
 const { resultData, isTranslating } = useTranslation();
 const { isBookmarked, toggleBookmark } = useBookmarks();
@@ -58,7 +58,7 @@ const selectLang = (index: number, code: string) => {
   activeLang.value = code;
 };
 
-const tabContainerRef = ref<HTMLElement | null>(null);
+const tabContainerRef = useTemplateRef<HTMLElement>('tabContainerRef');
 const indicatorStyle = ref({ width: '0px', transform: 'translate3d(0,0,0)', left: '0', opacity: 0 });
 
 const updateIndicator = () => {

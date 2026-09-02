@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue';
+import { ref, watch, nextTick, onMounted, onUnmounted, computed, useTemplateRef } from 'vue';
 import { Sun, Moon, Settings, X, Languages, Bookmark, Clipboard, History, Square } from 'lucide-vue-next';
-import { useTheme } from '../composables/useTheme';
-import { useTranslation } from '../composables/useTranslation';
-import { useBookmarks } from '../composables/useBookmarks';
-import { useHistory } from '../composables/useHistory';
-import { detectSourceLanguage } from '../utils/detect-source-language';
+import { useTheme } from '@/composables/useTheme';
+import { useTranslation } from '@/composables/useTranslation';
+import { useBookmarks } from '@/composables/useBookmarks';
+import { useHistory } from '@/composables/useHistory';
+import { detectSourceLanguage } from '@/utils/detect-source-language';
 
 const { currentTheme, toggleTheme } = useTheme();
 const { inputText, sourceLangPreference, translate, stopTranslation, clear, resultData, isTranslating } =
@@ -15,7 +15,7 @@ const { isHistoryOpen } = useHistory();
 
 const hasResult = computed(() => !!resultData.value || isTranslating.value);
 
-const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const textareaRef = useTemplateRef<HTMLTextAreaElement>('textareaRef');
 type SourceLanguage = 'zh' | 'ja' | 'en' | 'pt-BR';
 
 const lastDetectedSourceLanguage = ref<SourceLanguage | 'hidden'>('hidden');

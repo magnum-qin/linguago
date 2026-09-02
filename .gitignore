@@ -10,6 +10,7 @@ output
 *.sqlite-shm
 *.sqlite-wal
 *.log
+*.tsbuildinfo
 
 *.zip
 *.tar.gz

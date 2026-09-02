@@ -7,14 +7,14 @@ const highlightCache = new Map<string, Array<{ text: string; isHighlight: boolea
 <script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps<{
+const { text, highlight } = defineProps<{
   text: string;
   highlight?: string | string[];
 }>();
 
 // Parse text like "漢[かん]字[じ]" or "{漢字|かんじ}" into array of segments
 const parsedSegments = computed(() => {
-  const input = props.text;
+  const input = text;
   if (!input) return [];
 
   if (parseCache.has(input)) {
@@ -62,7 +62,7 @@ const parsedSegments = computed(() => {
 });
 
 const highlightTerms = computed(() => {
-  const raw = Array.isArray(props.highlight) ? props.highlight : [props.highlight || ''];
+  const raw = Array.isArray(highlight) ? highlight : [highlight || ''];
   const seen = new Set<string>();
   const terms: string[] = [];
 

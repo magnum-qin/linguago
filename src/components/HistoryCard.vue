@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ArrowRight, History, Trash2, X } from 'lucide-vue-next';
-import M3DrawerShell from './M3DrawerShell.vue';
-import { useHistory } from '../composables/useHistory';
-import { useTranslation } from '../composables/useTranslation';
+import M3DrawerShell from '@/components/M3DrawerShell.vue';
+import { useHistory } from '@/composables/useHistory';
+import { useTranslation } from '@/composables/useTranslation';
 
 const { historyItems, isHistoryOpen, removeHistory, clearHistory } = useHistory();
 const { inputText, translate } = useTranslation();

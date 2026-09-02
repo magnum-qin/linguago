@@ -41,24 +41,6 @@
     --m3-on-tertiary-container: #3e001d;
     --m3-outline: #8b95a5;
     --m3-outline-variant: #c1c9d6;
-
-    /* Base theme variables */
-    --bg: #ffffff;
-    --ink: #171412;
-    --muted: #766c63;
-    --line: rgba(23, 20, 18, 0.12);
-    --paper: rgba(255, 255, 255, 0.94);
-    --paper-strong: #ffffff;
-    --field: #f5f5f2;
-    --accent: #c95c3a;
-    --accent-deep: #96391f;
-    --leaf: #247060;
-    --glow: rgba(36, 112, 96, 0.2);
-    --shadow: 0 24px 70px rgba(24, 22, 20, 0.1);
-    --button-h: 62px;
-    --button-h-compact: 58px;
-    --button-radius: 22px;
-    --button-radius-compact: 18px;
   }
 
   :root[data-theme='light'] {
@@ -82,19 +64,6 @@
     --m3-on-tertiary-container: #ffd9e2;
     --m3-outline: #6e7682;
     --m3-outline-variant: #3c424b;
-
-    --bg: #060606;
-    --ink: #f7f4ee;
-    --muted: #b8b0a6;
-    --line: rgba(247, 244, 238, 0.14);
-    --paper: rgba(24, 24, 22, 0.94);
-    --paper-strong: #111110;
-    --field: rgba(255, 255, 255, 0.08);
-    --accent: #e06f49;
-    --accent-deep: #ff9a73;
-    --leaf: #7cc7b6;
-    --glow: rgba(124, 199, 182, 0.22);
-    --shadow: 0 26px 80px rgba(0, 0, 0, 0.34);
   }
 
   /* --- Rose Theme --- */

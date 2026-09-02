@@ -8,28 +8,28 @@ import {
   DialogContent
 } from 'radix-vue';
 
-const props = withDefaults(
-  defineProps<{
-    modelValue: boolean;
-    title: string;
-    titleId: string;
-    closeLabel?: string;
-    maxWidth?: number | string;
-    fixedHeight?: boolean;
-  }>(),
-  {
-    closeLabel: '关闭 / Fechar',
-    maxWidth: 420,
-    fixedHeight: false
-  }
-);
+const {
+  modelValue,
+  title,
+  titleId,
+  closeLabel = '关闭 / Fechar',
+  maxWidth = 420,
+  fixedHeight = false
+} = defineProps<{
+  modelValue: boolean;
+  title: string;
+  titleId: string;
+  closeLabel?: string;
+  maxWidth?: number | string;
+  fixedHeight?: boolean;
+}>();
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void;
 }>();
 
 const slots = useSlots();
-const contentClasses = computed(() => ['m3-dialog-content', props.fixedHeight ? 'm3-dialog-content--fixed' : '']);
+const contentClasses = computed(() => ['m3-dialog-content', fixedHeight ? 'm3-dialog-content--fixed' : '']);
 
 const requestClose = () => emit('update:modelValue', false);
 </script>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 import {
   SelectRoot,
   SelectTrigger,
@@ -17,7 +17,12 @@ interface SelectOption {
   value: string;
 }
 
-const props = defineProps<{
+const {
+  modelValue,
+  items,
+  id,
+  disabled = false
+} = defineProps<{
   modelValue: string;
   items: Array<string | SelectOption>;
   id?: string;
@@ -28,8 +33,11 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void;
 }>();
 
+const autoId = useId();
+const resolvedId = computed(() => id || autoId);
+
 const normalizedOptions = computed(() => {
-  return props.items.map((item) => {
+  return items.map((item) => {
     if (typeof item === 'string') {
       return { label: item, value: item };
     }
@@ -37,15 +45,14 @@ const normalizedOptions = computed(() => {
   });
 });
 const currentDisplayLabel = computed(() => {
-  return normalizedOptions.value.find((o) => o.value === props.modelValue)?.label || props.modelValue;
+  return normalizedOptions.value.find((o) => o.value === modelValue)?.label || modelValue;
 });
 </script>
 
 <template>
   <div class="m3-select-wrapper relative w-full">
     <input
-      v-if="id"
-      :id="id"
+      :id="resolvedId"
       type="hidden"
       :value="currentDisplayLabel"
     />
@@ -55,6 +62,7 @@ const currentDisplayLabel = computed(() => {
       @update:model-value="emit('update:modelValue', $event)"
     >
       <SelectTrigger
+        :id="`${resolvedId}-trigger`"
         class="m3-native-select w-full flex items-center justify-between px-4 py-3.5 rounded-2xl bg-m3-surface border border-m3-outline-variant/30 text-m3-on-surface font-medium text-[0.92rem] hover:bg-m3-surface-container-high focus:outline-none focus:ring-2 focus:ring-m3-primary transition-colors cursor-pointer select-none text-left"
       >
         <SelectValue class="truncate text-m3-on-surface">

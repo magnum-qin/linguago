@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Volume2, Copy, Check } from 'lucide-vue-next';
-import FuriganaText from './FuriganaText.vue';
-import { speak } from '../utils/speech';
-import { useCopy } from '../composables/useCopy';
+import FuriganaText from '@/components/FuriganaText.vue';
+import { speak } from '@/utils/speech';
+import { useCopy } from '@/composables/useCopy';
 
-import type { TranslateResponse } from '../types/translation';
+import type { TranslateResponse } from '@/types/translation';
 
-const props = defineProps<{
+const { resultData, activeLang } = defineProps<{
   resultData: TranslateResponse | string | null;
   activeLang: string;
 }>();
@@ -15,9 +15,9 @@ const props = defineProps<{
 const { copy, isCopied } = useCopy();
 
 const currentExplanation = computed(() => {
-  if (!props.resultData || typeof props.resultData === 'string') return '';
-  if (props.resultData.type !== 'sentence') return '';
-  return props.resultData.explanations?.[props.activeLang] || props.resultData.explanation || '';
+  if (!resultData || typeof resultData === 'string') return '';
+  if (resultData.type !== 'sentence') return '';
+  return resultData.explanations?.[activeLang] || resultData.explanation || '';
 });
 </script>
 

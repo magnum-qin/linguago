@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, ref, watch, useTemplateRef } from 'vue';
 import { ArrowRight } from 'lucide-vue-next';
 
-const props = withDefaults(
-  defineProps<{
-    modelValue: boolean;
-    title: string;
-    titleId: string;
-    closeLabel?: string;
-  }>(),
-  { closeLabel: '关闭 / Fechar' }
-);
+const {
+  modelValue,
+  title,
+  titleId,
+  closeLabel = '关闭 / Fechar'
+} = defineProps<{
+  modelValue: boolean;
+  title: string;
+  titleId: string;
+  closeLabel?: string;
+}>();
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void;
 }>();
 
-const drawer = ref<HTMLElement | null>(null);
+const drawer = useTemplateRef<HTMLElement>('drawer');
 let previousFocus: HTMLElement | null = null;
 let previousBodyOverflow = '';
 let previousRootOverflow = '';
@@ -38,7 +40,7 @@ const focusableElements = () =>
     : [];
 
 const handleKeydown = (event: KeyboardEvent) => {
-  if (!props.modelValue) return;
+  if (!modelValue) return;
   if (event.key === 'Escape') {
     event.preventDefault();
     close();
@@ -60,7 +62,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 watch(
-  () => props.modelValue,
+  () => modelValue,
   async (open) => {
     if (open) {
       previousFocus = document.activeElement as HTMLElement | null;

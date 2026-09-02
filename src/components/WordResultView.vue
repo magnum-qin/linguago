@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { Volume2, Copy, Check } from 'lucide-vue-next';
 import FuriganaText from './FuriganaText.vue';
-import { speak } from '../utils/speech';
-import { useCopy } from '../composables/useCopy';
-import { useDictionaryEntry } from '../composables/useDictionaryEntry';
-import { splitTranslations } from '../utils/text-utils';
-import type { TranslateResponse } from '../types/translation';
+import { speak } from '@/utils/speech';
+import { useCopy } from '@/composables/useCopy';
+import { useDictionaryEntry } from '@/composables/useDictionaryEntry';
+import { splitTranslations } from '@/utils/text-utils';
+import type { TranslateResponse } from '@/types/translation';
 
-const props = defineProps<{
+const {
+  resultData,
+  activeLang,
+  langs = []
+} = defineProps<{
   resultData: TranslateResponse | string | null;
   activeLang: string;
   langs?: Array<{ code: string; label: string }>;
@@ -37,8 +41,8 @@ const {
   shouldShowExampleTranslation,
   senseExampleHighlightTerms
 } = useDictionaryEntry(
-  () => props.resultData,
-  () => props.activeLang
+  () => resultData,
+  () => activeLang
 );
 
 const splitDefinitions = (text: string) => {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { AlertTriangle, Check, Loader2 } from 'lucide-vue-next';
-import M3ModalShell from './M3ModalShell.vue';
-import M3Select from './M3Select.vue';
-import { reportTranslationError } from '../utils/api';
+import M3ModalShell from '@/components/M3ModalShell.vue';
+import M3Select from '@/components/M3Select.vue';
+import { reportTranslationError } from '@/utils/api';
 
-const props = defineProps<{
+const { isOpen, term, activeLang } = defineProps<{
   isOpen: boolean;
   term: string;
   activeLang: string;
@@ -23,23 +23,26 @@ const reportError = ref('');
 const reportOptions = [
   { value: '', label: '快速一键报告 / Relatório rápido' },
   { value: '拼写错误', label: '拼写错误 / Erro ortográfico' },
-  { value: '释义不准确', label: '释义不准确 / Definição imprecisa' },
-  { value: '语境不符', label: '语境不符 / Contexto inadequado' },
-  { value: '其他', label: '其他 / Outros' }
+  { value: '语法错误', label: '语法错误 / Erro gramatical' },
+  { value: '语境不符', label: '语境不符 / Contexto incorreto' },
+  { value: '发音不准确', label: '发音不准确 / Pronúncia imprecisa' },
+  { value: '其他问题', label: '其他问题 / Outro' }
 ];
 
 const close = () => {
-  if (!isReporting.value) emit('close');
+  emit('close');
 };
 
 const submitReport = async () => {
-  if (!props.term || isReporting.value) return;
+  if (isReporting.value || isReported.value) return;
+
   isReporting.value = true;
   reportError.value = '';
+
   try {
     await reportTranslationError({
-      term: props.term,
-      target_lang: props.activeLang,
+      term,
+      target_lang: activeLang,
       reason: reportReason.value
     });
     isReported.value = true;
@@ -52,7 +55,7 @@ const submitReport = async () => {
 };
 
 watch(
-  () => props.isOpen,
+  () => isOpen,
   (open) => {
     if (!open) {
       reportReason.value = '';
