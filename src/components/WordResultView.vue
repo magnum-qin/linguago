@@ -93,15 +93,14 @@ const {
           </div>
 
           <div v-for="sense in group.senses" :key="`${group.key}-${sense.sense_order}-${sense.gloss_key}`" class="py-5">
-            <div class="flex gap-4 items-start">
+            <div class="flex gap-3.5 items-start">
               <span
-                class="flex items-center justify-center w-[30px] h-[30px] rounded-[9px] bg-m3-primary/10 text-m3-primary text-[0.95rem] font-black shrink-0 mt-1.5"
+                class="flex items-center justify-center w-7 h-7 rounded-lg bg-m3-primary/10 text-m3-primary text-[0.88rem] font-black shrink-0"
                 >{{ sense.sense_order }}</span
               >
-              <div class="flex flex-col gap-2 w-full pt-0.5">
-                <div class="flex flex-wrap items-center gap-2">
+              <div class="flex flex-col gap-1.5 w-full">
+                <div v-if="sense.part_of_speech" class="flex flex-wrap items-center gap-2">
                   <span
-                    v-if="sense.part_of_speech"
                     class="px-2 py-0.5 rounded-[6px] bg-m3-surface-variant/60 text-m3-on-surface-variant text-[0.65rem] font-bold uppercase tracking-widest"
                     >{{ sense.part_of_speech }}</span
                   >

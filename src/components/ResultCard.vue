@@ -416,19 +416,19 @@ onUnmounted(() => {
 
 .slide-left-enter-from {
   opacity: 0;
-  transform: translateX(12px) scale(0.99);
+  transform: translateX(12px);
 }
 .slide-left-leave-to {
   opacity: 0;
-  transform: translateX(-12px) scale(0.99);
+  transform: translateX(-12px);
 }
 
 .slide-right-enter-from {
   opacity: 0;
-  transform: translateX(-12px) scale(0.99);
+  transform: translateX(-12px);
 }
 .slide-right-leave-to {
   opacity: 0;
-  transform: translateX(12px) scale(0.99);
+  transform: translateX(12px);
 }
 </style>
