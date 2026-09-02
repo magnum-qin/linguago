@@ -143,15 +143,14 @@ const ENGLISH_WORDS = new Set([
 const PORTUGUESE_SUFFIX = /(?:ções?|mente|dades?|ando|endo|indo|ados?|adas?|idos?|idas?|eiros?|eiras?|osos?|osas?)$/u;
 const ENGLISH_SUFFIX = /(?:ing|ed|tion|tions|ness|less|ous|ment|ments)$/u;
 
+export type DetectedSourceLanguage = 'zh' | 'ja' | 'en' | 'pt-BR' | 'hidden';
+
 /**
  * Lightweight UI-language inference. The server remains authoritative after a
  * request; this detector exists so users can see and override the source
  * language before searching.
- *
- * @param {string} text
- * @returns {'zh' | 'ja' | 'en' | 'pt-BR' | 'hidden'}
  */
-export function detectSourceLanguage(text) {
+export function detectSourceLanguage(text: string): DetectedSourceLanguage {
   const trimmed = String(text || '').trim();
   if (!trimmed) return 'hidden';
   if (/[぀-ヿ]/u.test(trimmed)) return 'ja';

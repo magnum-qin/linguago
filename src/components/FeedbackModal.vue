@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue';
 import { AlertTriangle, Check, ChevronDown, Loader2 } from 'lucide-vue-next';
 import M3ModalShell from './M3ModalShell.vue';
-import { reportTranslationError } from '../utils/api.js';
+import { reportTranslationError } from '../utils/api';
 
 const props = defineProps<{
   isOpen: boolean;

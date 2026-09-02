@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ArrowLeft, Check, ChevronDown, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
 import M3ModalShell from './M3ModalShell.vue';
 import { EDITABLE_PROVIDERS, getModelsForProvider, settings } from '../composables/useSettings';
-import { verifyTranslation } from '../utils/api.js';
+import { verifyTranslation } from '../utils/api';
 import { checkForPwaUpdate } from '../utils/pwa-update';
 
 const isOpen = ref(false);

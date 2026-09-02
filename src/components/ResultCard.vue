@@ -11,6 +11,7 @@ import { Star, Flag, Volume2, Loader2, Copy, Check } from 'lucide-vue-next';
 import { settings } from '../composables/useSettings';
 import { speak } from '../utils/speech';
 import { useCopy } from '../composables/useCopy';
+import type { WordResponse, SentenceResponse, WordSense, LocalizedText, WordDetail } from '../types/translation';
 
 const { resultData, isTranslating } = useTranslation();
 const { isBookmarked, toggleBookmark } = useBookmarks();
@@ -99,29 +100,35 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateIndicator);
 });
 
-const currentTranslation = computed(() => {
-  if (!resultData.value || !resultData.value.translations) return null;
+const wordResult = computed<WordResponse | null>(() => {
+  if (resultData.value && typeof resultData.value === 'object' && resultData.value.type === 'word') {
+    return resultData.value as WordResponse;
+  }
+  return null;
+});
+
+const currentTranslation = computed<LocalizedText | null>(() => {
+  if (!resultData.value || typeof resultData.value === 'string' || !resultData.value.translations) return null;
   return resultData.value.translations[activeLang.value] || null;
 });
 
-const currentWordDetail = computed(() => {
-  if (!resultData.value || !resultData.value.word_details) return null;
-  return resultData.value.word_details[activeLang.value] || null;
+const currentWordDetail = computed<WordDetail | null>(() => {
+  return wordResult.value?.word_details?.[activeLang.value] || null;
 });
 
-const currentSenses = computed(() => {
-  if (!resultData.value) return [];
-  const groupedSenses = Array.isArray(resultData.value.pronunciation_groups)
-    ? resultData.value.pronunciation_groups.flatMap((group: any) => (Array.isArray(group.senses) ? group.senses : []))
+const currentSenses = computed<WordSense[]>(() => {
+  if (!wordResult.value) return [];
+  const groupedSenses = Array.isArray(wordResult.value.pronunciation_groups)
+    ? wordResult.value.pronunciation_groups.flatMap((group) => (Array.isArray(group.senses) ? group.senses : []))
     : [];
-  const source = groupedSenses.length > 0 ? groupedSenses : resultData.value.senses || [];
+  const source = groupedSenses.length > 0 ? groupedSenses : wordResult.value.senses || [];
   return source.filter(
-    (s: any) => s?.localizations?.[activeLang.value]?.definition || s?.definitions?.[activeLang.value]
+    (s: WordSense) => s?.localizations?.[activeLang.value]?.definition || s?.definitions?.[activeLang.value]
   );
 });
 
 const hasDictionarySenses = computed(() => {
-  return resultData.value?.provider === 'dictionary' && currentSenses.value.length > 0;
+  return resultData.value && typeof resultData.value === 'object' && resultData.value.provider === 'dictionary' && currentSenses.value.length > 0;
 });
 
 const headwordPhonetic = computed(() => {
@@ -158,7 +165,7 @@ const copyAllResult = () => {
     lines.push(currentTranslation.value.text);
   }
   if (currentSenses.value.length > 0) {
-    currentSenses.value.forEach((s: any) => {
+    currentSenses.value.forEach((s: WordSense) => {
       const def = s?.localizations?.[activeLang.value]?.definition || s?.definitions?.[activeLang.value] || '';
       const term = s?.localizations?.[activeLang.value]?.term || '';
       if (term && def) lines.push(`${s.sense_order}. ${term}: ${def}`);

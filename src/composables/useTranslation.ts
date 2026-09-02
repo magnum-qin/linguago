@@ -1,10 +1,11 @@
 import { ref, shallowRef } from 'vue';
-import { openTranslationStream } from '../utils/api.js';
+import { openTranslationStream } from '../utils/api';
+import type { TranslateResponse } from '../types/translation';
 import { settings } from './useSettings';
 import { useHistory } from './useHistory';
 
 const inputText = ref('');
-const resultData = shallowRef<any>(null);
+const resultData = shallowRef<TranslateResponse | string | null>(null);
 const isTranslating = ref(false);
 const sourceLangPreference = ref<'auto' | 'zh' | 'ja' | 'en' | 'pt-BR'>('auto');
 let activeController: AbortController | null = null;

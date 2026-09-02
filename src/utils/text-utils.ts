@@ -1,10 +1,10 @@
-export function stripHtml(html) {
+export function stripHtml(html: string): string {
   const template = document.createElement('template');
   template.innerHTML = html || '';
   return template.content.textContent || '';
 }
 
-export function escapeHtml(value) {
+export function escapeHtml(value: string | number | null | undefined): string {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -13,10 +13,10 @@ export function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-export function escapeAttribute(value) {
+export function escapeAttribute(value: string | number | null | undefined): string {
   return escapeHtml(value).replaceAll('`', '&#96;');
 }
 
-export function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function escapeRegExp(value: string | number | null | undefined): string {
+  return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

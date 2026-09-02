@@ -5,7 +5,7 @@ import { useTheme } from '../composables/useTheme';
 import { useTranslation } from '../composables/useTranslation';
 import { useBookmarks } from '../composables/useBookmarks';
 import { useHistory } from '../composables/useHistory';
-import { detectSourceLanguage } from '../utils/detect-source-language.js';
+import { detectSourceLanguage } from '../utils/detect-source-language';
 
 const { currentTheme, toggleTheme } = useTheme();
 const { inputText, sourceLangPreference, translate, stopTranslation, clear, resultData, isTranslating } =

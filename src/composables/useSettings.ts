@@ -1,5 +1,5 @@
 import { reactive, watch } from 'vue';
-import { fetchRemoteSettings, fetchRemoteModels, saveRemoteSettings } from '../utils/api.js';
+import { fetchRemoteSettings, fetchRemoteModels, saveRemoteSettings } from '../utils/api';
 
 export const HISTORY_KEY = 'linguago-history-v5';
 export const SETTINGS_KEY = 'linguago-settings-v1';

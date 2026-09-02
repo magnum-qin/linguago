@@ -1,4 +1,4 @@
-import { detectSourceLanguage } from '../src/utils/detect-source-language.js';
+import { detectSourceLanguage } from '../src/utils/detect-source-language.ts';
 
 const cases = [
   ['', 'hidden'],

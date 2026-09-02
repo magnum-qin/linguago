@@ -5,15 +5,17 @@ import FuriganaText from './FuriganaText.vue';
 import { speak } from '../utils/speech';
 import { useCopy } from '../composables/useCopy';
 
+import type { TranslateResponse } from '../types/translation';
+
 const props = defineProps<{
-  resultData: any;
+  resultData: TranslateResponse | string | null;
   activeLang: string;
 }>();
 
 const { copy, isCopied } = useCopy();
 
 const currentExplanation = computed(() => {
-  if (!props.resultData) return '';
+  if (!props.resultData || typeof props.resultData === 'string') return '';
   if (props.resultData.type !== 'sentence') return '';
   return props.resultData.explanations?.[props.activeLang] || props.resultData.explanation || '';
 });

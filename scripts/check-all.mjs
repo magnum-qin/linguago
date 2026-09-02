@@ -14,9 +14,6 @@ const checks = [
     args: ['scripts/sw-cache-check.mjs']
   },
   ...[
-    'src/utils/api.js',
-    'src/utils/text-utils.js',
-    'src/utils/pronunciation.js',
     'public/sw.js',
     'scripts/api-smoke.mjs',
     'scripts/stream-benchmark.mjs',

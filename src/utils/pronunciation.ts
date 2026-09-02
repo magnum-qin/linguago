@@ -1,6 +1,6 @@
-import { escapeHtml, escapeRegExp } from './text-utils.js';
+import { escapeHtml, escapeRegExp } from './text-utils';
 
-export function formatPronunciationText(text, lang, isAlreadyEscaped = false) {
+export function formatPronunciationText(text: string, lang: string, isAlreadyEscaped = false): string {
   if (lang === 'ja') {
     return formatJapaneseFurigana(text, isAlreadyEscaped);
   }
@@ -10,14 +10,14 @@ export function formatPronunciationText(text, lang, isAlreadyEscaped = false) {
   return isAlreadyEscaped ? text : escapeHtml(text);
 }
 
-function formatJapaneseFurigana(text, isAlreadyEscaped = false) {
+function formatJapaneseFurigana(text: string, isAlreadyEscaped = false): string {
   let escaped = isAlreadyEscaped ? text : escapeHtml(text);
 
-  escaped = escaped.replace(/\{([^|{}]+)\|([^|{}]+)\}/g, (match, base, reading) => {
+  escaped = escaped.replace(/\{([^|{}]+)\|([^|{}]+)\}/g, (_match, base, reading) => {
     return `<ruby>${base}<rt>${reading}</rt></ruby>`;
   });
 
-  const readings = {
+  const readings: Record<string, string> = {
     観光スポット: 'かんこうスポット',
     観光: 'かんこう',
     景色: 'けしき',
@@ -39,7 +39,6 @@ function formatJapaneseFurigana(text, isAlreadyEscaped = false) {
     何: 'なに',
     時間: 'じかん',
     朝: 'あさ',
-    昼: 'ひる',
     夜: 'よる',
     勉強: 'べんきょう',
     練習: 'れんしゅう',
@@ -81,7 +80,7 @@ function formatJapaneseFurigana(text, isAlreadyEscaped = false) {
   if (!keys.length) return escaped;
 
   const pattern = new RegExp(`(<ruby[\\s\\S]*?<\\/ruby>)|(<[^>]+>)|(${keys.map(escapeRegExp).join('|')})`, 'g');
-  return escaped.replace(pattern, (match, rubyBlock, tag, word) => {
+  return escaped.replace(pattern, (_match, rubyBlock, tag, word) => {
     if (rubyBlock) return rubyBlock;
     if (tag) return tag;
     const reading = readings[word];
@@ -89,10 +88,10 @@ function formatJapaneseFurigana(text, isAlreadyEscaped = false) {
   });
 }
 
-function formatEnglishKeywordPronunciation(text, isAlreadyEscaped = false) {
+function formatEnglishKeywordPronunciation(text: string, isAlreadyEscaped = false): string {
   let html = isAlreadyEscaped ? text : escapeHtml(text);
 
-  html = html.replace(/\{([^|{}]+)\|([^|{}]+)\}/g, (match, word, pronunciation) => {
+  html = html.replace(/\{([^|{}]+)\|([^|{}]+)\}/g, (_match, word, pronunciation) => {
     return `<span class="keyword-pronunciation">${word}<small>${pronunciation}</small></span>`;
   });
 
