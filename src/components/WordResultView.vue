@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Volume2, Copy, Check } from 'lucide-vue-next';
 import FuriganaText from './FuriganaText.vue';
 import { speak } from '../utils/speech';
 import { useCopy } from '../composables/useCopy';
-import type { TranslateResponse, WordResponse, WordSense, WordExample, WordDetail } from '../types/translation';
+import { useDictionaryEntry } from '../composables/useDictionaryEntry';
+import type { TranslateResponse } from '../types/translation';
 
 const props = defineProps<{
   resultData: TranslateResponse | string | null;
@@ -14,320 +14,31 @@ const props = defineProps<{
 
 const { copy, isCopied } = useCopy();
 
-const wordResult = computed<WordResponse | null>(() => {
-  if (props.resultData && typeof props.resultData === 'object' && props.resultData.type === 'word') {
-    return props.resultData as WordResponse;
-  }
-  return null;
-});
-
-const sourceLanguageCode = computed(() => {
-  return wordResult.value?.detected_source_lang || 'en';
-});
-
-const currentWord = computed(() => {
-  if (currentWordDetail.value?.word) return currentWordDetail.value.word;
-  if (typeof props.resultData === 'string') return props.resultData;
-  if (wordResult.value?.translations?.[props.activeLang]?.text)
-    return wordResult.value.translations[props.activeLang]!.text;
-  return '';
-});
-
-const currentWordDetail = computed<WordDetail | null>(() => {
-  return wordResult.value?.word_details?.[props.activeLang] || null;
-});
-
-const currentSenses = computed<WordSense[]>(() => {
-  if (!wordResult.value) return [];
-  const groupedSenses = Array.isArray(wordResult.value.pronunciation_groups)
-    ? wordResult.value.pronunciation_groups.flatMap((group) => (Array.isArray(group.senses) ? group.senses : []))
-    : [];
-  const source = groupedSenses.length > 0 ? groupedSenses : wordResult.value.senses || [];
-  return source.filter((s: WordSense) => senseDefinition(s, props.activeLang));
-});
-
-const currentSenseGroups = computed(() => {
-  const groups: Array<{ key: string; label: string; system: string; senses: WordSense[] }> = [];
-  const index = new Map<string, { key: string; label: string; system: string; senses: WordSense[] }>();
-  const sourceLang = wordResult.value?.detected_source_lang || '';
-
-  if (wordResult.value && Array.isArray(wordResult.value.pronunciation_groups)) {
-    let groupedSenseCount = 0;
-    for (const group of wordResult.value.pronunciation_groups) {
-      const senses = Array.isArray(group.senses)
-        ? group.senses.filter((sense: WordSense) => senseDefinition(sense, props.activeLang))
-        : [];
-      if (senses.length === 0) continue;
-      if (group.lang !== sourceLang || !group.reading) continue;
-      groupedSenseCount += senses.length;
-      groups.push({
-        key: group.reading_key || group.reading || `group-${groups.length + 1}`,
-        label: group.reading || '',
-        system: group.reading_system || '',
-        senses
-      });
-    }
-    if (groups.length > 0 && groupedSenseCount === currentSenses.value.length) return groups;
-    groups.length = 0;
-  }
-
-  for (const sense of currentSenses.value) {
-    const reading = senseReading(sense, props.activeLang);
-    const key = reading.key || '__ungrouped';
-    let group = index.get(key);
-    if (!group) {
-      group = { key, label: reading.label, system: reading.system, senses: [] };
-      index.set(key, group);
-      groups.push(group);
-    }
-    group.senses.push(sense);
-  }
-
-  return groups;
-});
-
-const hasDictionarySenses = computed(() => {
-  return wordResult.value?.provider === 'dictionary' && currentSenses.value.length > 0;
-});
-
-const showSenseGroups = computed(() => {
-  return currentSenseGroups.value.some((group) => group.label) && currentSenseGroups.value.length > 1;
-});
-
-const currentExamples = computed<WordExample[]>(() => {
-  if (!wordResult.value || !wordResult.value.examples) return [];
-  return wordResult.value.examples.filter((e: WordExample) => exampleTranslation(e, props.activeLang));
-});
-
-const senseDefinition = (sense: WordSense, lang: string): string => {
-  return sense?.localizations?.[lang]?.definition || sense?.definitions?.[lang] || '';
-};
-
-const senseTerm = (sense: WordSense, lang: string): string => {
-  return sense?.localizations?.[lang]?.term || '';
-};
-
-const shouldShowSenseTerm = (sense: WordSense): boolean => {
-  const term = senseTerm(sense, props.activeLang);
-  if (!term) return false;
-  const current = currentWord.value;
-  if (!current) return true;
-  const normTerm = stripInlineAnnotations(term).trim().toLowerCase();
-  const normCurrent = stripInlineAnnotations(current).trim().toLowerCase();
-  return normTerm !== normCurrent;
-};
-
-const stripInlineAnnotations = (value: string) => {
-  return String(value || '').replace(/\{([^|{}]+)\|([^|{}]+)\}/g, '$1');
-};
-
-const ENGLISH_HIGHLIGHT_STOPWORDS = new Set([
-  'a',
-  'an',
-  'and',
-  'are',
-  'as',
-  'be',
-  'by',
-  'for',
-  'from',
-  'in',
-  'is',
-  'of',
-  'on',
-  'or',
-  'the',
-  'to',
-  'with'
-]);
-
-const IRREGULAR_ENGLISH_HIGHLIGHT_FORMS: Record<string, string[]> = {
-  be: ['am', 'is', 'are', 'was', 'were', 'been', 'being'],
-  become: ['became', 'becomes', 'becoming'],
-  begin: ['began', 'begun', 'begins', 'beginning'],
-  break: ['broke', 'broken', 'breaks', 'breaking'],
-  bring: ['brought', 'brings', 'bringing'],
-  buy: ['bought', 'buys', 'buying'],
-  choose: ['chose', 'chosen', 'chooses', 'choosing'],
-  come: ['came', 'comes', 'coming'],
-  do: ['did', 'done', 'does', 'doing'],
-  drink: ['drank', 'drunk', 'drinks', 'drinking'],
-  eat: ['ate', 'eaten', 'eats', 'eating'],
-  fall: ['fell', 'fallen', 'falls', 'falling'],
-  feel: ['felt', 'feels', 'feeling'],
-  find: ['found', 'finds', 'finding'],
-  get: ['got', 'gotten', 'gets', 'getting'],
-  give: ['gave', 'given', 'gives', 'giving'],
-  go: ['went', 'gone', 'goes', 'going'],
-  have: ['had', 'has', 'having'],
-  keep: ['kept', 'keeps', 'keeping'],
-  know: ['knew', 'known', 'knows', 'knowing'],
-  leave: ['left', 'leaves', 'leaving'],
-  make: ['made', 'makes', 'making'],
-  meet: ['met', 'meets', 'meeting'],
-  run: ['ran', 'runs', 'running'],
-  say: ['said', 'says', 'saying'],
-  see: ['saw', 'seen', 'sees', 'seeing'],
-  sell: ['sold', 'sells', 'selling'],
-  send: ['sent', 'sends', 'sending'],
-  take: ['took', 'taken', 'takes', 'taking'],
-  tell: ['told', 'tells', 'telling'],
-  think: ['thought', 'thinks', 'thinking'],
-  win: ['won', 'wins', 'winning'],
-  write: ['wrote', 'written', 'writes', 'writing']
-};
-
-const isEnglishWord = (value: string) => /^[A-Za-z][A-Za-z'’-]*$/u.test(value);
-
-const regularEnglishForms = (term: string) => {
-  const lower = term.toLocaleLowerCase();
-  if (!isEnglishWord(term) || lower.length < 3 || ENGLISH_HIGHLIGHT_STOPWORDS.has(lower)) return [];
-  const forms = new Set<string>();
-
-  forms.add(`${lower}s`);
-  if (lower.endsWith('e')) {
-    forms.add(`${lower}d`);
-    forms.add(`${lower.slice(0, -1)}ing`);
-  } else if (/^[a-z]+[^aeiou][aeiou][^aeiouwxy]$/u.test(lower)) {
-    const last = lower.at(-1) || '';
-    forms.add(`${lower}${last}ed`);
-    forms.add(`${lower}${last}ing`);
-  } else {
-    forms.add(`${lower}ed`);
-    forms.add(`${lower}ing`);
-  }
-
-  if (lower.endsWith('y') && !/[aeiou]y$/u.test(lower)) {
-    forms.add(`${lower.slice(0, -1)}ies`);
-    forms.add(`${lower.slice(0, -1)}ied`);
-  }
-
-  return [...forms];
-};
-
-const expandedHighlightForms = (term: string) => {
-  const lower = term.toLocaleLowerCase();
-  return [...(IRREGULAR_ENGLISH_HIGHLIGHT_FORMS[lower] || []), ...regularEnglishForms(term)];
-};
-
-const splitHighlightTerms = (...values: Array<unknown>) => {
-  const terms: string[] = [];
-  const seen = new Set<string>();
-
-  const addTerm = (term: string) => {
-    if (!term) return;
-    if (/^[\p{Script=Latin}\p{N}_'’-]$/u.test(term)) return;
-    const key = term.toLocaleLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    terms.push(term);
-  };
-
-  const addTermWithForms = (term: string) => {
-    addTerm(term);
-    for (const form of expandedHighlightForms(term)) {
-      addTerm(form);
-    }
-  };
-
-  for (const value of values) {
-    const cleaned = stripInlineAnnotations(String(value || ''));
-    for (const rawTerm of cleaned.split(/\s*(?:[;；,，、/]|(?:\bor\b)|(?:\band\b))\s*/giu)) {
-      const term = rawTerm.trim();
-      if (!term) continue;
-      addTermWithForms(term);
-      for (const word of term.split(/\s+/u)) {
-        const cleanWord = word.trim();
-        if (!isEnglishWord(cleanWord)) continue;
-        if (ENGLISH_HIGHLIGHT_STOPWORDS.has(cleanWord.toLocaleLowerCase())) continue;
-        addTermWithForms(cleanWord);
-      }
-    }
-  }
-
-  return terms;
-};
-
-const currentExampleHighlightTerms = computed(() => {
-  const currentTranslationText = wordResult.value?.translations?.[props.activeLang]?.text;
-  return splitHighlightTerms(currentWord.value, currentTranslationText);
-});
-
-const senseExampleHighlightTerms = (sense: WordSense): string[] => {
-  const sourceLang = wordResult.value?.detected_source_lang || '';
-  const currentTranslationText = wordResult.value?.translations?.[props.activeLang]?.text;
-  return splitHighlightTerms(
-    currentWord.value,
-    currentTranslationText,
-    senseTerm(sense, props.activeLang),
-    sourceLang ? senseTerm(sense, sourceLang) : ''
-  );
-};
-
-const senseReading = (sense: WordSense, lang: string) => {
-  const localization = sense?.localizations?.[lang];
-  const group = sense?.pronunciation_group;
-  const label = localization?.reading || localization?.pronunciation || (group && group.lang === lang ? group.reading : '') || '';
-  const key = (group && group.lang === lang ? group.reading_key : '') || label.toLocaleLowerCase();
-  const system =
-    localization?.reading_system ||
-    localization?.pronunciation_system ||
-    (group && group.lang === lang ? group.reading_system : '') ||
-    '';
-  return { label, key, system };
-};
-
-const sensePronunciation = (sense: WordSense, lang: string) => {
-  const localization = sense?.localizations?.[lang];
-  const label = localization?.pronunciation || localization?.reading || '';
-  const system = localization?.pronunciation_system || localization?.reading_system || '';
-  return { label, system };
-};
-
-const senseKey = (sense: WordSense): string => {
-  return `${sense?.sense_order || ''}:${sense?.gloss_key || ''}`;
-};
-
-const formatSenseCopyText = (sense: WordSense): string => {
-  const term = senseTerm(sense, props.activeLang);
-  const definition = senseDefinition(sense, props.activeLang);
-  return term ? `${term}: ${definition}` : definition;
-};
-
-const formatExampleCopyText = (example: WordExample): string => {
-  const sentence = stripInlineAnnotations(example?.sentence || '');
-  const translation = shouldShowExampleTranslation(example, props.activeLang)
-    ? stripInlineAnnotations(exampleTranslation(example, props.activeLang))
-    : '';
-  return translation ? `${sentence}\n${translation}` : sentence;
-};
-
-const senseExamples = (sense: WordSense): WordExample[] => {
-  return Array.isArray(sense?.examples)
-    ? sense.examples.filter((example: WordExample) => exampleTranslation(example, props.activeLang))
-    : [];
-};
-
-const hasSenseScopedExamples = computed(() => {
-  return currentSenses.value.some((sense: WordSense) => senseExamples(sense).length > 0);
-});
-
-const exampleTranslation = (example: WordExample, lang: string): string => {
-  return example?.localizations?.[lang]?.text || example?.translations?.[lang] || '';
-};
-
-const shouldShowExampleTranslation = (example: WordExample, lang: string): boolean => {
-  const translation = exampleTranslation(example, lang);
-  if (!translation) return false;
-  return normalizeComparableText(example?.sentence) !== normalizeComparableText(translation);
-};
-
-const normalizeComparableText = (value: unknown): string => {
-  return String(value || '')
-    .replace(/\{([^|{}]+)\|([^|{}]+)\}/g, '$1')
-    .replace(/\s+/g, '')
-    .trim();
-};
+const {
+  currentWord,
+  currentSenses,
+  currentSenseGroups,
+  hasDictionarySenses,
+  showSenseGroups,
+  currentExamples,
+  hasSenseScopedExamples,
+  currentExampleHighlightTerms,
+  senseDefinition,
+  senseTerm,
+  shouldShowSenseTerm,
+  senseReading,
+  sensePronunciation,
+  senseKey,
+  formatSenseCopyText,
+  formatExampleCopyText,
+  senseExamples,
+  exampleTranslation,
+  shouldShowExampleTranslation,
+  senseExampleHighlightTerms
+} = useDictionaryEntry(
+  () => props.resultData,
+  () => props.activeLang
+);
 </script>
 
 <template>
