@@ -15,17 +15,24 @@ export function useTheme() {
     document.documentElement.style.backgroundColor = 'var(--m3-surface)';
   };
 
-  const toggleTheme = (event?: Event) => {
-    const next = currentTheme.value === 'dark' ? 'light' : 'dark';
-
+  const safeViewTransition = (callback: () => void) => {
     if (!document.startViewTransition) {
-      currentTheme.value = next;
-      settings.theme = next;
-      settings.themeSettingsVersion = THEME_SETTINGS_VERSION;
+      callback();
       return;
     }
+    try {
+      const transition = document.startViewTransition(callback);
+      transition.finished.catch(() => {});
+      transition.ready.catch(() => {});
+      transition.updateCallbackDone?.catch(() => {});
+    } catch {
+      callback();
+    }
+  };
 
-    document.startViewTransition(() => {
+  const toggleTheme = (event?: Event) => {
+    const next = currentTheme.value === 'dark' ? 'light' : 'dark';
+    safeViewTransition(() => {
       currentTheme.value = next;
       settings.theme = next;
       settings.themeSettingsVersion = THEME_SETTINGS_VERSION;
@@ -51,11 +58,7 @@ export function useTheme() {
   watch(
     () => settings.colorScheme,
     (newScheme) => {
-      if (!document.startViewTransition) {
-        applyTheme(currentTheme.value, newScheme || 'blue');
-        return;
-      }
-      document.startViewTransition(() => {
+      safeViewTransition(() => {
         applyTheme(currentTheme.value, newScheme || 'blue');
       });
     }

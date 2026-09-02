@@ -52,6 +52,8 @@ const requestClose = () => emit('update:modelValue', false);
             :class="contentClasses"
             :aria-labelledby="titleId"
             :style="{ maxWidth: typeof maxWidth === 'number' ? `${maxWidth}px` : maxWidth }"
+            @pointer-down-outside="(event) => event.preventDefault()"
+            @interact-outside="(event) => event.preventDefault()"
           >
             <div class="m3-dialog-card" :class="{ 'm3-dialog-card--fixed': fixedHeight }">
               <header class="m3-dialog-header" @touchmove.stop.prevent>
