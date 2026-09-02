@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, useSlots } from 'vue';
 import { X } from 'lucide-vue-next';
+import {
+  DialogRoot,
+  DialogPortal,
+  DialogOverlay,
+  DialogContent
+} from 'radix-vue';
 
 const props = withDefaults(
   defineProps<{
@@ -29,56 +35,69 @@ const requestClose = () => emit('update:modelValue', false);
 </script>
 
 <template>
-  <v-dialog
-    class="m3-dialog"
-    :model-value="modelValue"
-    :max-width="maxWidth"
-    :scrim="true"
-    :scrim-opacity="0.4"
-    :aria-labelledby="titleId"
-    scroll-strategy="block"
-    transition="m3-dialog-transition"
-    :content-props="{
-      class: contentClasses,
-      'aria-labelledby': titleId
-    }"
-    @update:model-value="emit('update:modelValue', $event)"
-  >
-    <v-card class="m3-dialog-card" :class="{ 'm3-dialog-card--fixed': fixedHeight }">
-      <header class="m3-dialog-header" @touchmove.stop.prevent>
-        <div class="m3-dialog-title-group">
-          <slot name="leading"></slot>
-          <slot name="title-icon"></slot>
-          <h2 :id="titleId" class="m3-dialog-title">{{ title }}</h2>
-        </div>
-        <button type="button" class="m3-icon-button" :aria-label="closeLabel" @click="requestClose">
-          <X class="h-5 w-5" aria-hidden="true" />
-        </button>
-      </header>
+  <DialogRoot :open="modelValue" @update:open="emit('update:modelValue', $event)">
+    <DialogPortal>
+      <Transition name="m3-scrim-fade">
+        <DialogOverlay
+          v-if="modelValue"
+          class="m3-dialog-scrim fixed inset-0 z-[2400]"
+          @click="requestClose"
+        />
+      </Transition>
+      <div class="fixed inset-0 z-[2400] flex items-center justify-center p-3 pointer-events-none">
+        <Transition name="m3-dialog-transition">
+          <DialogContent
+            v-if="modelValue"
+            class="m3-dialog-content pointer-events-auto outline-none"
+            :class="contentClasses"
+            :aria-labelledby="titleId"
+            :style="{ maxWidth: typeof maxWidth === 'number' ? `${maxWidth}px` : maxWidth }"
+          >
+            <div class="m3-dialog-card" :class="{ 'm3-dialog-card--fixed': fixedHeight }">
+              <header class="m3-dialog-header" @touchmove.stop.prevent>
+                <div class="m3-dialog-title-group">
+                  <slot name="leading"></slot>
+                  <slot name="title-icon"></slot>
+                  <h2 :id="titleId" class="m3-dialog-title">{{ title }}</h2>
+                </div>
+                <button type="button" class="m3-icon-button" :aria-label="closeLabel" @click="requestClose">
+                  <X class="h-5 w-5" aria-hidden="true" />
+                </button>
+              </header>
 
-      <main class="m3-dialog-body">
-        <slot></slot>
-      </main>
+              <main class="m3-dialog-body">
+                <slot></slot>
+              </main>
 
-      <footer v-if="slots.actions" class="m3-dialog-actions" @touchmove.stop.prevent>
-        <slot name="actions"></slot>
-      </footer>
-    </v-card>
-  </v-dialog>
+              <footer v-if="slots.actions" class="m3-dialog-actions" @touchmove.stop.prevent>
+                <slot name="actions"></slot>
+              </footer>
+            </div>
+          </DialogContent>
+        </Transition>
+      </div>
+    </DialogPortal>
+  </DialogRoot>
 </template>
 
 <style scoped>
+.m3-dialog-scrim {
+  background: rgb(0 0 0 / 0.4);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
 .m3-dialog-card {
   width: 100%;
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);
-  overflow: hidden !important;
+  overflow: hidden;
   overscroll-behavior: none;
-  display: flex !important;
+  display: flex;
   flex-direction: column;
   border: 1px solid color-mix(in srgb, var(--color-m3-outline-variant) 20%, transparent);
-  border-radius: 26px !important;
-  background: var(--color-m3-surface-container) !important;
-  box-shadow: 0 24px 64px rgb(0 0 0 / 0.22) !important;
+  border-radius: 26px;
+  background: var(--color-m3-surface-container);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.22);
 }
 
 .m3-dialog-card--fixed {
@@ -161,59 +180,43 @@ const requestClose = () => emit('update:modelValue', false);
   -webkit-user-select: none;
 }
 
-:global(.m3-dialog-content) {
-  width: min(100% - 24px, 420px) !important;
-  margin: 12px !important;
+.m3-dialog-content {
+  width: min(100% - 24px, 420px);
+  margin: 12px;
   overscroll-behavior: none;
 }
 
-:global(.m3-dialog-content--fixed) {
+.m3-dialog-content--fixed {
   height: min(580px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px));
 }
 
-:global(.m3-dialog .v-overlay__scrim) {
-  background: rgb(0 0 0 / 0.4) !important;
-  opacity: 1 !important;
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+.m3-scrim-fade-enter-active,
+.m3-scrim-fade-leave-active {
+  transition: opacity 150ms linear;
 }
 
-:global(.m3-dialog-transition-enter-active) {
+.m3-scrim-fade-enter-from,
+.m3-scrim-fade-leave-to {
+  opacity: 0;
+}
+
+.m3-dialog-transition-enter-active {
   transition:
     transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 140ms linear;
   will-change: transform, opacity;
 }
 
-:global(.m3-dialog-transition-leave-active) {
+.m3-dialog-transition-leave-active {
   transition:
     transform 120ms cubic-bezier(0.4, 0, 1, 1),
     opacity 100ms linear;
   will-change: transform, opacity;
 }
 
-:global(.m3-dialog-transition-enter-from),
-:global(.m3-dialog-transition-leave-to) {
+.m3-dialog-transition-enter-from,
+.m3-dialog-transition-leave-to {
   transform: translate3d(0, 12px, 0) scale(0.985);
   opacity: 0;
-}
-
-@media (max-width: 600px) {
-  .m3-dialog-header {
-    padding-left: 16px;
-  }
-
-  .m3-dialog-body,
-  .m3-dialog-actions {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :global(.m3-dialog-transition-enter-active),
-  :global(.m3-dialog-transition-leave-active) {
-    transition-duration: 1ms;
-  }
 }
 </style>

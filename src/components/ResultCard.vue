@@ -240,45 +240,39 @@ onUnmounted(() => {
           </div>
 
           <div class="flex gap-2 items-center shrink-0">
-            <v-btn
-              icon
-              variant="flat"
-              density="comfortable"
-              class="bg-transparent hover:bg-m3-surface-variant/50 rounded-full !text-m3-on-surface-variant"
+            <button
+              type="button"
+              class="w-9 h-9 inline-flex items-center justify-center bg-transparent hover:bg-m3-surface-variant/50 rounded-full text-m3-on-surface-variant transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-m3-primary"
               @click="copyAllResult"
               :aria-label="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
               :title="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
             >
               <Check v-if="isCopied('all-result')" class="w-4.5 h-4.5 text-green-600 dark:text-green-400" />
               <Copy v-else class="w-4.5 h-4.5" />
-            </v-btn>
-            <v-btn
+            </button>
+            <button
               v-if="currentWord && resultData?.type !== 'sentence'"
-              icon
-              variant="flat"
-              density="comfortable"
-              class="rounded-full !text-m3-on-surface-variant"
+              type="button"
+              class="w-9 h-9 inline-flex items-center justify-center rounded-full text-m3-on-surface-variant transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-m3-primary"
               :class="
                 isBookmarked(currentWord)
-                  ? '!text-m3-primary bg-m3-primary/10'
+                  ? 'text-m3-primary bg-m3-primary/10'
                   : 'bg-transparent hover:bg-m3-surface-variant/50'
               "
               @click="toggleBookmark(currentWord)"
               aria-label="收藏 / Favorito"
             >
               <Star class="w-5 h-5" :class="isBookmarked(currentWord) ? 'fill-current' : ''" />
-            </v-btn>
-            <v-btn
+            </button>
+            <button
               v-if="currentWord"
-              icon
-              variant="flat"
-              density="comfortable"
-              class="bg-transparent hover:bg-m3-surface-variant/50 rounded-full !text-m3-on-surface-variant"
+              type="button"
+              class="w-9 h-9 inline-flex items-center justify-center bg-transparent hover:bg-m3-surface-variant/50 rounded-full text-m3-on-surface-variant transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-m3-primary"
               @click="isReportModalOpen = true"
               aria-label="报告翻译问题 / Reportar"
             >
               <Flag class="w-4.5 h-4.5" />
-            </v-btn>
+            </button>
           </div>
         </div>
 

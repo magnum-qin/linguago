@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { AlertTriangle, Check, ChevronDown, Loader2 } from 'lucide-vue-next';
+import { AlertTriangle, Check, Loader2 } from 'lucide-vue-next';
 import M3ModalShell from './M3ModalShell.vue';
+import M3Select from './M3Select.vue';
 import { reportTranslationError } from '../utils/api';
 
 const props = defineProps<{
@@ -26,12 +27,6 @@ const reportOptions = [
   { value: '语境不符', label: '语境不符 / Contexto inadequado' },
   { value: '其他', label: '其他 / Outros' }
 ];
-
-const selectMenuProps = {
-  contentClass: 'm3-select-menu-content',
-  maxHeight: 240,
-  location: 'top' as const
-};
 
 const close = () => {
   if (!isReporting.value) emit('close');
@@ -88,23 +83,11 @@ watch(
 
       <div class="feedback-field">
         <label class="feedback-label" for="feedback-reason">问题类型 / Tipo de problema</label>
-        <v-select
+        <M3Select
           id="feedback-reason"
           v-model="reportReason"
           :items="reportOptions"
-          item-title="label"
-          item-value="value"
-          variant="solo"
-          flat
-          hide-details
-          class="m3-native-select"
-          menu-icon="none"
-          :menu-props="selectMenuProps"
-        >
-          <template #append-inner>
-            <ChevronDown class="h-5 w-5 text-m3-on-surface-variant opacity-70" aria-hidden="true" />
-          </template>
-        </v-select>
+        />
       </div>
 
       <p v-if="reportError" class="feedback-error" role="alert">{{ reportError }}</p>
@@ -116,18 +99,23 @@ watch(
 
     <template #actions>
       <div class="feedback-actions">
-        <v-btn variant="flat" class="m3-button m3-button--cancel" :disabled="isReporting || isReported" @click="close">
+        <button
+          type="button"
+          class="m3-button m3-button--cancel"
+          :disabled="isReporting || isReported"
+          @click="close"
+        >
           取消 / Cancelar
-        </v-btn>
-        <v-btn
-          variant="flat"
+        </button>
+        <button
+          type="button"
           class="m3-button m3-button--primary"
           :disabled="isReporting || isReported"
           @click="submitReport"
         >
-          <Loader2 v-if="isReporting" class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+          <Loader2 v-if="isReporting" class="mr-2 h-4 w-4 animate-spin inline-block" aria-hidden="true" />
           {{ isReporting ? '提交中 / Enviando' : '提交 / Enviar' }}
-        </v-btn>
+        </button>
       </div>
     </template>
   </M3ModalShell>

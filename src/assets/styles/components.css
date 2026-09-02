@@ -19,100 +19,93 @@
   animation: none;
 }
 
-/* Vuetify Root Reset */
-.v-application {
-  font-family: inherit !important;
-  background: transparent !important;
-}
-
 /* Material 3 Select Dropdown Menu */
 .m3-select-menu-content {
-  border-radius: 16px !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1) !important;
-  background: var(--color-m3-surface) !important;
-  border: 1px solid color-mix(in srgb, var(--color-m3-outline-variant) 30%, transparent) !important;
-  overflow: hidden !important;
-  max-width: calc(100vw - 24px) !important;
-  max-height: min(240px, calc(100dvh - 160px)) !important;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  background: var(--color-m3-surface);
+  border: 1px solid color-mix(in srgb, var(--color-m3-outline-variant) 30%, transparent);
+  overflow: hidden;
+  max-width: calc(100vw - 24px);
+  max-height: min(260px, calc(100dvh - 160px));
   overscroll-behavior: contain;
 }
 
 :root[data-theme='dark'] .m3-select-menu-content {
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 
-.m3-select-menu-content .v-list {
-  padding: 6px !important;
-  background: transparent !important;
-  max-height: inherit !important;
-  overflow-y: auto !important;
-  overscroll-behavior-y: contain;
-}
-
-.m3-select-menu-content .v-list-item {
-  min-height: 46px !important;
-  border-radius: 10px !important;
-  margin-bottom: 2px !important;
-}
-
-.m3-select-menu-content .v-list-item--active {
-  background: color-mix(in srgb, var(--color-m3-primary) 11%, transparent) !important;
-  color: var(--color-m3-primary) !important;
-}
-
-.m3-select-menu-content .v-list-item-title {
-  min-width: 0 !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  text-transform: none !important;
-  font-size: 0.88rem !important;
-}
-
-.m3-native-select .v-select__selection-text {
-  min-width: 0 !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  text-transform: none !important;
+@media (max-width: 600px) {
+  .m3-select-menu-content {
+    max-width: calc(100vw - 58px);
+    max-height: min(240px, calc(100dvh - 168px));
+  }
 }
 
 /* Material 3 Buttons */
-.m3-button.v-btn {
-  min-width: 0 !important;
-  height: 48px !important;
-  border-radius: 16px !important;
-  font-size: 0.82rem !important;
-  font-weight: 800 !important;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
+.m3-button {
+  min-width: 0;
+  height: 48px;
+  border-radius: 16px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    opacity 150ms ease,
+    transform 100ms ease;
 }
 
-.m3-button.v-btn:focus-visible {
-  outline: 2px solid var(--color-m3-primary) !important;
-  outline-offset: 2px !important;
+.m3-button:active {
+  transform: scale(0.98);
 }
 
-.m3-button--primary.v-btn {
-  height: 52px !important;
-  background: var(--color-m3-primary) !important;
-  color: var(--color-m3-on-primary) !important;
+.m3-button:focus-visible {
+  outline: 2px solid var(--color-m3-primary);
+  outline-offset: 2px;
 }
 
-.m3-button--secondary.v-btn {
-  background: var(--color-m3-secondary-container) !important;
-  color: var(--color-m3-on-secondary-container) !important;
+.m3-button--primary {
+  height: 52px;
+  background: var(--color-m3-primary);
+  color: var(--color-m3-on-primary);
 }
 
-.m3-button--tertiary.v-btn {
-  background: var(--color-m3-surface-container-highest, var(--color-m3-surface-container-high)) !important;
-  color: var(--color-m3-on-surface-variant) !important;
+.m3-button--primary:hover {
+  opacity: 0.92;
 }
 
-.m3-button--cancel.v-btn {
-  height: 52px !important;
-  background: var(--color-m3-surface-container-highest, var(--color-m3-surface-container-high)) !important;
-  color: var(--color-m3-on-surface-variant) !important;
+.m3-button--secondary {
+  background: var(--color-m3-secondary-container);
+  color: var(--color-m3-on-secondary-container);
+}
+
+.m3-button--secondary:hover {
+  opacity: 0.92;
+}
+
+.m3-button--tertiary {
+  background: var(--color-m3-surface-container-highest, var(--color-m3-surface-container-high));
+  color: var(--color-m3-on-surface-variant);
+}
+
+.m3-button--tertiary:hover {
+  background: var(--color-m3-surface-container-high);
+}
+
+.m3-button--cancel {
+  height: 52px;
+  background: var(--color-m3-surface-container-highest, var(--color-m3-surface-container-high));
+  color: var(--color-m3-on-surface-variant);
+}
+
+.m3-button--cancel:hover {
+  opacity: 0.92;
 }
 
 /* Form Settings Field Items */
@@ -125,11 +118,4 @@
   display: grid;
   gap: 0.5rem;
   grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
-}
-
-@media (max-width: 600px) {
-  .m3-select-menu-content {
-    max-width: calc(100vw - 58px) !important;
-    max-height: min(224px, calc(100dvh - 168px)) !important;
-  }
 }

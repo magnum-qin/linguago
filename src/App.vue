@@ -62,7 +62,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <v-app class="!bg-transparent !font-sans transition-colors duration-300">
+  <div class="bg-transparent font-sans transition-colors duration-300 min-h-screen">
     <div class="min-h-dvh flex flex-col items-center w-full relative">
       <!-- Smooth layout spacer: shifts main container with native continuous easing -->
       <div
@@ -112,7 +112,7 @@ onUnmounted(() => {
         </div>
       </div>
     </Transition>
-  </v-app>
+  </div>
 </template>
 
 <style scoped>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { ArrowLeft, Check, ChevronDown, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
+import { ArrowLeft, Check, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
 import M3ModalShell from './M3ModalShell.vue';
+import M3Select from './M3Select.vue';
 import { EDITABLE_PROVIDERS, getModelsForProvider, settings } from '../composables/useSettings';
 import { verifyTranslation } from '../utils/api';
 import { checkForPwaUpdate } from '../utils/pwa-update';
@@ -27,12 +28,6 @@ const providerOptions = [
   { value: 'gemini', label: 'Google Gemini' },
   { value: 'deepseek', label: 'DeepSeek' }
 ];
-
-const selectMenuProps = {
-  contentClass: 'm3-select-menu-content',
-  maxHeight: 240,
-  location: 'bottom' as const
-};
 
 const isEditingModels = computed(() => activePage.value === 'models');
 const isEditableProvider = computed(() => EDITABLE_PROVIDERS.includes(settings.provider));
@@ -177,67 +172,44 @@ onUnmounted(() => {
       <div v-if="!isEditingModels" key="settings" class="settings-page">
         <section class="setting-field">
           <label class="setting-label" for="translation-provider">翻译服务 / Provedor</label>
-          <v-select
+          <M3Select
             id="translation-provider"
             v-model="settings.provider"
             :items="providerOptions"
-            item-title="label"
-            item-value="value"
-            variant="solo"
-            flat
-            hide-details
-            class="m3-native-select"
-            menu-icon="none"
-            :menu-props="selectMenuProps"
-          >
-            <template #append-inner>
-              <ChevronDown class="h-5 w-5 text-m3-on-surface-variant opacity-70" aria-hidden="true" />
-            </template>
-          </v-select>
+          />
         </section>
 
         <section class="setting-field">
           <label class="setting-label" for="translation-model">AI 模型 / Modelo</label>
-          <v-select
+          <M3Select
             id="translation-model"
             v-model="settings.model"
             :items="currentModels"
-            variant="solo"
-            flat
-            hide-details
-            class="m3-native-select m3-model-select"
-            menu-icon="none"
-            :loading="verifyStatus === 'loading'"
-            :menu-props="selectMenuProps"
-          >
-            <template #append-inner>
-              <ChevronDown class="h-5 w-5 text-m3-on-surface-variant opacity-70" aria-hidden="true" />
-            </template>
-          </v-select>
+          />
 
           <div class="model-utility-row" :class="{ 'model-utility-row--single': !isEditableProvider }">
-            <v-btn
-              variant="flat"
+            <button
+              type="button"
               :disabled="isVerifying"
               class="m3-button m3-button--secondary"
               @click="verifyModelSetting"
             >
-              <Loader2 v-if="verifyStatus === 'loading'" class="mr-1.5 h-4 w-4 shrink-0 animate-spin" />
-              <Check v-else-if="verifyStatus === 'success'" class="mr-1.5 h-4 w-4 shrink-0" />
-              <X v-else-if="verifyStatus === 'error'" class="mr-1.5 h-4 w-4 shrink-0" />
+              <Loader2 v-if="verifyStatus === 'loading'" class="mr-1.5 h-4 w-4 shrink-0 animate-spin inline-block" />
+              <Check v-else-if="verifyStatus === 'success'" class="mr-1.5 h-4 w-4 shrink-0 inline-block" />
+              <X v-else-if="verifyStatus === 'error'" class="mr-1.5 h-4 w-4 shrink-0 inline-block" />
               <span v-if="verifyStatus === 'loading'">验证中 / Validando</span>
               <span v-else-if="verifyStatus === 'success'">连接成功 / Conectado</span>
               <span v-else-if="verifyStatus === 'error'">连接失败 / Erro</span>
               <span v-else>测试连接 / Testar</span>
-            </v-btn>
-            <v-btn
+            </button>
+            <button
               v-if="isEditableProvider"
-              variant="flat"
+              type="button"
               class="m3-button m3-button--secondary"
               @click="activePage = 'models'"
             >
               编辑模型 / Editar
-            </v-btn>
+            </button>
           </div>
         </section>
 
@@ -267,11 +239,11 @@ onUnmounted(() => {
           </div>
         </section>
 
-        <v-btn
+        <button
           data-testid="check-pwa-update"
-          variant="flat"
+          type="button"
           :disabled="updateStatus === 'checking' || updateStatus === 'updating'"
-          class="m3-button m3-button--tertiary w-full"
+          class="m3-button m3-button--tertiary w-full inline-flex items-center justify-center"
           @click="checkUpdate"
         >
           <Loader2
@@ -285,7 +257,7 @@ onUnmounted(() => {
           <span v-else-if="updateStatus === 'updating'">正在更新 / Atualizando</span>
           <span v-else-if="updateStatus === 'error'">检查失败 / Tentar novamente</span>
           <span v-else>检查更新 / Verificar atualização</span>
-        </v-btn>
+        </button>
       </div>
 
       <div v-else key="models" class="model-manager">
@@ -330,12 +302,12 @@ onUnmounted(() => {
 
     <template #actions>
       <div v-if="!isEditingModels" class="dialog-action-grid">
-        <v-btn variant="flat" class="m3-button m3-button--cancel" @click="close">取消 / Cancelar</v-btn>
-        <v-btn variant="flat" class="m3-button m3-button--primary" @click="saveAndClose">确认 / Confirmar</v-btn>
+        <button type="button" class="m3-button m3-button--cancel" @click="close">取消 / Cancelar</button>
+        <button type="button" class="m3-button m3-button--primary" @click="saveAndClose">确认 / Confirmar</button>
       </div>
-      <v-btn v-else variant="flat" class="m3-button m3-button--primary w-full" @click="activePage = 'settings'">
+      <button v-else type="button" class="m3-button m3-button--primary w-full" @click="activePage = 'settings'">
         完成 / Concluído
-      </v-btn>
+      </button>
     </template>
   </M3ModalShell>
 </template>
