@@ -1,0 +1,34 @@
+/* Typography & Pronunciation Styling */
+
+@keyframes typing-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.keyword-pronunciation {
+  @apply inline-grid align-baseline;
+  gap: 1px;
+}
+
+.keyword-pronunciation small {
+  color: var(--muted);
+  font-size: 0.58em;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Furigana Ruby Typography */
+ruby {
+  ruby-align: center;
+}
+
+rt {
+  font-size: 0.6em;
+  line-height: 1;
+  user-select: none;
+}

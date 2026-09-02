@@ -29,7 +29,6 @@ const currentWord = computed(() => {
   return '';
 });
 
-const isDesktop = ref(false);
 const DEFAULT_RESULT_LANG = 'en';
 const activeLang = ref(DEFAULT_RESULT_LANG);
 
@@ -177,25 +176,6 @@ const copyAllResult = () => {
   copy(lines.join('\n'), 'all-result');
 };
 
-const updateDesktopState = () => {
-  isDesktop.value = window.innerWidth >= 960;
-};
-
-const syncBodyClasses = () => {
-  if (resultData.value || isTranslating.value) {
-    document.body.classList.add('has-result');
-    document.body.classList.remove('has-desktop-idle');
-  } else if (isDesktop.value) {
-    document.body.classList.remove('has-result');
-    document.body.classList.add('has-desktop-idle');
-  } else {
-    document.body.classList.remove('has-result');
-    document.body.classList.remove('has-desktop-idle');
-  }
-};
-
-watch([resultData, isTranslating, isDesktop], syncBodyClasses);
-
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape' && isReportModalOpen.value) {
     isReportModalOpen.value = false;
@@ -203,14 +183,10 @@ const handleKeydown = (e: KeyboardEvent) => {
 };
 
 onMounted(() => {
-  updateDesktopState();
-  syncBodyClasses();
-  window.addEventListener('resize', updateDesktopState);
   window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('resize', updateDesktopState);
   window.removeEventListener('keydown', handleKeydown);
 });
 </script>
