@@ -7,13 +7,19 @@ import ResultLoader from './ResultLoader.vue';
 import FeedbackModal from './FeedbackModal.vue';
 import WordResultView from './WordResultView.vue';
 import SentenceResultView from './SentenceResultView.vue';
-import { Star, Flag, Volume2, Loader2 } from 'lucide-vue-next';
+import { Star, Flag, Volume2, Loader2, Copy, Check } from 'lucide-vue-next';
 import { settings } from '../composables/useSettings';
 import { speak } from '../utils/speech';
+import { useCopy } from '../composables/useCopy';
 
 const { resultData, isTranslating } = useTranslation();
 const { isBookmarked, toggleBookmark } = useBookmarks();
+const { copy, isCopied } = useCopy();
 const colorScheme = computed(() => settings.colorScheme || 'blue');
+
+const sourceLanguageCode = computed(() => {
+  return resultData.value?.detected_source_lang || resultData.value?.source_lang || 'en';
+});
 
 const currentWord = computed(() => {
   if (currentWordDetail.value?.word) return currentWordDetail.value.word;
@@ -118,6 +124,31 @@ const hasDictionarySenses = computed(() => {
   return resultData.value?.provider === 'dictionary' && currentSenses.value.length > 0;
 });
 
+const copyAllResult = () => {
+  if (!resultData.value) return;
+  if (typeof resultData.value === 'string') {
+    copy(resultData.value, 'all-result');
+    return;
+  }
+  const lines: string[] = [];
+  if (currentWord.value) lines.push(currentWord.value);
+  if (currentTranslation.value?.phonetic) lines.push(`[${currentTranslation.value.phonetic}]`);
+  if (currentTranslation.value?.text && currentTranslation.value.text !== currentWord.value) {
+    lines.push(currentTranslation.value.text);
+  }
+  if (currentSenses.value.length > 0) {
+    currentSenses.value.forEach((s: any) => {
+      const def = s?.localizations?.[activeLang.value]?.definition || s?.definitions?.[activeLang.value] || '';
+      const term = s?.localizations?.[activeLang.value]?.term || '';
+      if (term && def) lines.push(`${s.sense_order}. ${term}: ${def}`);
+      else if (def) lines.push(`${s.sense_order}. ${def}`);
+    });
+  } else if (currentWordDetail.value?.definition) {
+    lines.push(currentWordDetail.value.definition);
+  }
+  copy(lines.join('\n'), 'all-result');
+};
+
 const updateDesktopState = () => {
   isDesktop.value = window.innerWidth >= 960;
 };
@@ -165,11 +196,9 @@ onUnmounted(() => {
         class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative"
       >
         <div class="flex items-center justify-between w-full mb-6">
-          <span
-            class="text-[0.7rem] font-bold uppercase tracking-widest text-m3-on-surface-variant flex items-center gap-1.5"
-          >
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-m3-surface border border-m3-outline-variant/30 text-m3-on-surface-variant text-[0.72rem] font-bold shadow-xs">
             <span
-              class="w-1.5 h-1.5 rounded-full"
+              class="w-2 h-2 rounded-full shrink-0"
               :class="
                 resultData.provider === 'dictionary'
                   ? 'bg-[#ff9800]'
@@ -178,37 +207,47 @@ onUnmounted(() => {
                     : 'bg-[#008053]'
               "
             ></span>
-            <div class="flex flex-col">
-              <span class="flex items-center gap-1.5">
-                {{
-                  resultData.provider === 'dictionary'
-                    ? '核心词典'
-                    : (resultData.cache_hit ?? resultData.cached)
-                      ? '已缓存'
-                      : 'AI'
-                }}
-                <Loader2
-                  v-if="
-                    isTranslating &&
-                    resultData.provider !== 'dictionary' &&
-                    !(resultData.cache_hit ?? resultData.cached)
-                  "
-                  class="w-3 h-3.5 animate-spin text-m3-primary"
-                />
-              </span>
-              <span
-                class="text-[0.55rem] opacity-70 tracking-normal mt-0.5"
-                v-if="resultData.provider === 'dictionary' || (resultData.cache_hit ?? resultData.cached)"
-              >
-                {{ resultData.provider === 'dictionary' ? 'Dicionário Principal' : 'Em cache' }}
-              </span>
-              <span class="text-[0.55rem] opacity-70 tracking-normal mt-0.5 uppercase" v-else>
-                {{ resultData.provider }}<template v-if="resultData.model"> / {{ resultData.model }}</template>
-              </span>
-            </div>
-          </span>
+            <span class="tracking-wide">
+              {{
+                resultData.provider === 'dictionary'
+                  ? '核心词典'
+                  : (resultData.cache_hit ?? resultData.cached)
+                    ? '已缓存'
+                    : 'AI'
+              }}
+            </span>
+            <span class="text-[0.68rem] opacity-70 font-medium border-l border-m3-outline-variant/40 pl-2">
+              {{
+                resultData.provider === 'dictionary'
+                  ? 'Dicionário'
+                  : (resultData.cache_hit ?? resultData.cached)
+                    ? 'Cache'
+                    : (resultData.model || resultData.provider)
+              }}
+            </span>
+            <Loader2
+              v-if="
+                isTranslating &&
+                resultData.provider !== 'dictionary' &&
+                !(resultData.cache_hit ?? resultData.cached)
+              "
+              class="w-3.5 h-3.5 animate-spin text-m3-primary ml-0.5 shrink-0"
+            />
+          </div>
 
           <div class="flex gap-2 items-center shrink-0">
+            <v-btn
+              icon
+              variant="flat"
+              density="comfortable"
+              class="bg-transparent hover:bg-m3-surface-variant/50 rounded-full !text-m3-on-surface-variant"
+              @click="copyAllResult"
+              :aria-label="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
+              :title="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
+            >
+              <Check v-if="isCopied('all-result')" class="w-4.5 h-4.5 text-green-600 dark:text-green-400" />
+              <Copy v-else class="w-4.5 h-4.5" />
+            </v-btn>
             <v-btn
               v-if="currentWord && resultData?.type !== 'sentence'"
               icon
@@ -273,10 +312,29 @@ onUnmounted(() => {
           <!-- Header Text / Query Word -->
           <div class="flex items-center justify-between gap-4 mb-4" v-if="currentWord">
             <h1
-              class="text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] font-display font-black text-m3-on-surface tracking-tight break-words"
+              class="text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] font-display font-black text-m3-on-surface tracking-tight break-words flex-1"
             >
               <FuriganaText :text="currentWord" />
             </h1>
+            <div class="flex items-center gap-1 shrink-0">
+              <button
+                @click="speak(currentWord, sourceLanguageCode)"
+                class="inline-flex items-center justify-center w-9 h-9 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                title="朗读词条 / Pronunciar"
+                aria-label="朗读词条"
+              >
+                <Volume2 class="w-5 h-5 opacity-80" />
+              </button>
+              <button
+                @click="copy(currentWord, 'main-word')"
+                class="inline-flex items-center justify-center w-9 h-9 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                :title="isCopied('main-word') ? '已复制' : '复制词条'"
+                :aria-label="isCopied('main-word') ? '已复制' : '复制词条'"
+              >
+                <Check v-if="isCopied('main-word')" class="w-5 h-5 text-green-600 dark:text-green-400" />
+                <Copy v-else class="w-5 h-5 opacity-80" />
+              </button>
+            </div>
           </div>
 
           <!-- Phonetics -->

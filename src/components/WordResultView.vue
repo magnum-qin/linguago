@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Volume2, ChevronDown } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { Volume2, Copy, Check } from 'lucide-vue-next';
 import FuriganaText from './FuriganaText.vue';
 import { speak } from '../utils/speech';
+import { useCopy } from '../composables/useCopy';
 
 const props = defineProps<{
   resultData: any;
   activeLang: string;
-  langs: Array<{ code: string; label: string }>;
+  langs?: Array<{ code: string; label: string }>;
 }>();
 
-const expandedSenseKeys = ref<Set<string>>(new Set());
+const { copy, isCopied } = useCopy();
+
+const sourceLanguageCode = computed(() => {
+  return props.resultData?.detected_source_lang || props.resultData?.source_lang || 'en';
+});
 
 const currentWord = computed(() => {
   if (currentWordDetail.value?.word) return currentWordDetail.value.word;
@@ -266,20 +271,18 @@ const senseKey = (sense: any) => {
   return `${sense?.sense_order || ''}:${sense?.gloss_key || ''}`;
 };
 
-const isSenseExpanded = (sense: any) => {
-  return expandedSenseKeys.value.has(senseKey(sense));
+const formatSenseCopyText = (sense: any) => {
+  const term = senseTerm(sense, props.activeLang);
+  const definition = senseDefinition(sense, props.activeLang);
+  return term ? `${term}: ${definition}` : definition;
 };
 
-const toggleSenseExpanded = (sense: any) => {
-  const next = new Set(expandedSenseKeys.value);
-  const key = senseKey(sense);
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
-  expandedSenseKeys.value = next;
-};
-
-const senseLocalization = (sense: any, lang: string) => {
-  return sense?.localizations?.[lang] || {};
+const formatExampleCopyText = (example: any) => {
+  const sentence = stripInlineAnnotations(example?.sentence || '');
+  const translation = shouldShowExampleTranslation(example, props.activeLang)
+    ? stripInlineAnnotations(exampleTranslation(example, props.activeLang))
+    : '';
+  return translation ? `${sentence}\n${translation}` : sentence;
 };
 
 const senseExamples = (sense: any) => {
@@ -291,10 +294,6 @@ const senseExamples = (sense: any) => {
 const hasSenseScopedExamples = computed(() => {
   return currentSenses.value.some((sense: any) => senseExamples(sense).length > 0);
 });
-
-const langDisplay = (lang: string) => {
-  return props.langs.find((item) => item.code === lang)?.label || lang;
-};
 
 const exampleTranslation = (example: any, lang: string) => {
   return example?.localizations?.[lang]?.text || example?.translations?.[lang] || '';
@@ -339,13 +338,15 @@ const normalizeComparableText = (value: any) => {
         class="flex flex-col pt-3 pb-6"
         :class="!hasSenseScopedExamples && currentExamples.length > 0 ? 'border-b border-m3-outline-variant/25' : ''"
       >
-        <h4 class="text-[0.7rem] font-black uppercase tracking-[0.2em] text-m3-primary/80 mb-2 flex items-center gap-2">
-          <span class="w-1 h-3 rounded-full bg-m3-primary/50"></span>
-          <div class="flex flex-col">
-            <span>释义</span>
-            <span class="text-[0.6rem] opacity-70 tracking-widest mt-0.5">Definições</span>
-          </div>
-        </h4>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-1.5 h-3.5 rounded-full bg-m3-primary"></span>
+          <h4 class="text-[0.82rem] font-bold text-m3-on-surface tracking-wide flex items-center gap-2">
+            释义
+            <span class="px-2 py-0.5 rounded-full bg-m3-primary/10 text-m3-primary text-[0.65rem] font-semibold tracking-normal uppercase">
+              Definições
+            </span>
+          </h4>
+        </div>
 
         <div v-for="group in currentSenseGroups" :key="group.key" class="py-2">
           <div
@@ -398,48 +399,18 @@ const normalizeComparableText = (value: any) => {
                     >
                   </button>
                   <button
-                    v-if="sense.localizations"
-                    @click="toggleSenseExpanded(sense)"
-                    class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-m3-surface border border-m3-outline-variant/30 text-m3-on-surface-variant text-[0.78rem] font-black hover:bg-m3-surface-container-high transition-all"
-                    aria-label="Toggle multilingual sense details"
+                    @click="copy(formatSenseCopyText(sense), `sense-${senseKey(sense)}`)"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                    :aria-label="isCopied(`sense-${senseKey(sense)}`) ? '已复制' : '复制释义'"
+                    :title="isCopied(`sense-${senseKey(sense)}`) ? '已复制' : '复制释义'"
                   >
-                    四语
-                    <ChevronDown
-                      class="w-3.5 h-3.5 transition-transform"
-                      :class="isSenseExpanded(sense) ? 'rotate-180' : ''"
-                    />
+                    <Check v-if="isCopied(`sense-${senseKey(sense)}`)" class="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                    <Copy v-else class="w-3.5 h-3.5 opacity-70" />
                   </button>
                 </div>
                 <span class="text-m3-on-surface text-[1.05rem] sm:text-[1.22rem] font-medium leading-relaxed"
                   ><FuriganaText :text="senseDefinition(sense, activeLang)"
                 /></span>
-
-                <!-- Expanded Localization Info -->
-                <div v-if="isSenseExpanded(sense)" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div
-                    v-for="lang in langs"
-                    :key="`${senseKey(sense)}-${lang.code}`"
-                    class="rounded-[14px] bg-m3-surface/70 border border-m3-outline-variant/20 p-3 flex flex-col gap-1.5"
-                  >
-                    <div class="flex items-center justify-between gap-2">
-                      <span class="text-[0.65rem] font-black tracking-widest text-m3-primary uppercase">{{
-                        langDisplay(lang.code)
-                      }}</span>
-                      <span
-                        v-if="sensePronunciation(sense, lang.code).label"
-                        class="text-[0.72rem] font-bold text-m3-on-surface-variant"
-                      >
-                        {{ sensePronunciation(sense, lang.code).label }}
-                      </span>
-                    </div>
-                    <span class="text-m3-on-surface text-[1rem] font-black leading-snug"
-                      ><FuriganaText :text="senseLocalization(sense, lang.code).term"
-                    /></span>
-                    <span class="text-m3-on-surface-variant text-[0.9rem] leading-relaxed"
-                      ><FuriganaText :text="senseLocalization(sense, lang.code).definition"
-                    /></span>
-                  </div>
-                </div>
 
                 <!-- Sense Scoped Examples -->
                 <div v-if="senseExamples(sense).length > 0" class="mt-4 flex flex-col gap-3">
@@ -449,7 +420,7 @@ const normalizeComparableText = (value: any) => {
                     class="flex gap-3 items-start rounded-[14px] bg-m3-surface/55 border border-m3-outline-variant/15 p-3"
                   >
                     <span class="w-1.5 h-1.5 rounded-full bg-m3-primary/50 mt-2.5 shrink-0"></span>
-                    <div class="flex flex-col gap-1">
+                    <div class="flex flex-col gap-1 flex-1 min-w-0">
                       <p class="text-m3-on-surface text-[0.98rem] font-medium leading-relaxed">
                         <FuriganaText :text="example.sentence" :highlight="senseExampleHighlightTerms(sense)" />
                       </p>
@@ -463,6 +434,25 @@ const normalizeComparableText = (value: any) => {
                         />
                       </p>
                     </div>
+                    <div class="flex items-center gap-1 shrink-0 ml-1 pt-0.5">
+                      <button
+                        @click="speak(example.sentence, sourceLanguageCode)"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                        title="朗读例句 / Pronunciar"
+                        aria-label="朗读例句"
+                      >
+                        <Volume2 class="w-3.5 h-3.5 opacity-75" />
+                      </button>
+                      <button
+                        @click="copy(formatExampleCopyText(example), `scoped-ex-${senseKey(sense)}-${i}`)"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                        :title="isCopied(`scoped-ex-${senseKey(sense)}-${i}`) ? '已复制' : '复制例句'"
+                        :aria-label="isCopied(`scoped-ex-${senseKey(sense)}-${i}`) ? '已复制' : '复制例句'"
+                      >
+                        <Check v-if="isCopied(`scoped-ex-${senseKey(sense)}-${i}`)" class="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                        <Copy v-else class="w-3.5 h-3.5 opacity-75" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -473,20 +463,22 @@ const normalizeComparableText = (value: any) => {
 
       <!-- General Examples (when not scoped to senses) -->
       <div v-if="currentExamples.length > 0 && !hasSenseScopedExamples" class="pt-6 pb-2">
-        <h4 class="text-[0.7rem] font-black uppercase tracking-[0.2em] text-m3-primary/80 mb-2 flex items-center gap-2">
-          <span class="w-1 h-3 rounded-full bg-m3-primary/50"></span>
-          <div class="flex flex-col">
-            <span>例句</span>
-            <span class="text-[0.6rem] opacity-70 tracking-widest mt-0.5">Exemplos</span>
-          </div>
-        </h4>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-1.5 h-3.5 rounded-full bg-m3-primary"></span>
+          <h4 class="text-[0.82rem] font-bold text-m3-on-surface tracking-wide flex items-center gap-2">
+            例句
+            <span class="px-2 py-0.5 rounded-full bg-m3-primary/10 text-m3-primary text-[0.65rem] font-semibold tracking-normal uppercase">
+              Exemplos
+            </span>
+          </h4>
+        </div>
         <div class="flex flex-col">
           <div v-for="(example, i) in currentExamples" :key="i" class="py-4">
             <div class="flex gap-4 items-start">
               <span class="flex items-center justify-center w-[26px] h-[26px] shrink-0 mt-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-m3-primary/50"></span>
               </span>
-              <div class="flex flex-col gap-1.5 w-full pt-0.5">
+              <div class="flex flex-col gap-1.5 flex-1 min-w-0 pt-0.5">
                 <p class="text-m3-on-surface text-[1.05rem] font-medium leading-relaxed">
                   <FuriganaText :text="example.sentence" :highlight="currentExampleHighlightTerms" />
                 </p>
@@ -499,6 +491,25 @@ const normalizeComparableText = (value: any) => {
                     :highlight="currentExampleHighlightTerms"
                   />
                 </p>
+              </div>
+              <div class="flex items-center gap-1 shrink-0 ml-1 pt-1">
+                <button
+                  @click="speak(example.sentence, sourceLanguageCode)"
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                  title="朗读例句 / Pronunciar"
+                  aria-label="朗读例句"
+                >
+                  <Volume2 class="w-3.5 h-3.5 opacity-75" />
+                </button>
+                <button
+                  @click="copy(formatExampleCopyText(example), `general-ex-${i}`)"
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                  :title="isCopied(`general-ex-${i}`) ? '已复制' : '复制例句'"
+                  :aria-label="isCopied(`general-ex-${i}`) ? '已复制' : '复制例句'"
+                >
+                  <Check v-if="isCopied(`general-ex-${i}`)" class="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                  <Copy v-else class="w-3.5 h-3.5 opacity-75" />
+                </button>
               </div>
             </div>
           </div>
