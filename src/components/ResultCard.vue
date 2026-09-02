@@ -11,6 +11,7 @@ import { Star, Flag, Volume2, Loader2, Copy, Check } from 'lucide-vue-next';
 import { settings } from '../composables/useSettings';
 import { speak } from '../utils/speech';
 import { useCopy } from '../composables/useCopy';
+import { splitTranslations, splitPhonetics } from '../utils/text-utils';
 import type { WordResponse, SentenceResponse, WordSense, LocalizedText, WordDetail } from '../types/translation';
 
 const { resultData, isTranslating } = useTranslation();
@@ -149,6 +150,32 @@ const headwordPhoneticSystem = computed(() => {
     return loc?.pronunciation_system || loc?.reading_system || '';
   }
   return '';
+});
+
+const parsedHeadwords = computed(() => {
+  if (!currentWord.value) {
+    return { primary: '', alternatives: [] };
+  }
+  if (resultData.value && typeof resultData.value === 'object' && resultData.value.type !== 'word') {
+    return { primary: currentWord.value, alternatives: [] };
+  }
+  const items = splitTranslations(currentWord.value);
+  if (items.length <= 1) {
+    return { primary: currentWord.value, alternatives: [] };
+  }
+  return {
+    primary: items[0],
+    alternatives: items.slice(1)
+  };
+});
+
+const parsedPhonetics = computed(() => {
+  if (!headwordPhonetic.value) return [];
+  return splitPhonetics(headwordPhonetic.value);
+});
+
+const primaryPhonetic = computed(() => {
+  return parsedPhonetics.value[0] || '';
 });
 
 const copyAllResult = () => {
@@ -310,44 +337,88 @@ onUnmounted(() => {
         <!-- Translation Main Result -->
         <div class="mt-6 flex flex-col">
           <!-- Header Text / Query Word with Phonetics -->
-          <div class="flex flex-wrap items-center gap-3 mb-4" v-if="currentWord">
+          <div class="flex flex-wrap items-center gap-3 mb-2" v-if="parsedHeadwords.primary">
             <h1
               class="text-[clamp(1.6rem,5vw,2.25rem)] leading-[1.35] font-display font-black text-m3-on-surface tracking-tight break-words"
             >
-              <FuriganaText :text="currentWord" />
+              <FuriganaText :text="parsedHeadwords.primary" />
             </h1>
             <button
-              v-if="headwordPhonetic"
-              @click="speak(currentTranslation?.audio_text || currentWord, activeLang)"
-              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-m3-primary/10 text-m3-primary text-[0.85rem] font-bold tracking-wide hover:bg-m3-primary hover:text-m3-on-primary transition-all shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-m3-primary active:scale-95"
+              v-if="primaryPhonetic"
+              @click="speak(parsedHeadwords.primary, activeLang)"
+              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-m3-primary/10 text-m3-primary text-[0.85rem] font-bold tracking-wide hover:bg-m3-primary hover:text-m3-on-primary transition-all shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-m3-primary active:scale-95 cursor-pointer"
               title="朗读发音 / Pronunciar"
               aria-label="朗读发音"
             >
               <Volume2 class="w-3.5 h-3.5 opacity-80" />
-              {{ headwordPhonetic }}
+              {{ primaryPhonetic }}
               <span v-if="headwordPhoneticSystem" class="text-[0.58rem] uppercase tracking-widest opacity-70">
                 {{ headwordPhoneticSystem }}
               </span>
             </button>
             <div class="flex items-center gap-1 shrink-0 ml-auto">
               <button
-                v-if="!headwordPhonetic"
-                @click="speak(currentWord, activeLang)"
-                class="inline-flex items-center justify-center w-9 h-9 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                v-if="!primaryPhonetic"
+                @click="speak(parsedHeadwords.primary, activeLang)"
+                class="inline-flex items-center justify-center w-9 h-9 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors cursor-pointer"
                 title="朗读词条 / Pronunciar"
                 aria-label="朗读词条"
               >
                 <Volume2 class="w-5 h-5 opacity-80" />
               </button>
               <button
-                @click="copy(currentWord, 'main-word')"
-                class="inline-flex items-center justify-center w-9 h-9 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
+                @click="copy(parsedHeadwords.primary, 'main-word')"
+                class="inline-flex items-center justify-center w-9 h-9 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors cursor-pointer"
                 :title="isCopied('main-word') ? '已复制' : '复制词条'"
                 :aria-label="isCopied('main-word') ? '已复制' : '复制词条'"
               >
                 <Transition name="m3-icon-swap" mode="out-in">
                   <Check v-if="isCopied('main-word')" key="check" class="w-5 h-5 text-green-600 dark:text-green-400" />
                   <Copy v-else key="copy" class="w-5 h-5 opacity-80" />
+                </Transition>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alternative Translations Chips (When word has multiple translations) -->
+          <div
+            v-if="parsedHeadwords.alternatives.length > 0"
+            class="flex flex-wrap items-center gap-2 mb-4 pt-1"
+          >
+            <span class="text-[0.72rem] font-bold uppercase tracking-wider text-m3-outline shrink-0 mr-1">
+              其他译法 / Outras:
+            </span>
+            <div
+              v-for="(alt, idx) in parsedHeadwords.alternatives"
+              :key="alt"
+              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-m3-surface-container border border-m3-outline-variant/30 text-m3-on-surface text-[0.88rem] font-semibold hover:bg-m3-surface-container-high transition-colors shadow-2xs"
+            >
+              <span>{{ alt }}</span>
+              <span
+                v-if="parsedPhonetics[idx + 1]"
+                class="text-[0.72rem] text-m3-outline font-normal"
+              >
+                {{ parsedPhonetics[idx + 1] }}
+              </span>
+              <button
+                type="button"
+                @click.stop="speak(alt, activeLang)"
+                class="w-5 h-5 rounded-full inline-flex items-center justify-center text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors cursor-pointer ml-0.5"
+                title="朗读发音 / Pronunciar"
+                :aria-label="`朗读 ${alt}`"
+              >
+                <Volume2 class="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                @click.stop="copy(alt, `alt-word-${idx}`)"
+                class="w-5 h-5 rounded-full inline-flex items-center justify-center text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors cursor-pointer"
+                title="复制词条 / Copiar"
+                :aria-label="`复制 ${alt}`"
+              >
+                <Transition name="m3-icon-swap" mode="out-in">
+                  <Check v-if="isCopied(`alt-word-${idx}`)" class="w-3 h-3 text-green-600 dark:text-green-400" />
+                  <Copy v-else class="w-3 h-3 opacity-60" />
                 </Transition>
               </button>
             </div>

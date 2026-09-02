@@ -4,6 +4,7 @@ import FuriganaText from './FuriganaText.vue';
 import { speak } from '../utils/speech';
 import { useCopy } from '../composables/useCopy';
 import { useDictionaryEntry } from '../composables/useDictionaryEntry';
+import { splitTranslations } from '../utils/text-utils';
 import type { TranslateResponse } from '../types/translation';
 
 const props = defineProps<{
@@ -39,6 +40,10 @@ const {
   () => props.resultData,
   () => props.activeLang
 );
+
+const splitDefinitions = (text: string) => {
+  return splitTranslations(text);
+};
 </script>
 
 <template>
@@ -129,7 +134,22 @@ const {
                   </button>
                 </div>
                 <div class="flex items-start justify-between gap-3">
-                  <p class="text-m3-on-surface text-[1.05rem] sm:text-[1.18rem] font-medium leading-relaxed flex-1">
+                  <div
+                    v-if="splitDefinitions(senseDefinition(sense, activeLang)).length > 1"
+                    class="flex flex-col gap-1.5 flex-1"
+                  >
+                    <div
+                      v-for="(defItem, dIdx) in splitDefinitions(senseDefinition(sense, activeLang))"
+                      :key="dIdx"
+                      class="flex items-start gap-2 text-m3-on-surface text-[1.02rem] sm:text-[1.12rem] font-medium leading-relaxed"
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full bg-m3-primary/70 shrink-0 mt-2.5"></span>
+                      <span class="flex-1">
+                        <FuriganaText :text="defItem" />
+                      </span>
+                    </div>
+                  </div>
+                  <p v-else class="text-m3-on-surface text-[1.05rem] sm:text-[1.18rem] font-medium leading-relaxed flex-1">
                     <FuriganaText :text="senseDefinition(sense, activeLang)" />
                   </p>
                   <button
