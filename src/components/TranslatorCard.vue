@@ -137,8 +137,13 @@ const toggleSourceLang = async () => {
 };
 
 const handleClear = () => {
+  if (window.scrollY > 0) {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
   clear();
-  textareaRef.value?.focus({ preventScroll: true });
+  requestAnimationFrame(() => {
+    textareaRef.value?.focus({ preventScroll: true });
+  });
 };
 
 const usesMobileKeyboard = () => {
@@ -263,6 +268,8 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
         <Transition name="fade-up">
           <button
             v-if="inputText.length > 0"
+            data-testid="clear-button"
+            aria-label="清空 / Limpar"
             type="button"
             class="h-11 flex items-center justify-center rounded-full px-4 sm:px-5 text-[0.85rem] font-bold text-m3-on-surface bg-m3-surface shadow-sm border border-m3-outline-variant/30 hover:bg-m3-surface-container-high transition-all outline-none focus-visible:ring-2 focus-visible:ring-m3-primary absolute left-0 z-10 whitespace-nowrap tracking-normal normal-case cursor-pointer"
             @click="handleClear"

@@ -52,9 +52,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  layoutMotionRun += 1;
-  layoutMotion?.cancel();
-  layoutMotion = null;
   window.removeEventListener('pwa-update-available', handleUpdateAvailable);
   window.removeEventListener('pwa-updated', handleUpdated);
   window.removeEventListener('api-error', handleApiError);

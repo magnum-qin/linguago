@@ -277,11 +277,9 @@
     @apply font-sans antialiased transition-colors duration-200;
     color: var(--ink);
     background: var(--bg);
-    padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 28px);
-  }
-
-  body.modal-open {
-    @apply overflow-hidden;
+    padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 28px) !important;
+    padding-right: 16px !important;
+    margin-right: 0 !important;
   }
 
   button,
