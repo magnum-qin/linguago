@@ -100,6 +100,16 @@ const senseTerm = (sense: any, lang: string) => {
   return sense?.localizations?.[lang]?.term || '';
 };
 
+const shouldShowSenseTerm = (sense: any) => {
+  const term = senseTerm(sense, props.activeLang);
+  if (!term) return false;
+  const current = currentWord.value;
+  if (!current) return true;
+  const normTerm = stripInlineAnnotations(term).trim().toLowerCase();
+  const normCurrent = stripInlineAnnotations(current).trim().toLowerCase();
+  return normTerm !== normCurrent;
+};
+
 const stripInlineAnnotations = (value: string) => {
   return String(value || '').replace(/\{([^|{}]+)\|([^|{}]+)\}/g, '$1');
 };
@@ -378,9 +388,12 @@ const normalizeComparableText = (value: any) => {
                     >{{ sense.part_of_speech }}</span
                   >
                 </div>
-                <div class="flex flex-wrap items-center gap-2.5">
+                <div
+                  v-if="shouldShowSenseTerm(sense) || sensePronunciation(sense, activeLang).label"
+                  class="flex flex-wrap items-center gap-2.5"
+                >
                   <span
-                    v-if="senseTerm(sense, activeLang)"
+                    v-if="shouldShowSenseTerm(sense)"
                     class="text-m3-on-surface text-[1.35rem] sm:text-[1.65rem] font-black leading-tight"
                     ><FuriganaText :text="senseTerm(sense, activeLang)"
                   /></span>
@@ -408,9 +421,21 @@ const normalizeComparableText = (value: any) => {
                     <Copy v-else class="w-3.5 h-3.5 opacity-70" />
                   </button>
                 </div>
-                <span class="text-m3-on-surface text-[1.05rem] sm:text-[1.22rem] font-medium leading-relaxed"
-                  ><FuriganaText :text="senseDefinition(sense, activeLang)"
-                /></span>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-m3-on-surface text-[1.05rem] sm:text-[1.22rem] font-medium leading-relaxed flex-1"
+                    ><FuriganaText :text="senseDefinition(sense, activeLang)"
+                  /></span>
+                  <button
+                    v-if="!shouldShowSenseTerm(sense) && !sensePronunciation(sense, activeLang).label"
+                    @click="copy(formatSenseCopyText(sense), `sense-${senseKey(sense)}`)"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors shrink-0"
+                    :aria-label="isCopied(`sense-${senseKey(sense)}`) ? '已复制' : '复制释义'"
+                    :title="isCopied(`sense-${senseKey(sense)}`) ? '已复制' : '复制释义'"
+                  >
+                    <Check v-if="isCopied(`sense-${senseKey(sense)}`)" class="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                    <Copy v-else class="w-3.5 h-3.5 opacity-70" />
+                  </button>
+                </div>
 
                 <!-- Sense Scoped Examples -->
                 <div v-if="senseExamples(sense).length > 0" class="mt-4 flex flex-col gap-3">
