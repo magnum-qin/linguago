@@ -77,9 +77,9 @@ const splitDefinitions = (text: string) => {
       >
         <div class="flex items-center gap-2 mb-3">
           <span class="w-1.5 h-3.5 rounded-full bg-m3-primary"></span>
-          <h4 class="text-[0.82rem] font-bold text-m3-on-surface tracking-wide flex items-center gap-2">
-            释义
-            <span class="px-2 py-0.5 rounded-full bg-m3-primary/10 text-m3-primary text-[0.65rem] font-semibold tracking-normal uppercase">
+          <h4 class="text-[0.82rem] font-bold text-m3-on-surface tracking-wide flex items-center">
+            <span>释义</span>
+            <span class="text-[0.68rem] text-m3-on-surface-variant/70 font-medium border-l border-m3-outline-variant/40 pl-2 ml-2">
               Definições
             </span>
           </h4>
@@ -125,7 +125,7 @@ const splitDefinitions = (text: string) => {
                     v-if="sensePronunciation(sense, activeLang).label"
                     @click="speak(senseTerm(sense, activeLang), activeLang)"
                     class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-m3-primary/10 text-m3-primary text-[0.8rem] font-bold tracking-wide hover:bg-m3-primary hover:text-m3-on-primary transition-all shadow-xs"
-                    title="朗读发音 / Pronunciar"
+                    title="朗读发音 | Pronunciar"
                     aria-label="朗读发音"
                   >
                     <Volume2 class="w-3.5 h-3.5 opacity-80" />
@@ -193,7 +193,7 @@ const splitDefinitions = (text: string) => {
                       <button
                         @click="speak(example.sentence, sourceLanguageCode)"
                         class="inline-flex items-center justify-center w-7 h-7 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
-                        title="朗读例句 / Pronunciar"
+                        title="朗读例句 | Pronunciar"
                         aria-label="朗读例句"
                       >
                         <Volume2 class="w-3.5 h-3.5 opacity-75" />
@@ -220,9 +220,9 @@ const splitDefinitions = (text: string) => {
       <div v-if="currentExamples.length > 0 && !hasSenseScopedExamples" class="pt-6 pb-2">
         <div class="flex items-center gap-2 mb-3">
           <span class="w-1.5 h-3.5 rounded-full bg-m3-primary"></span>
-          <h4 class="text-[0.82rem] font-bold text-m3-on-surface tracking-wide flex items-center gap-2">
-            例句
-            <span class="px-2 py-0.5 rounded-full bg-m3-primary/10 text-m3-primary text-[0.65rem] font-semibold tracking-normal uppercase">
+          <h4 class="text-[0.82rem] font-bold text-m3-on-surface tracking-wide flex items-center">
+            <span>例句</span>
+            <span class="text-[0.68rem] text-m3-on-surface-variant/70 font-medium border-l border-m3-outline-variant/40 pl-2 ml-2">
               Exemplos
             </span>
           </h4>
@@ -251,7 +251,7 @@ const splitDefinitions = (text: string) => {
                 <button
                   @click="speak(example.sentence, sourceLanguageCode)"
                   class="inline-flex items-center justify-center w-7 h-7 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
-                  title="朗读例句 / Pronunciar"
+                  title="朗读例句 | Pronunciar"
                   aria-label="朗读例句"
                 >
                   <Volume2 class="w-3.5 h-3.5 opacity-75" />

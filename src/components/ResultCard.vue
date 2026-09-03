@@ -271,8 +271,8 @@ onUnmounted(() => {
               type="button"
               class="w-9 h-9 inline-flex items-center justify-center bg-transparent hover:bg-m3-surface-variant/50 rounded-full text-m3-on-surface-variant transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-m3-primary"
               @click="copyAllResult"
-              :aria-label="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
-              @title="isCopied('all-result') ? '已复制结果' : '复制翻译结果 / Copiar'"
+              :aria-label="isCopied('all-result') ? '已复制结果' : '复制翻译结果 | Copiar'"
+              @title="isCopied('all-result') ? '已复制结果' : '复制翻译结果 | Copiar'"
             >
               <Transition name="m3-icon-swap" mode="out-in">
                 <Check v-if="isCopied('all-result')" key="check" class="w-4.5 h-4.5 text-green-600 dark:text-green-400" />
@@ -289,7 +289,7 @@ onUnmounted(() => {
                   : 'bg-transparent hover:bg-m3-surface-variant/50'
               "
               @click="toggleBookmark(currentWord)"
-              aria-label="收藏 / Favorito"
+              aria-label="收藏 | Favorito"
             >
               <Star class="w-5 h-5" :class="isBookmarked(currentWord) ? 'fill-current' : ''" />
             </button>
@@ -298,7 +298,7 @@ onUnmounted(() => {
               type="button"
               class="w-9 h-9 inline-flex items-center justify-center bg-transparent hover:bg-m3-surface-variant/50 rounded-full text-m3-on-surface-variant transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-m3-primary"
               @click="isReportModalOpen = true"
-              aria-label="报告翻译问题 / Reportar"
+              aria-label="报告翻译问题 | Reportar"
             >
               <Flag class="w-4.5 h-4.5" />
             </button>
@@ -348,7 +348,7 @@ onUnmounted(() => {
                 v-if="primaryPhonetic"
                 @click="speak(parsedHeadwords.primary, activeLang)"
                 class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-m3-primary/10 text-m3-primary text-[0.85rem] font-bold tracking-wide hover:bg-m3-primary hover:text-m3-on-primary transition-all shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-m3-primary active:scale-95 cursor-pointer"
-                title="朗读发音 / Pronunciar"
+                title="朗读发音 | Pronunciar"
                 aria-label="朗读发音"
               >
                 <Volume2 class="w-3.5 h-3.5 opacity-80" />
@@ -362,7 +362,7 @@ onUnmounted(() => {
                   v-if="!primaryPhonetic"
                   @click="speak(parsedHeadwords.primary, activeLang)"
                   class="inline-flex items-center justify-center w-9 h-9 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors cursor-pointer"
-                  title="朗读词条 / Pronunciar"
+                  title="朗读词条 | Pronunciar"
                   aria-label="朗读词条"
                 >
                   <Volume2 class="w-5 h-5 opacity-80" />
@@ -386,8 +386,9 @@ onUnmounted(() => {
               v-if="parsedHeadwords.alternatives.length > 0"
               class="flex flex-wrap items-center gap-2 mb-4 pt-1"
             >
-              <span class="text-[0.72rem] font-bold uppercase tracking-wider text-m3-outline shrink-0 mr-1">
-                其他译法 / Outras:
+              <span class="text-[0.72rem] font-bold tracking-wider text-m3-outline shrink-0 mr-1 inline-flex items-center">
+                <span>其他译法</span>
+                <span class="text-[0.65rem] opacity-70 font-medium border-l border-m3-outline-variant/40 pl-1.5 ml-1.5">Outras</span>
               </span>
               <div
                 v-for="(alt, idx) in parsedHeadwords.alternatives"
@@ -405,7 +406,7 @@ onUnmounted(() => {
                   type="button"
                   @click.stop="speak(alt, activeLang)"
                   class="w-5 h-5 rounded-full inline-flex items-center justify-center text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors cursor-pointer ml-0.5"
-                  title="朗读发音 / Pronunciar"
+                  title="朗读发音 | Pronunciar"
                   :aria-label="`朗读 ${alt}`"
                 >
                   <Volume2 class="w-3 h-3" />
@@ -414,7 +415,7 @@ onUnmounted(() => {
                   type="button"
                   @click.stop="copy(alt, `alt-word-${idx}`)"
                   class="w-5 h-5 rounded-full inline-flex items-center justify-center text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors cursor-pointer"
-                  title="复制词条 / Copiar"
+                  title="复制词条 | Copiar"
                   :aria-label="`复制 ${alt}`"
                 >
                   <Transition name="m3-icon-swap" mode="out-in">

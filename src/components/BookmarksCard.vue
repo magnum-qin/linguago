@@ -18,9 +18,9 @@ const loadWord = (word: string) => {
 <template>
   <M3DrawerShell
     v-model="isBookmarksOpen"
-    title="生词本 / Caderno"
+    title="生词本 | Caderno"
     title-id="bookmarks-drawer-title"
-    close-label="关闭生词本 / Fechar caderno"
+    close-label="关闭生词本 | Fechar caderno"
   >
     <template #icon>
       <Bookmark class="h-5 w-5 shrink-0 text-m3-primary" aria-hidden="true" />
@@ -29,12 +29,13 @@ const loadWord = (word: string) => {
     <Transition name="m3-fade-scale" mode="out-in">
       <div v-if="bookmarks.length === 0" key="empty" class="drawer-empty-state">
         <Bookmark class="mb-4 h-12 w-12 text-m3-outline-variant/60" aria-hidden="true" />
-        <p class="text-sm font-medium text-m3-on-surface-variant">
-          还没有收藏任何单词<br />
+        <p class="text-sm font-medium text-m3-on-surface-variant flex flex-col items-center">
+          <span>还没有收藏任何单词</span>
           <span class="mt-0.5 inline-block text-[0.8rem] text-m3-outline">Nenhuma palavra salva</span>
         </p>
-        <p class="mt-5 text-xs leading-relaxed text-m3-outline">
-          点击结果旁的星标加入生词本<br />Clique na estrela ao lado para salvar
+        <p class="mt-5 text-xs leading-relaxed text-m3-outline flex flex-col items-center">
+          <span>点击结果旁的星标加入生词本</span>
+          <span class="mt-0.5 inline-block text-[0.75rem] opacity-75">Clique na estrela ao lado para salvar</span>
         </p>
       </div>
 
@@ -53,7 +54,7 @@ const loadWord = (word: string) => {
           <button
             type="button"
             class="drawer-item-action"
-            :aria-label="`移除收藏 ${word} / Remover ${word}`"
+            :aria-label="`移除收藏 ${word} | Remover ${word}`"
             @click.stop="removeBookmark(word)"
           >
             <Trash2 class="h-4 w-4" aria-hidden="true" />

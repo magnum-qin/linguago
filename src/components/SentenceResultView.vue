@@ -47,9 +47,9 @@ const currentExplanation = computed(() => {
       <div class="flex items-center justify-between gap-2 mb-3">
         <div class="flex items-center gap-2">
           <span class="w-1.5 h-3.5 rounded-full bg-m3-primary"></span>
-          <h4 class="text-[0.82rem] font-bold text-m3-on-surface tracking-wide flex items-center gap-2">
-            句意解析
-            <span class="px-2 py-0.5 rounded-full bg-m3-primary/10 text-m3-primary text-[0.65rem] font-semibold tracking-normal uppercase">
+          <h4 class="text-[0.82rem] font-bold text-m3-on-surface tracking-wide flex items-center">
+            <span>句意解析</span>
+            <span class="text-[0.68rem] text-m3-on-surface-variant/70 font-medium border-l border-m3-outline-variant/40 pl-2 ml-2">
               Explicação
             </span>
           </h4>
@@ -58,7 +58,7 @@ const currentExplanation = computed(() => {
           <button
             @click="speak(currentExplanation, activeLang)"
             class="inline-flex items-center justify-center w-8 h-8 rounded-full text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 transition-colors"
-            title="朗读句意解析 / Pronunciar"
+            title="朗读句意解析 | Pronunciar"
             aria-label="朗读句意解析"
           >
             <Volume2 class="w-4 h-4 opacity-80" />

@@ -6,7 +6,7 @@ const {
   modelValue,
   title,
   titleId,
-  closeLabel = '关闭 / Fechar'
+  closeLabel = '关闭 | Fechar'
 } = defineProps<{
   modelValue: boolean;
   title: string;

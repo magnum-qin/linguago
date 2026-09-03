@@ -21,12 +21,12 @@ const isReported = ref(false);
 const reportError = ref('');
 
 const reportOptions = [
-  { value: '', label: '快速一键报告 / Relatório rápido' },
-  { value: '拼写错误', label: '拼写错误 / Erro ortográfico' },
-  { value: '语法错误', label: '语法错误 / Erro gramatical' },
-  { value: '语境不符', label: '语境不符 / Contexto incorreto' },
-  { value: '发音不准确', label: '发音不准确 / Pronúncia imprecisa' },
-  { value: '其他问题', label: '其他问题 / Outro' }
+  { value: '', label: '快速一键报告 | Relatório rápido' },
+  { value: '拼写错误', label: '拼写错误 | Erro ortográfico' },
+  { value: '语法错误', label: '语法错误 | Erro gramatical' },
+  { value: '语境不符', label: '语境不符 | Contexto incorreto' },
+  { value: '发音不准确', label: '发音不准确 | Pronúncia imprecisa' },
+  { value: '其他问题', label: '其他问题 | Outro' }
 ];
 
 const close = () => {
@@ -48,7 +48,7 @@ const submitReport = async () => {
     isReported.value = true;
     setTimeout(() => emit('close'), 1600);
   } catch {
-    reportError.value = '提交失败，请重试 / Falha ao enviar. Tente novamente.';
+    reportError.value = '提交失败，请重试 | Falha ao enviar. Tente novamente.';
   } finally {
     isReporting.value = false;
   }
@@ -69,10 +69,10 @@ watch(
 <template>
   <M3ModalShell
     :model-value="isOpen"
-    title="报告翻译问题 / Reportar"
+    title="报告翻译问题 | Reportar"
     title-id="feedback-dialog-title"
     :max-width="460"
-    close-label="关闭反馈 / Fechar relatório"
+    close-label="关闭反馈 | Fechar relatório"
     @update:model-value="close"
   >
     <template #title-icon>
@@ -80,12 +80,16 @@ watch(
     </template>
 
     <div class="feedback-content">
-      <p class="feedback-description">
-        发现翻译结果不准确？提交快速报告以帮助我们优化系统。 / Ajude-nos a melhorar a tradução.
+      <p class="feedback-description flex flex-col gap-0.5">
+        <span>发现翻译结果不准确？提交快速报告以帮助我们优化系统。</span>
+        <span class="text-[0.75rem] opacity-70">Ajude-nos a melhorar a tradução.</span>
       </p>
 
       <div class="feedback-field">
-        <label class="feedback-label" for="feedback-reason">问题类型 / Tipo de problema</label>
+        <label class="feedback-label flex items-center" for="feedback-reason">
+          <span>问题类型</span>
+          <span class="text-[0.68rem] opacity-60 font-medium border-l border-m3-outline-variant/40 pl-1.5 ml-1.5">Tipo de problema</span>
+        </label>
         <M3Select
           id="feedback-reason"
           v-model="reportReason"
@@ -97,9 +101,10 @@ watch(
         <p v-if="reportError" class="feedback-error" role="alert">{{ reportError }}</p>
       </Transition>
       <Transition name="m3-expand">
-        <div v-if="isReported" class="feedback-success" role="status">
-          <Check class="h-4 w-4" aria-hidden="true" />
-          感谢反馈 / Obrigado!
+        <div v-if="isReported" class="feedback-success inline-flex items-center" role="status">
+          <Check class="h-4 w-4 mr-1.5" aria-hidden="true" />
+          <span>感谢反馈</span>
+          <span class="text-[0.78rem] opacity-75 font-normal border-l border-current/30 pl-1.5 ml-1.5">Obrigado!</span>
         </div>
       </Transition>
     </div>
@@ -108,20 +113,25 @@ watch(
       <div class="feedback-actions">
         <button
           type="button"
-          class="m3-button m3-button--cancel"
+          class="m3-button m3-button--cancel inline-flex items-center justify-center"
           :disabled="isReporting || isReported"
           @click="close"
         >
-          取消 / Cancelar
+          <span>取消</span><span class="text-[0.78rem] opacity-75 font-normal border-l border-current/30 pl-1.5 ml-1.5">Cancelar</span>
         </button>
         <button
           type="button"
-          class="m3-button m3-button--primary"
+          class="m3-button m3-button--primary inline-flex items-center justify-center"
           :disabled="isReporting || isReported"
           @click="submitReport"
         >
           <Loader2 v-if="isReporting" class="mr-2 h-4 w-4 animate-spin inline-block" aria-hidden="true" />
-          {{ isReporting ? '提交中 / Enviando' : '提交 / Enviar' }}
+          <span v-if="isReporting" class="inline-flex items-center">
+            <span>提交中</span><span class="text-[0.78rem] opacity-80 font-normal border-l border-current/30 pl-1.5 ml-1.5">Enviando</span>
+          </span>
+          <span v-else class="inline-flex items-center">
+            <span>提交</span><span class="text-[0.78rem] opacity-80 font-normal border-l border-current/30 pl-1.5 ml-1.5">Enviar</span>
+          </span>
         </button>
       </div>
     </template>

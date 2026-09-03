@@ -271,14 +271,14 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
           <button
             v-if="inputText.length > 0"
             data-testid="clear-button"
-            aria-label="清空 / Limpar"
+            aria-label="清空 | Limpar"
             type="button"
             class="h-11 flex items-center justify-center rounded-full px-4 sm:px-5 text-[0.85rem] font-bold text-m3-on-surface bg-m3-surface shadow-sm border border-m3-outline-variant/30 hover:bg-m3-surface-container-high transition-all outline-none focus-visible:ring-2 focus-visible:ring-m3-primary absolute left-0 z-10 whitespace-nowrap tracking-normal normal-case cursor-pointer"
             @click="handleClear"
           >
             <X class="w-3.5 h-3.5 mr-1.5 shrink-0" />
             <span class="font-bold">清空</span>
-            <span class="text-[0.72rem] opacity-65 font-normal ml-1">Limpar</span>
+            <span class="text-[0.72rem] opacity-65 font-normal border-l border-m3-outline-variant/50 pl-1.5 ml-1.5 inline-flex items-center">Limpar</span>
           </button>
         </Transition>
 
@@ -287,7 +287,7 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
           type="button"
           class="h-11 flex items-center justify-center rounded-[28px] rounded-br-sm px-5 sm:px-6 text-[0.85rem] font-bold text-m3-on-primary hover:opacity-90 transition-colors disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-m3-surface-container focus-visible:ring-m3-primary ml-auto z-10 relative shrink-0 whitespace-nowrap tracking-normal normal-case cursor-pointer"
           :class="isTranslating ? 'bg-[#BA1A1A]' : 'bg-m3-primary'"
-          :aria-label="isTranslating ? '中止翻译 / Parar tradução' : '翻译 / Traduzir'"
+          :aria-label="isTranslating ? '中止翻译 | Parar tradução' : '翻译 | Traduzir'"
           @click="handlePrimaryAction"
           :disabled="!isTranslating && !inputText.trim()"
         >
@@ -295,12 +295,12 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
             <span v-if="isTranslating" key="stop" class="inline-flex items-center">
               <Square class="w-3.5 h-3.5 mr-1.5 fill-current shrink-0" />
               <span class="font-bold">中止</span>
-              <span class="text-[0.72rem] opacity-70 font-normal ml-1">Parar</span>
+              <span class="text-[0.72rem] opacity-75 font-normal border-l border-current/30 pl-1.5 ml-1.5 inline-flex items-center">Parar</span>
             </span>
             <span v-else key="translate" class="inline-flex items-center">
               <Languages class="w-3.5 h-3.5 mr-1.5 shrink-0" />
               <span class="font-bold">翻译</span>
-              <span class="text-[0.72rem] opacity-70 font-normal ml-1">Traduzir</span>
+              <span class="text-[0.72rem] opacity-75 font-normal border-l border-current/30 pl-1.5 ml-1.5 inline-flex items-center">Traduzir</span>
             </span>
           </Transition>
         </button>

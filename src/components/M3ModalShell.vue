@@ -11,7 +11,7 @@ const {
   modelValue,
   title,
   titleId,
-  closeLabel = '关闭 / Fechar',
+  closeLabel = '关闭 | Fechar',
   maxWidth = 420,
   fixedHeight = false
 } = defineProps<{

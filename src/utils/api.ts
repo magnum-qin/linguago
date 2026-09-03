@@ -26,7 +26,7 @@ async function request<T = unknown>(url: string, options: RequestInit = {}): Pro
     const error = err instanceof Error ? err : new Error(String(err));
     // Browser native connection failure error name
     if (error.message === 'Failed to fetch') {
-      const offlineMsg = '网络连接失败，请检查您的网络连接 / Sem conexão com a internet';
+      const offlineMsg = '网络连接失败，请检查您的网络连接 | Sem conexão com a internet';
       window.dispatchEvent(new CustomEvent('api-error', { detail: { message: offlineMsg } }));
       throw new Error(offlineMsg);
     }
@@ -91,7 +91,7 @@ export async function openTranslationStream(payload: TranslatePayload, signal?: 
       throw err;
     }
     if (err instanceof Error && err.message === 'Failed to fetch') {
-      const offlineMsg = '网络连接失败，请检查您的网络连接 / Sem conexão com a internet';
+      const offlineMsg = '网络连接失败，请检查您的网络连接 | Sem conexão com a internet';
       window.dispatchEvent(new CustomEvent('api-error', { detail: { message: offlineMsg } }));
       throw new Error(offlineMsg);
     }

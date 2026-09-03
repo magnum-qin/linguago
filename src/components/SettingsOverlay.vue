@@ -23,9 +23,9 @@ let originalSettings = {
 };
 
 const providerOptions = [
-  { value: 'auto', label: '智能路由 / Auto' },
+  { value: 'auto', label: '智能路由 | Auto' },
   { value: 'cloudflare', label: 'Cloudflare Workers AI' },
-  { value: 'dashscope', label: '阿里云百炼 / DashScope' },
+  { value: 'dashscope', label: '阿里云百炼 | DashScope' },
   { value: 'gemini', label: 'Google Gemini' },
   { value: 'deepseek', label: 'DeepSeek' }
 ];
@@ -33,7 +33,7 @@ const providerOptions = [
 const isEditingModels = computed(() => activePage.value === 'models');
 const isEditableProvider = computed(() => EDITABLE_PROVIDERS.includes(settings.provider));
 const currentModels = computed(() => getModelsForProvider(settings.provider));
-const dialogTitle = computed(() => (isEditingModels.value ? '模型管理 / Modelos' : '设置 / Configurações'));
+const dialogTitle = computed(() => (isEditingModels.value ? '模型管理 | Modelos' : '设置 | Configurações'));
 
 const editableModels = computed({
   get: () => settings.modelOptions?.[settings.provider] || getModelsForProvider(settings.provider),
@@ -155,14 +155,14 @@ onUnmounted(() => {
     :title="dialogTitle"
     title-id="settings-dialog-title"
     fixed-height
-    close-label="关闭设置 / Fechar configurações"
+    close-label="关闭设置 | Fechar configurações"
     @update:model-value="onDialogUpdate"
   >
     <template v-if="isEditingModels" #leading>
       <button
         type="button"
         class="settings-back-button"
-        aria-label="返回设置 / Voltar às configurações"
+        aria-label="返回设置 | Voltar às configurações"
         @click="activePage = 'settings'"
       >
         <ArrowLeft class="h-5 w-5" aria-hidden="true" />
@@ -172,7 +172,10 @@ onUnmounted(() => {
     <Transition name="settings-page" mode="out-in">
       <div v-if="!isEditingModels" key="settings" class="settings-page">
         <section class="setting-field">
-          <label class="setting-label" for="translation-provider">翻译服务 / Provedor</label>
+          <label class="setting-label flex items-center" for="translation-provider">
+            <span>翻译服务</span>
+            <span class="text-[0.68rem] opacity-60 font-medium border-l border-m3-outline-variant/40 pl-1.5 ml-1.5">Provedor</span>
+          </label>
           <M3Select
             id="translation-provider"
             v-model="settings.provider"
@@ -181,7 +184,10 @@ onUnmounted(() => {
         </section>
 
         <section class="setting-field">
-          <label class="setting-label" for="translation-model">AI 模型 / Modelo</label>
+          <label class="setting-label flex items-center" for="translation-model">
+            <span>AI 模型</span>
+            <span class="text-[0.68rem] opacity-60 font-medium border-l border-m3-outline-variant/40 pl-1.5 ml-1.5">Modelo</span>
+          </label>
           <M3Select
             id="translation-model"
             v-model="settings.model"
@@ -192,31 +198,42 @@ onUnmounted(() => {
             <button
               type="button"
               :disabled="isVerifying"
-              class="m3-button m3-button--secondary"
+              class="m3-button m3-button--secondary inline-flex items-center justify-center"
               @click="verifyModelSetting"
             >
               <Loader2 v-if="verifyStatus === 'loading'" class="mr-1.5 h-4 w-4 shrink-0 animate-spin inline-block" />
               <Check v-else-if="verifyStatus === 'success'" class="mr-1.5 h-4 w-4 shrink-0 inline-block" />
               <X v-else-if="verifyStatus === 'error'" class="mr-1.5 h-4 w-4 shrink-0 inline-block" />
-              <span v-if="verifyStatus === 'loading'">验证中 / Validando</span>
-              <span v-else-if="verifyStatus === 'success'">连接成功 / Conectado</span>
-              <span v-else-if="verifyStatus === 'error'">连接失败 / Erro</span>
-              <span v-else>测试连接 / Testar</span>
+              <span v-if="verifyStatus === 'loading'" class="inline-flex items-center">
+                <span>验证中</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Validando</span>
+              </span>
+              <span v-else-if="verifyStatus === 'success'" class="inline-flex items-center">
+                <span>连接成功</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Conectado</span>
+              </span>
+              <span v-else-if="verifyStatus === 'error'" class="inline-flex items-center">
+                <span>连接失败</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Erro</span>
+              </span>
+              <span v-else class="inline-flex items-center">
+                <span>测试连接</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Testar</span>
+              </span>
             </button>
             <button
               v-if="isEditableProvider"
               type="button"
-              class="m3-button m3-button--secondary"
+              class="m3-button m3-button--secondary inline-flex items-center justify-center"
               @click="activePage = 'models'"
             >
-              编辑模型 / Editar
+              <span>编辑模型</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Editar</span>
             </button>
           </div>
         </section>
 
         <section class="setting-field">
-          <span class="setting-label">个性化主题 / Temas</span>
-          <div class="theme-options" role="group" aria-label="个性化主题 / Temas">
+          <span class="setting-label flex items-center">
+            <span>个性化主题</span>
+            <span class="text-[0.68rem] opacity-60 font-medium border-l border-m3-outline-variant/40 pl-1.5 ml-1.5">Temas</span>
+          </span>
+          <div class="theme-options" role="group" aria-label="个性化主题 | Temas">
             <button
               v-for="color in ['blue', 'rose', 'mint', 'amber', 'violet', 'classic']"
               :key="color"
@@ -234,7 +251,7 @@ onUnmounted(() => {
                 }
               ]"
               :aria-pressed="settings.colorScheme === color"
-              :aria-label="`切换到 ${color} 主题 / Mudar para o tema ${color}`"
+              :aria-label="`切换到 ${color} 主题 | Mudar para o tema ${color}`"
               @click="settings.colorScheme = color"
             ></button>
           </div>
@@ -253,17 +270,30 @@ onUnmounted(() => {
           />
           <Check v-else-if="updateStatus === 'current'" class="mr-2 h-4 w-4 shrink-0" />
           <RefreshCw v-else class="mr-2 h-4 w-4 shrink-0" />
-          <span v-if="updateStatus === 'checking'">检查中 / Verificando</span>
-          <span v-else-if="updateStatus === 'current'">已是最新版本 / Atualizado</span>
-          <span v-else-if="updateStatus === 'updating'">正在更新 / Atualizando</span>
-          <span v-else-if="updateStatus === 'error'">检查失败 / Tentar novamente</span>
-          <span v-else>检查更新 / Verificar atualização</span>
+          <span v-if="updateStatus === 'checking'" class="inline-flex items-center">
+            <span>检查中</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Verificando</span>
+          </span>
+          <span v-else-if="updateStatus === 'current'" class="inline-flex items-center">
+            <span>已是最新版本</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Atualizado</span>
+          </span>
+          <span v-else-if="updateStatus === 'updating'" class="inline-flex items-center">
+            <span>正在更新</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Atualizando</span>
+          </span>
+          <span v-else-if="updateStatus === 'error'" class="inline-flex items-center">
+            <span>检查失败</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Tentar novamente</span>
+          </span>
+          <span v-else class="inline-flex items-center">
+            <span>检查更新</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Verificar atualização</span>
+          </span>
         </button>
       </div>
 
       <div v-else key="models" class="model-manager">
         <div class="model-manager-context">
-          <span class="setting-label">当前服务 / Provedor</span>
+          <span class="setting-label flex items-center">
+            <span>当前服务</span>
+            <span class="text-[0.68rem] opacity-60 font-medium border-l border-m3-outline-variant/40 pl-1.5 ml-1.5">Provedor</span>
+          </span>
           <strong>{{ providerOptions.find((item) => item.value === settings.provider)?.label }}</strong>
         </div>
 
@@ -272,14 +302,14 @@ onUnmounted(() => {
           name="m3-list"
           class="model-list relative"
           role="list"
-          aria-label="模型列表 / Lista de modelos"
+          aria-label="模型列表 | Lista de modelos"
         >
           <div v-for="model in editableModels" :key="model" class="model-row" role="listitem">
             <span class="model-row-name" :title="model">{{ model }}</span>
             <button
               type="button"
               class="model-remove-button"
-              :aria-label="`删除模型 ${model} / Remover modelo ${model}`"
+              :aria-label="`删除模型 ${model} | Remover modelo ${model}`"
               @click="removeModel(model)"
             >
               <Trash2 class="h-4 w-4" aria-hidden="true" />
@@ -288,19 +318,22 @@ onUnmounted(() => {
         </TransitionGroup>
 
         <form class="model-add-form" @submit.prevent="addModel">
-          <label class="setting-label" :for="modelInputId">添加模型 / Adicionar modelo</label>
+          <label class="setting-label flex items-center" :for="modelInputId">
+            <span>添加模型</span>
+            <span class="text-[0.68rem] opacity-60 font-medium border-l border-m3-outline-variant/40 pl-1.5 ml-1.5">Adicionar modelo</span>
+          </label>
           <div class="model-add-row">
             <input
               :id="modelInputId"
               v-model="newModelName"
               type="text"
               autocomplete="off"
-              placeholder="输入模型标识 / Inserir ID"
+              placeholder="输入模型标识 | Inserir ID"
               class="model-add-input"
             />
-            <button type="submit" class="model-add-button" :disabled="!newModelName.trim()">
+            <button type="submit" class="model-add-button inline-flex items-center justify-center" :disabled="!newModelName.trim()">
               <Plus class="h-4 w-4" aria-hidden="true" />
-              <span>添加 / Adic.</span>
+              <span>添加</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Adic.</span>
             </button>
           </div>
         </form>
@@ -309,11 +342,15 @@ onUnmounted(() => {
 
     <template #actions>
       <div v-if="!isEditingModels" class="dialog-action-grid">
-        <button type="button" class="m3-button m3-button--cancel" @click="close">取消 / Cancelar</button>
-        <button type="button" class="m3-button m3-button--primary" @click="saveAndClose">确认 / Confirmar</button>
+        <button type="button" class="m3-button m3-button--cancel inline-flex items-center justify-center" @click="close">
+          <span>取消</span><span class="text-[0.78rem] opacity-75 font-normal border-l border-current/30 pl-1.5 ml-1.5">Cancelar</span>
+        </button>
+        <button type="button" class="m3-button m3-button--primary inline-flex items-center justify-center" @click="saveAndClose">
+          <span>确认</span><span class="text-[0.78rem] opacity-80 font-normal border-l border-current/30 pl-1.5 ml-1.5">Confirmar</span>
+        </button>
       </div>
-      <button v-else type="button" class="m3-button m3-button--primary w-full" @click="activePage = 'settings'">
-        完成 / Concluído
+      <button v-else type="button" class="m3-button m3-button--primary w-full inline-flex items-center justify-center" @click="activePage = 'settings'">
+        <span>完成</span><span class="text-[0.78rem] opacity-80 font-normal border-l border-current/30 pl-1.5 ml-1.5">Concluído</span>
       </button>
     </template>
   </M3ModalShell>

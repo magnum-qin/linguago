@@ -29,9 +29,9 @@ const formatTime = (value: string) => {
 <template>
   <M3DrawerShell
     v-model="isHistoryOpen"
-    title="搜索历史 / Histórico"
+    title="搜索历史 | Histórico"
     title-id="history-drawer-title"
-    close-label="关闭搜索历史 / Fechar histórico"
+    close-label="关闭搜索历史 | Fechar histórico"
   >
     <template #icon>
       <History class="h-5 w-5 shrink-0 text-m3-primary" aria-hidden="true" />
@@ -40,16 +40,18 @@ const formatTime = (value: string) => {
     <Transition name="m3-fade-scale" mode="out-in">
       <div v-if="historyItems.length === 0" key="empty" class="drawer-empty-state">
         <History class="mb-4 h-12 w-12 text-m3-outline-variant/60" aria-hidden="true" />
-        <p class="text-sm font-medium text-m3-on-surface-variant">
-          还没有搜索记录<br />
+        <p class="text-sm font-medium text-m3-on-surface-variant flex flex-col items-center">
+          <span>还没有搜索记录</span>
           <span class="mt-0.5 inline-block text-[0.8rem] text-m3-outline">Nenhuma busca recente</span>
         </p>
       </div>
 
       <div v-else key="list" class="drawer-list relative">
         <div class="flex justify-end">
-          <button type="button" class="drawer-clear-button" @click="clearHistory">
-            <X class="h-3.5 w-3.5" aria-hidden="true" />清空 / Limpar
+          <button type="button" class="drawer-clear-button inline-flex items-center" @click="clearHistory">
+            <X class="h-3.5 w-3.5" aria-hidden="true" />
+            <span>清空</span>
+            <span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5 inline-flex items-center">Limpar</span>
           </button>
         </div>
 
@@ -71,7 +73,7 @@ const formatTime = (value: string) => {
             <button
               type="button"
               class="drawer-item-action"
-              :aria-label="`移除历史 ${item.text} / Remover ${item.text}`"
+              :aria-label="`移除历史 ${item.text} | Remover ${item.text}`"
               @click.stop="removeHistory(item.text)"
             >
               <Trash2 class="h-4 w-4" aria-hidden="true" />
