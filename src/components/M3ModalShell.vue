@@ -4,7 +4,6 @@ import { X } from 'lucide-vue-next';
 import {
   DialogRoot,
   DialogPortal,
-  DialogOverlay,
   DialogContent
 } from 'radix-vue';
 
@@ -35,10 +34,10 @@ const requestClose = () => emit('update:modelValue', false);
 </script>
 
 <template>
-  <DialogRoot :open="modelValue" @update:open="emit('update:modelValue', $event)">
+  <DialogRoot :open="modelValue" :modal="false" @update:open="emit('update:modelValue', $event)">
     <DialogPortal>
       <Transition name="m3-scrim-fade">
-        <DialogOverlay
+        <div
           v-if="modelValue"
           class="m3-dialog-scrim fixed inset-0 z-[2400]"
           @click="requestClose"
@@ -54,6 +53,7 @@ const requestClose = () => emit('update:modelValue', false);
             :style="{ maxWidth: typeof maxWidth === 'number' ? `${maxWidth}px` : maxWidth }"
             @pointer-down-outside="(event) => event.preventDefault()"
             @interact-outside="(event) => event.preventDefault()"
+            @focus-outside="(event) => event.preventDefault()"
           >
             <div class="m3-dialog-card" :class="{ 'm3-dialog-card--fixed': fixedHeight }">
               <header class="m3-dialog-header" @touchmove.stop.prevent>
