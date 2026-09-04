@@ -63,12 +63,12 @@ const currentDisplayLabel = computed(() => {
     >
       <SelectTrigger
         :id="`${resolvedId}-trigger`"
-        class="m3-native-select w-full flex items-center justify-between px-4 py-3.5 rounded-2xl bg-m3-surface border border-m3-outline-variant/30 text-m3-on-surface font-medium text-[0.92rem] hover:bg-m3-surface-container-high focus:outline-none focus:ring-2 focus:ring-m3-primary transition-colors cursor-pointer select-none text-left"
+        class="m3-native-select group w-full flex items-center justify-between px-4 py-3.5 rounded-2xl bg-m3-surface border border-m3-outline-variant/30 text-m3-on-surface font-medium text-[0.92rem] hover:bg-m3-surface-container-high focus:outline-none focus:ring-2 focus:ring-m3-primary transition-colors cursor-pointer select-none text-left"
       >
         <SelectValue class="truncate text-m3-on-surface">
           {{ currentDisplayLabel }}
         </SelectValue>
-        <ChevronDown class="h-5 w-5 text-m3-on-surface-variant opacity-70 shrink-0 ml-2" aria-hidden="true" />
+        <ChevronDown class="m3-select-chevron h-5 w-5 text-m3-on-surface-variant opacity-70 shrink-0 ml-2 transition-transform duration-200 ease-out group-data-[state=open]:rotate-180" aria-hidden="true" />
       </SelectTrigger>
 
       <SelectPortal>

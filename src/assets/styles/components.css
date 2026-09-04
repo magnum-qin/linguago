@@ -29,6 +29,8 @@
   max-width: calc(100vw - 24px);
   max-height: min(260px, calc(100dvh - 160px));
   overscroll-behavior: contain;
+  transform-origin: var(--radix-select-content-transform-origin, top center);
+  will-change: transform, opacity;
 }
 
 :root[data-theme='dark'] .m3-select-menu-content {
@@ -40,6 +42,78 @@
     max-width: calc(100vw - 58px);
     max-height: min(240px, calc(100dvh - 168px));
   }
+}
+
+/* Material 3 Select Motion */
+@keyframes m3-select-in-bottom {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes m3-select-out-bottom {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+}
+
+@keyframes m3-select-in-top {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes m3-select-out-top {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+}
+
+.m3-select-menu-content[data-state='open'] {
+  animation: m3-select-in-bottom 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.m3-select-menu-content[data-state='closed'] {
+  animation: m3-select-out-bottom 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.m3-select-menu-content[data-side='top'][data-state='open'] {
+  transform-origin: var(--radix-select-content-transform-origin, bottom center);
+  animation-name: m3-select-in-top;
+}
+
+.m3-select-menu-content[data-side='top'][data-state='closed'] {
+  transform-origin: var(--radix-select-content-transform-origin, bottom center);
+  animation-name: m3-select-out-top;
+}
+
+/* Trigger chevron rotation */
+.m3-native-select .m3-select-chevron {
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.m3-native-select[data-state='open'] .m3-select-chevron {
+  transform: rotate(180deg);
 }
 
 /* Material 3 Buttons */
