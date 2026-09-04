@@ -23,11 +23,11 @@ export const DEFAULT_MODELS: Record<Provider, string> = {
   auto: '@cf/zai-org/glm-4.7-flash',
   cloudflare: '@cf/zai-org/glm-4.7-flash',
   dashscope: 'qwen3.8-flash',
-  gemini: 'gemini-3.5-flash',
+  gemini: 'gemini-3.8-flash',
   deepseek: 'deepseek-v4-flash'
 };
 
-export const MODEL_OPTIONS_VERSION = 7;
+export const MODEL_OPTIONS_VERSION = 8;
 export const EDITABLE_PROVIDERS: Exclude<Provider, 'auto'>[] = ['cloudflare', 'dashscope', 'gemini', 'deepseek'];
 
 export const MODEL_OPTIONS: Record<Provider, string[]> = {
@@ -55,7 +55,16 @@ export const MODEL_OPTIONS: Record<Provider, string[]> = {
     'kimi-k2.7-code',
     'qwen3.5-ocr'
   ],
-  gemini: ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview', 'gemini-2.5-flash', 'gemini-2.5-pro'],
+  gemini: [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-pro-preview',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro'
+  ],
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro']
 };
 

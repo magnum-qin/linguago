@@ -4,7 +4,7 @@ import { fetchRemoteSettings, fetchRemoteModels, saveRemoteSettings } from '../u
 export const HISTORY_KEY = 'linguago-history-v5';
 export const SETTINGS_KEY = 'linguago-settings-v1';
 export const THEME_SETTINGS_VERSION = 2;
-export const MODEL_OPTIONS_VERSION = 7;
+export const MODEL_OPTIONS_VERSION = 8;
 
 export const RESULT_LANGUAGES = [
   { code: 'en', label: 'EN', speech: 'en-US' },
@@ -19,7 +19,7 @@ export const DEFAULT_MODELS: Record<string, string> = {
   auto: '@cf/zai-org/glm-4.7-flash',
   cloudflare: '@cf/zai-org/glm-4.7-flash',
   dashscope: 'qwen3.8-flash',
-  gemini: 'gemini-3.5-flash',
+  gemini: 'gemini-3.8-flash',
   deepseek: 'deepseek-v4-flash'
 };
 
@@ -51,7 +51,16 @@ export const DEFAULT_MODEL_OPTIONS: Record<string, string[]> = {
     'kimi-k2.7-code',
     'qwen3.5-ocr'
   ],
-  gemini: ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
+  gemini: [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-pro-preview',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro'
+  ],
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro']
 };
 
