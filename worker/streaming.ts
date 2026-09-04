@@ -93,13 +93,29 @@ function buildPartialStructuredResponse(input: {
 
   const explanation = readJsonStringField(input.rawText, 'explanation');
   const explanations = {
-    zh: readSectionLanguageString(input.rawText, 'explanations', 'zh'),
-    en: readSectionLanguageString(input.rawText, 'explanations', 'en'),
-    'pt-BR': readSectionLanguageString(input.rawText, 'explanations', 'pt-BR'),
-    ja: readSectionLanguageString(input.rawText, 'explanations', 'ja')
+    zh:
+      readSectionLanguageString(input.rawText, 'explanations', 'zh') ||
+      readSectionLanguageObjectString(input.rawText, 'translations', 'zh', 'explanation') ||
+      readSectionLanguageObjectString(input.rawText, 'translations', 'zh', 'context_note'),
+    en:
+      readSectionLanguageString(input.rawText, 'explanations', 'en') ||
+      readSectionLanguageObjectString(input.rawText, 'translations', 'en', 'explanation') ||
+      readSectionLanguageObjectString(input.rawText, 'translations', 'en', 'context_note'),
+    'pt-BR':
+      readSectionLanguageString(input.rawText, 'explanations', 'pt-BR') ||
+      readSectionLanguageObjectString(input.rawText, 'translations', 'pt-BR', 'explanation') ||
+      readSectionLanguageObjectString(input.rawText, 'translations', 'pt-BR', 'context_note'),
+    ja:
+      readSectionLanguageString(input.rawText, 'explanations', 'ja') ||
+      readSectionLanguageObjectString(input.rawText, 'translations', 'ja', 'explanation') ||
+      readSectionLanguageObjectString(input.rawText, 'translations', 'ja', 'context_note')
   };
   if (explanation && !explanations[input.targetLang]) {
-    explanations[input.targetLang] = explanation;
+    const isChinese = /[\u4e00-\u9fff]/u.test(explanation);
+    const targetIsLatin = input.targetLang === 'en' || input.targetLang === 'pt-BR';
+    if (!(targetIsLatin && isChinese)) {
+      explanations[input.targetLang] = explanation;
+    }
   }
 
   const hasAnyTranslation = Boolean(translation) || Object.values(translations).some((item) => Boolean(item.text));

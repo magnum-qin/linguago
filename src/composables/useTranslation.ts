@@ -3,6 +3,7 @@ import { openTranslationStream } from '../utils/api';
 import type { TranslateResponse } from '../types/translation';
 import { settings } from './useSettings';
 import { useHistory } from './useHistory';
+import { detectSourceLanguage } from '../utils/detect-source-language';
 
 const inputText = ref('');
 const resultData = shallowRef<TranslateResponse | string | null>(null);
@@ -26,10 +27,17 @@ export function useTranslation() {
     activeController = controller;
 
     try {
+      const detected = detectSourceLanguage(text);
+      const effectiveSource =
+        sourceLangPreference.value === 'auto'
+          ? (detected === 'hidden' ? 'auto' : detected)
+          : sourceLangPreference.value;
+      const targetLang = effectiveSource === 'en' ? 'zh' : 'en';
+
       const payload = {
         text,
         source_lang: sourceLangPreference.value,
-        target_lang: 'zh',
+        target_lang: targetLang,
         provider: settings.provider,
         model: settings.model
       };

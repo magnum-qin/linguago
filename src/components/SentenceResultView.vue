@@ -17,7 +17,13 @@ const { copy, isCopied } = useCopy();
 const currentExplanation = computed(() => {
   if (!resultData || typeof resultData === 'string') return '';
   if (resultData.type !== 'sentence') return '';
-  return resultData.explanations?.[activeLang] || resultData.explanation || '';
+  if (resultData.explanations?.[activeLang]) {
+    return resultData.explanations[activeLang];
+  }
+  if (resultData.target_lang === activeLang && resultData.explanation) {
+    return resultData.explanation;
+  }
+  return '';
 });
 </script>
 

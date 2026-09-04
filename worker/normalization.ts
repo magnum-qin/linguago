@@ -142,9 +142,24 @@ function normalizeSentenceExplanations(
     normalized.ja ||= normalizeStringOrText(items.ja);
   }
 
+  // Also support models nesting context_note / explanation under language blocks
+  for (const lang of ['zh', 'en', 'pt-BR', 'ja'] as const) {
+    if (translated[lang] && typeof translated[lang] === 'object') {
+      const block = translated[lang] as Record<string, unknown>;
+      normalized[lang] ||= normalizeStringOrText(block.explanation || block.context_note || block.note);
+    }
+    if (translated.translations && typeof translated.translations === 'object') {
+      const transBlock = (translated.translations as Record<string, unknown>)[lang];
+      if (transBlock && typeof transBlock === 'object') {
+        const item = transBlock as Record<string, unknown>;
+        normalized[lang] ||= normalizeStringOrText(item.explanation || item.context_note || item.note);
+      }
+    }
+  }
+
   const fallback =
     normalizeStringOrText(translated.explanation) || normalizeStringOrText(translated.sentence_explanation);
-  if (fallback) {
+  if (fallback && isUsableExplanation(targetLang, fallback)) {
     normalized[targetLang] ||= fallback;
   }
 
@@ -182,19 +197,25 @@ function isPlaceholderExplanation(text: string): boolean {
 }
 
 function fallbackExplanation(lang: LanguageCode, translated: Record<string, unknown>): string {
-  const translation = normalizeStringOrText(translated.translation);
-  if (!translation) return '';
+  const translations =
+    translated.translations && typeof translated.translations === 'object'
+      ? (translated.translations as Record<string, unknown>)
+      : {};
+  const langText =
+    normalizeStringOrText(translations[lang]) ||
+    (lang === translated.target_lang ? normalizeStringOrText(translated.translation) : '');
+  if (!langText) return '';
 
   if (lang === 'zh') {
-    return `这句话的意思是：${translation}`;
+    return `这句话的意思是：${langText}`;
   }
   if (lang === 'ja') {
-    return `この文の意味は「${translation}」です。`;
+    return `この文の意味は「${langText}」です。`;
   }
   if (lang === 'pt-BR') {
-    return `A frase significa: ${translation}`;
+    return `A frase significa: ${langText}`;
   }
-  return `The sentence means: ${translation}`;
+  return `The sentence means: ${langText}`;
 }
 
 function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolean {
@@ -207,6 +228,11 @@ function isExpectedExplanationLanguage(lang: LanguageCode, text: string): boolea
 
   if (lang === 'ja') {
     return /[\u3040-\u30ff]/u.test(value);
+  }
+
+  if (lang === 'en' || lang === 'pt-BR') {
+    // English and Portuguese explanations MUST contain Latin characters and MUST NOT contain Chinese characters
+    return /[a-zA-Z]/u.test(value) && !/[\u4e00-\u9fff]/u.test(value);
   }
 
   return true;

@@ -204,23 +204,30 @@ If the target language is English, annotate English words in the translation and
 
 export const DASH_SCOPE_SYSTEM_PROMPT = `You are a translation engine. Return valid JSON only.
 The user provides source language, target language, and text.
-Return zh, en, pt-BR, and ja fields in their own languages.
+Output this JSON shape exactly:
+{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","translations":{"en":{"text":"English translation"},"pt-BR":{"text":"Tradução em português"},"zh":{"text":"中文翻译"},"ja":{"text":"日本語の翻訳"}},"explanations":{"en":"English explanation of sentence meaning and nuance","pt-BR":"Explicação do significado e nuance da frase em português","zh":"句意与语境的简短中文解析","ja":"文の意味やニュアンスの簡潔な日本語解説"}}
 CRITICAL RULES:
-1. For ALL Japanese text (translations, explanations), you MUST annotate every single kanji with hiragana using {kanji|hiragana}, e.g., {観光|かんこう}, {昼ご飯|ひるごはん}, {何|なに}. DO NOT leave any kanji without readings!
-2. For all English text, annotate words that exceed high school vocabulary with IPA using {word|IPA}.
-For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.
-For single words or lexical phrases, return the same structure as dictionary lookup: translations, word_details, senses with four-language definitions, and examples with four-language translations. In word translations, include phonetic and audio_text for zh, en, pt-BR, and ja.
-Use the same JSON shape as the translation API schema.`;
+1. Each language field MUST be entirely in its own language:
+   - 'en' fields (translation, explanation) MUST be 100% in natural English. NEVER write Chinese in 'en'!
+   - 'pt-BR' fields (translation, explanation) MUST be 100% in Brazilian Portuguese. NEVER write Chinese in 'pt-BR'!
+   - 'zh' fields MUST be in Simplified Chinese.
+   - 'ja' fields MUST be in natural Japanese.
+2. For ALL Japanese text (translations, explanations), you MUST annotate every single kanji with hiragana using {kanji|hiragana}, e.g., {観光|かんこう}, {昼ご飯|ひるごはん}, {何|なに}. DO NOT leave any kanji without readings!
+3. For all English and Portuguese text, annotate difficult words (exceeding high school vocabulary) with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}.
+4. For single words or lexical phrases, return type "word" with translations, word_details, senses with four-language definitions, and examples with four-language translations. In word translations, include phonetic and audio_text for zh, en, pt-BR, and ja.`;
 
 export const DASH_SCOPE_PREVIEW_SYSTEM_PROMPT = `Return valid JSON only.
 Translate into the requested target language and return:
-{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation in target language"}
-CRITICAL: If the target language is Japanese, you MUST annotate every single kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {昼ご飯|ひるごはん}, {何|なに}. Do NOT skip this rule!
-If the target language is English, annotate difficult English words with IPA: {word|IPA}.`;
+{"type":"sentence","detected_source_lang":"zh","translation":"target-language text","explanation":"brief explanation strictly in the requested target language"}
+CRITICAL RULES:
+1. The 'translation' and 'explanation' fields MUST be written entirely in the requested target language. If target language is English, the explanation MUST be in English. If target language is Portuguese, the explanation MUST be in Portuguese. NEVER output Chinese when target language is English or Portuguese!
+2. If the target language is Japanese, annotate every single kanji with hiragana: {kanji|hiragana}.
+3. If the target language is English, annotate difficult English words with IPA: {word|IPA}.`;
 
 export const CLOUDFLARE_SYSTEM_PROMPT = `Translate the input for a mobile language-learning app.
 Follow the JSON schema exactly.
 Use zh, en, pt-BR, and ja fields in their own languages.
+CRITICAL: Each language field MUST be in that specific language ('en' in English, 'pt-BR' in Portuguese, 'zh' in Chinese, 'ja' in Japanese). NEVER output Chinese in 'en' or 'pt-BR' or 'ja' fields.
 For all Japanese text (translations, explanations, definitions, examples), annotate kanji terms with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}, {景色|けしき}.
 For all English text (translations, explanations, definitions, examples), annotate English words that exceed the vocabulary level of an average high school student (expanding the range to include intermediate words like "screwdriver", "sewer") with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}. Do not annotate extremely basic everyday words.
 For word definitions, write concise definitions only; no pronunciation, markdown, or cross-language equivalents.
@@ -228,6 +235,7 @@ For single words or lexical phrases, return the same structure as dictionary loo
 
 export const CLOUDFLARE_PREVIEW_SYSTEM_PROMPT = `Translate into the requested target language.
 Follow the JSON schema exactly.
+CRITICAL: The translation and explanation MUST be written entirely in the requested target language. NEVER output Chinese when target language is English or Portuguese!
 If the target language is Japanese, annotate kanji in the translation and explanation with hiragana using the format {kanji|hiragana}, e.g. {観光|かんこう}.
 If the target language is English or Portuguese, annotate difficult words (exceeding high school vocabulary) in the translation and explanation with standard International Phonetic Alphabet (IPA) pronunciation using the format {word|IPA}, e.g. {screwdriver|ˈskruːˌdraɪ.vər}, {exceção|e.seˈsɐ̃w}. Do not annotate extremely basic everyday words.
 Return a natural translation and one concise explanation only.`;

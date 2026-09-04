@@ -83,9 +83,10 @@ watch(activeTabIndex, async () => {
   updateIndicator();
 });
 
-watch(resultData, async (value) => {
-  if (value && typeof value !== 'string') {
-    activeLang.value = DEFAULT_RESULT_LANG;
+watch(resultData, async (newValue, oldValue) => {
+  if (newValue && !oldValue && typeof newValue !== 'string') {
+    const src = newValue.detected_source_lang || newValue.source_lang;
+    activeLang.value = src === 'en' ? 'zh' : DEFAULT_RESULT_LANG;
   }
   await nextTick();
   setTimeout(updateIndicator, 50);
