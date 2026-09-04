@@ -21,6 +21,7 @@ const { copy, isCopied } = useCopy();
 
 const {
   currentWord,
+  currentWordDetail,
   currentSenses,
   currentSenseGroups,
   hasDictionarySenses,

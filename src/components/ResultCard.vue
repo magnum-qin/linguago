@@ -220,10 +220,11 @@ onUnmounted(() => {
 
 <template>
   <section class="flex flex-col w-full relative z-0">
-    <Transition mode="out-in" name="fade" @enter="updateIndicator">
+    <Transition mode="out-in" name="fade" type="transition" @enter="updateIndicator">
       <!-- Result State -->
       <div
         v-if="resultData"
+        key="result"
         class="bg-m3-surface-container rounded-[28px] p-5 sm:p-8 shadow-sm border border-m3-outline-variant/20 relative"
       >
         <div class="flex items-center justify-between w-full mb-6">
@@ -438,7 +439,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Waiting / Loading State -->
-      <ResultLoader v-else :is-translating="isTranslating" :color-scheme="colorScheme" />
+      <ResultLoader v-else key="loader" :is-translating="isTranslating" :color-scheme="colorScheme" />
     </Transition>
 
     <!-- Feedback / Error Report Dialog -->

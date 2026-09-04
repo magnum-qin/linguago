@@ -8,66 +8,68 @@ const { isTranslating, colorScheme = 'blue' } = defineProps<{
 </script>
 
 <template>
-  <div class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10 animate-unified-float">
-    <!-- Themed Unified Continuous Loader Container -->
-    <div
-      class="relative flex items-center justify-center w-28 h-28 continuous-loader"
-      :class="[`theme-loader-${colorScheme}`, { 'is-active': isTranslating }]"
-    >
-      <!-- Continuous Dual-Ring Halo System (Single unified primitive across idle & active) -->
-      <div class="continuous-halo halo-ring-1"></div>
-      <div class="continuous-halo halo-ring-2"></div>
-
-      <!-- Center floating orb with morphing icon core -->
+  <div class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10">
+    <div class="flex flex-col items-center gap-6 animate-unified-float w-full">
+      <!-- Themed Unified Continuous Loader Container -->
       <div
-        class="center-orb relative bg-m3-surface-container w-16 h-16 rounded-full flex items-center justify-center shadow-sm border border-m3-outline-variant/15 z-10 text-m3-primary transition-all duration-500 ease-spring"
-        :class="isTranslating ? 'scale-95 shadow-md' : 'scale-100'"
+        class="relative flex items-center justify-center w-28 h-28 continuous-loader"
+        :class="[`theme-loader-${colorScheme}`, { 'is-active': isTranslating }]"
       >
-        <!-- Sparkles (Idle): continuous organic shimmer breathing -->
-        <Sparkles
-          class="w-7 h-7 absolute transition-all duration-500 ease-spring"
-          :class="
-            isTranslating
-              ? 'scale-0 rotate-45 opacity-0 pointer-events-none'
-              : 'scale-100 rotate-0 opacity-100 animate-core-shimmer'
-          "
-        />
-        <!-- Loader2 (Active): smooth accelerating spin -->
-        <Loader2
-          class="w-7 h-7 absolute transition-all duration-500 ease-spring"
-          :class="
-            isTranslating
-              ? 'scale-100 rotate-0 opacity-100 animate-spin'
-              : 'scale-0 -rotate-45 opacity-0 pointer-events-none'
-          "
-        />
-      </div>
-    </div>
+        <!-- Continuous Dual-Ring Halo System (Single unified primitive across idle & active) -->
+        <div class="continuous-halo halo-ring-1"></div>
+        <div class="continuous-halo halo-ring-2"></div>
 
-    <!-- Status Text with M3 Mode-Out-In Smooth Crossfade -->
-    <div class="flex flex-col items-center gap-1.5 opacity-80 min-h-[58px] justify-center">
-      <Transition name="m3-fade-scale" mode="out-in">
-        <div v-if="isTranslating" key="translating" class="flex flex-col items-center">
-          <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center flex items-center">
-            <span>解析中</span>
-            <span class="text-[0.68rem] opacity-70 tracking-normal font-normal border-l border-current/30 pl-1.5 ml-1.5">Analisando</span>
-          </p>
-          <p class="text-m3-outline text-[0.85rem] font-medium text-center mt-1 flex flex-col items-center">
-            <span>正在加载翻译结果...</span>
-            <span class="text-[0.72rem] opacity-70 inline-block mt-0.5">Carregando...</span>
-          </p>
+        <!-- Center floating orb with morphing icon core -->
+        <div
+          class="center-orb relative bg-m3-surface-container w-16 h-16 rounded-full flex items-center justify-center shadow-sm border border-m3-outline-variant/15 z-10 text-m3-primary transition-all duration-500 ease-spring"
+          :class="isTranslating ? 'scale-95 shadow-md' : 'scale-100'"
+        >
+          <!-- Sparkles (Idle): continuous organic shimmer breathing -->
+          <Sparkles
+            class="w-7 h-7 absolute transition-all duration-500 ease-spring"
+            :class="
+              isTranslating
+                ? 'scale-0 rotate-45 opacity-0 pointer-events-none'
+                : 'scale-100 rotate-0 opacity-100 animate-core-shimmer'
+            "
+          />
+          <!-- Loader2 (Active): smooth accelerating spin -->
+          <Loader2
+            class="w-7 h-7 absolute transition-all duration-500 ease-spring"
+            :class="
+              isTranslating
+                ? 'scale-100 rotate-0 opacity-100 animate-spin'
+                : 'scale-0 -rotate-45 opacity-0 pointer-events-none'
+            "
+          />
         </div>
-        <div v-else key="idle" class="flex flex-col items-center">
-          <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center flex items-center">
-            <span>等待输入</span>
-            <span class="text-[0.68rem] opacity-70 tracking-normal font-normal border-l border-current/30 pl-1.5 ml-1.5">Aguardando</span>
-          </p>
-          <p class="text-m3-outline text-[0.85rem] font-medium text-center mt-1 flex flex-col items-center">
-            <span>支持中 · 英 · 葡 · 日 自动识别</span>
-            <span class="text-[0.72rem] opacity-70 inline-block mt-0.5">Suporta detecção auto ZH/EN/PT/JA</span>
-          </p>
-        </div>
-      </Transition>
+      </div>
+
+      <!-- Status Text with M3 Mode-Out-In Smooth Crossfade -->
+      <div class="flex flex-col items-center gap-1.5 opacity-80 min-h-[58px] justify-center">
+        <Transition name="m3-fade-scale" mode="out-in">
+          <div v-if="isTranslating" key="translating" class="flex flex-col items-center">
+            <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center flex items-center">
+              <span>解析中</span>
+              <span class="text-[0.68rem] opacity-70 tracking-normal font-normal border-l border-current/30 pl-1.5 ml-1.5">Analisando</span>
+            </p>
+            <p class="text-m3-outline text-[0.85rem] font-medium text-center mt-1 flex flex-col items-center">
+              <span>正在加载翻译结果...</span>
+              <span class="text-[0.72rem] opacity-70 inline-block mt-0.5">Carregando...</span>
+            </p>
+          </div>
+          <div v-else key="idle" class="flex flex-col items-center">
+            <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center flex items-center">
+              <span>等待输入</span>
+              <span class="text-[0.68rem] opacity-70 tracking-normal font-normal border-l border-current/30 pl-1.5 ml-1.5">Aguardando</span>
+            </p>
+            <p class="text-m3-outline text-[0.85rem] font-medium text-center mt-1 flex flex-col items-center">
+              <span>支持中 · 英 · 葡 · 日 自动识别</span>
+              <span class="text-[0.72rem] opacity-70 inline-block mt-0.5">Suporta detecção auto ZH/EN/PT/JA</span>
+            </p>
+          </div>
+        </Transition>
+      </div>
     </div>
   </div>
 </template>
