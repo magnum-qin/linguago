@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, useSlots } from 'vue';
+import { computed, useSlots, watch } from 'vue';
 import { X } from 'lucide-vue-next';
 import {
   DialogRoot,
   DialogPortal,
   DialogContent
 } from 'radix-vue';
+import { refreshStatusBarColor } from '../composables/useTheme';
 
 const {
   modelValue,
@@ -31,20 +32,31 @@ const slots = useSlots();
 const contentClasses = computed(() => ['m3-dialog-content', fixedHeight ? 'm3-dialog-content--fixed' : '']);
 
 const requestClose = () => emit('update:modelValue', false);
+
+watch(
+  () => modelValue,
+  (isOpen) => {
+    if (!isOpen) {
+      refreshStatusBarColor();
+      setTimeout(refreshStatusBarColor, 240);
+    }
+  }
+);
 </script>
 
 <template>
   <DialogRoot :open="modelValue" :modal="false" @update:open="emit('update:modelValue', $event)">
     <DialogPortal>
-      <Transition name="m3-scrim-fade">
+      <Transition name="m3-scrim-fade" @after-leave="refreshStatusBarColor">
         <div
           v-if="modelValue"
-          class="m3-dialog-scrim fixed inset-0 z-[2400]"
+          class="m3-dialog-scrim fixed bottom-0 left-0 right-0 z-[2400]"
+          :style="{ top: 'env(safe-area-inset-top, 0px)' }"
           @click="requestClose"
         />
       </Transition>
       <div class="fixed inset-0 z-[2400] flex items-center justify-center p-3 pointer-events-none">
-        <Transition name="m3-dialog-transition">
+        <Transition name="m3-dialog-transition" @after-leave="refreshStatusBarColor">
           <DialogContent
             v-if="modelValue"
             class="m3-dialog-content pointer-events-auto outline-none"
@@ -192,9 +204,12 @@ const requestClose = () => emit('update:modelValue', false);
   height: min(580px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px));
 }
 
-.m3-scrim-fade-enter-active,
+.m3-scrim-fade-enter-active {
+  transition: opacity 340ms cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
 .m3-scrim-fade-leave-active {
-  transition: opacity 150ms linear;
+  transition: opacity 220ms cubic-bezier(0.3, 0, 0.8, 0.15);
 }
 
 .m3-scrim-fade-enter-from,
@@ -204,21 +219,25 @@ const requestClose = () => emit('update:modelValue', false);
 
 .m3-dialog-transition-enter-active {
   transition:
-    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 140ms linear;
+    transform 340ms cubic-bezier(0.05, 0.7, 0.1, 1),
+    opacity 260ms cubic-bezier(0.05, 0.7, 0.1, 1);
   will-change: transform, opacity;
 }
 
 .m3-dialog-transition-leave-active {
   transition:
-    transform 120ms cubic-bezier(0.4, 0, 1, 1),
-    opacity 100ms linear;
+    transform 220ms cubic-bezier(0.3, 0, 0.8, 0.15),
+    opacity 180ms cubic-bezier(0.3, 0, 0.8, 0.15);
   will-change: transform, opacity;
 }
 
-.m3-dialog-transition-enter-from,
+.m3-dialog-transition-enter-from {
+  transform: translate3d(0, 24px, 0) scale(0.92);
+  opacity: 0;
+}
+
 .m3-dialog-transition-leave-to {
-  transform: translate3d(0, 12px, 0) scale(0.985);
+  transform: translate3d(0, 14px, 0) scale(0.96);
   opacity: 0;
 }
 </style>

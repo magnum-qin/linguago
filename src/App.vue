@@ -59,20 +59,31 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="bg-transparent font-sans transition-colors duration-300 min-h-screen">
-    <div class="min-h-dvh flex flex-col items-center w-full relative">
+  <div class="bg-m3-surface text-m3-on-surface font-sans transition-colors duration-300 w-full">
+    <!-- Dedicated Status Bar Tint Element for iOS WebKit Sampling -->
+    <div
+      id="ios-status-bar-tint"
+      class="fixed top-0 left-0 right-0 pointer-events-none z-[9998]"
+      :style="{
+        height: 'env(safe-area-inset-top, 0px)',
+        backgroundColor: 'var(--m3-surface)'
+      }"
+      aria-hidden="true"
+    ></div>
+
+    <div class="flex flex-col items-center w-full relative">
       <!-- Smooth layout spacer: shifts main container with native continuous easing -->
       <div
         class="w-full shrink-0 will-change-[height]"
         :style="{
-          height: hasResult ? 'env(safe-area-inset-top, 24px)' : '12vh',
+          height: hasResult ? '0px' : 'clamp(0px, 3vh, 24px)',
           transition: 'height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)'
         }"
       ></div>
 
       <main
         ref="mainRef"
-        class="w-full max-w-[720px] mx-auto px-2 sm:px-6 md:px-8 pb-12 flex flex-col relative gap-4"
+        class="w-full max-w-[720px] mx-auto px-2 sm:px-6 md:px-8 pb-4 sm:pb-8 flex flex-col relative gap-4"
       >
         <TranslatorCard />
         <ResultCard />

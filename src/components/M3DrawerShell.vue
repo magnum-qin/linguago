@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch, useTemplateRef } from 'vue';
 import { ArrowRight } from 'lucide-vue-next';
+import { refreshStatusBarColor } from '../composables/useTheme';
 
 const {
   modelValue,
@@ -21,11 +22,9 @@ const emit = defineEmits<{
 const drawer = useTemplateRef<HTMLElement>('drawer');
 let previousFocus: HTMLElement | null = null;
 let previousBodyOverflow = '';
-let previousRootOverflow = '';
 
 const restorePageScroll = () => {
   document.body.style.overflow = previousBodyOverflow;
-  document.documentElement.style.overflow = previousRootOverflow;
 };
 
 const close = () => emit('update:modelValue', false);
@@ -67,9 +66,7 @@ watch(
     if (open) {
       previousFocus = document.activeElement as HTMLElement | null;
       previousBodyOverflow = document.body.style.overflow;
-      previousRootOverflow = document.documentElement.style.overflow;
       document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
       document.addEventListener('keydown', handleKeydown);
       await nextTick();
       focusableElements()[0]?.focus();
@@ -78,6 +75,8 @@ watch(
       restorePageScroll();
       previousFocus?.focus();
       previousFocus = null;
+      refreshStatusBarColor();
+      setTimeout(refreshStatusBarColor, 280);
     }
   }
 );
@@ -90,11 +89,12 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <Transition name="m3-drawer-backdrop">
+    <Transition name="m3-drawer-backdrop" @after-leave="refreshStatusBarColor">
       <button
         v-if="modelValue"
         type="button"
         class="m3-drawer-backdrop"
+        :style="{ top: 'env(safe-area-inset-top, 0px)' }"
         :aria-label="closeLabel"
         @click="close"
       ></button>
@@ -212,9 +212,12 @@ onBeforeUnmount(() => {
   padding: 20px 24px max(24px, env(safe-area-inset-bottom));
 }
 
-.m3-drawer-backdrop-enter-active,
+.m3-drawer-backdrop-enter-active {
+  transition: opacity 380ms cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
 .m3-drawer-backdrop-leave-active {
-  transition: opacity 180ms ease;
+  transition: opacity 260ms cubic-bezier(0.3, 0, 0.8, 0.15);
 }
 
 .m3-drawer-backdrop-enter-from,
@@ -222,9 +225,13 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
-.m3-drawer-slide-enter-active,
+.m3-drawer-slide-enter-active {
+  transition: transform 380ms cubic-bezier(0.05, 0.7, 0.1, 1);
+  will-change: transform;
+}
+
 .m3-drawer-slide-leave-active {
-  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 260ms cubic-bezier(0.3, 0, 0.8, 0.15);
   will-change: transform;
 }
 

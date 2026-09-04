@@ -28,11 +28,39 @@ export function updateMetaThemeColor(resolved: 'light' | 'dark') {
   const color = resolved === 'dark' ? '#121417' : '#ffffff';
   const metas = document.querySelectorAll('meta[name="theme-color"]');
   metas.forEach((meta) => {
-    const media = meta.getAttribute('media');
-    if (!media) {
-      meta.setAttribute('content', color);
-    }
+    meta.setAttribute('content', color);
   });
+
+  // WebKit cache-buster: guarantee an unconditional active meta tag exists
+  let activeMeta = document.getElementById('active-meta-theme-color') as HTMLMetaElement | null;
+  if (!activeMeta) {
+    activeMeta = document.createElement('meta');
+    activeMeta.id = 'active-meta-theme-color';
+    activeMeta.name = 'theme-color';
+    document.head.appendChild(activeMeta);
+  }
+  activeMeta.setAttribute('content', color);
+}
+
+export function refreshStatusBarColor() {
+  if (typeof document === 'undefined') return;
+  const resolved = resolvedTheme.value;
+  const color = resolved === 'dark' ? '#121417' : '#ffffff';
+
+  // 1. Update all meta theme-color tags for Safari/Chrome status bars
+  updateMetaThemeColor(resolved);
+
+  // 2. Set explicit hex background colors on html and body for WebKit edge sampling
+  document.documentElement.style.backgroundColor = color;
+  if (document.body) {
+    document.body.style.backgroundColor = color;
+  }
+
+  // 3. Ensure top-edge status bar anchor element matches
+  const statusBarTint = document.getElementById('ios-status-bar-tint');
+  if (statusBarTint) {
+    statusBarTint.style.backgroundColor = color;
+  }
 }
 
 export function applyTheme(theme: string, colorScheme: string = 'blue') {
@@ -50,9 +78,12 @@ export function applyTheme(theme: string, colorScheme: string = 'blue') {
     document.documentElement.dataset.theme = resolved;
     document.documentElement.dataset.themePreference = theme;
     document.documentElement.dataset.colorScheme = colorScheme;
-    document.documentElement.style.backgroundColor = 'var(--m3-surface)';
+    document.documentElement.style.backgroundColor = resolved === 'dark' ? '#121417' : '#ffffff';
+    if (document.body) {
+      document.body.style.backgroundColor = resolved === 'dark' ? '#121417' : '#ffffff';
+    }
     document.documentElement.style.colorScheme = resolved;
-    updateMetaThemeColor(resolved);
+    refreshStatusBarColor();
   }
 }
 

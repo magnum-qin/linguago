@@ -8,8 +8,8 @@ const { isTranslating, colorScheme = 'blue' } = defineProps<{
 </script>
 
 <template>
-  <div class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10">
-    <div class="flex flex-col items-center gap-6 animate-unified-float w-full">
+  <div class="flex flex-col items-center justify-center py-4 sm:py-8 gap-4 sm:gap-6 mt-1 sm:mt-4">
+    <div class="flex flex-col items-center gap-4 sm:gap-6 animate-unified-float w-full">
       <!-- Themed Unified Continuous Loader Container -->
       <div
         class="relative flex items-center justify-center w-28 h-28 continuous-loader"
