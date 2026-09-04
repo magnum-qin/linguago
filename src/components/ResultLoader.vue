@@ -8,399 +8,347 @@ const { isTranslating, colorScheme = 'blue' } = defineProps<{
 </script>
 
 <template>
-  <div class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10">
-    <!-- Themed Unified Loader Container -->
-    <div class="relative flex items-center justify-center w-28 h-28" :class="`theme-loader-${colorScheme}`">
-      <!-- Idle decor elements (fade in/out smoothly) -->
-      <div
-        class="absolute inset-0 theme-decor-idle-1 transition-all duration-500 ease-spring"
-        :class="isTranslating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'"
-      ></div>
-      <div
-        class="absolute inset-0 theme-decor-idle-2 transition-all duration-500 ease-spring"
-        :class="isTranslating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'"
-      ></div>
+  <div class="flex flex-col items-center justify-center py-10 gap-6 mt-4 md:mt-10 animate-unified-float">
+    <!-- Themed Unified Continuous Loader Container -->
+    <div
+      class="relative flex items-center justify-center w-28 h-28 continuous-loader"
+      :class="[`theme-loader-${colorScheme}`, { 'is-active': isTranslating }]"
+    >
+      <!-- Continuous Dual-Ring Halo System (Single unified primitive across idle & active) -->
+      <div class="continuous-halo halo-ring-1"></div>
+      <div class="continuous-halo halo-ring-2"></div>
 
-      <!-- Active decor elements (fade in/out smoothly) -->
+      <!-- Center floating orb with morphing icon core -->
       <div
-        class="absolute inset-0 theme-decor-active-1 transition-all duration-500 ease-spring"
-        :class="isTranslating ? 'opacity-100 scale-100' : 'opacity-0 scale-90'"
-      ></div>
-      <div
-        class="absolute inset-0 theme-decor-active-2 transition-all duration-500 ease-spring"
-        :class="isTranslating ? 'opacity-100 scale-100' : 'opacity-0 scale-90'"
-      ></div>
-
-      <!-- Inner circle with smooth icon transition -->
-      <div
-        class="relative bg-m3-surface-container w-16 h-16 rounded-full flex items-center justify-center shadow-sm border border-m3-outline-variant/10 z-10 text-m3-primary/70 transition-all duration-500"
+        class="center-orb relative bg-m3-surface-container w-16 h-16 rounded-full flex items-center justify-center shadow-sm border border-m3-outline-variant/15 z-10 text-m3-primary transition-all duration-500 ease-spring"
+        :class="isTranslating ? 'scale-95 shadow-md' : 'scale-100'"
       >
-        <!-- Sparkles (Idle) -->
+        <!-- Sparkles (Idle): continuous organic shimmer breathing -->
         <Sparkles
           class="w-7 h-7 absolute transition-all duration-500 ease-spring"
-          :class="isTranslating ? 'scale-0 rotate-45 opacity-0' : 'scale-100 rotate-0 opacity-100'"
+          :class="
+            isTranslating
+              ? 'scale-0 rotate-45 opacity-0 pointer-events-none'
+              : 'scale-100 rotate-0 opacity-100 animate-core-shimmer'
+          "
         />
-        <!-- Loader2 (Active) -->
+        <!-- Loader2 (Active): smooth accelerating spin -->
         <Loader2
           class="w-7 h-7 absolute transition-all duration-500 ease-spring"
-          :class="isTranslating ? 'scale-100 rotate-180 opacity-100 animate-spin' : 'scale-0 rotate-0 opacity-0'"
+          :class="
+            isTranslating
+              ? 'scale-100 rotate-0 opacity-100 animate-spin'
+              : 'scale-0 -rotate-45 opacity-0 pointer-events-none'
+          "
         />
       </div>
     </div>
-    <div
-      class="flex flex-col items-center gap-1.5 opacity-80"
-      :class="{ 'animate-float': !isTranslating }"
-      style="animation-delay: 0.2s"
-    >
-      <template v-if="isTranslating">
-        <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center">
-          解析中<br /><span class="text-[0.7rem] opacity-70 tracking-normal mt-0.5 inline-block">Analisando</span>
-        </p>
-        <p class="text-m3-outline text-[0.85rem] font-medium text-center">
-          正在加载翻译结果...<br /><span class="text-[0.75rem] opacity-70 mt-0.5 inline-block">Carregando...</span>
-        </p>
-      </template>
-      <template v-else>
-        <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center">
-          等待输入<br /><span class="text-[0.7rem] opacity-70 tracking-normal mt-0.5 inline-block">Aguardando</span>
-        </p>
-        <p class="text-m3-outline text-[0.85rem] font-medium text-center">
-          支持中 / 英 / 葡 / 日 自动识别<br /><span class="text-[0.75rem] opacity-70 mt-0.5 inline-block"
-            >Suporta detecção auto ZH/EN/PT/JA</span
-          >
-        </p>
-      </template>
+
+    <!-- Status Text with M3 Mode-Out-In Smooth Crossfade -->
+    <div class="flex flex-col items-center gap-1.5 opacity-80 min-h-[58px] justify-center">
+      <Transition name="m3-fade-scale" mode="out-in">
+        <div v-if="isTranslating" key="translating" class="flex flex-col items-center">
+          <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center flex items-center">
+            <span>解析中</span>
+            <span class="text-[0.68rem] opacity-70 tracking-normal font-normal border-l border-current/30 pl-1.5 ml-1.5">Analisando</span>
+          </p>
+          <p class="text-m3-outline text-[0.85rem] font-medium text-center mt-1 flex flex-col items-center">
+            <span>正在加载翻译结果...</span>
+            <span class="text-[0.72rem] opacity-70 inline-block mt-0.5">Carregando...</span>
+          </p>
+        </div>
+        <div v-else key="idle" class="flex flex-col items-center">
+          <p class="text-m3-on-surface-variant font-bold tracking-[0.15em] text-[0.8rem] uppercase text-center flex items-center">
+            <span>等待输入</span>
+            <span class="text-[0.68rem] opacity-70 tracking-normal font-normal border-l border-current/30 pl-1.5 ml-1.5">Aguardando</span>
+          </p>
+          <p class="text-m3-outline text-[0.85rem] font-medium text-center mt-1 flex flex-col items-center">
+            <span>支持中 · 英 · 葡 · 日 自动识别</span>
+            <span class="text-[0.72rem] opacity-70 inline-block mt-0.5">Suporta detecção auto ZH/EN/PT/JA</span>
+          </p>
+        </div>
+      </Transition>
     </div>
   </div>
 </template>
 
 <style scoped>
-@keyframes float {
+/* ==========================================================================
+   Continuous Interruptible Motion Engine (FaceID-Style Seamless Transitions)
+   ========================================================================== */
+
+/* --- 1. Unified Gentle Float for Entire Element --- */
+@keyframes unified-float {
   0%,
   100% {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translateY(-6px);
   }
 }
-.animate-float {
-  animation: float 4s ease-in-out infinite;
+
+.animate-unified-float {
+  animation: unified-float 5s ease-in-out infinite;
+  will-change: transform;
 }
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.5;
-  }
+
+/* --- 2. Core Star Sparkle Shimmer (Living Center) --- */
+@keyframes core-shimmer {
+  0%,
   100% {
-    transform: scale(1.5);
-    opacity: 0;
+    transform: scale(0.96);
+    opacity: 0.8;
+    filter: drop-shadow(0 0 0px transparent);
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-m3-primary) 35%, transparent));
   }
 }
-.animate-pulse-ring {
-  animation: pulse-ring 3s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+
+.animate-core-shimmer {
+  animation: core-shimmer 3.2s ease-in-out infinite;
 }
 
-/* --- Themed wait/load loader animations --- */
-
-.theme-decor-idle-1,
-.theme-decor-idle-2,
-.theme-decor-active-1,
-.theme-decor-active-2 {
+/* --- 3. Base Continuous Halo Rings --- */
+.continuous-halo {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px solid transparent;
   pointer-events: none;
-  /* Prevent WebKit/Safari round layer clipping bug on iOS */
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   transform: translate3d(0, 0, 0);
-  will-change: transform, opacity;
+  will-change: transform, opacity, border-color;
+  transition:
+    border-color 500ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-style 500ms ease,
+    border-width 500ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 500ms ease;
 }
 
-/* --- Blue Theme --- */
-.theme-loader-blue .theme-decor-idle-1 {
-  border-color: color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
-  animation: pulse-ring 3s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-}
-.theme-loader-blue .theme-decor-idle-2 {
-  border-color: color-mix(in srgb, var(--color-m3-primary) 15%, transparent);
-  animation: pulse-ring 3s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-  animation-delay: 1.5s;
-}
-.theme-loader-blue .theme-decor-active-1 {
-  border-style: double;
-  border-width: 4px;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 50%, transparent);
-  animation: classic-gear-cw 3s linear infinite;
-}
-.theme-loader-blue .theme-decor-active-2 {
-  border-color: color-mix(in srgb, var(--color-m3-primary) 40%, transparent);
-  animation: classic-gear-ccw 5s linear infinite;
-  margin: -4px;
-}
+/* ==========================================================================
+   Theme-Specific Continuous Dual-Wave Harmonic Motions
+   ========================================================================== */
 
-/* --- Rose Theme --- */
-.theme-loader-rose .theme-decor-idle-1,
-.theme-loader-rose .theme-decor-idle-2 {
-  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
+/* --- A. Rose Theme (Heartfelt Soft Organic Morphing) --- */
+.theme-loader-rose .halo-ring-1 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 38%, transparent);
+  animation: rose-continuous-wave 3.6s ease-in-out infinite;
 }
-.theme-loader-rose .theme-decor-idle-1 {
-  animation: rose-heartbeat 2.4s ease-in-out infinite;
+.theme-loader-rose .halo-ring-2 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
+  animation: rose-continuous-wave 3.6s ease-in-out infinite;
+  animation-delay: -1.8s; /* 50% Phase Shift for continuous interlocking waves */
 }
-.theme-loader-rose .theme-decor-idle-2 {
-  animation: rose-heartbeat 2.4s ease-in-out infinite;
-  animation-delay: 1.2s;
-}
-.theme-loader-rose .theme-decor-active-1 {
-  animation: rose-morph 4s ease-in-out infinite;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 60%, transparent);
-}
-.theme-loader-rose .theme-decor-active-2 {
-  animation: rose-morph 6s ease-in-out infinite;
-  animation-delay: -2s;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 25%, transparent);
-  margin: -4px;
-}
-
-/* --- Mint Theme --- */
-.theme-loader-mint .theme-decor-idle-1,
-.theme-loader-mint .theme-decor-idle-2 {
-  border-radius: 60% 40% 60% 40% / 40% 60% 40% 60%;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
-}
-.theme-loader-mint .theme-decor-idle-1 {
-  animation: mint-breath 4s ease-in-out infinite;
-}
-.theme-loader-mint .theme-decor-idle-2 {
-  animation: mint-breath 4s ease-in-out infinite;
-  animation-delay: 2s;
-}
-.theme-loader-mint .theme-decor-active-1 {
-  animation: mint-spin-cw 5s linear infinite;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 50%, transparent);
-}
-.theme-loader-mint .theme-decor-active-2 {
-  animation: mint-spin-ccw 7s linear infinite;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
-  margin: -6px;
-}
-
-/* --- Amber Theme --- */
-.theme-loader-amber .theme-decor-idle-1,
-.theme-loader-amber .theme-decor-idle-2 {
-  border-style: dashed;
+.theme-loader-rose.is-active .halo-ring-1 {
   border-width: 2px;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
+  border-color: color-mix(in srgb, var(--color-m3-primary) 65%, transparent);
+  animation: continuous-spin-cw 3s linear infinite;
 }
-.theme-loader-amber .theme-decor-idle-1 {
-  animation: amber-flare 2.5s ease-out infinite;
-}
-.theme-loader-amber .theme-decor-idle-2 {
-  animation: amber-flare 2.5s ease-out infinite;
-  animation-delay: 1.25s;
-}
-.theme-loader-amber .theme-decor-active-1 {
-  animation: amber-spin 3s linear infinite;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 60%, transparent);
-}
-.theme-loader-amber .theme-decor-active-2 {
-  animation: amber-spin 4s linear infinite;
-  animation-delay: -1.5s;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 25%, transparent);
-  margin: -5px;
-}
-
-/* --- Violet Theme --- */
-.theme-loader-violet .theme-decor-idle-1,
-.theme-loader-violet .theme-decor-idle-2 {
-  border-radius: 35% 65% 35% 65% / 65% 35% 65% 35%;
+.theme-loader-rose.is-active .halo-ring-2 {
+  border-width: 1.5px;
   border-color: color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
-}
-.theme-loader-violet .theme-decor-idle-1 {
-  animation: violet-twinkle 4s ease-in-out infinite;
-}
-.theme-loader-violet .theme-decor-idle-2 {
-  animation: violet-twinkle 4s ease-in-out infinite;
-  animation-delay: 2s;
-}
-.theme-loader-violet .theme-decor-active-1 {
-  animation: violet-spin 6s linear infinite;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 50%, transparent);
-}
-.theme-loader-violet .theme-decor-active-2 {
-  animation: violet-spin 9s linear infinite;
-  animation-delay: -3s;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
-  margin: -5px;
+  animation: continuous-spin-ccw 4.5s linear infinite;
+  margin: -4px;
 }
 
-/* --- Classic Theme --- */
-.theme-loader-classic .theme-decor-idle-1,
-.theme-loader-classic .theme-decor-idle-2 {
-  border-color: color-mix(in srgb, var(--color-m3-primary) 25%, transparent);
-}
-.theme-loader-classic .theme-decor-idle-1 {
-  animation: classic-tick 4s steps(4, end) infinite;
-}
-.theme-loader-classic .theme-decor-idle-2 {
-  animation: classic-tick 4s steps(4, end) infinite;
-  animation-delay: 2s;
-}
-.theme-loader-classic .theme-decor-active-1 {
-  border-style: dotted;
-  border-width: 3px;
-  animation: classic-gear-cw 12s linear infinite;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 50%, transparent);
-}
-.theme-loader-classic .theme-decor-active-2 {
-  border-style: dotted;
-  border-width: 3px;
-  animation: classic-gear-ccw 18s linear infinite;
-  border-color: color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
-  margin: -6px;
+@keyframes rose-continuous-wave {
+  0%,
+  100% {
+    transform: scale(0.92) rotate(0deg);
+    opacity: 0.3;
+    border-radius: 50% 50% 50% 50% / 46% 46% 54% 54%;
+  }
+  50% {
+    transform: scale(1.18) rotate(180deg);
+    opacity: 0.85;
+    border-radius: 46% 54% 46% 54% / 54% 46% 54% 46%;
+  }
 }
 
-/* --- Keyframe Animations --- */
-@keyframes rose-heartbeat {
-  0% {
+/* --- B. Blue Theme (Harmonic Water Ripple) --- */
+.theme-loader-blue .halo-ring-1 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
+  animation: blue-continuous-wave 3.4s ease-in-out infinite;
+}
+.theme-loader-blue .halo-ring-2 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
+  animation: blue-continuous-wave 3.4s ease-in-out infinite;
+  animation-delay: -1.7s;
+}
+.theme-loader-blue.is-active .halo-ring-1 {
+  border-width: 2.5px;
+  border-style: double;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 60%, transparent);
+  animation: continuous-spin-cw 2.8s linear infinite;
+}
+.theme-loader-blue.is-active .halo-ring-2 {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
+  animation: continuous-spin-ccw 4.2s linear infinite;
+  margin: -4px;
+}
+
+@keyframes blue-continuous-wave {
+  0%,
+  100% {
     transform: scale(0.9);
-    opacity: 0.7;
+    opacity: 0.25;
   }
-  15% {
-    transform: scale(1.12);
-    opacity: 0.95;
-  }
-  30% {
-    transform: scale(0.96);
+  50% {
+    transform: scale(1.16);
     opacity: 0.8;
   }
-  45% {
-    transform: scale(1.22);
-    opacity: 0.45;
-  }
-  70%,
-  100% {
-    transform: scale(1.4);
-    opacity: 0;
-  }
 }
 
-@keyframes rose-morph {
-  0%,
-  100% {
-    border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
-    transform: rotate(0deg);
-  }
-  50% {
-    border-radius: 40% 60% 40% 60% / 60% 40% 60% 40%;
-    transform: rotate(180deg);
-  }
+/* --- C. Mint Theme (Forest Living Breath) --- */
+.theme-loader-mint .halo-ring-1 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
+  animation: mint-continuous-wave 4s ease-in-out infinite;
+}
+.theme-loader-mint .halo-ring-2 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 18%, transparent);
+  animation: mint-continuous-wave 4s ease-in-out infinite;
+  animation-delay: -2s;
+}
+.theme-loader-mint.is-active .halo-ring-1 {
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 60%, transparent);
+  animation: continuous-spin-cw 3.2s linear infinite;
+}
+.theme-loader-mint.is-active .halo-ring-2 {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 25%, transparent);
+  animation: continuous-spin-ccw 5s linear infinite;
+  margin: -5px;
 }
 
-@keyframes mint-breath {
+@keyframes mint-continuous-wave {
   0%,
   100% {
-    transform: scale(0.85) rotate(-15deg);
-    opacity: 0.6;
+    transform: scale(0.9) rotate(-12deg);
+    border-radius: 55% 45% 55% 45% / 45% 55% 45% 55%;
+    opacity: 0.3;
   }
   50% {
-    transform: scale(1.08) rotate(15deg);
+    transform: scale(1.16) rotate(12deg);
+    border-radius: 45% 55% 45% 55% / 55% 45% 55% 45%;
     opacity: 0.85;
   }
 }
 
-@keyframes mint-spin-cw {
-  0% {
-    transform: rotate(0deg);
-    border-radius: 60% 40% 60% 40% / 40% 60% 40% 60%;
-  }
-  100% {
-    transform: rotate(360deg);
-    border-radius: 60% 40% 60% 40% / 40% 60% 40% 60%;
-  }
+/* --- D. Amber Theme (Warm Solar Halo) --- */
+.theme-loader-amber .halo-ring-1 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
+  animation: amber-continuous-wave 3.2s ease-in-out infinite;
 }
-@keyframes mint-spin-ccw {
-  0% {
-    transform: rotate(0deg);
-    border-radius: 40% 60% 40% 60% / 60% 40% 60% 40%;
-  }
-  100% {
-    transform: rotate(-360deg);
-    border-radius: 40% 60% 40% 60% / 60% 40% 60% 40%;
-  }
+.theme-loader-amber .halo-ring-2 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
+  animation: amber-continuous-wave 3.2s ease-in-out infinite;
+  animation-delay: -1.6s;
 }
-
-@keyframes amber-flare {
-  0% {
-    transform: scale(0.8) rotate(0deg);
-    opacity: 0.7;
-  }
-  100% {
-    transform: scale(1.45) rotate(45deg);
-    opacity: 0;
-  }
+.theme-loader-amber.is-active .halo-ring-1 {
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 65%, transparent);
+  animation: continuous-spin-cw 2.6s linear infinite;
+}
+.theme-loader-amber.is-active .halo-ring-2 {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
+  animation: continuous-spin-ccw 4s linear infinite;
+  margin: -5px;
 }
 
-@keyframes amber-spin {
-  0% {
-    transform: rotate(0deg) scale(0.95);
-    filter: blur(0.5px);
-  }
-  50% {
-    transform: rotate(180deg) scale(1.06);
-    filter: blur(1.5px);
-  }
-  100% {
-    transform: rotate(360deg) scale(0.95);
-    filter: blur(0.5px);
-  }
-}
-
-@keyframes violet-twinkle {
+@keyframes amber-continuous-wave {
   0%,
   100% {
-    transform: scale(0.8) rotate(0deg);
-    opacity: 0.45;
+    transform: scale(0.92) rotate(0deg);
+    opacity: 0.25;
   }
   50% {
-    transform: scale(1.12) rotate(90deg);
-    opacity: 0.95;
+    transform: scale(1.18) rotate(90deg);
+    opacity: 0.85;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--color-m3-primary) 20%, transparent);
   }
 }
 
-@keyframes violet-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+/* --- E. Violet Theme (Cosmic Astral Shimmer) --- */
+.theme-loader-violet .halo-ring-1 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 35%, transparent);
+  animation: violet-continuous-wave 3.8s ease-in-out infinite;
+}
+.theme-loader-violet .halo-ring-2 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 18%, transparent);
+  animation: violet-continuous-wave 3.8s ease-in-out infinite;
+  animation-delay: -1.9s;
+}
+.theme-loader-violet.is-active .halo-ring-1 {
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 65%, transparent);
+  animation: continuous-spin-cw 3.5s linear infinite;
+}
+.theme-loader-violet.is-active .halo-ring-2 {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 25%, transparent);
+  animation: continuous-spin-ccw 5.5s linear infinite;
+  margin: -5px;
 }
 
-@keyframes classic-tick {
+@keyframes violet-continuous-wave {
   0%,
   100% {
-    transform: scale(0.88);
+    transform: scale(0.9) rotate(0deg);
+    border-radius: 40% 60% 40% 60% / 60% 40% 60% 40%;
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.17) rotate(180deg);
+    border-radius: 60% 40% 60% 40% / 40% 60% 40% 60%;
     opacity: 0.85;
   }
-  25% {
-    transform: scale(0.94);
-    opacity: 0.7;
+}
+
+/* --- F. Classic Theme (Precision Minimal Concentric Rhythms) --- */
+.theme-loader-classic .halo-ring-1 {
+  border: 1.5px solid color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
+  animation: classic-continuous-wave 3.6s ease-in-out infinite;
+}
+.theme-loader-classic .halo-ring-2 {
+  border: 1px solid color-mix(in srgb, var(--color-m3-primary) 18%, transparent);
+  animation: classic-continuous-wave 3.6s ease-in-out infinite;
+  animation-delay: -1.8s;
+}
+.theme-loader-classic.is-active .halo-ring-1 {
+  border-width: 2px;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 60%, transparent);
+  animation: continuous-spin-cw 6s linear infinite;
+}
+.theme-loader-classic.is-active .halo-ring-2 {
+  border-width: 1.5px;
+  border-style: dotted;
+  border-color: color-mix(in srgb, var(--color-m3-primary) 30%, transparent);
+  animation: continuous-spin-ccw 9s linear infinite;
+  margin: -5px;
+}
+
+@keyframes classic-continuous-wave {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.3;
   }
   50% {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  75% {
-    transform: scale(1.06);
-    opacity: 0.35;
+    transform: scale(1.15);
+    opacity: 0.8;
   }
 }
 
-@keyframes classic-gear-cw {
+/* --- Global Continuous Rotations (No jumps across cycles) --- */
+@keyframes continuous-spin-cw {
   0% {
     transform: rotate(0deg);
   }
@@ -408,7 +356,8 @@ const { isTranslating, colorScheme = 'blue' } = defineProps<{
     transform: rotate(360deg);
   }
 }
-@keyframes classic-gear-ccw {
+
+@keyframes continuous-spin-ccw {
   0% {
     transform: rotate(0deg);
   }
