@@ -19,7 +19,7 @@ export const DEFAULT_MODELS: Record<string, string> = {
   auto: '@cf/zai-org/glm-4.7-flash',
   cloudflare: '@cf/zai-org/glm-4.7-flash',
   dashscope: 'qwen3.8-flash',
-  gemini: 'gemini-3.8-flash',
+  gemini: 'gemini-3.5-flash',
   deepseek: 'deepseek-v4-flash'
 };
 
