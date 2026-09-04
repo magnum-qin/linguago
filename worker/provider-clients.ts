@@ -234,7 +234,11 @@ export async function translateWithGemini(input: ProviderRequest): Promise<Recor
       };
     }>;
   };
-  const rawText = payload.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+  const rawText =
+    payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part?.text ?? '')
+      .join('')
+      .trim() ?? '';
 
   if (!rawText) {
     throw new TranslateError('PROVIDER_EMPTY_RESPONSE', 'Gemini returned empty content.', 502, provider, input.model);
@@ -369,7 +373,11 @@ async function streamGeminiJson(input: ProviderRequest, onAccumulated: (accumula
   return readSseText(
     response,
     (_delta, accumulated) => onAccumulated(accumulated),
-    (payload) => normalizeStringOrText(payload.candidates?.[0]?.content?.parts?.[0]?.text)
+    (payload) =>
+      payload.candidates?.[0]?.content?.parts
+        ?.map((part: any) => normalizeStringOrText(part?.text))
+        .filter(Boolean)
+        .join('') || ''
   );
 }
 
@@ -431,6 +439,9 @@ function fetchGemini(input: ProviderRequest, generationConfig: Record<string, un
 function geminiStructuredConfig(systemPrompt?: string): Record<string, unknown> {
   return {
     temperature: 0.2,
+    thinkingConfig: {
+      thinkingBudget: 0
+    },
     responseFormat: {
       text: {
         mimeType: 'APPLICATION_JSON',
@@ -443,6 +454,9 @@ function geminiStructuredConfig(systemPrompt?: string): Record<string, unknown> 
 function geminiLegacyStructuredConfig(systemPrompt?: string): Record<string, unknown> {
   return {
     temperature: 0.2,
+    thinkingConfig: {
+      thinkingBudget: 0
+    },
     responseMimeType: 'application/json',
     responseSchema: isPreviewPrompt(systemPrompt) ? PREVIEW_RESPONSE_SCHEMA : FULL_RESPONSE_SCHEMA
   };
