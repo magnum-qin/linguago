@@ -3,8 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121417" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#060606" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,32 +19,35 @@
       (() => {
         try {
           const settings = JSON.parse(localStorage.getItem('linguago-settings-v1') || '{}');
-          const themeSettingsVersion = 2;
+          const themeSettingsVersion = 3;
           const preference =
             settings.themeSettingsVersion === themeSettingsVersion &&
             ['light', 'dark', 'system'].includes(settings.theme)
               ? settings.theme
               : 'system';
+          const isSystemDark =
+            typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
           const resolved =
-            preference === 'system' && matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'dark'
-              : preference === 'dark'
-                ? 'dark'
-                : 'light';
+            preference === 'system' ? (isSystemDark ? 'dark' : 'light') : preference;
           document.documentElement.dataset.theme = resolved;
           document.documentElement.dataset.themePreference = preference;
-          document.documentElement.style.backgroundColor = resolved === 'dark' ? '#060606' : '#ffffff';
+          document.documentElement.style.backgroundColor = resolved === 'dark' ? '#121417' : '#ffffff';
+          document.documentElement.style.colorScheme = resolved;
         } catch {
-          const resolved = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          const isSystemDark =
+            typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+          const resolved = isSystemDark ? 'dark' : 'light';
           document.documentElement.dataset.theme = resolved;
           document.documentElement.dataset.themePreference = 'system';
-          document.documentElement.style.backgroundColor = resolved === 'dark' ? '#060606' : '#ffffff';
+          document.documentElement.style.backgroundColor = resolved === 'dark' ? '#121417' : '#ffffff';
+          document.documentElement.style.colorScheme = resolved;
         }
       })();
     </script>
     <title>LinguaGo</title>
   </head>
   <body>
+    <div id="pwa-theme-probe" style="display:none;" aria-hidden="true"></div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

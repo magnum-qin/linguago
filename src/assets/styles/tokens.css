@@ -66,6 +66,112 @@
     --m3-outline-variant: #3c424b;
   }
 
+  /* Native System Dark Mode Fallback for WebKit / iOS PWA */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']):not([data-theme='dark']) {
+      color-scheme: dark;
+      --m3-surface: #121417;
+      --m3-surface-container: #1c2025;
+      --m3-surface-container-high: #262b32;
+      --m3-on-surface: #e2e2e6;
+      --m3-on-surface-variant: #a4abb5;
+      --m3-primary: #8ab4f8;
+      --m3-on-primary: #002a5b;
+      --m3-primary-container: #003f80;
+      --m3-on-primary-container: #d1e4ff;
+      --m3-secondary-container: #2a3644;
+      --m3-on-secondary-container: #d7e3f7;
+      --m3-tertiary-container: #6a1a3c;
+      --m3-on-tertiary-container: #ffd9e2;
+      --m3-outline: #6e7682;
+      --m3-outline-variant: #3c424b;
+    }
+
+    :root:not([data-theme='light']):not([data-theme='dark'])[data-color-scheme='rose'] {
+      --m3-surface: #1a1113;
+      --m3-surface-container: #26171b;
+      --m3-surface-container-high: #351f25;
+      --m3-primary: #ffb1c8;
+      --m3-on-primary: #650036;
+      --m3-primary-container: #8e0a52;
+      --m3-on-primary-container: #ffd9e4;
+      --m3-secondary-container: #5b3f45;
+      --m3-on-secondary-container: #fad8e0;
+      --m3-tertiary-container: #683d3e;
+      --m3-on-tertiary-container: #ffd9d8;
+    }
+
+    :root:not([data-theme='light']):not([data-theme='dark'])[data-color-scheme='mint'] {
+      --m3-surface: #0f1614;
+      --m3-surface-container: #16221e;
+      --m3-surface-container-high: #1e302a;
+      --m3-primary: #5ddbba;
+      --m3-on-primary: #00382c;
+      --m3-primary-container: #005140;
+      --m3-on-primary-container: #7df8d6;
+      --m3-secondary-container: #334b41;
+      --m3-on-secondary-container: #cce8dd;
+      --m3-tertiary-container: #404859;
+      --m3-on-tertiary-container: #dde5f9;
+    }
+
+    :root:not([data-theme='light']):not([data-theme='dark'])[data-color-scheme='amber'] {
+      --m3-surface: #181510;
+      --m3-surface-container: #231e17;
+      --m3-surface-container-high: #322b21;
+      --m3-primary: #f0bf4c;
+      --m3-on-primary: #412d00;
+      --m3-primary-container: #5e4200;
+      --m3-on-primary-container: #ffdea4;
+      --m3-secondary-container: #4e4539;
+      --m3-on-secondary-container: #efe0cf;
+      --m3-tertiary-container: #314e42;
+      --m3-on-tertiary-container: #c8e6d9;
+    }
+
+    :root:not([data-theme='light']):not([data-theme='dark'])[data-color-scheme='violet'] {
+      --m3-surface: #131118;
+      --m3-surface-container: #1d1a25;
+      --m3-surface-container-high: #282433;
+      --m3-primary: #d0bcff;
+      --m3-on-primary: #381e72;
+      --m3-primary-container: #4f378b;
+      --m3-on-primary-container: #eaddff;
+      --m3-secondary-container: #4a4458;
+      --m3-on-secondary-container: #e8def8;
+      --m3-tertiary-container: #633b48;
+      --m3-on-tertiary-container: #ffd8e4;
+    }
+
+    :root:not([data-theme='light']):not([data-theme='dark'])[data-color-scheme='classic'] {
+      --m3-surface: #1a1918;
+      --m3-surface-container: #262423;
+      --m3-surface-container-high: #32302e;
+      --m3-on-surface: #e8e6e3;
+      --m3-on-surface-variant: #a4a09b;
+      --m3-primary: #d76f53;
+      --m3-on-primary: #ffffff;
+      --m3-primary-container: #662a17;
+      --m3-on-primary-container: #f7e5de;
+      --m3-secondary-container: #363432;
+      --m3-on-secondary-container: #e8e6e3;
+      --m3-tertiary-container: #662a17;
+      --m3-on-tertiary-container: #f7e5de;
+      --m3-outline: #524e4b;
+      --m3-outline-variant: #3c3937;
+    }
+  }
+
+  /* PWA theme detection probe */
+  #pwa-theme-probe {
+    color: #111111;
+  }
+  @media (prefers-color-scheme: dark) {
+    #pwa-theme-probe {
+      color: #eeeeee;
+    }
+  }
+
   /* --- Rose Theme --- */
   :root[data-color-scheme='rose'] {
     --m3-surface: #ffffff;

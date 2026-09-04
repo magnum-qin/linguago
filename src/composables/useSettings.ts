@@ -3,7 +3,7 @@ import { fetchRemoteSettings, fetchRemoteModels, saveRemoteSettings } from '../u
 
 export const HISTORY_KEY = 'linguago-history-v5';
 export const SETTINGS_KEY = 'linguago-settings-v1';
-export const THEME_SETTINGS_VERSION = 2;
+export const THEME_SETTINGS_VERSION = 3;
 export const MODEL_OPTIONS_VERSION = 8;
 
 export const RESULT_LANGUAGES = [

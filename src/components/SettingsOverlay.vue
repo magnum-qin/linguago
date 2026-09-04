@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, useId } from 'vue';
-import { ArrowLeft, Check, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
+import { ArrowLeft, Check, Loader2, Plus, RefreshCw, Trash2, X, Sun, Moon, SunMoon } from 'lucide-vue-next';
 import M3ModalShell from '@/components/M3ModalShell.vue';
 import M3Select from '@/components/M3Select.vue';
 import { EDITABLE_PROVIDERS, getModelsForProvider, settings } from '@/composables/useSettings';
+import { useTheme } from '@/composables/useTheme';
 import { verifyTranslation } from '@/utils/api';
 import { checkForPwaUpdate } from '@/utils/pwa-update';
 
@@ -14,10 +15,18 @@ const activePage = ref<'settings' | 'models'>('settings');
 const updateStatus = ref<'idle' | 'checking' | 'current' | 'updating' | 'error'>('idle');
 const newModelName = ref('');
 const modelInputId = useId();
+const { setTheme } = useTheme();
+
+const themeModes = [
+  { value: 'system', label: '跟随系统', sub: 'Sistema', icon: SunMoon },
+  { value: 'light', label: '浅色模式', sub: 'Claro', icon: Sun },
+  { value: 'dark', label: '深色模式', sub: 'Escuro', icon: Moon }
+];
 
 let originalSettings = {
   provider: settings.provider,
   model: settings.model,
+  theme: settings.theme,
   colorScheme: settings.colorScheme,
   modelOptions: JSON.stringify(settings.modelOptions)
 };
@@ -55,6 +64,7 @@ const openSettings = () => {
   originalSettings = {
     provider: settings.provider,
     model: settings.model,
+    theme: settings.theme,
     colorScheme: settings.colorScheme,
     modelOptions: JSON.stringify(settings.modelOptions)
   };
@@ -67,6 +77,9 @@ const close = () => {
   settings.model = originalSettings.model;
   settings.colorScheme = originalSettings.colorScheme;
   settings.modelOptions = JSON.parse(originalSettings.modelOptions || '{}');
+  if (settings.theme !== originalSettings.theme) {
+    setTheme(originalSettings.theme);
+  }
   isOpen.value = false;
   resetViewState();
 };
@@ -224,6 +237,32 @@ onUnmounted(() => {
               @click="activePage = 'models'"
             >
               <span>编辑模型</span><span class="text-[0.72rem] opacity-70 font-normal border-l border-current/30 pl-1.5 ml-1.5">Editar</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="setting-field">
+          <span class="setting-label flex items-center">
+            <span>外观模式</span>
+            <span class="text-[0.68rem] opacity-60 font-medium border-l border-m3-outline-variant/40 pl-1.5 ml-1.5">Aparência</span>
+          </span>
+          <div class="grid grid-cols-3 gap-2" role="group" aria-label="外观模式 | Aparência">
+            <button
+              v-for="mode in themeModes"
+              :key="mode.value"
+              type="button"
+              class="flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-center transition-all cursor-pointer select-none"
+              :class="[
+                settings.theme === mode.value
+                  ? 'bg-m3-primary/12 border-m3-primary text-m3-primary font-semibold shadow-xs'
+                  : 'bg-m3-surface-container border-m3-outline-variant/30 text-m3-on-surface hover:bg-m3-surface-container-high'
+              ]"
+              :aria-pressed="settings.theme === mode.value"
+              @click="setTheme(mode.value)"
+            >
+              <component :is="mode.icon" class="h-4 w-4 mb-1 shrink-0" />
+              <span class="text-[0.82rem] leading-tight">{{ mode.label }}</span>
+              <span class="text-[0.65rem] opacity-60 font-normal mt-0.5">{{ mode.sub }}</span>
             </button>
           </div>
         </section>

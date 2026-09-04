@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted, computed, useTemplateRef } from 'vue';
-import { Sun, Moon, Settings, X, Languages, Bookmark, Clipboard, History, Square } from 'lucide-vue-next';
+import { Sun, Moon, SunMoon, Settings, X, Languages, Bookmark, Clipboard, History, Square } from 'lucide-vue-next';
 import { useTheme } from '@/composables/useTheme';
 import { useTranslation } from '@/composables/useTranslation';
 import { useBookmarks } from '@/composables/useBookmarks';
 import { useHistory } from '@/composables/useHistory';
 import { detectSourceLanguage } from '@/utils/detect-source-language';
 
-const { currentTheme, toggleTheme } = useTheme();
+const { currentTheme, resolvedTheme, toggleTheme } = useTheme();
 const { inputText, sourceLangPreference, translate, stopTranslation, clear, resultData, isTranslating } =
   useTranslation();
 const { isBookmarksOpen } = useBookmarks();
@@ -43,6 +43,15 @@ const sourceToggleLabel = computed(() =>
 const sourceToggleAriaLabel = computed(() => {
   if (sourceLangPreference.value === 'auto') return 'Detected source language';
   return `${sourceNames[sourceLangPreference.value]} source. Click to switch.`;
+});
+
+const themeToggleAriaLabel = computed(() => {
+  if (currentTheme.value === 'system') {
+    return `外观：跟随系统 (${resolvedTheme.value === 'dark' ? '深色' : '浅色'}) | Aparência: Seguir sistema`;
+  }
+  return currentTheme.value === 'dark'
+    ? '外观：深色模式 | Aparência: Modo escuro'
+    : '外观：浅色模式 | Aparência: Modo claro';
 });
 
 const autoResize = () => {
@@ -211,12 +220,14 @@ const handleTextareaKeydown = (e: KeyboardEvent) => {
         <button
           type="button"
           class="w-10 h-10 rounded-full inline-flex items-center justify-center text-m3-on-surface-variant hover:bg-m3-surface-container-high focus-visible:ring-2 focus-visible:ring-m3-primary transition-colors cursor-pointer"
+          :aria-label="themeToggleAriaLabel"
+          :title="themeToggleAriaLabel"
           @click="toggleTheme"
-          aria-label="Toggle Theme"
         >
           <Transition name="m3-icon-swap" mode="out-in">
-            <Sun v-if="currentTheme === 'dark'" key="sun" class="w-5 h-5" />
-            <Moon v-else key="moon" class="w-5 h-5" />
+            <SunMoon v-if="currentTheme === 'system'" key="system" class="w-5 h-5" />
+            <Sun v-else-if="currentTheme === 'light'" key="light" class="w-5 h-5" />
+            <Moon v-else key="dark" class="w-5 h-5" />
           </Transition>
         </button>
 
