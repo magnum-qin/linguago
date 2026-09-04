@@ -25,7 +25,7 @@ const buttonState = await page.evaluate(() => ({
 }));
 
 await page.locator('#providerSelect').selectOption('dashscope');
-await page.locator('#modelSelect').selectOption('qwen3.6-flash');
+await page.locator('#modelSelect').selectOption('qwen3.8-flash');
 await page.locator('#saveModelButton').click();
 const savedStatus = await page.locator('#modelStatus').innerText();
 await page.locator('#verifyModelButton').click();

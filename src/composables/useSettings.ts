@@ -4,7 +4,7 @@ import { fetchRemoteSettings, fetchRemoteModels, saveRemoteSettings } from '../u
 export const HISTORY_KEY = 'linguago-history-v5';
 export const SETTINGS_KEY = 'linguago-settings-v1';
 export const THEME_SETTINGS_VERSION = 2;
-export const MODEL_OPTIONS_VERSION = 6;
+export const MODEL_OPTIONS_VERSION = 7;
 
 export const RESULT_LANGUAGES = [
   { code: 'en', label: 'EN', speech: 'en-US' },
@@ -18,8 +18,8 @@ export const LANGUAGES = Object.fromEntries(RESULT_LANGUAGES.map((language) => [
 export const DEFAULT_MODELS: Record<string, string> = {
   auto: '@cf/zai-org/glm-4.7-flash',
   cloudflare: '@cf/zai-org/glm-4.7-flash',
-  dashscope: 'qwen3.6-flash',
-  gemini: 'gemini-2.5-flash',
+  dashscope: 'qwen3.8-flash',
+  gemini: 'gemini-3.5-flash',
   deepseek: 'deepseek-v4-flash'
 };
 
@@ -35,7 +35,22 @@ export const DEFAULT_MODEL_OPTIONS: Record<string, string[]> = {
     '@cf/qwen/qwen3-30b-a3b-fp8',
     '@cf/openai/gpt-oss-20b'
   ],
-  dashscope: ['qwen3.6-flash', 'qwen3.6-35b-a3b', 'glm-5.1', 'deepseek-v4-pro', 'deepseek-v4-flash'],
+  dashscope: [
+    'qwen3.8-flash',
+    'qwen3.7-flash',
+    'qwen3.8-27b',
+    'qwen3.8-max',
+    'glm-5.2',
+    'kimi-k3',
+    'deepseek-v4-flash-0731',
+    'deepseek-v4-pro-0813',
+    'qwen3.8-max-0902',
+    'qwen3.7-flash-2026-07-15',
+    'qwen3.7-max-2026-06-08',
+    'qwen3.8-2.4t-a95b',
+    'kimi-k2.7-code',
+    'qwen3.5-ocr'
+  ],
   gemini: ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro']
 };

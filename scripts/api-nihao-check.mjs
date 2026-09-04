@@ -6,7 +6,7 @@ const response = await fetch('https://translation-pwa.qhzggzh-linguago.workers.d
     source_lang: 'auto',
     target_lang: 'zh',
     provider: 'auto',
-    model: 'qwen3.6-flash'
+    model: 'qwen3.8-flash'
   })
 });
 

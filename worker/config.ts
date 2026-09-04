@@ -22,12 +22,12 @@ export const MESSAGES = {
 export const DEFAULT_MODELS: Record<Provider, string> = {
   auto: '@cf/zai-org/glm-4.7-flash',
   cloudflare: '@cf/zai-org/glm-4.7-flash',
-  dashscope: 'qwen3.6-flash',
+  dashscope: 'qwen3.8-flash',
   gemini: 'gemini-3.5-flash',
   deepseek: 'deepseek-v4-flash'
 };
 
-export const MODEL_OPTIONS_VERSION = 6;
+export const MODEL_OPTIONS_VERSION = 7;
 export const EDITABLE_PROVIDERS: Exclude<Provider, 'auto'>[] = ['cloudflare', 'dashscope', 'gemini', 'deepseek'];
 
 export const MODEL_OPTIONS: Record<Provider, string[]> = {
@@ -40,21 +40,20 @@ export const MODEL_OPTIONS: Record<Provider, string[]> = {
     '@cf/openai/gpt-oss-20b'
   ],
   dashscope: [
-    'qwen3.6-flash',
-    'qwen3.6-35b-a3b',
-    'glm-5.1',
-    'qwen3.6-plus-2026-04-02',
-    'qwen3.6-plus',
-    'qwen3.5-plus-2026-04-20',
-    'qwen3.6-max-preview',
-    'qwen3.7-max',
-    'kimi-k2.6',
-    'qwen3.7-max-2026-05-20',
-    'qwen-flash-character-2026-02-26',
-    'deepseek-v4-pro',
-    'qwen3.6-27b',
-    'gui-plus-2026-02-26',
-    'deepseek-v4-flash'
+    'qwen3.8-flash',
+    'qwen3.7-flash',
+    'qwen3.8-27b',
+    'qwen3.8-max',
+    'glm-5.2',
+    'kimi-k3',
+    'deepseek-v4-flash-0731',
+    'deepseek-v4-pro-0813',
+    'qwen3.8-max-0902',
+    'qwen3.7-flash-2026-07-15',
+    'qwen3.7-max-2026-06-08',
+    'qwen3.8-2.4t-a95b',
+    'kimi-k2.7-code',
+    'qwen3.5-ocr'
   ],
   gemini: ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview', 'gemini-2.5-flash', 'gemini-2.5-pro'],
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro']
