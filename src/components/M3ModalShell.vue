@@ -33,12 +33,18 @@ const contentClasses = computed(() => ['m3-dialog-content', fixedHeight ? 'm3-di
 
 const requestClose = () => emit('update:modelValue', false);
 
+const handleAfterLeave = () => {
+  refreshStatusBarColor();
+  setTimeout(refreshStatusBarColor, 80);
+};
+
 watch(
   () => modelValue,
   (isOpen) => {
     if (!isOpen) {
       refreshStatusBarColor();
-      setTimeout(refreshStatusBarColor, 240);
+      setTimeout(refreshStatusBarColor, 120);
+      setTimeout(refreshStatusBarColor, 260);
     }
   }
 );
@@ -47,7 +53,7 @@ watch(
 <template>
   <DialogRoot :open="modelValue" :modal="false" @update:open="emit('update:modelValue', $event)">
     <DialogPortal>
-      <Transition name="m3-scrim-fade" @after-leave="refreshStatusBarColor">
+      <Transition name="m3-scrim-fade" @after-leave="handleAfterLeave">
         <div
           v-if="modelValue"
           class="m3-dialog-scrim fixed bottom-0 left-0 right-0 z-[2400]"
@@ -56,7 +62,7 @@ watch(
         />
       </Transition>
       <div class="fixed inset-0 z-[2400] flex items-center justify-center p-3 pointer-events-none">
-        <Transition name="m3-dialog-transition" @after-leave="refreshStatusBarColor">
+        <Transition name="m3-dialog-transition" @after-leave="handleAfterLeave">
           <DialogContent
             v-if="modelValue"
             class="m3-dialog-content pointer-events-auto outline-none"
@@ -96,6 +102,7 @@ watch(
 
 <style scoped>
 .m3-dialog-scrim {
+  top: env(safe-area-inset-top, 0px);
   background: rgb(0 0 0 / 0.4);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);

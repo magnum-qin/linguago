@@ -9,8 +9,12 @@ import HistoryCard from '@/components/HistoryCard.vue';
 import SettingsOverlay from '@/components/SettingsOverlay.vue';
 import { Loader2, AlertTriangle } from 'lucide-vue-next';
 
-const { currentTheme } = useTheme();
+const { currentTheme, resolvedTheme } = useTheme();
 const { resultData, isTranslating } = useTranslation();
+
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 const hasResult = computed(() => !!resultData.value || isTranslating.value);
 const mainRef = useTemplateRef<HTMLElement>('mainRef');
@@ -60,16 +64,19 @@ onUnmounted(() => {
 
 <template>
   <div class="bg-m3-surface text-m3-on-surface font-sans transition-colors duration-300 w-full">
-    <!-- Dedicated Status Bar Tint Element for iOS WebKit Sampling -->
-    <div
-      id="ios-status-bar-tint"
-      class="fixed top-0 left-0 right-0 pointer-events-none z-[9998]"
-      :style="{
-        height: 'env(safe-area-inset-top, 0px)',
-        backgroundColor: 'var(--m3-surface)'
-      }"
-      aria-hidden="true"
-    ></div>
+    <!-- Dedicated Status Bar Tint Element for iOS WebKit Sampling & Tap-to-top -->
+    <Teleport to="body">
+      <div
+        id="ios-status-bar-tint"
+        class="fixed top-0 left-0 right-0 z-[99999] select-none cursor-pointer"
+        :style="{
+          height: 'env(safe-area-inset-top, 0px)',
+          backgroundColor: resolvedTheme === 'dark' ? '#121417' : '#ffffff'
+        }"
+        aria-hidden="true"
+        @click="scrollToTop"
+      ></div>
+    </Teleport>
 
     <div class="flex flex-col items-center w-full relative">
       <!-- Smooth layout spacer: shifts main container with native continuous easing -->

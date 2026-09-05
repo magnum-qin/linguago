@@ -61,6 +61,22 @@ export function refreshStatusBarColor() {
   if (statusBarTint) {
     statusBarTint.style.backgroundColor = color;
   }
+
+  // 4. Trigger WebKit chrome re-evaluation with a 1px micro-scroll pulse
+  if (typeof window !== 'undefined') {
+    const currentY = window.scrollY;
+    if (currentY === 0) {
+      window.scrollBy(0, 1);
+      requestAnimationFrame(() => {
+        window.scrollBy(0, -1);
+      });
+    } else {
+      window.scrollBy(0, -1);
+      requestAnimationFrame(() => {
+        window.scrollBy(0, 1);
+      });
+    }
+  }
 }
 
 export function applyTheme(theme: string, colorScheme: string = 'blue') {

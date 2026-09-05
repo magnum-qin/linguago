@@ -130,6 +130,7 @@ onBeforeUnmount(() => {
 .m3-drawer-backdrop {
   position: fixed;
   inset: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 40;
   width: 100%;
   height: 100%;
