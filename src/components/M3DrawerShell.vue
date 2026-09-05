@@ -134,9 +134,7 @@ onBeforeUnmount(() => {
   z-index: 40;
   width: 100%;
   height: 100%;
-  background: rgb(0 0 0 / 0.32);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: rgb(0 0 0 / 0.35);
 }
 
 .m3-drawer {

@@ -53,6 +53,10 @@ onMounted(() => {
   window.addEventListener('pwa-update-available', handleUpdateAvailable);
   window.addEventListener('pwa-updated', handleUpdated);
   window.addEventListener('api-error', handleApiError);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistration().then((reg) => reg?.update().catch(() => {}));
+  }
 });
 
 onUnmounted(() => {

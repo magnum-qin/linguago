@@ -31,6 +31,12 @@ export function updateMetaThemeColor(resolved: 'light' | 'dark') {
     meta.setAttribute('content', color);
   });
 
+  const statusStyle = resolved === 'dark' ? 'black' : 'default';
+  const statusMetas = document.querySelectorAll('meta[name="apple-mobile-web-app-status-bar-style"]');
+  statusMetas.forEach((m) => {
+    m.setAttribute('content', statusStyle);
+  });
+
   // WebKit cache-buster: guarantee an unconditional active meta tag exists
   let activeMeta = document.getElementById('active-meta-theme-color') as HTMLMetaElement | null;
   if (!activeMeta) {

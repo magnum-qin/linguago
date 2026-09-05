@@ -9,6 +9,8 @@
     <meta name="theme-color" content="#ffffff" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" media="(prefers-color-scheme: light)" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" media="(prefers-color-scheme: dark)" content="black" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="LinguaGo" />
     <meta name="description" content="AI translation PWA" />
@@ -33,6 +35,10 @@
           document.documentElement.dataset.themePreference = preference;
           document.documentElement.style.backgroundColor = resolved === 'dark' ? '#121417' : '#ffffff';
           document.documentElement.style.colorScheme = resolved;
+          const statusStyle = resolved === 'dark' ? 'black' : 'default';
+          document.querySelectorAll('meta[name="apple-mobile-web-app-status-bar-style"]').forEach((m) => {
+            m.setAttribute('content', statusStyle);
+          });
         } catch {
           const isSystemDark =
             typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
@@ -41,6 +47,10 @@
           document.documentElement.dataset.themePreference = 'system';
           document.documentElement.style.backgroundColor = resolved === 'dark' ? '#121417' : '#ffffff';
           document.documentElement.style.colorScheme = resolved;
+          const statusStyle = resolved === 'dark' ? 'black' : 'default';
+          document.querySelectorAll('meta[name="apple-mobile-web-app-status-bar-style"]').forEach((m) => {
+            m.setAttribute('content', statusStyle);
+          });
         }
       })();
     </script>

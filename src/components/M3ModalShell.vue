@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { computed, useSlots, watch } from 'vue';
 import { X } from 'lucide-vue-next';
-import {
-  DialogRoot,
-  DialogPortal,
-  DialogContent
-} from 'radix-vue';
 import { refreshStatusBarColor } from '../composables/useTheme';
 
 const {
@@ -51,61 +46,60 @@ watch(
 </script>
 
 <template>
-  <DialogRoot :open="modelValue" :modal="false" @update:open="emit('update:modelValue', $event)">
-    <DialogPortal>
-      <Transition name="m3-scrim-fade" @after-leave="handleAfterLeave">
+  <Teleport to="body">
+    <Transition name="m3-scrim-fade" @after-leave="handleAfterLeave">
+      <div
+        v-if="modelValue"
+        class="m3-dialog-scrim fixed bottom-0 left-0 right-0 z-[2400]"
+        :style="{ top: 'env(safe-area-inset-top, 0px)' }"
+        @click="requestClose"
+      />
+    </Transition>
+    <div
+      v-if="modelValue"
+      class="fixed inset-x-0 bottom-0 z-[2400] flex items-center justify-center p-3 pointer-events-none"
+      :style="{ top: 'env(safe-area-inset-top, 0px)' }"
+    >
+      <Transition name="m3-dialog-transition" @after-leave="handleAfterLeave">
         <div
           v-if="modelValue"
-          class="m3-dialog-scrim fixed bottom-0 left-0 right-0 z-[2400]"
-          :style="{ top: 'env(safe-area-inset-top, 0px)' }"
-          @click="requestClose"
-        />
+          class="m3-dialog-content pointer-events-auto outline-none"
+          :class="contentClasses"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="titleId"
+          :style="{ maxWidth: typeof maxWidth === 'number' ? `${maxWidth}px` : maxWidth }"
+        >
+          <div class="m3-dialog-card" :class="{ 'm3-dialog-card--fixed': fixedHeight }">
+            <header class="m3-dialog-header" @touchmove.stop.prevent>
+              <div class="m3-dialog-title-group">
+                <slot name="leading"></slot>
+                <slot name="title-icon"></slot>
+                <h2 :id="titleId" class="m3-dialog-title">{{ title }}</h2>
+              </div>
+              <button type="button" class="m3-icon-button" :aria-label="closeLabel" @click="requestClose">
+                <X class="h-5 w-5" aria-hidden="true" />
+              </button>
+            </header>
+
+            <main class="m3-dialog-body">
+              <slot></slot>
+            </main>
+
+            <footer v-if="slots.actions" class="m3-dialog-actions" @touchmove.stop.prevent>
+              <slot name="actions"></slot>
+            </footer>
+          </div>
+        </div>
       </Transition>
-      <div class="fixed inset-0 z-[2400] flex items-center justify-center p-3 pointer-events-none">
-        <Transition name="m3-dialog-transition" @after-leave="handleAfterLeave">
-          <DialogContent
-            v-if="modelValue"
-            class="m3-dialog-content pointer-events-auto outline-none"
-            :class="contentClasses"
-            :aria-labelledby="titleId"
-            :style="{ maxWidth: typeof maxWidth === 'number' ? `${maxWidth}px` : maxWidth }"
-            @pointer-down-outside="(event) => event.preventDefault()"
-            @interact-outside="(event) => event.preventDefault()"
-            @focus-outside="(event) => event.preventDefault()"
-          >
-            <div class="m3-dialog-card" :class="{ 'm3-dialog-card--fixed': fixedHeight }">
-              <header class="m3-dialog-header" @touchmove.stop.prevent>
-                <div class="m3-dialog-title-group">
-                  <slot name="leading"></slot>
-                  <slot name="title-icon"></slot>
-                  <h2 :id="titleId" class="m3-dialog-title">{{ title }}</h2>
-                </div>
-                <button type="button" class="m3-icon-button" :aria-label="closeLabel" @click="requestClose">
-                  <X class="h-5 w-5" aria-hidden="true" />
-                </button>
-              </header>
-
-              <main class="m3-dialog-body">
-                <slot></slot>
-              </main>
-
-              <footer v-if="slots.actions" class="m3-dialog-actions" @touchmove.stop.prevent>
-                <slot name="actions"></slot>
-              </footer>
-            </div>
-          </DialogContent>
-        </Transition>
-      </div>
-    </DialogPortal>
-  </DialogRoot>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
 .m3-dialog-scrim {
   top: env(safe-area-inset-top, 0px);
-  background: rgb(0 0 0 / 0.4);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: rgb(0 0 0 / 0.45);
 }
 
 .m3-dialog-card {
