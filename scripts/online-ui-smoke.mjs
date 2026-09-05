@@ -175,9 +175,19 @@ async function collectState(page) {
       .split(/\n/g)
       .map((line) => line.trim())
       .filter(Boolean);
-    const provider = lines.some((line) => line === 'DICIONÁRIO PRINCIPAL' || line === 'Dicionário Principal')
+    const provider = lines.some((line) =>
+      line === 'DICIONÁRIO PRINCIPAL' ||
+      line === 'Dicionário Principal' ||
+      line === '核心词典' ||
+      line === 'Dicionário'
+    )
       ? 'dictionary'
-      : lines.some((line) => line === 'EM CACHE' || line === 'Em cache')
+      : lines.some((line) =>
+          line === 'EM CACHE' ||
+          line === 'Em cache' ||
+          line === '已缓存' ||
+          line === 'Cache'
+        )
         ? 'cached'
         : lines.includes('AI')
           ? 'ai'
