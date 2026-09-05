@@ -50,15 +50,13 @@ watch(
     <Transition name="m3-scrim-fade" @after-leave="handleAfterLeave">
       <div
         v-if="modelValue"
-        class="m3-dialog-scrim fixed bottom-0 left-0 right-0 z-[2400]"
-        :style="{ top: 'env(safe-area-inset-top, 0px)' }"
+        class="m3-dialog-scrim fixed inset-0 z-[2400]"
         @click="requestClose"
       />
     </Transition>
     <div
       v-if="modelValue"
-      class="fixed inset-x-0 bottom-0 z-[2400] flex items-center justify-center p-3 pointer-events-none"
-      :style="{ top: 'env(safe-area-inset-top, 0px)' }"
+      class="fixed inset-0 z-[2400] flex items-center justify-center p-3 pointer-events-none"
     >
       <Transition name="m3-dialog-transition" @after-leave="handleAfterLeave">
         <div
@@ -98,7 +96,6 @@ watch(
 
 <style scoped>
 .m3-dialog-scrim {
-  top: env(safe-area-inset-top, 0px);
   background: rgb(0 0 0 / 0.45);
 }
 

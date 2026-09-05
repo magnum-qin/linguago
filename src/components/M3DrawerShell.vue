@@ -94,7 +94,6 @@ onBeforeUnmount(() => {
         v-if="modelValue"
         type="button"
         class="m3-drawer-backdrop"
-        :style="{ top: 'env(safe-area-inset-top, 0px)' }"
         :aria-label="closeLabel"
         @click="close"
       ></button>
@@ -130,8 +129,7 @@ onBeforeUnmount(() => {
 .m3-drawer-backdrop {
   position: fixed;
   inset: 0;
-  top: env(safe-area-inset-top, 0px);
-  z-index: 40;
+  z-index: 2200;
   width: 100%;
   height: 100%;
   background: rgb(0 0 0 / 0.35);
@@ -141,7 +139,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset-block: 0;
   right: 0;
-  z-index: 50;
+  z-index: 2300;
   width: min(400px, 90vw);
   display: flex;
   flex-direction: column;

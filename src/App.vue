@@ -72,7 +72,7 @@ onUnmounted(() => {
     <Teleport to="body">
       <div
         id="ios-status-bar-tint"
-        class="fixed top-0 left-0 right-0 z-[99999] select-none cursor-pointer"
+        class="fixed top-0 left-0 right-0 z-[2000] select-none cursor-pointer"
         :style="{
           height: 'env(safe-area-inset-top, 0px)',
           backgroundColor: resolvedTheme === 'dark' ? '#121417' : '#ffffff'
