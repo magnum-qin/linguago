@@ -45,6 +45,8 @@ const allowed = new Set([
   'scripts\\filter-dictionary-v2-production-batch.mjs',
   'scripts\\filter-dictionary-v2-daily-recovery-candidates.mjs',
   'scripts\\build-dictionary-v2-model-confirmed-sense-index.mjs',
+  'scripts\\restore-dictionary-v2-missing-stock.mjs',
+  'scripts\\watch-remote-dictionary-main-db.ps1',
   'config\\dictionary-overrides\\product-entry-form-aliases.json',
   'scripts\\update-remote-runner-manifest-entries.mjs',
   'data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db'

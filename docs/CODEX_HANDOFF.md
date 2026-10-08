@@ -1,5 +1,33 @@
 # Codex Handoff
 
+## 2026-10-09 custodian trail, supply exhaustion, b24 micro-batch
+
+- Main-DB audit trail installed: scheduled task `LinguaGo Runner Main DB
+  Custodian` (`scripts/watch-remote-dictionary-main-db.ps1`, every 10 minutes)
+  appends SHA-256 heartbeats to `state/main-db-audit-trail.jsonl` and, on hash
+  change, records attribution (locks, active runs, recent backups). Verified
+  live: the b24 draft write was captured as `pipeline_run_activity`; changes
+  with no lock/run/backup context are classified `UNATTRIBUTED_CHANGE`.
+- Supply exhaustion at current scan parameters: additional-sense recovery
+  selected 15 of 1,300; native-daily selected 1 of 700 (169 excluded batch
+  reports, 178,697 attempted senses). Funnel analysis: 3,099 bindings died at
+  the trust filter (2,742 `untrusted_selected_source_sense`, of which
+  kaikki-zh alone is 2,576) and the 323 trusted rows collapsed to 1 under
+  entry-level batch-history exclusion. The remaining large untapped pool is
+  **kaikki-zh (Wiktionary Chinese) as a zh primary source** — widening zh
+  authoritative sources to include it is the next Plan-A-style policy lever
+  and needs an explicit user decision.
+- b24 micro-batch (15 ja additional-sense rows): draft-production 15 -> 10
+  aligned/approved/supported -> 10 generated; release validation 10/10;
+  committed via the official controlled path. Post-commit main SHA
+  `D896D58B2B5F09C3A5AE7B7BB630B67E18960D4C3A86D3CD37E678A2EB3A0A25`,
+  counts 52,697 entries / 61,096 senses / 58,113 accepted. Publishable
+  trajectory vs v218 baseline (57,120): approximately +1,000 (+970 restore
+  state +10 b24 - b24 promote delta pending next risk audit).
+- Session commits: `011f378` (dictionary pipeline, 104 files) and `fff59ae`
+  (docs). App-side working-tree changes (TranslatorCard.vue, worker/config.ts,
+  .agents/) deliberately left uncommitted.
+
 ## 2026-10-08 stock restore completed (incident resolved)
 
 The unexplained main-DB stock loss was reversed with user approval. A local AI-chat-record
