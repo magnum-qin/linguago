@@ -1,5 +1,20 @@
 # Codex Handoff
 
+## 2026-10-09 A-group close-out: lane exhausted again, deferred words need frequency data
+
+- b27 cohort from the b26 trusted pool returned 0 (one-sense-per-entry rule:
+  the remaining 178 rows are second senses on consumed entries). The
+  additional-sense lane is exhausted again.
+- Remaining pool composition: 2,314 untrusted bindings are 96% the EN lane
+  (wikdict-en-* 2,192, omw 104, freedict 17); zh is fully converted. The next
+  supply lever is conditional wikdict-en authorization for the EN lane
+  (Plan-A pattern, needs an explicit user decision).
+- The 1,044 deferred CC-CEDICT repair words have NO same-word zh entry with a
+  frequency rank anywhere in the source DB — rank borrowing is impossible.
+  Unlocking them requires an external Chinese word-frequency list covering
+  those words (data-acquisition follow-up).
+- All six session commits pushed to origin/main (9954159..d63d8ec).
+
 ## 2026-10-09 b26: CC-CEDICT repair supply converted; 120/120 committed
 
 The repaired CC-CEDICT senses revived the exhausted additional-sense lane:
