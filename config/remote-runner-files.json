@@ -686,7 +686,7 @@
     {
       "path": "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
       "bytes": 367538176,
-      "sha256": "55F4157F0535A6C1E7D14502F26D024FCD611B4A4E563B1FCC9BFFD307964528"
+      "sha256": "4E765276A38ACA0A502B246641B9A439E16DCCDA762EA5F0718652062A5DAA8C"
     },
     {
       "path": "scripts\\lib\\jmdict-review-metadata.mjs",

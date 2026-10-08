@@ -1,5 +1,23 @@
 # Codex Handoff
 
+## 2026-10-09 b26: CC-CEDICT repair supply converted; 120/120 committed
+
+The repaired CC-CEDICT senses revived the exhausted additional-sense lane:
+- The runner's builder copy predates the zh-kaikki trust flag (2,717/2,750
+  eligible rows died as untrusted through it), so b26's trust/quality/cohort
+  stages were rerun manually with the full flag set: 436 trusted -> cohort 258.
+- Draft production: 258 -> aligned 241 -> Gemma 192 -> reverse 151 -> preview
+  140 -> preflight 120 -> 120 drafts written.
+- Release validation: reverse evidence 120/120, final Gemma 120/120 — the
+  cleanest full-pass batch of this cycle (raw-to-final 46.5% vs b25's ~1.8%).
+- Committed via the official controlled path; main SHA after
+  `4E765276A38ACA0A502B246641B9A439E16DCCDA762EA5F0718652062A5DAA8C`,
+  counts 52,710 entries / 61,229 senses / 58,245 accepted / 244,908 locs.
+- Publishable trajectory vs v218 baseline: roughly +1,140 of +5,000.
+- Follow-up: the runner's builder must be synced with the local flag set at
+  the next manifest reconciliation; 1,044 deferred repair words still need a
+  frequency source before they become scan-visible.
+
 ## 2026-10-09 CC-CEDICT homograph sense repair applied to the source DB
 
 The v219 versioned-identity staging rebuild was converted into a bounded,
