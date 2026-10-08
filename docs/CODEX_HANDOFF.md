@@ -1,5 +1,222 @@
 # Codex Handoff
 
+## 2026-10-08 stock restore completed (incident resolved)
+
+The unexplained main-DB stock loss was reversed with user approval. A local AI-chat-record
+search (Codex ends 9/23; the Antigravity session 2fec3e3b of 9/30-10/2 shows the
+user-ordered stock governance: 514 traditional merges, 1,902 duplicate-sense merges,
+reading repairs, import-210, then the autonomous production-4000 campaign) found NO
+record of any decision to delete the 8,990 entries — all agent records end 10/2 00:39
+before the drop was ever observed. Evidence also shows the deletion preceded the
+campaign's inserts (851 campaign entries reused freed ids).
+
+Restore executed via `scripts/restore-dictionary-v2-missing-stock.mjs` (single
+transaction, FK+quick_check built in, idempotent fingerprints by created_at):
+- Pass 1: 9,841 entries + 9,880 senses + ~50k child rows re-added from
+  `backups/production-accepted-210-before-import-20261001-054018.db`
+  (851 entry ids and 1,091 sense ids remapped above both DBs' maxima;
+  24 pinyin group_key collisions suffixed `-restored-<id>`, e.g. 处子 vs 出资).
+- Pass 2: 1,614 senses the loss had stripped from SURVIVING entries (+9,818 child
+  rows; 7 sense_order shifts to avoid (entry_id, sense_order) collisions).
+- Post-restore: mainland plan reports 0 pending repairs (backup post-dates the
+  canonicalization); alias audit clean (753 rows, 0 non-publishable targets);
+  fast audit ok; published-risk ok (accepted 58,103 / publishable 58,090 /
+  flagged 0); full native D1 export + in-memory import audit passed.
+- Final main DB: 52,697 entries / 61,086 senses / 244,336 localizations,
+  SHA-256 `49844C342270AB98D7D7E6C00B0FA3DCA7ABEAC37EB1A6C41E08950D8C36028A`
+  (manifest entry updated). Publishable 58,090 vs the 57,120 v218 online
+  baseline = +970 cumulative (the governance merges traded count for quality;
+  b23 added +86). Recovery chain: `backups/main-before-stock-restore-20261008.db`
+  (pre-restore state) and the 10/1 backup both retained. No D1/Worker release ran.
+
+## 2026-10-08 b23 daily-primary production cycle + UNRESOLVED main-DB stock loss
+
+### Data-integrity incident requiring user decision
+
+Between 2026-10-01 05:40 and 2026-10-08, the authoritative main product DB
+lost 8,990 entries versus the `production-accepted-210-before-import-20261001-054018.db`
+backup: 8,413 `accepted` entries (ja=4,014, zh=3,998, pt-BR=539, en=439; examples
+礼賽, 车轴, 和声, 貯水池, 飞地) and 577 drafts, about 9,419 senses total.
+The operation is undocumented (docs end at 2026-09-23), has no report, and made
+no `backups/` file. An undocumented "production-4000" campaign
+(runs `production-4000-controlled-run1..8`, `production-4000-additional-senses-run1`,
+batch files `production-4000-*` dated 2026-10-01/02) and "phase1 stock governance"
+(the 2026-09-30 traditional-split merge, 514 entries) are the only visible
+activity in that window; the mass deletion is not the merge. Current publishable
+export is 47,180 senses versus the 57,120 v218 online baseline: the +2,006
+cumulative progress recorded on 2026-09-23 no longer holds; the DB sits about
+9,940 publishable senses BELOW the online baseline. Recovery point:
+`backups/production-accepted-210-before-import-20261001-054018.db`
+(51,332 entries / 59,011 senses). Restoring it would drop the campaign's ~554
+post-10/1 entries and the b23 drafts/promotions, so the decision (restore vs
+accept as intentional governance) belongs to the user. Forensic scripts remain
+on the runner (`state/db-counts*.mjs`, `state/db-diff.mjs`, `state/db-forensics.mjs`).
+
+### b23 daily-primary cycle (completed 2026-10-08)
+
+- Daily-primary quality hold root cause fixed: the b22 cohort was 98.9%
+  fallback senses (entry primary already attempted -> selector bound a leftover
+  minor sense to satisfy the 720-row quota). New rule
+  `primary_sense_attempted_no_daily_fallback` in `daily-candidate-quality.mjs`
+  defers such entries; gloss categories added (ministry, era names, zh pattern
+  glosses, Han-script redirects, place/biographical/brand markers,
+  wikdict "en:" gloss artifacts).
+- pt-BR empty-intersection opened (Plan A): freedict quarantine now blocks the
+  freedict alternative at binding time; wikdict-pt/omw are conditionally native
+  (`--allow-pt-br-wikdict-source`, default tied to the additional-sense flag);
+  the production pipeline prefilter now passes the wikdict flag. pt went
+  0 -> 205-240 rows per scan.
+- Model-confirmed sense feedback loop: `build-dictionary-v2-model-confirmed-sense-index.mjs`
+  produces a pin index (dual-model consensus senses) and an attempt index
+  (reviewed non-consensus senses are spent). The selector pins confirmed
+  senses (`--confirmed-senses`) and bypasses the no-fallback deferral for them.
+  Verified: 56/60 confirmed senses pinned on rebinding, 66 new attempt keys.
+- b23 batch: 570 rows frozen, audit clean. validation100 (pt=51/zh=43/ja=6):
+  Qwen 58/100, dual consensus 54/100; alternate-sense revision (10 rebinds)
+  lifted dual consensus to 60/100. The 80% qualification gate is NOT met;
+  the lane ceiling at current scan pools is ~60%.
+- Production (draft-production, frozen bindings, selection stage disabled):
+  zh/ja run 24 drafts; pt run 64 drafts (1 validation reject). Release
+  validation: 24/24 and 62/64 (2 final-review rejects). Both committed through
+  the official controlled path after fixing two blockers: the half-deployed
+  mainland-simplified canonicalization (260 headwords + 1,403 localization
+  repairs applied via the plan/apply tool pair; config alias rows synced,
+  18 alias rows targeting draft/absent entries pruned with backup
+  `logs/alias-prune-20261008-removed.json`) and a stale runner copy of the
+  mainland plan test (synced to the manifest hash).
+- Post-commit state: 42,856 entries / 47,191 accepted senses / 2,159 drafts;
+  main SHA `33DCF42FFF834FA2F60F3ECC97BA9BADAE70B60A38E0581108AD8C480E6E0047`.
+  Rollback backups for both commits exist under `backups/`. b23 added 86
+  publishable senses (24 zh/ja + 62 pt). No D1 export/push, Worker deploy, or
+  release-gate run occurred.
+
+## 2026-09-23 b21 daily-primary candidate diagnostic
+
+Full local access is enabled and `ssh -o BatchMode=yes ts-win-jump` succeeds;
+the jump host is not blocked by permissions or network reachability. The prior
+large read appeared hung because a PowerShell diagnostic deserialized and
+serialized the b19 run's deeply nested reports, growing to about 57 GB resident
+memory. Its command line was verified as read-only and the orphaned process was
+stopped. For large or nested runner JSON, use Node for parsing and emit compact
+summaries; PowerShell 5 `ConvertFrom-Json` can also reject duplicate properties
+and print the entire multi-megabyte input as an error.
+
+The b21 native-daily scan completed without a model call or product-DB write.
+From 158,450 excluded source-entry IDs, classification retained 13,781
+high-frequency gaps or repairable failures. The rank-50,000 scan returned
+2,500 entries; exact daily-sense binding kept 2,433, the source trust filter
+kept 1,489, and the daily filter retained 1,333. The first cohort selector
+incorrectly returned zero because its quality check treated already-attempted
+higher-scoring senses as eligible competitors. The sense selector now records
+`attempted_source_sense` on each alternative, and the quality check compares
+only unblocked, unlinked, unattempted senses. Regression tests preserve the
+reject behavior for a genuinely skipped higher-priority sense.
+
+The corrected selector produced 90 rows (`zh=50`, `ja=25`, `en=15`, `pt-BR=0`;
+the requested Portuguese quota had no trusted candidates). Manual review of
+the first 50 did not pass the daily-value gate: it includes Japanese grammar
+fragments/auxiliary forms and Chinese proper, historical, administrative, or
+specialized terms (for example `れる`, `せる`, `孙中山`, `军区`, and `尚书`).
+Do not send this cohort to Qwen/Gemma or draft insertion. Improve candidate
+quality and PT sourcing, then regenerate and review a fresh top-50 before any
+LLM stage.
+
+The data-only fix is synced to the runner for
+`daily-candidate-quality.mjs` and
+`select-dictionary-v2-product-daily-primary-senses.mjs`; their exact hashes are
+in the runner manifest. The first attempt to run the whole builder stopped on
+Node's progress output to stderr because the builder uses
+`$ErrorActionPreference='Stop'`. A narrow stderr-handling change is local, but
+the runner's builder script differs from the local copy, so do not sync that
+file or regenerate the full manifest as a side effect. Until its exact runner
+version is reconciled, rerun the already-built candidate stages directly and
+check Node exit codes.
+
+Runner main product DB remains `50,162 entries / 59,126 senses` at SHA-256
+`38AC193AD39BCD9AC1C73428A9A2E12EE05DFC5A5D71BDBF574F5AF1D0C91AD0`. No
+additional-sense commit, D1 operation, Worker cache bump, or deployment
+occurred in b21.
+
+The 20-row Qwen pilot returned 10 semantic pre-screen approvals, but the
+read-only authoritative reverse-evidence check selected 0/10 (9 unsupported,
+1 manual). Using Qwen's reviewed English anchors as lookup queries did not
+improve support (0 supported, 8 unsupported, 2 manual), so do not weaken or
+patch the evidence gate on this basis. The b19 reverse report confirms the
+largest language gaps are Portuguese (681 no-evidence, 154 conflicts) and
+Japanese (240 no-evidence, 100 conflicts); Chinese/Japanese also have
+polysemy-match failures. See `V219_DAILY_RECOVERY.md` for the full breakdown.
+
+The later b21 range-20 review showed RTX Qwen endpoints at context 1,024 could
+not handle the compact prompt (1,033-1,212 input tokens); the same strict
+review contract passed on A6000 144/147 at context 2,048 / output 700, yielding
+13/20 Qwen accepts. Gemma rejected/manual-reviewed all 13 because the broad
+candidate pool lacked locked independent target-term evidence. Do not generate
+from that pool: reverse-coverage fields were zero for all 500 rows. The separate
+dual-source-consensus `nono` row now passes local fixed-generator dry-run,
+four-language reverse evidence, and Gemma final review (1/1, no corrections);
+the controlled builder selected only `nono`, while `expert` remained blocked.
+No database writes occurred. Exact remote sync/manifest authorization is still
+required before draft insertion; see `V219_DAILY_RECOVERY.md` for hashes and
+the run reports.
+
+## 2026-09-23 b20 controlled recovery commit
+
+The jump host is reachable over SSH as `ts-win-jump`; a prior diagnosis that
+the local execution sandbox blocked access was not supported by the later
+inspection. The apparent hang was a local PowerShell diagnostic deserializing
+and serializing deeply nested b19 JSON, growing to about 57 GB resident memory.
+After full local access was enabled, SSH returned `DESKTOP-B2NRVIK`; a fresh
+read-only probe also listed `D:\linguago-runner\state` successfully.
+
+Frozen batch `batches/v220-b20-recovery-filtered-20260922-162801.json` had
+1,310 audited rows (`zh=600`, `ja=540`, `en=170`). Qwen generated 305 rows,
+304 valid, and wrote 304 review-only drafts. Correct release validation used
+the established reverse-evidence policy (at least 3 supported languages,
+maximum 1 manual language): 304 supported; final Gemma accepted 297 without
+corrections. The 297 Chinese localization sets were checked with OpenCC
+Traditional-to-Simplified conversion; no changes were detected in Chinese
+terms, definitions, or available examples.
+
+The 297 accepted senses passed isolated promote, published-risk (`flagged=0`),
+fast audit and full native export/in-memory import. The runner main product DB
+was atomically replaced only after the runner's official controlled-commit
+script repeated validation. Main SHA-256:
+`38AC193AD39BCD9AC1C73428A9A2E12EE05DFC5A5D71BDBF574F5AF1D0C91AD0`.
+Rollback backup:
+`backups/v220-b20-controlled-replay-manual1-20260923-1040-main-before-commit-20260923-112307.db`
+(SHA-256 matches the pre-commit main DB). Counts are `50,162 entries / 59,126
+publishable senses / 236,504 sense localizations`; relative to the v218 online
+baseline, the cumulative gain is +2,006 publishable senses, 2,994 short of
+the +5,000 release threshold. D1 and Worker remain unchanged.
+
+Do not treat this as resolving the separate daily-primary quality hold. The
+runner manifest's product-DB entry was updated, but full manifest regeneration
+and verification remain blocked: the runner is missing
+`scripts/evaluate-dictionary-v2-simplified-draft-flow.mjs`; manual comparison
+also found 16 missing/hash-mismatched manifest files. Do not sync all local
+changes wholesale; reconcile an exact deployment list first. Detailed evidence
+and the cadence-summary correction are in
+[V219_DAILY_RECOVERY.md](V219_DAILY_RECOVERY.md).
+
+## 2026-09-23 b19 controlled commit
+
+Run `v220-additional-recovery-b19-20260918-023154` completed draft production,
+read-only release validation, and isolated controlled replay/promote. The
+authoritative jump-host DB now contains `49,870 entries / 58,829 publishable
+senses / 235,316 sense localizations`, with `flagged_senses=0`. Main DB SHA-256:
+`5EB11A831A11FBB42DAB81F2F36D09582666786029732D9DCA001728D0A8E728`.
+The online v218 D1/Worker baseline is unchanged; 3,291 further publishable
+senses are needed before the +5,000 release threshold. See
+[V219_DAILY_RECOVERY.md](V219_DAILY_RECOVERY.md) for the b19 audit and rollback
+backup. Do not overwrite the jump-host DB with the older local DB.
+
+## 2026-09-22 jump-host task recovery
+
+See [JUMP_HOST_TASK_CREDENTIAL.md](JUMP_HOST_TASK_CREDENTIAL.md) for the
+password-logon scheduled-task setup. SSH key login does not create an
+interactive Windows session. The b19 run is now complete as documented above.
+Do not deploy D1 or Worker before the +5,000 threshold and full release gates.
+
 ## v219 daily recovery: candidate quality hold
 
 See [V219_DAILY_RECOVERY.md](V219_DAILY_RECOVERY.md) before restarting production.
@@ -6848,3 +7065,41 @@ untracked. The durable extractors are
 - Worker cache `v147-localized-sense-repair` was deployed as Version ID
   `d4a42a8a-5504-450a-a3da-318ab6613aa2`. General and focused online
   dictionary regressions passed, including the eight repaired terms.
+
+## 2026-09-23 dictionary production handoff
+
+- Authoritative remote runner: `D:\linguago-runner` on `ts-win-jump`.
+  SSH and remote PowerShell `-EncodedCommand` were verified; do not diagnose
+  the earlier command-string quoting failure as an SSH/network outage.
+- b20 controlled replay `v220-b20-controlled-replay-manual1-20260923-1040`
+  committed 297 senses after isolated validation. Main DB: 50,162 entries,
+  59,126 senses, 236,504 localizations; SHA-256
+  `38AC193AD39BCD9AC1C73428A9A2E12EE05DFC5A5D71BDBF574F5AF1D0C91AD0`.
+  Rollback backup:
+  `D:\linguago-runner\backups\v220-b20-controlled-replay-manual1-20260923-1040-main-before-commit-20260923-112307.db`.
+- Cumulative growth from v218 (57,120 senses) is +2,006; +2,994 remains
+  before the +5,000 release threshold. D1/Worker are unchanged.
+- b21 remote final review accepted `muscular`, `oitavo`, and `pio`, but these
+  were not the Qwen+Gemma source-review consensus rows. The source consensus
+  (`expert`, `nono`) did not intersect the same final-gate report, so the
+  controlled builder selected zero. No b21 draft/main-DB write occurred.
+- Local repaired-generator dry-run for `nono` passed, but remote manifest still
+  pins the older generator and does not register the Japanese-reading helper.
+  Exact proposed hashes and the required backup/sync/register/verify sequence
+  are documented in `docs/V219_DAILY_RECOVERY.md`. Do not sync those files or
+  mutate the remote manifest until the user explicitly authorizes those exact
+  changes; general filesystem access permission is not runner-manifest approval.
+- Next: after that exact authorization, verify hashes, replay only `nono` as a
+  draft (`needs_review=1`), run isolated fast/published-risk/export audits, then
+  resume high-frequency candidate production. Keep D1 unchanged until +5,000
+  publishable senses and all release gates pass.
+
+## 2026-09-23 b21 source-gap recovery note
+
+See `docs/V219_DAILY_RECOVERY.md` under “b21 dual-frequency source-gap
+qualification” for the 500-candidate funnel, Qwen/Gemma source and final-review
+results, the zero-write status, and the JMdict replacement-character reading
+bug. Local regression and TypeScript checks pass. Runner retry is intentionally
+not started because its manifest still pins the prior generator and does not
+include the new Japanese-reading helper; install only after the exact hashes
+and backup scope are authorized and verified.

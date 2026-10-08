@@ -1,11 +1,42 @@
 # LinguaGo Project Overview For AI
 
-## v219 recovery checkpoint
+## 2026-09-23 b21 candidate gate
 
-Read [V219_DAILY_RECOVERY.md](V219_DAILY_RECOVERY.md) for the latest recovery
-work. The 100-candidate deterministic check passed, but spot review did not.
-Mixed-lane production remains on a quality hold, with no new DB writes or D1
-release from this validation. Older baseline sections below are historical.
+The jump host is reachable over SSH after local full access was enabled. The
+apparent unreadable/hung state came from a read-only PowerShell diagnostic that
+expanded deeply nested b19 JSON to about 57 GB, plus PowerShell 5 JSON parsing
+limitations; use Node and compact summaries for runner reports.
+
+b21's corrected daily-primary selector produced 90 candidates (`zh=50`,
+`ja=25`, `en=15`, `pt-BR=0`), but the first-50 quality review found too many
+Japanese grammar fragments and Chinese proper/historical/administrative or
+specialized terms. No LLM, product DB write, D1 export, or Worker deployment
+was performed. Keep the daily-primary gate on hold until a fresh top-50 cohort
+passes manual review and Portuguese has eligible independent source evidence.
+See [V219_DAILY_RECOVERY.md](V219_DAILY_RECOVERY.md) and
+[CODEX_HANDOFF.md](CODEX_HANDOFF.md) for counts, hashes, and operational
+failure modes.
+
+A 20-candidate Qwen source-review pilot had 10 semantic approvals, but strict
+read-only reverse-evidence validation supported 0/10; substituting model
+anchors did not fix it. The b21 native-daily cohort is therefore not ready for
+draft generation. b19's primary attrition is missing or conflicting target-
+language reverse evidence (especially Portuguese and Japanese), not model
+uptime. Preserve the b20 release gates and improve exact bilingual evidence
+coverage/sense binding before increasing production volume.
+
+## 2026-09-23 runner checkpoint
+
+The authoritative jump-host product DB includes the controlled b20 recovery
+commit: `50,162 entries / 59,126 publishable senses / 236,504 localizations`,
+SHA-256 `38AC193AD39BCD9AC1C73428A9A2E12EE05DFC5A5D71BDBF574F5AF1D0C91AD0`.
+The batch added 297 independently reviewed senses; cumulative progress over
+the v218 online baseline is +2,006, leaving 2,994 to the +5,000 D1 release
+threshold. D1 and Worker were not changed. The daily-primary quality hold
+remains separate and unresolved. Runner manifest reconciliation is also
+pending (16 missing/hash-mismatched files); do not deploy the entire local
+working tree. Read [V219_DAILY_RECOVERY.md](V219_DAILY_RECOVERY.md) and
+[CODEX_HANDOFF.md](CODEX_HANDOFF.md) before continuing.
 
 ## Current jump-host baseline and online release (2026-08-24)
 
