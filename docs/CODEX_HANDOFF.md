@@ -1,5 +1,24 @@
 # Codex Handoff
 
+## 2026-10-09 wikdict-en lever; b27 committed with 188 promoted senses
+
+User approved conditional wikdict-en authorization for the EN lane
+(`--allow-en-wikdict-source`, Plan-A pattern, coupled default). Tests,
+deployment and manifest registration follow the established discipline
+(filter `A053EFD8...`, pipeline `80C17F24...`).
+- EN lane rebuilt from the frozen b26 eligible pool: trust 436 -> 2,380,
+  cohort b27 = 600 (quota-limited, EN-dominant).
+- b27 draft-production: 600 -> alignment 600/600 (wikdict-en anchors carry
+  localizations) -> Gemma 365 -> reverse 227 -> preview 211 -> preflight 194
+  -> 194 drafts written.
+- Release validation: reverse evidence 194/194, final Gemma 188/194.
+  Committed via the official controlled path; main SHA after
+  `11D8F6DAFBDC380DB5198252D6E62330FB149E1D3F9171450071147F174F7A6B`.
+- Post-commit counts: 52,710 entries / 61,423 senses / 58,433 accepted /
+  245,684 localizations. This is the largest batch of the cycle (+188).
+- Pool remainder: trusted2 (2,380) minus b26 (258) minus b27 (600) leaves
+  ~1,500 rows eligible for further batches (b28+) under one-per-entry.
+
 ## 2026-10-09 A-group close-out: lane exhausted again, deferred words need frequency data
 
 - b27 cohort from the b26 trusted pool returned 0 (one-sense-per-entry rule:

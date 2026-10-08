@@ -198,6 +198,39 @@ assert.deepEqual(
   JSON.parse(fs.readFileSync(zhKaikkiOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
   [42]
 );
+
+const enWikdictInputPath = path.join(directory, 'en-wikdict-input.json');
+const enWikdictOutPath = path.join(directory, 'en-wikdict-out.json');
+const enWikdictRejectedPath = path.join(directory, 'en-wikdict-rejected.json');
+fs.writeFileSync(enWikdictInputPath, `${JSON.stringify({ selected: [
+  anchoredRow(51, 'en', 'beware', 'be cautious', 'wikdict-en-pt'),
+  anchoredRow(52, 'en', 'shack', 'small house', 'ecdict')
+] })}\n`);
+const enWikdict = spawnSync(process.execPath, [
+  'scripts/filter-dictionary-v2-production-batch.mjs',
+  '--report', enWikdictInputPath,
+  '--out', enWikdictOutPath,
+  '--rejected-out', enWikdictRejectedPath,
+  '--require-authoritative-source-sense', 'true',
+  '--allow-en-wikdict-source', 'true'
+], { cwd: process.cwd(), encoding: 'utf8' });
+assert.equal(enWikdict.status, 0, enWikdict.stderr || enWikdict.stdout);
+assert.deepEqual(
+  JSON.parse(fs.readFileSync(enWikdictOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
+  [51, 52]
+);
+const enWikdictDisabled = spawnSync(process.execPath, [
+  'scripts/filter-dictionary-v2-production-batch.mjs',
+  '--report', enWikdictInputPath,
+  '--out', enWikdictOutPath,
+  '--rejected-out', enWikdictRejectedPath,
+  '--require-authoritative-source-sense', 'true'
+], { cwd: process.cwd(), encoding: 'utf8' });
+assert.equal(enWikdictDisabled.status, 0, enWikdictDisabled.stderr || enWikdictDisabled.stdout);
+assert.deepEqual(
+  JSON.parse(fs.readFileSync(enWikdictOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
+  [52]
+);
 console.log('production batch prefilter tests passed');
 
 function row(id, sourceLang, word, gloss) {

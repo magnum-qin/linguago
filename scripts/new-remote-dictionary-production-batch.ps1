@@ -222,7 +222,8 @@ if ($CandidateMode -eq 'additional-sense') {
     --allow-english-omw-source false `
     --allow-pt-br-omw-source true `
     --allow-pt-br-wikdict-source true `
-    --allow-zh-kaikki-source true
+    --allow-zh-kaikki-source true `
+    --allow-en-wikdict-source true
   if ($LASTEXITCODE -ne 0) { throw "Additional-sense trust filter failed with exit code $LASTEXITCODE" }
   $PoolPath = $TrustedPoolPath
   # Entry-level history is intentionally not applied here. A represented entry
@@ -275,7 +276,8 @@ if ($CandidateMode -eq 'native-daily') {
     --allow-english-omw-source false `
     --allow-pt-br-omw-source true `
     --allow-pt-br-wikdict-source true `
-    --allow-zh-kaikki-source true
+    --allow-zh-kaikki-source true `
+    --allow-en-wikdict-source true
   if ($LASTEXITCODE -ne 0) { throw "Native daily trust filter failed with exit code $LASTEXITCODE" }
   $PoolPath = $NativeTrustedPoolPath
 }

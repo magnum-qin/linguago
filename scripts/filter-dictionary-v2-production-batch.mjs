@@ -16,6 +16,7 @@ const allowEnglishOmwSource = args['allow-english-omw-source'] === 'true';
 const allowPtBrOmwSource = args['allow-pt-br-omw-source'] === 'true';
 const allowPtBrWikdictSource = args['allow-pt-br-wikdict-source'] === 'true';
 const allowZhKaikkiSource = args['allow-zh-kaikki-source'] === 'true';
+const allowEnWikdictSource = args['allow-en-wikdict-source'] === 'true';
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const rows = reportRows(report);
 if (!rows) throw new Error('Production batch requires a selected or candidates array');
@@ -63,6 +64,7 @@ const output = {
       allow_pt_br_omw_source: allowPtBrOmwSource,
       allow_pt_br_wikdict_source: allowPtBrWikdictSource,
       allow_zh_kaikki_source: allowZhKaikkiSource,
+      allow_en_wikdict_source: allowEnWikdictSource,
       automatic_database_write: false
     },
     summary,
@@ -134,7 +136,8 @@ function hasAuthoritativeSelectedSense(row, lang) {
       source.includes('freedict-eng-por') ||
       source.includes('ecdict') ||
       source.includes('wordnet') ||
-      (allowEnglishOmwSource && source.includes('omw'))
+      (allowEnglishOmwSource && source.includes('omw')) ||
+      (allowEnWikdictSource && source.includes('wikdict-en'))
     );
   }
   return false;
