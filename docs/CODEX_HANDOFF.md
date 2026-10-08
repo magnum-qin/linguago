@@ -1,5 +1,26 @@
 # Codex Handoff
 
+## 2026-10-09 CC-CEDICT homograph sense repair applied to the source DB
+
+The v219 versioned-identity staging rebuild was converted into a bounded,
+strictly additive repair of the authoritative `linguago_v2_full.db`:
+- Delta from the fixed-importer staging DB
+  (`logs/v219-cedict-isolated-rebuild-wal/staging.db`, hash-bound):
+  5,750 senses / 4,262 words absent from canonical cc-cedict by exact
+  (word, gloss) — includes the 3,264 multiple-reading collision recoveries
+  plus snapshot drift since the original import.
+- 4,520 senses attached to 3,218 existing zh entries with frequency ranks
+  (`apply-cc-cedict-recovered-senses.mjs`, new ids above max, per-entry
+  sense_order appended, idempotent re-run verified: 0 duplicates).
+- 1,230 senses on 1,044 words deferred: those words lack a zh entry with a
+  frequency rank, so they are invisible to the ranked daily scan until a
+  frequency source is assigned (follow-up item).
+- Post-state: 201,159 canonical cc-cedict senses; zero (entry_id, sense_order)
+  duplicates, zero FK violations, quick_check ok. Source-DB backup:
+  `backups/linguago_v2_full-before-cc-cedict-repair-20261009.db`.
+- The recovered senses are unattempted candidates; the next native-daily
+  batch build (b26) is the real smoke test for their discoverability.
+
 ## 2026-10-09 kaikki-zh lane unlocked; b24 + b25 committed
 
 User approved widening zh authoritative sources: `--allow-zh-kaikki-source`
