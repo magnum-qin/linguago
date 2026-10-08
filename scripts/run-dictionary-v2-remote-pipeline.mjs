@@ -627,7 +627,8 @@ async function runSimplifiedPipeline() {
       '--require-authoritative-source-sense', String(requireAuthoritativeSourceSense),
       '--allow-english-omw-source', args['allow-english-omw-source'] || 'false',
       '--allow-pt-br-omw-source', args['allow-pt-br-omw-source'] || (allowLinkedPrimaryForAdditionalSense ? 'true' : 'false'),
-      '--allow-pt-br-wikdict-source', args['allow-pt-br-wikdict-source'] || (allowLinkedPrimaryForAdditionalSense ? 'true' : 'false')
+      '--allow-pt-br-wikdict-source', args['allow-pt-br-wikdict-source'] || (allowLinkedPrimaryForAdditionalSense ? 'true' : 'false'),
+      '--allow-zh-kaikki-source', args['allow-zh-kaikki-source'] || (allowLinkedPrimaryForAdditionalSense ? 'true' : 'false')
     ], [files.productionFiltered, files.productionRejected]);
     sourceReviewInput = files.productionFiltered;
   }

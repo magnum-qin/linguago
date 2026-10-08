@@ -1,5 +1,27 @@
 # Codex Handoff
 
+## 2026-10-09 kaikki-zh lane unlocked; b24 + b25 committed
+
+User approved widening zh authoritative sources: `--allow-zh-kaikki-source`
+(conditional, default tied to the additional-sense flag like the pt-BR levers)
+in the trust filter, passed through the pipeline prefilter and the batch
+builder. Tests cover allow/deny. Deployed with backups
+(`logs/feedback-loop-backup/*.bak2`), manifest hashes registered.
+
+- b25 rebuilt from the frozen b24 binding pool: trust 3,099 -> 2,976
+  (kaikki-zh 2,576 now trusted), quality 2,976, cohort 796 (quota-limited).
+- b25 draft-production: prefilter 796 -> alignment 257 (kaikki-zh rows lose
+  heavily at the min-2-langs alignment gate) -> Gemma 149 -> reverse 43 ->
+  preview 38 -> preflight 15 -> 14 drafts written.
+- Release validation 13/13 reverse-supported, Gemma final 12/13; committed
+  via the official controlled path. Main SHA after:
+  `55F4157F0535A6C1E7D14502F26D024FCD611B4A4E563B1FCC9BFFD307964528`.
+- b24 micro-batch (10/10) committed earlier at
+  `D896D58B2B5F09C3A5AE7B7BB630B67E18960D4C3A86D3CD37E678A2EB3A0A25`.
+- Custodian trail captured both commits as CHANGE events attributed to their
+  pipeline runs. Next untapped supply: the ~539 b25 rows lost at the
+  alignment gate (kaikki-zh senses lack target-language localizations).
+
 ## 2026-10-09 custodian trail, supply exhaustion, b24 micro-batch
 
 - Main-DB audit trail installed: scheduled task `LinguaGo Runner Main DB

@@ -165,6 +165,39 @@ assert.deepEqual(
   JSON.parse(fs.readFileSync(ptWikdictOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
   [32, 33]
 );
+
+const zhKaikkiInputPath = path.join(directory, 'zh-kaikki-input.json');
+const zhKaikkiOutPath = path.join(directory, 'zh-kaikki-out.json');
+const zhKaikkiRejectedPath = path.join(directory, 'zh-kaikki-rejected.json');
+fs.writeFileSync(zhKaikkiInputPath, `${JSON.stringify({ selected: [
+  anchoredRow(41, 'zh', '漏掉', 'to leave out', 'kaikki-zh'),
+  anchoredRow(42, 'zh', '糊弄', 'to go through the motions', 'cc-cedict')
+] })}\n`);
+const zhKaikki = spawnSync(process.execPath, [
+  'scripts/filter-dictionary-v2-production-batch.mjs',
+  '--report', zhKaikkiInputPath,
+  '--out', zhKaikkiOutPath,
+  '--rejected-out', zhKaikkiRejectedPath,
+  '--require-authoritative-source-sense', 'true',
+  '--allow-zh-kaikki-source', 'true'
+], { cwd: process.cwd(), encoding: 'utf8' });
+assert.equal(zhKaikki.status, 0, zhKaikki.stderr || zhKaikki.stdout);
+assert.deepEqual(
+  JSON.parse(fs.readFileSync(zhKaikkiOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
+  [41, 42]
+);
+const zhKaikkiDisabled = spawnSync(process.execPath, [
+  'scripts/filter-dictionary-v2-production-batch.mjs',
+  '--report', zhKaikkiInputPath,
+  '--out', zhKaikkiOutPath,
+  '--rejected-out', zhKaikkiRejectedPath,
+  '--require-authoritative-source-sense', 'true'
+], { cwd: process.cwd(), encoding: 'utf8' });
+assert.equal(zhKaikkiDisabled.status, 0, zhKaikkiDisabled.stderr || zhKaikkiDisabled.stdout);
+assert.deepEqual(
+  JSON.parse(fs.readFileSync(zhKaikkiOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
+  [42]
+);
 console.log('production batch prefilter tests passed');
 
 function row(id, sourceLang, word, gloss) {

@@ -15,6 +15,7 @@ const requireAuthoritativeSourceSense = args['require-authoritative-source-sense
 const allowEnglishOmwSource = args['allow-english-omw-source'] === 'true';
 const allowPtBrOmwSource = args['allow-pt-br-omw-source'] === 'true';
 const allowPtBrWikdictSource = args['allow-pt-br-wikdict-source'] === 'true';
+const allowZhKaikkiSource = args['allow-zh-kaikki-source'] === 'true';
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const rows = reportRows(report);
 if (!rows) throw new Error('Production batch requires a selected or candidates array');
@@ -61,6 +62,7 @@ const output = {
       allow_english_omw_source: allowEnglishOmwSource,
       allow_pt_br_omw_source: allowPtBrOmwSource,
       allow_pt_br_wikdict_source: allowPtBrWikdictSource,
+      allow_zh_kaikki_source: allowZhKaikkiSource,
       automatic_database_write: false
     },
     summary,
@@ -115,7 +117,9 @@ function hasAuthoritativeSelectedSense(row, lang) {
     ? row.daily_sense_selection.alternatives.find((item) => Number(item?.id) === selectedSenseId)
     : null;
   const source = String(selected?.source || '').toLocaleLowerCase();
-  if (lang === 'zh') return source.includes('cc-cedict');
+  if (lang === 'zh') {
+    return source.includes('cc-cedict') || (allowZhKaikkiSource && source.includes('kaikki-zh'));
+  }
   if (lang === 'ja') return source.includes('jmdict');
   if (lang === 'pt-BR') {
     return (
