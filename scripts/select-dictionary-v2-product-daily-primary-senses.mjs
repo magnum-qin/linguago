@@ -3,6 +3,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import { dailyCandidateReasons } from './lib/daily-candidate-quality.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const reportPath = requiredPath(args.report, 'report');
@@ -24,6 +25,10 @@ const excludedReportPaths = [args.exclude, args['attempt-index']]
   .filter(Boolean)
   .map((value) => requiredPath(value, 'exclude'));
 const attemptedSourceSenses = loadAttemptedSourceSenses(excludedReportPaths);
+const confirmedSensesPath = args['confirmed-senses'] ? requiredPath(args['confirmed-senses'], 'confirmed-senses') : null;
+const confirmedByEntry = confirmedSensesPath
+  ? new Map((readJson(confirmedSensesPath).selected || []).map((row) => [Number(row.source_entry_id), row]))
+  : new Map();
 
 const report = readJson(reportPath);
 const candidates = Array.isArray(report.selected) ? report.selected : [];
@@ -67,7 +72,12 @@ for (const candidate of candidates) {
     if (!firstOrderBySource.has(key)) firstOrderBySource.set(key, Number(sense.sense_order));
   }
   const alternatives = sourceSenses.map((sense) =>
-    inspectSense(candidate, sense, firstOrderBySource.get(String(sense.source || 'unknown')))
+    inspectSense(
+      candidate,
+      sense,
+      firstOrderBySource.get(String(sense.source || 'unknown')),
+      attemptedSourceSenses.has(sourceSenseKey(candidate.source_entry_id, sense.id))
+    )
   );
   const primaryNativeSense = alternatives
     .filter((sense) => isNativeSource(candidate.source_lang, sense.source) && !sense.blocked_reason)
@@ -81,14 +91,31 @@ for (const candidate of candidates) {
     });
     continue;
   }
+  // Model-confirmed primary senses (dual-model source-review consensus) pin
+  // the entry to that exact sense; they legitimately override the
+  // no-fallback deferral for an attempted higher-order primary.
+  const confirmedSense = confirmedByEntry.get(Number(candidate.source_entry_id)) || null;
+  const pinnedAlternative = confirmedSense
+    ? alternatives.find(
+        (sense) =>
+          Number(sense.id) === Number(confirmedSense.source_sense_id) &&
+          String(sense.gloss_key || '') === String(confirmedSense.gloss_key || '')
+      )
+    : null;
+  const pinnedUsable =
+    pinnedAlternative &&
+    !pinnedAlternative.linked_product_sense &&
+    !pinnedAlternative.blocked_reason &&
+    !pinnedAlternative.attempted_source_sense;
   const otherwiseEligible = alternatives.filter(
     (sense) => !sense.linked_product_sense && !sense.blocked_reason
   );
   const eligible = otherwiseEligible.filter(
     (sense) => !attemptedSourceSenses.has(sourceSenseKey(candidate.source_entry_id, sense.id))
   );
-  eligible.sort((left, right) => right.daily_sense_score - left.daily_sense_score || left.sense_order - right.sense_order);
-  const best = eligible[0];
+  const best = pinnedUsable
+    ? pinnedAlternative
+    : (eligible.sort((left, right) => right.daily_sense_score - left.daily_sense_score || left.sense_order - right.sense_order)[0]);
   if (!best || best.daily_sense_score < minimumScore) {
     rejected.push({
       ...identity(candidate),
@@ -98,6 +125,26 @@ for (const candidate of candidates) {
           ? 'all_eligible_source_senses_attempted'
           : 'no_eligible_source_sense',
       best_score: best?.daily_sense_score ?? null,
+      alternatives: alternatives.slice(0, 12).map(compactAlternative)
+    });
+    continue;
+  }
+  const candidateQuality = dailyCandidateReasons({
+    ...candidate,
+    first_sense_id: best.id,
+    gloss_key: best.gloss_key,
+    part_of_speech: best.part_of_speech,
+    daily_sense_selection: {
+      alternatives: alternatives.slice(0, 12).map(compactAlternative),
+      confirmed_sense: pinnedUsable ? pinnedAlternative.id : undefined
+    }
+  }, 'new_headword');
+  if (candidateQuality.length > 0) {
+    rejected.push({
+      ...identity(candidate),
+      reason: candidateQuality[0],
+      candidate_reasons: candidateQuality,
+      best_score: best.daily_sense_score,
       alternatives: alternatives.slice(0, 12).map(compactAlternative)
     });
     continue;
@@ -114,9 +161,12 @@ for (const candidate of candidates) {
     first_sense_clean_localization_lang_count: best.clean_localization_langs.length,
     first_sense_localizations: best.localizations,
     daily_sense_selection: {
-      policy: allowLinkedPrimaryForAdditionalSense
-        ? 'native_dictionary_additional_unlinked_sense'
-        : 'native_dictionary_then_daily_semantics',
+      policy: pinnedUsable
+        ? 'model_confirmed_primary_sense'
+        : allowLinkedPrimaryForAdditionalSense
+          ? 'native_dictionary_additional_unlinked_sense'
+          : 'native_dictionary_then_daily_semantics',
+      confirmed_sense: pinnedUsable ? best.id : undefined,
       score: best.daily_sense_score,
       reasons: best.score_reasons,
       original_sense_id: candidate.first_sense_id ?? null,
@@ -145,6 +195,7 @@ const common = {
     minimum_score: minimumScore,
     require_native_source: requireNativeSource,
     allow_linked_primary_for_additional_sense: allowLinkedPrimaryForAdditionalSense,
+    confirmed_senses: confirmedSensesPath ? relative(confirmedSensesPath) : null,
     excluded_reports: excludedReportPaths.map(relative),
     attempted_source_senses: attemptedSourceSenses.size
   },
@@ -153,6 +204,7 @@ const common = {
     selected: selected.length,
     rejected: rejected.length,
     selected_by_lang: countBy(selected, (row) => row.source_lang),
+    confirmed_sense_pinned: selected.filter((row) => row.daily_sense_selection.policy === 'model_confirmed_primary_sense').length,
     changed_from_report_first_sense: selected.filter((row) => row.daily_sense_selection.changed).length,
     excluded_attempted_senses: attemptedSourceSenses.size,
     selected_by_source: countBy(selected, (row) => row.daily_sense_selection.alternatives.find((item) => item.id === row.first_sense_id)?.source)
@@ -163,7 +215,7 @@ writeJson(outPath, { ...common, selected_count: selected.length, selected });
 writeJson(rejectedOutPath, { ...common, rejected_count: rejected.length, rejected });
 console.log(JSON.stringify({ ok: true, out: relative(outPath), rejected_out: relative(rejectedOutPath), summary: common.summary }, null, 2));
 
-function inspectSense(candidate, sense, firstSourceSenseOrder) {
+function inspectSense(candidate, sense, firstSourceSenseOrder, attemptedSourceSense) {
   const rows = localizations.all(sense.id).filter(isCleanLocalization).map(compactLocalization);
   const cleanLangs = [...new Set(rows.map((row) => row.lang))].sort();
   const gloss = String(sense.gloss_key || '').normalize('NFKC').trim();
@@ -189,15 +241,25 @@ function inspectSense(candidate, sense, firstSourceSenseOrder) {
   score -= Math.min(1_000, Math.max(0, Number(sense.sense_order || 1) - 1) * 50);
 
   let blockedReason = null;
+  const qualityReasons = dailyCandidateReasons({
+    ...candidate,
+    ...sense,
+    first_sense_id: sense.id,
+    gloss_key: gloss,
+    part_of_speech: sense.part_of_speech
+  });
+
   if (requireNativeSource && !isNativeSource(candidate.source_lang, sense.source))
     blockedReason = 'non_native_lexicon_source';
   else if (isMetaLetterSense(gloss)) blockedReason = 'metalinguistic_letter_or_symbol_sense';
   else if (isProperOrSpecialized(gloss)) blockedReason = 'proper_or_specialized_gloss';
   else if (hasWrongScriptGloss(gloss, candidate.source_lang)) blockedReason = 'wrong_script_or_translation_only_gloss';
+  else if (qualityReasons.length > 0) blockedReason = qualityReasons[0];
 
   return {
     ...sense,
     linked_product_sense: linked,
+    attempted_source_sense: attemptedSourceSense,
     localizations: rows,
     clean_localization_langs: cleanLangs,
     daily_sense_score: blockedReason ? -1 : score,
@@ -219,6 +281,7 @@ function nativeSourceScore(lang, source) {
   if (lang === 'pt-BR') {
     if (value.includes('dicionario') || value.includes('freedict')) return 6_000;
     if (value.includes('kaikki-pt')) return 4_500;
+    if (value.includes('wikdict-pt')) return 4_500;
   }
   if (lang === 'en') {
     if (value.includes('freedict-eng-por')) return 6_000;
@@ -236,7 +299,13 @@ function isNativeSource(lang, source) {
   if (lang === 'zh') return value.includes('cc-cedict') || value.includes('kaikki-zh');
   if (lang === 'ja') return value.includes('jmdict') || value.includes('kaikki-ja');
   if (lang === 'pt-BR')
-    return value.includes('dicionario') || value.includes('freedict') || value.includes('kaikki-pt');
+    return (
+      value.includes('dicionario') ||
+      value.includes('freedict') ||
+      value.includes('kaikki-pt') ||
+      value.includes('wikdict-pt') ||
+      value.includes('omw')
+    );
   if (lang === 'en')
     return (
       value.includes('freedict-eng-por') ||
@@ -284,7 +353,8 @@ function compactAlternative(sense) {
     clean_langs: sense.clean_localization_langs,
     score: sense.daily_sense_score,
     blocked_reason: sense.blocked_reason,
-    linked_product_sense: sense.linked_product_sense
+    linked_product_sense: sense.linked_product_sense,
+    attempted_source_sense: sense.attempted_source_sense
   };
 }
 

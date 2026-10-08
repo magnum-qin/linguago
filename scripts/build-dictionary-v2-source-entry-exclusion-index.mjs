@@ -5,12 +5,16 @@ import path from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
 const root = path.resolve(args.root || '.');
-const historyPath = path.resolve(root, args.history || 'data/candidates/v123-attempted-source-history.json');
+const historyPaths = String(args.history || 'data/candidates/v123-attempted-source-history.json')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map((value) => path.resolve(root, value));
 const runsRoot = path.resolve(root, args['runs-root'] || 'runs');
 const batchRoot = path.resolve(root, args['batch-root'] || 'batches');
 const outPath = path.resolve(root, args.out || 'state/native-daily-source-entry-exclusions.json');
 
-const reportPaths = new Set([historyPath]);
+const reportPaths = new Set(historyPaths);
 if (fs.existsSync(runsRoot)) {
   for (const manifestPath of walkManifestFiles(runsRoot)) {
     try {

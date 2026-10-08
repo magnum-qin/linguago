@@ -13,6 +13,8 @@ const enabled = args.enabled !== 'false';
 const excludeAllCapitalizedLatin = args['exclude-all-capitalized-latin'] === 'true';
 const requireAuthoritativeSourceSense = args['require-authoritative-source-sense'] === 'true';
 const allowEnglishOmwSource = args['allow-english-omw-source'] === 'true';
+const allowPtBrOmwSource = args['allow-pt-br-omw-source'] === 'true';
+const allowPtBrWikdictSource = args['allow-pt-br-wikdict-source'] === 'true';
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const rows = reportRows(report);
 if (!rows) throw new Error('Production batch requires a selected or candidates array');
@@ -57,6 +59,8 @@ const output = {
       exclude_obvious_source_language_mismatch: true,
       require_authoritative_selected_source_sense: requireAuthoritativeSourceSense,
       allow_english_omw_source: allowEnglishOmwSource,
+      allow_pt_br_omw_source: allowPtBrOmwSource,
+      allow_pt_br_wikdict_source: allowPtBrWikdictSource,
       automatic_database_write: false
     },
     summary,
@@ -113,7 +117,14 @@ function hasAuthoritativeSelectedSense(row, lang) {
   const source = String(selected?.source || '').toLocaleLowerCase();
   if (lang === 'zh') return source.includes('cc-cedict');
   if (lang === 'ja') return source.includes('jmdict');
-  if (lang === 'pt-BR') return source.includes('freedict') || source.includes('dicionario');
+  if (lang === 'pt-BR') {
+    return (
+      source.includes('freedict') ||
+      source.includes('dicionario') ||
+      (allowPtBrOmwSource && source.includes('omw')) ||
+      (allowPtBrWikdictSource && source.includes('wikdict-pt'))
+    );
+  }
   if (lang === 'en') {
     return (
       source.includes('freedict-eng-por') ||

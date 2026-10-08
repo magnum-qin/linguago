@@ -8,12 +8,14 @@ param(
   [ValidateSet('native-daily', 'additional-sense', 'daily-mixed')]
   [string]$CandidateMode = 'daily-mixed',
   [string]$SupplementalSourceDb = '.tmp\combined\openwn-word2word3-ja-apertium-wikidata-v3-evidence.db',
-  [string]$NativeTargets = 'zh=2000,ja=1500,pt-BR=750,en=750',
+  [string]$NativeTargets = 'zh=30000,ja=10000,pt-BR=5000,en=5000',
   [ValidateRange(1, 100)]
   [int]$AdditionalSenseMaxEntryAttempts = 3,
   [ValidateRange(1, 100)]
   [int]$AdditionalSenseCandidateMultiplier = 12,
-  [bool]$ContinueOnProductionGateFailure = $true
+  [bool]$ContinueOnProductionGateFailure = $true,
+  [ValidateSet('full', 'draft-production')]
+  [string]$ExecutionMode = 'full'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -134,6 +136,7 @@ function Start-PipelineProcess([string]$RunId, [string]$Batch, [int]$GenerationT
     '-GenerationTarget', [string]$GenerationTarget,
     '-SupplementalSourceDb', $SupplementalSourceDb,
     '-PipelineMode', 'simplified',
+    '-ExecutionMode', $ExecutionMode,
     '-ProductionPrefilter', 'true',
     '-RequireAuthoritativeSourceSense', 'true',
     '-DailyPrimarySenseSelection', 'true',
@@ -230,6 +233,11 @@ try {
         '-AdditionalSenseMaxEntryAttempts', [string]$AdditionalSenseMaxEntryAttempts
       )
     }
+    if ($ExecutionMode -eq 'draft-production') {
+      # Draft production cannot mutate publishable rows. Its candidate build is
+      # allowed to proceed when unrelated mutable manifest entries have drifted.
+      $BatchArgs += '-SkipVerify'
+    }
     if ($EffectiveMode -eq 'daily-mixed') {
       $NominalHeadwordLimit = [Math]::Ceiling($Requested * 0.60)
       $NativeLimit = $Requested
@@ -272,16 +280,37 @@ try {
       }
       exit 0
     }
+    if ($Selected -lt $Requested -and $ExecutionMode -ne 'draft-production') {
+      Write-State 'candidate_shortfall' @{
+        cohort = $Cohort
+        batch = $BatchRelative
+        requested = $Requested
+        selected = $Selected
+        validation_batch_complete = $false
+        gpu_started = $false
+      }
+      exit 0
+    }
+    if ($Selected -lt $Requested) {
+      Write-State 'candidate_shortfall_continuing' @{
+        cohort = $Cohort
+        batch = $BatchRelative
+        requested = $Requested
+        selected = $Selected
+        execution_mode = $ExecutionMode
+        gpu_started = $false
+      }
+    }
     if ($CandidateMode -eq 'daily-mixed') {
       $QualityHold = Read-Json (Join-Path $StateRoot 'daily-production-quality-hold.json')
-      if ($QualityHold -and $QualityHold.status -eq 'candidate_quality_review_required') {
+      if ($ExecutionMode -ne 'draft-production' -and $QualityHold -and $QualityHold.status -eq 'candidate_quality_review_required') {
         Write-State 'candidate_quality_review_required' @{ batch = $BatchRelative; review = $QualityHold; gpu_started = $false }
         exit 0
       }
       $QualityAudit = Join-Path $StateRoot "$($script:CurrentRunId)-candidate-audit.json"
       & node.exe (Join-Path $Root 'scripts\audit-dictionary-v2-daily-candidate-cohort.mjs') `
         --report (Join-Path $Root $BatchRelative) --out $QualityAudit `
-        --inspect-count 50 --minimum-candidates $Selected
+        --inspect-count 50 --minimum-candidates $(if ($ExecutionMode -eq 'draft-production') { $Selected } else { $Requested })
       if ($LASTEXITCODE -ne 0) {
         Write-State 'candidate_quality_review_required' @{ batch = $BatchRelative; audit = $QualityAudit; gpu_started = $false }
         exit 0
@@ -306,6 +335,30 @@ try {
       selected = $Selected
       pipeline_pid = $PipelineProcess.Id
       expected_main_sha256 = $ExpectedMainSha256
+    }
+    if ($ExecutionMode -eq 'draft-production') {
+      $ManifestPath = Join-Path $RunDir 'manifest.json'
+      while ($true) {
+        $PipelineProcess.Refresh()
+        $PipelineManifest = Read-Json $ManifestPath
+        if ($PipelineManifest -and $PipelineManifest.status -eq 'complete') {
+          Write-State 'draft_batch_complete' @{
+            run_id = $script:CurrentRunId
+            batch = $BatchRelative
+            selected = $Selected
+            pipeline = $PipelineManifest.summary
+            release_validation_pending = $true
+          }
+          exit 0
+        }
+        if ($PipelineManifest -and $PipelineManifest.status -eq 'failed') {
+          throw "Draft pipeline failed: $($PipelineManifest.error)"
+        }
+        if ($PipelineProcess.HasExited) {
+          throw "Draft pipeline exited before a complete manifest; exit=$($PipelineProcess.ExitCode)"
+        }
+        Start-Sleep -Seconds $PollSeconds
+      }
     }
     try {
       & $CompletionScript -Root $Root -RunId $script:CurrentRunId `

@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import OpenCC from 'opencc-js';
+import { JAPANESE_GRAMMAR_FRAGMENTS } from './lib/daily-candidate-quality.mjs';
 
 const traditionalToSimplified = OpenCC.Converter({ from: 'tw', to: 'cn' });
 
@@ -67,6 +68,8 @@ const nativeQuery = `
               lower(COALESCE(s.source, '')) LIKE '%freedict-por-eng%'
               OR lower(COALESCE(s.source, '')) LIKE '%wikdict-pt-%'
               OR lower(COALESCE(s.source, '')) LIKE '%dicionario%'
+              OR lower(COALESCE(s.source, '')) LIKE '%omw-30%'
+              OR lower(COALESCE(s.source, '')) LIKE '%kaikki-pt%'
             )
           )
           OR (
@@ -75,6 +78,8 @@ const nativeQuery = `
               lower(COALESCE(s.source, '')) LIKE '%freedict-eng-por%'
               OR lower(COALESCE(s.source, '')) LIKE '%wikdict-en-%'
               OR lower(COALESCE(s.source, '')) LIKE '%ecdict%'
+              OR lower(COALESCE(s.source, '')) LIKE '%wordnet%'
+              OR lower(COALESCE(s.source, '')) LIKE '%kaikki-en%'
             )
           )
         )
@@ -281,7 +286,10 @@ function isLowValueCandidate(word, lang) {
 function isLowValueCjkCandidate(word, lang) {
   const text = String(word || '').trim();
   if (lang === 'zh') return [...text].length < 2 || [...text].length > 8;
-  if (lang === 'ja') return [...text].length > 12;
+  if (lang === 'ja') {
+    if ([...text].length < 2 || [...text].length > 12) return true;
+    if (JAPANESE_GRAMMAR_FRAGMENTS.has(text)) return true;
+  }
   return false;
 }
 

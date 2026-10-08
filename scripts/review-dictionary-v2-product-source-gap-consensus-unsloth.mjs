@@ -1,6 +1,7 @@
 import './lib/load-local-env.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { sourceSenseKey } from './lib/source-sense-key.mjs';
 import { performance } from 'node:perf_hooks';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
@@ -70,6 +71,19 @@ if (normalizedFamily(model) === normalizedFamily(generationModel)) {
 
 const generationReport = readJson(generationPath);
 const evidenceReport = readJson(evidencePath);
+const inputHashes = Object.fromEntries(
+  [['generation', generationPath], ['evidence', evidencePath]].map(([key, file]) =>
+    [key, createHash('sha256').update(fs.readFileSync(file)).digest('hex')]
+  )
+);
+if (resume && fs.existsSync(outPath)) {
+  const previous = readJson(outPath);
+  for (const key of ['generation', 'evidence']) {
+    if (previous.input_sha256?.[key] !== inputHashes[key]) {
+      throw new Error(`Cannot resume: missing or changed ${key} input fingerprint; use a new review output`);
+    }
+  }
+}
 const generationRows = Array.isArray(generationReport.generated)
   ? generationReport.generated
   : Array.isArray(generationReport.replayed)
@@ -496,6 +510,7 @@ function buildOutput() {
     ok: orderedReviews.every((row) => row.valid),
     generated_at: new Date().toISOString(),
     generation_report: path.relative(process.cwd(), generationPath),
+    input_sha256: inputHashes,
     evidence_report: path.relative(process.cwd(), evidencePath),
     policy: {
       generation_model: generationModel,

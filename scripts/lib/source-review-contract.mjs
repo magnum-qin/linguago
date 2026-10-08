@@ -1,6 +1,13 @@
 const LANGS = ['en', 'pt-BR', 'zh', 'ja'];
 const DECISIONS = new Set(['accept', 'reject', 'manual_review']);
 
+export function sourceReviewSystemPrompt(requireDailyPrimary = false) {
+  const role = 'You are a conservative multilingual lexicographer screening noisy open-dictionary evidence. ';
+  return role + (requireDailyPrimary
+    ? 'Judge both exact source-language meaning and modern everyday sense priority. A real dictionary sense alone is insufficient. Reject proper names, brands, named works and narrowly specialized senses from this daily batch. Do not mistake synonymous wording, established loanwords or shared Chinese/Japanese characters for a semantic mismatch. Use manual_review when priority is uncertain; do not invent usage frequency. Return JSON only.'
+    : 'Judge only whether the proposed sense is real for the source-language headword. Return JSON only.');
+}
+
 export function validateSourceReviewEnvelope(review) {
   if (!review || typeof review !== 'object' || Array.isArray(review)) return ['not_object'];
 

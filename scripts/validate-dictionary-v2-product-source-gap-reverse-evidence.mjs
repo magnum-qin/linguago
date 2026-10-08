@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as OpenCC from "opencc-js";
 import { canonicalEnglishSpellingVariant } from "./lib/source-gap-lexical-contract.mjs";
+import { japaneseReverseLookupVariants } from './lib/japanese-reverse-lookup-variants.mjs';
 import { candidateSourceSenseKey, sourceSenseKey } from "./lib/source-sense-key.mjs";
 
 const DEFAULT_SOURCE_DB = "data/processed/linguago_v2_full.db";
@@ -18,15 +19,15 @@ const REPLACEMENT_CHAR_RE = /[\uFFFD]/u;
 const LATIN1_MOJIBAKE_RE = /(?:\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2[\u0080-\u00bf]{1,2})/u;
 const JAPANESE_MOJIBAKE_RE = /[\u9287\u9288\u9289][\u3040-\u30ff\u4e00-\u9fff]?/u;
 const STRONG_REVERSE_SOURCES = {
-  en: new Set(["ecdict"]),
-  "pt-BR": new Set(["freedict-por-eng", "wikdict-pt-en"]),
-  zh: new Set(["cc-cedict", "kaikki-zh", "wikdict-zh-en"]),
-  ja: new Set(["jmdict", "wikdict-ja-en", "kaikki-ja"])
+  en: new Set(["ecdict", "omw-30", "wordnet", "kaikki-en", "freedict-eng-por"]),
+  "pt-BR": new Set(["freedict-por-eng", "wikdict-pt-en", "omw-30", "kaikki-pt", "wikdict-pt-ja", "wikdict-pt-zh"]),
+  zh: new Set(["cc-cedict", "kaikki-zh", "wikdict-zh-en", "omw-30", "wikdict-zh-pt", "wikdict-zh-ja"]),
+  ja: new Set(["jmdict", "wikdict-ja-en", "kaikki-ja", "omw-30", "wikdict-ja-pt", "wikdict-ja-zh"])
 };
 const FORWARD_SOURCES = {
-  "pt-BR": new Set(["freedict-eng-por", "wikdict-en-pt"]),
-  zh: new Set(["wikdict-en-zh"]),
-  ja: new Set(["wikdict-en-ja"])
+  "pt-BR": new Set(["freedict-eng-por", "wikdict-en-pt", "omw-30"]),
+  zh: new Set(["wikdict-en-zh", "omw-30"]),
+  ja: new Set(["wikdict-en-ja", "omw-30", "freedict-eng-por"])
 };
 const STOPWORDS = new Set([
   "a", "an", "and", "as", "at", "be", "by", "for", "from", "in", "into", "is", "of", "on", "or",
@@ -695,12 +696,12 @@ function extractReverseEvidence(row, lang, anchors) {
   const source = row.source_key;
   const raw = safeJson(row.raw_json);
   const glosses = [];
-  if (isStrongReverseSource(lang, source)) {
+  if (source === "omw-30") {
+    glosses.push(...asStrings(raw.localizations?.en), ...englishGlosses(row.gloss, raw));
+  } else if (isStrongReverseSource(lang, source)) {
     if (source === "ecdict") glosses.push(row.word);
     else if (String(raw.target_lang || "") === "en") glosses.push(...asStrings(raw.translations), row.gloss);
     else glosses.push(...englishGlosses(row.gloss, raw));
-  } else if (source === "omw-30") {
-    glosses.push(...asStrings(raw.localizations?.en));
   }
   return unique(glosses).map((englishGloss) => ({
     source,
@@ -884,15 +885,11 @@ function splitTerms(value) {
 
 function termLookupVariants(lang, value) {
   const term = String(value || '').normalize('NFKC').trim();
+  if (lang === 'ja') return japaneseReverseLookupVariants(term);
   const variants = new Set([term]);
   if (lang === 'zh') {
     variants.add(traditionalToSimplified(term));
     variants.add(simplifiedToTraditional(term));
-  }
-  if (lang === 'ja') {
-    if (term.endsWith('する') && term.length > 2) variants.add(term.slice(0, -2));
-    if (term.endsWith('な') && term.length > 1) variants.add(term.slice(0, -1));
-    if (term.endsWith('の') && term.length > 1) variants.add(term.slice(0, -1));
   }
   if (lang === 'zh' && term.endsWith('的') && term.length > 1) variants.add(term.slice(0, -1));
   return [...variants];

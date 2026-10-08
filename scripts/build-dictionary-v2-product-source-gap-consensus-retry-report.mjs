@@ -5,6 +5,7 @@ const args = parseArgs(process.argv.slice(2));
 const reportPaths = requiredPaths(args.reports, 'reports');
 const consensusPaths = requiredPaths(args.consensus, 'consensus');
 const outPath = path.resolve(args.out || 'logs/product-source-gap-consensus-retry.json');
+const decisions = new Set(csv(args.decisions || 'reject,manual_review'));
 
 const candidates = new Map();
 for (const reportPath of reportPaths) {
@@ -19,7 +20,11 @@ const rejected = new Map();
 for (const consensusPath of consensusPaths) {
   const report = readJson(consensusPath);
   for (const review of report.reviews || []) {
-    if (review?.valid !== true || review?.consensus_accepted === true) continue;
+    if (
+      review?.valid !== true ||
+      review?.consensus_accepted === true ||
+      !decisions.has(String(review?.decision || ''))
+    ) continue;
     const key = candidateKey(review);
     if (key) rejected.set(key, review);
   }
@@ -53,6 +58,11 @@ const output = {
   generated_at: new Date().toISOString(),
   source_reports: reportPaths.map(relative),
   consensus_reports: consensusPaths.map(relative),
+  policy: {
+    retry_decisions: [...decisions].sort(),
+    preserve_exact_candidate_identity: true,
+    automatic_publication: false
+  },
   summary: { candidates: candidates.size, rejected_reviews: rejected.size, selected: selected.length },
   selected_count: selected.length,
   selected
@@ -64,6 +74,10 @@ console.log(JSON.stringify({ ok: true, out: relative(outPath), summary: output.s
 function formatCorrection(value) {
   if (typeof value === 'string') return value;
   return Object.entries(value || {}).map(([key, item]) => `${key}=${item}`).join(', ');
+}
+
+function csv(value) {
+  return String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
 }
 
 function candidateKey(row) {

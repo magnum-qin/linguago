@@ -129,6 +129,42 @@ assert.deepEqual(
   JSON.parse(fs.readFileSync(authoritativeOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
   [21, 22, 24, 26]
 );
+
+const ptWikdictInputPath = path.join(directory, 'pt-wikdict-input.json');
+const ptWikdictOutPath = path.join(directory, 'pt-wikdict-out.json');
+const ptWikdictRejectedPath = path.join(directory, 'pt-wikdict-rejected.json');
+fs.writeFileSync(ptWikdictInputPath, `${JSON.stringify({ selected: [
+  anchoredRow(31, 'pt-BR', 'freguesia', 'parish', 'wikdict-pt-en'),
+  anchoredRow(32, 'pt-BR', 'vigente', 'in force', 'omw-30'),
+  anchoredRow(33, 'zh', '城市', 'city', 'cc-cedict')
+] })}\n`);
+const ptWikdict = spawnSync(process.execPath, [
+  'scripts/filter-dictionary-v2-production-batch.mjs',
+  '--report', ptWikdictInputPath,
+  '--out', ptWikdictOutPath,
+  '--rejected-out', ptWikdictRejectedPath,
+  '--require-authoritative-source-sense', 'true',
+  '--allow-pt-br-omw-source', 'true',
+  '--allow-pt-br-wikdict-source', 'true'
+], { cwd: process.cwd(), encoding: 'utf8' });
+assert.equal(ptWikdict.status, 0, ptWikdict.stderr || ptWikdict.stdout);
+assert.deepEqual(
+  JSON.parse(fs.readFileSync(ptWikdictOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
+  [31, 32, 33]
+);
+const ptWikdictDisabled = spawnSync(process.execPath, [
+  'scripts/filter-dictionary-v2-production-batch.mjs',
+  '--report', ptWikdictInputPath,
+  '--out', ptWikdictOutPath,
+  '--rejected-out', ptWikdictRejectedPath,
+  '--require-authoritative-source-sense', 'true',
+  '--allow-pt-br-omw-source', 'true'
+], { cwd: process.cwd(), encoding: 'utf8' });
+assert.equal(ptWikdictDisabled.status, 0, ptWikdictDisabled.stderr || ptWikdictDisabled.stdout);
+assert.deepEqual(
+  JSON.parse(fs.readFileSync(ptWikdictOutPath, 'utf8')).selected.map((item) => item.source_entry_id),
+  [32, 33]
+);
 console.log('production batch prefilter tests passed');
 
 function row(id, sourceLang, word, gloss) {

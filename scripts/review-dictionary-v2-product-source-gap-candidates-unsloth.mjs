@@ -6,13 +6,16 @@ import Database from 'better-sqlite3';
 import * as OpenCC from 'opencc-js';
 import {
   validateDefinitionContract,
-  validateSourceReviewEnvelope
+  validateSourceReviewEnvelope,
+  sourceReviewSystemPrompt
 } from './lib/source-review-contract.mjs';
 import {
   matchBlindSourceAnchor,
   normalizeBlindSenses
 } from './lib/blind-source-anchor.mjs';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
+import { sourceReviewEvidence } from './lib/source-review-evidence.mjs';
+import { boundJmdictMetadata } from './lib/jmdict-review-metadata.mjs';
 
 const DEFAULT_REPORT = 'logs/product-coverage-gaps-v83-after-tier-b-complete-strict.json';
 const DEFAULT_OUT = 'logs/product-source-gap-candidate-evidence-review.json';
@@ -412,9 +415,7 @@ async function reviewRow(row, endpoint, attempt, previousError) {
           : [
               {
                 role: 'system',
-                content:
-                  'You are a conservative multilingual lexicographer screening noisy open-dictionary evidence. ' +
-                  'Judge only whether the proposed sense is real for the source-language headword. Return JSON only.'
+                content: sourceReviewSystemPrompt(requireDailyPrimary)
               },
               { role: 'user', content: buildPrompt(payload, previousError) }
             ]
@@ -797,6 +798,7 @@ function compactPayload(row) {
     source_entry_id: Number(row.source_entry_id),
     source_sense_id: Number(row.first_sense_id ?? row.source_sense_id) || null,
     headword: row.word,
+    native_sense_metadata: boundJmdictMetadata(row),
     source_language: row.source_lang,
     frequency_rank: row.frequency_rank ?? null,
     part_of_speech: row.part_of_speech || null,
@@ -836,21 +838,7 @@ function compactPayload(row) {
 }
 
 function compactSourceSenseEvidence(row) {
-  const candidates = Array.isArray(row?.sense_alignment?.candidates)
-    ? row.sense_alignment.candidates
-    : [];
-  const sourcePriority = (source) => {
-    const value = String(source || '').toLowerCase();
-    if (/^(jmdict|freedict|cc-cedict|ecdict)/u.test(value)) return 0;
-    if (value.startsWith('wikdict-')) return 1;
-    if (value.startsWith('omw-')) return 2;
-    return 3;
-  };
-  return candidates
-    .filter((item) => item?.source && item?.gloss_key)
-    .sort((a, b) => sourcePriority(a.source) - sourcePriority(b.source))
-    .slice(0, 8)
-    .map((item) => ({ source: item.source, gloss: item.gloss_key }));
+  return sourceReviewEvidence(row);
 }
 
 function compactSupplementalEvidence(row) {
@@ -959,6 +947,10 @@ When accepting, preferred_terms must copy the exact matching supplied hint form;
   return `Conservative source-sense review. Decide only whether proposed_gloss is a real sense of the source-language headword.
 ${requireDailyPrimary ? 'accept=well-supported common modern everyday sense; reject a non-primary sense when a clearly more common everyday sense exists; manual_review=uncertain everyday priority.' : 'accept=genuine primary/secondary, inflected, figurative, regional, archaic, transliterated, or close-synonym sense.'}
 reject=another word/language/homograph/name/spelling or unrelated concept. manual_review=ambiguous or thin evidence.
+The source_language identifies the headword language, not the gloss language. An English gloss for a Chinese or Japanese headword is expected bilingual dictionary evidence, never a language mismatch by itself.
+Judge the meaning of the supplied gloss, not whether it is a single word, phrase, gerund, or a synonym of your preferred wording. Reject only a demonstrated semantic or grammatical mismatch, not formatting or equivalent paraphrase.
+An existing proper-name homograph does not invalidate the supplied common-noun sense. Compare the locked sense and its evidence; do not silently substitute a celebrity, brand, character, place, or another reading.
+Entry frequency_rank measures the headword, not the relative frequency of its senses. Source order and heuristic scores also cannot prove a competing sense is dominant. If modern everyday priority cannot be established, use manual_review instead of inventing frequency evidence.
 ${requireDailyPrimary ? 'Use source_sense_evidence as evidence, not a guarantee of correctness or everyday priority. Source ordering and heuristic scores do not establish the most common sense. Do not switch the locked source_sense_id.' : 'Use source_sense_evidence as lexical evidence; JMdict/FreeDict/CC-CEDICT/ECDICT entries are authoritative when present.'}
 ${dailyPrimaryRule}
 ${strictHintRules}

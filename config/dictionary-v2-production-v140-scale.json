@@ -1,0 +1,60 @@
+{
+  "version": "v140-scale-evidence-yield-20260930",
+  "description": "Controlled scale production profile with balanced multi-language coverage, strict quality gates, and 3-lang reverse dictionary proof with 1-lang semantic review fallback.",
+  "baseline": {
+    "run_id": "v139-stock-governance-pilot-50",
+    "entries": 49699,
+    "senses": 57281,
+    "sense_localizations": 229124
+  },
+  "runner": {
+    "pipeline-mode": "simplified",
+    "production-prefilter": "true",
+    "require-authoritative-source-sense": "true",
+    "daily-primary-sense-selection": "true",
+    "source-sense-alignment": "true",
+    "allow-native-source-fallback": "true",
+    "reverse-evidence-prefilter": "false",
+    "reverse-evidence-min-target-langs": "2",
+    "source-reverse-max-manual-target-langs": "1",
+    "source-reverse-min-supported-target-langs": "3",
+    "enforce-generation-hint-terms": "true",
+    "allow-model-download": "false",
+    "supplemental-source-db": ".tmp/combined/openwn-word2word3-ja-apertium-wikidata-v3-evidence.db",
+    "qwen-endpoints": "http://127.0.0.1:11448,http://127.0.0.1:11447",
+    "qwen-variants": "11448=UD-IQ4_NL,11447=UD-IQ4_NL",
+    "qwen-model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+    "gemma-endpoints": "http://127.0.0.1:11442,http://127.0.0.1:11445,http://127.0.0.1:11446",
+    "gemma-variants": "11442=UD-Q4_K_XL,11445=UD-Q4_K_XL,11446=UD-Q4_K_XL",
+    "gemma-model": "unsloth/gemma-4-31B-it-qat-GGUF",
+    "elastic-model-swap": "true",
+    "elastic-endpoints": "http://127.0.0.1:11442,http://127.0.0.1:11445",
+    "elastic-minimum-items": "20",
+    "resume": "true"
+  },
+  "evidence_order": "dual_model_source_proposal_then_deterministic_reverse_evidence",
+  "qualification": {
+    "dry_run_input": 200,
+    "write_validation_input": 500,
+    "production_input": 5000,
+    "minimum_raw_to_final_rate": 0.05,
+    "minimum_generation_valid_rate": 0.95,
+    "minimum_final_no_correction_rate": 0.9,
+    "maximum_network_failure_rate": 0.02,
+    "maximum_json_failure_rate": 0.02
+  },
+  "publication": {
+    "minimum_new_publishable_senses": 500,
+    "controlled_replay_required": true,
+    "isolated_database_required": true,
+    "idempotent_replay_required": true,
+    "blocking_audit_counters_must_be_zero": true,
+    "d1_publish_is_separate_from_production": true
+  },
+  "language_policy": {
+    "zh": "mainland_simplified_first",
+    "taiwan_fallback_only_when_mainland_term_missing": true,
+    "model_consensus_is_lexical_evidence": false,
+    "wikdict_and_kaikki_family": "wiktionary"
+  }
+}

@@ -5,15 +5,23 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { fileURLToPath } from 'node:url';
 import { ensureUnslothModel } from './lib/unsloth-elastic-model.mjs';
 import { discoverUnslothStagePool } from './lib/unsloth-cluster-discovery.mjs';
 import { inspectCompletedPipelineStage } from './lib/dictionary-pipeline-stage-recovery.mjs';
 import { runChildProcessWithLog } from './lib/run-child-process-with-log.mjs';
 
+// Remote SSH and scheduled-task launchers may start outside the runner root.
+process.chdir(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
+
 const args = parseArgs(process.argv.slice(2));
 const pipelineMode = String(args['pipeline-mode'] || 'legacy').trim().toLowerCase();
 if (!['legacy', 'simplified'].includes(pipelineMode)) {
   throw new Error(`Invalid --pipeline-mode: ${pipelineMode}`);
+}
+const executionMode = String(args['execution-mode'] || 'full').trim().toLowerCase();
+if (!['full', 'draft-production', 'release-validation'].includes(executionMode)) {
+  throw new Error(`Invalid --execution-mode: ${executionMode}`);
 }
 const batchPath = requiredPath(args.batch, 'batch');
 const runId = String(args['run-id'] || path.basename(batchPath, '.json')).replace(/[^a-zA-Z0-9._-]/gu, '-');
@@ -61,9 +69,26 @@ const dailyPrimarySenseSelection =
     : pipelineMode === 'simplified';
 const allowLinkedPrimaryForAdditionalSense =
   args['allow-linked-primary-for-additional-sense'] === 'true';
-const additionalSenseReverseEvidenceArgs = allowLinkedPrimaryForAdditionalSense
-  ? ['--max-manual-target-langs', '1', '--min-supported-target-langs', '3']
-  : [];
+const sourceReverseMaxManualTargetLangs = Math.max(
+  0,
+  Number.parseInt(
+    args['source-reverse-max-manual-target-langs'] ||
+      (allowLinkedPrimaryForAdditionalSense ? '1' : '0'),
+    10
+  )
+);
+const sourceReverseMinSupportedTargetLangs = Math.max(
+  0,
+  Number.parseInt(
+    args['source-reverse-min-supported-target-langs'] ||
+      (allowLinkedPrimaryForAdditionalSense ? '3' : '0'),
+    10
+  )
+);
+const additionalSenseReverseEvidenceArgs = [
+  '--max-manual-target-langs', String(sourceReverseMaxManualTargetLangs),
+  '--min-supported-target-langs', String(sourceReverseMinSupportedTargetLangs)
+];
 const sourceSenseAlignment = args['source-sense-alignment'] === 'true';
 const allowNativeSourceFallback = args['allow-native-source-fallback'] === 'true';
 const reverseEvidencePrefilter = args['reverse-evidence-prefilter'] === 'true';
@@ -75,7 +100,7 @@ const reverseEvidencePrefilterLimit = Math.max(
   1,
   Number.parseInt(args['reverse-evidence-prefilter-limit'] || '1000000', 10)
 );
-const enforceGenerationHintTerms = args['enforce-generation-hint-terms'] === 'true';
+const enforceGenerationHintTerms = args['enforce-generation-hint-terms'] !== 'false';
 const strongSupplementalSourceKeys = String(args['strong-supplemental-source-keys'] || '').trim();
 const reviewedSupplementalSourceKeys = String(args['reviewed-supplemental-source-keys'] || '').trim();
 const candidateBoundSourceRoundtripKeys = String(
@@ -113,6 +138,7 @@ manifest.started_at ||= new Date().toISOString();
 manifest.status = 'running';
 manifest.models = { qwen: qwenModel, gemma: gemmaModel };
 manifest.pipeline_mode = pipelineMode;
+manifest.execution_mode = executionMode;
 manifest.endpoints = {
   qwen: csvValues(qwenEndpoints),
   gemma: csvValues(gemmaEndpoints),
@@ -133,6 +159,8 @@ manifest.reverse_evidence_prefilter = reverseEvidencePrefilter;
 manifest.daily_primary_sense_selection = dailyPrimarySenseSelection;
 manifest.source_sense_alignment = sourceSenseAlignment;
 manifest.allow_native_source_fallback = allowNativeSourceFallback;
+manifest.source_reverse_max_manual_target_langs = sourceReverseMaxManualTargetLangs;
+manifest.source_reverse_min_supported_target_langs = sourceReverseMinSupportedTargetLangs;
 manifest.reverse_evidence_min_target_langs = reverseEvidenceMinimumTargetLanguages;
 manifest.reverse_evidence_prefilter_limit = reverseEvidencePrefilterLimit;
 manifest.enforce_generation_hint_terms = enforceGenerationHintTerms;
@@ -192,7 +220,9 @@ files.reverseEvidenceFiltered = output('00c-reverse-evidence-prefilter.json');
 files.reverseEvidenceFilterDetails = output('00c-reverse-evidence-prefilter-details.json');
 
 try {
-  if (pipelineMode === 'simplified') {
+  if (executionMode === 'release-validation') {
+    await runReleaseValidationPipeline();
+  } else if (pipelineMode === 'simplified') {
     await runSimplifiedPipeline();
   } else {
   if (!sourceRunDir) {
@@ -357,6 +387,7 @@ try {
     '--deterministic-pronunciations', 'true',
     '--prewarm', 'true',
     '--resume', String(resume),
+    '--allow-endpoint-change-on-resume', 'true',
     '--dry-run', 'true',
     '--apply', 'false',
     '--log-generated', 'true'
@@ -433,6 +464,7 @@ try {
     '--deterministic-pronunciations', 'true',
     '--prewarm', 'true',
     '--resume', String(resume),
+    '--allow-endpoint-change-on-resume', 'true',
     '--dry-run', 'true',
     '--apply', 'false',
     '--log-generated', 'true'
@@ -593,7 +625,9 @@ async function runSimplifiedPipeline() {
       '--rejected-out', files.productionRejected,
       '--enabled', 'true',
       '--require-authoritative-source-sense', String(requireAuthoritativeSourceSense),
-      '--allow-english-omw-source', args['allow-english-omw-source'] || 'false'
+      '--allow-english-omw-source', args['allow-english-omw-source'] || 'false',
+      '--allow-pt-br-omw-source', args['allow-pt-br-omw-source'] || (allowLinkedPrimaryForAdditionalSense ? 'true' : 'false'),
+      '--allow-pt-br-wikdict-source', args['allow-pt-br-wikdict-source'] || (allowLinkedPrimaryForAdditionalSense ? 'true' : 'false')
     ], [files.productionFiltered, files.productionRejected]);
     sourceReviewInput = files.productionFiltered;
   }
@@ -841,11 +875,60 @@ async function runSimplifiedPipeline() {
     '--deterministic-pronunciations', 'true',
     '--prewarm', 'true',
     '--resume', String(resume),
-    '--dry-run', 'true',
-    '--apply', 'false',
+    '--allow-endpoint-change-on-resume', 'true',
+    '--dry-run', String(executionMode !== 'draft-production'),
+    '--apply', String(executionMode === 'draft-production'),
     '--publishable', 'false',
+    '--allow-no-promote-draft-writes', String(executionMode === 'draft-production'),
     '--log-generated', 'true'
   ], [files.generation, files.generationCheckpoint]);
+
+  if (executionMode === 'draft-production') {
+    const generation = JSON.parse(fs.readFileSync(files.generation, 'utf8'));
+    const generationStats = generation?.stats || {};
+    const summary = {
+      ok: true,
+      run_id: runId,
+      input_fingerprint: inputFingerprint,
+      pipeline_mode: 'simplified',
+      execution_mode: executionMode,
+      release_validation_pending: true,
+      summary: {
+        input: batchItemCount,
+        production_prefilter_selected: productionPrefilter
+          ? reportItemCount(files.productionFiltered)
+          : batchItemCount,
+        daily_primary_selected: dailyPrimarySenseSelection ? reportItemCount(files.dailyPrimary) : null,
+        source_sense_aligned: sourceSenseAlignment ? reportItemCount(files.senseAligned) : null,
+        source_reviewed: reportItemCount(files.gemmaReview),
+        gemma_source_approved: reportItemCount(files.gemmaApproved),
+        source_reverse_supported: reportItemCount(files.consensusSupported),
+        semantic_preview_accepted: reportItemCount(files.semanticAccepted),
+        jmdict_generation_ready: reportItemCount(files.generationReady),
+        generated_valid: Number(generationStats.accepted || 0),
+        draft_senses_inserted: Number(generationStats.senses_inserted || 0),
+        draft_senses_reused: Number(generationStats.senses_reused || 0),
+        draft_localizations_upserted: Number(generationStats.localizations_upserted || 0),
+        reverse_supported: null,
+        final_accepted: null,
+        automatic_database_writes: Number(generationStats.senses_inserted || 0)
+      },
+      reports: {
+        generationReady: relative(files.generationReady),
+        generation: relative(files.generation),
+        checkpoint: relative(files.generationCheckpoint),
+        summary: relative(files.summary)
+      }
+    };
+    fs.writeFileSync(files.summary, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    manifest.status = 'complete';
+    manifest.completed_at = new Date().toISOString();
+    manifest.release_validation_pending = true;
+    manifest.summary = summary.summary;
+    writeManifest();
+    console.log(JSON.stringify(summary, null, 2));
+    return;
+  }
 
   await stage('reverse_evidence', 'scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs', [
     '--report', files.generation,
@@ -930,6 +1013,91 @@ async function runSimplifiedPipeline() {
       generationReady: relative(files.generationReady),
       generation: relative(files.generation),
       reverse: relative(files.reverse),
+      finalGemma: relative(files.finalGemma),
+      finalAccepted: relative(files.finalAccepted),
+      summary: relative(files.summary)
+    }
+  };
+  fs.writeFileSync(files.summary, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+  manifest.status = 'complete';
+  manifest.completed_at = new Date().toISOString();
+  manifest.summary = summary.summary;
+  writeManifest();
+  console.log(JSON.stringify(summary, null, 2));
+}
+
+async function runReleaseValidationPipeline() {
+  if (!sourceRunDir) {
+    throw new Error('--execution-mode release-validation requires --source-run-dir');
+  }
+  const generationReport = path.join(sourceRunDir, '05-qwen-generation.json');
+  const generationReadyReport = path.join(sourceRunDir, '04f-generation-ready-candidates.json');
+  if (!fs.existsSync(generationReport)) {
+    throw new Error(`Source generation report not found: ${generationReport}`);
+  }
+  if (!fs.existsSync(generationReadyReport)) {
+    throw new Error(`Source generation-ready report not found: ${generationReadyReport}`);
+  }
+
+  await stage('reverse_evidence', 'scripts/validate-dictionary-v2-product-source-gap-reverse-evidence.mjs', [
+    '--report', generationReport,
+    '--out', files.reverse,
+    '--supported-report', files.reverseSupported,
+    '--input-mode', 'generated',
+    '--require-source-reverse-evidence', 'true',
+    '--evidence-family-policy', 'wiktionary',
+    ...additionalSenseReverseEvidenceArgs,
+    ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
+    ...supplementalValidationArgs
+  ], [files.reverse, files.reverseSupported]);
+
+  if (reportHasRows(files.reverseSupported)) await stage('final_gemma', 'scripts/review-dictionary-v2-product-source-gap-consensus-unsloth.mjs', [
+    '--generation', generationReport,
+    '--evidence', files.reverse,
+    '--out', files.finalGemma,
+    '--accepted-out', files.finalAccepted,
+    '--endpoints', gemmaEndpoints,
+    '--endpoint-gguf-variants', gemmaVariants,
+    '--model', gemmaModel,
+    '--generation-model', qwenModel,
+    '--only-supported', 'true',
+    '--limit', '1000000',
+    '--concurrency', String(gemmaConcurrency),
+    '--confidence-threshold', '0.9',
+    '--max-attempts', '2',
+    '--max-seq-length', '3072',
+    '--max-tokens', '650',
+    '--prompt-mode', 'full',
+    '--resume', String(resume),
+    '--retry-decisions', 'manual_review',
+    '--stream', 'false',
+    '--unload-before-load', String(elasticModelSwap)
+  ], [files.finalGemma, files.finalAccepted]);
+  else skipConsensusStage('final_gemma', files.finalGemma, files.finalAccepted);
+
+  const reverse = JSON.parse(fs.readFileSync(files.reverse, 'utf8'));
+  const finalReview = JSON.parse(fs.readFileSync(files.finalGemma, 'utf8'));
+  const summary = {
+    ok: true,
+    run_id: runId,
+    input_fingerprint: inputFingerprint,
+    pipeline_mode: pipelineMode,
+    execution_mode: executionMode,
+    source_run_dir: relative(sourceRunDir),
+    summary: {
+      input: batchItemCount,
+      jmdict_generation_ready: reportItemCount(generationReadyReport),
+      generated_valid: reportItemCount(generationReport),
+      reverse_supported: Number(reverse?.summary?.decisions?.supported || 0),
+      reverse_manual_review: Number(reverse?.summary?.decisions?.manual_review || 0),
+      final_accepted: Number(finalReview?.summary?.consensus_accepted || 0),
+      final_rejected: Number(finalReview?.summary?.rejected || 0),
+      automatic_database_writes: 0
+    },
+    reports: {
+      sourceGeneration: relative(generationReport),
+      reverse: relative(files.reverse),
+      reverseSupported: relative(files.reverseSupported),
       finalGemma: relative(files.finalGemma),
       finalAccepted: relative(files.finalAccepted),
       summary: relative(files.summary)

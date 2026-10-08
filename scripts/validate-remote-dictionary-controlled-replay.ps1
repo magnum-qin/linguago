@@ -57,8 +57,13 @@ foreach ($Path in @($GenerationReady, $Generation, $Reverse, $Consensus)) {
 }
 
 $GenerationReadyReport = [IO.File]::ReadAllText($GenerationReady, [Text.Encoding]::UTF8) | ConvertFrom-Json
+$GenerationReport = [IO.File]::ReadAllText($Generation, [Text.Encoding]::UTF8) | ConvertFrom-Json
+$DraftProductionWritesExist = [bool]$GenerationReport.stats.apply -and
+  -not [bool]$GenerationReport.stats.publishable -and
+  [int64]$GenerationReport.stats.senses_inserted -gt 0
 $HistoricalDraftRecovery = [bool]$GenerationReadyReport.selection_policy.historical_current_contract_recovery -or
-  ([string]$GenerationReadyReport.selection_policy.lane -eq 'historical_current-contract_recovery')
+  ([string]$GenerationReadyReport.selection_policy.lane -eq 'historical_current-contract_recovery') -or
+  $DraftProductionWritesExist
 
 Invoke-Node 'scripts\build-dictionary-v2-product-source-gap-controlled-consensus-input.mjs' @(
   '--review', $GenerationReady, '--generation', $Generation, '--evidence', $Reverse,

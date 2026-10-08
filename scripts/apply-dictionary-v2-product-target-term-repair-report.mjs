@@ -33,9 +33,20 @@ const selected = (report.selected || []).map((row) => {
       validation_report: path.relative(process.cwd(), repairsPath)
     };
   });
+  const generationHints = { ...(row.generation_hints || {}) };
+  for (const repair of repairRecords) {
+    generationHints[repair.target_lang] = {
+      terms: repair.terms,
+      sources: ['target-term-repair-v1'],
+      provenance: 'dictionary_validated_target_repair',
+      evidence_families: repair.evidence_families,
+      validation_report: repair.validation_report
+    };
+  }
   applied += 1;
   return {
     ...row,
+    generation_hints: generationHints,
     target_term_repairs: repairRecords,
     ...(repairRecords.length === 1 ? { target_term_repair: repairRecords[0] } : {})
   };

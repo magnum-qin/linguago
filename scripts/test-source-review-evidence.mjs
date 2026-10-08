@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { sourceReviewEvidence } from './lib/source-review-evidence.mjs';
+const selected = { id: 2, source: 'jmdict', gloss: 'official proclamation', part_of_speech: '&n;' };
+const row = { first_sense_id: 2, daily_sense_selection: { alternatives: [{ ...selected, id: 1, gloss: 'other sense' }, selected] } };
+assert.deepEqual(sourceReviewEvidence(row), [{ source: 'jmdict', gloss: selected.gloss, source_sense_id: 2, part_of_speech: '&n;' }]);
+assert.deepEqual(sourceReviewEvidence({ ...row, first_sense_id: 3 }), []);
+assert.deepEqual(sourceReviewEvidence({ first_sense_id: 2, daily_sense_selection: { alternatives: [{ ...selected, blocked_reason: 'blocked' }] } }), []);
+assert.deepEqual(sourceReviewEvidence({}), []);
+const combined = { ...row, sense_alignment: { candidates: [{ source: 'jmdict', gloss_key: selected.gloss }, { source: 'omw-30', gloss_key: 'announcement' }] } };
+assert.equal(sourceReviewEvidence(combined).length, 2);
+assert.equal(sourceReviewEvidence(combined)[0].source_sense_id, 2);
+console.log('Source review evidence tests passed');

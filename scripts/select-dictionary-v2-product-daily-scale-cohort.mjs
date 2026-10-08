@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { dailyCandidateReasons } from './lib/daily-candidate-quality.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const reportPath = requiredPath(args.report, 'report');
@@ -114,6 +115,8 @@ console.log(JSON.stringify({ ok: true, out: relative(outPath), summary: output.s
 function rejectionReason(row) {
   if (!enabledSourceLangs.has(row.source_lang)) return 'unsupported_source_lang';
   if (excludedCandidateKeys.has(candidateKey(row))) return 'previously_attempted';
+  const deterministicDailyReasons = dailyCandidateReasons(row);
+  if (deterministicDailyReasons.length) return `daily_quality:${deterministicDailyReasons[0]}`;
   if (!['core', 'common'].includes(row.daily_tier) && !(includeExtended && row.daily_tier === 'extended') && !(allowMissingDailyTier && !row.daily_tier)) return 'non_daily_tier';
   if (targetCoverage(row) < minimumTargetCoverage) return 'insufficient_target_coverage';
   if (matchingSourceCount(row) < minimumMatchingSources) return 'insufficient_matching_sources';

@@ -232,16 +232,6 @@
       "note": "Traditional query alias for Mainland canonical headword 鲁."
     },
     {
-      "entry_id": 48286,
-      "headword": "弦",
-      "lang": "zh",
-      "form": "絃",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias retained after canonicalizing 絃 to 弦."
-    },
-    {
       "entry_id": 867,
       "headword": "们",
       "lang": "zh",
@@ -2212,16 +2202,6 @@
       "note": "Traditional query alias for Mainland canonical headword 转."
     },
     {
-      "entry_id": 48516,
-      "headword": "续",
-      "lang": "zh",
-      "form": "續",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 续."
-    },
-    {
       "entry_id": 11989,
       "headword": "钟",
       "lang": "zh",
@@ -2310,16 +2290,6 @@
       "source": "deterministic:mainland-simplified-alias",
       "confidence": 1,
       "note": "Traditional query alias for Mainland canonical headword 计."
-    },
-    {
-      "entry_id": 51422,
-      "headword": "继",
-      "lang": "zh",
-      "form": "繼",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 继."
     },
     {
       "entry_id": 2582,
@@ -3002,16 +2972,6 @@
       "note": "Traditional query alias for Mainland canonical headword 亚."
     },
     {
-      "entry_id": 51275,
-      "headword": "红",
-      "lang": "zh",
-      "form": "紅",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 红."
-    },
-    {
       "entry_id": 2127,
       "headword": "脱",
       "lang": "zh",
@@ -3340,16 +3300,6 @@
       "source": "deterministic:mainland-simplified-alias",
       "confidence": 1,
       "note": "Traditional query alias retained after canonicalizing 負 to 负."
-    },
-    {
-      "entry_id": 48545,
-      "headword": "责",
-      "lang": "zh",
-      "form": "責",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 责."
     },
     {
       "entry_id": 28917,
@@ -3762,16 +3712,6 @@
       "note": "Traditional query alias retained after canonicalizing 認識 to 认识."
     },
     {
-      "entry_id": 49433,
-      "headword": "獭",
-      "lang": "zh",
-      "form": "獺",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 獭."
-    },
-    {
       "entry_id": 21772,
       "headword": "严",
       "lang": "zh",
@@ -3970,16 +3910,6 @@
       "source": "deterministic:mainland-simplified-alias",
       "confidence": 1,
       "note": "Traditional query alias for Mainland canonical headword 谈谈."
-    },
-    {
-      "entry_id": 48766,
-      "headword": "习",
-      "lang": "zh",
-      "form": "習",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 习."
     },
     {
       "entry_id": 21942,
@@ -5372,16 +5302,6 @@
       "note": "Traditional query alias for Mainland canonical headword 摆."
     },
     {
-      "entry_id": 48760,
-      "headword": "钥",
-      "lang": "zh",
-      "form": "鑰",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 钥."
-    },
-    {
       "entry_id": 23179,
       "headword": "萨",
       "lang": "zh",
@@ -5670,16 +5590,6 @@
       "source": "deterministic:mainland-simplified-alias",
       "confidence": 1,
       "note": "Traditional query alias retained after canonicalizing 園 to 园."
-    },
-    {
-      "entry_id": 48661,
-      "headword": "庆",
-      "lang": "zh",
-      "form": "慶",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 庆."
     },
     {
       "entry_id": 16465,
@@ -6622,16 +6532,6 @@
       "note": "Traditional query alias for Mainland canonical headword 诗."
     },
     {
-      "entry_id": 48534,
-      "headword": "乡",
-      "lang": "zh",
-      "form": "鄉",
-      "form_type": "traditional_alias",
-      "source": "deterministic:mainland-simplified-alias",
-      "confidence": 1,
-      "note": "Traditional query alias for Mainland canonical headword 乡."
-    },
-    {
       "entry_id": 26984,
       "headword": "几个",
       "lang": "zh",
@@ -7520,6 +7420,118 @@
       "source": "deterministic:mainland-simplified-alias",
       "confidence": 1,
       "note": "Traditional query alias retained after canonicalizing 腦子 to 脑子."
+    },
+    {
+      "entry_id": 256,
+      "headword": "着",
+      "lang": "zh",
+      "form": "著",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "source_entry_id": 1932,
+      "note": "Traditional query alias merged from entry 1932 (著) into canonical 着."
+    },
+    {
+      "entry_id": 9297,
+      "headword": "睡着",
+      "lang": "zh",
+      "form": "睡著",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "source_entry_id": 46680,
+      "note": "Traditional query alias merged from entry 46680 (睡著) into canonical 睡着."
+    },
+    {
+      "entry_id": 11983,
+      "headword": "续",
+      "lang": "zh",
+      "form": "續",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 續 to 续."
+    },
+    {
+      "entry_id": 12252,
+      "headword": "继",
+      "lang": "zh",
+      "form": "繼",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 繼 to 继."
+    },
+    {
+      "entry_id": 15339,
+      "headword": "红",
+      "lang": "zh",
+      "form": "紅",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 紅 to 红."
+    },
+    {
+      "entry_id": 16795,
+      "headword": "责",
+      "lang": "zh",
+      "form": "責",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 責 to 责."
+    },
+    {
+      "entry_id": 21764,
+      "headword": "獭",
+      "lang": "zh",
+      "form": "獺",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 獺 to 獭."
+    },
+    {
+      "entry_id": 21940,
+      "headword": "习",
+      "lang": "zh",
+      "form": "習",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 習 to 习."
+    },
+    {
+      "entry_id": 23159,
+      "headword": "钥",
+      "lang": "zh",
+      "form": "鑰",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 鑰 to 钥."
+    },
+    {
+      "entry_id": 24042,
+      "headword": "庆",
+      "lang": "zh",
+      "form": "慶",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 慶 to 庆."
+    },
+    {
+      "entry_id": 24758,
+      "headword": "乡",
+      "lang": "zh",
+      "form": "鄉",
+      "form_type": "traditional_alias",
+      "source": "deterministic:mainland-simplified-alias",
+      "confidence": 1,
+      "note": "Traditional query alias retained after canonicalizing 鄉 to 乡."
     }
   ]
 }

@@ -14,10 +14,17 @@ fs.mkdirSync(dataDir, { recursive: true });
 fs.mkdirSync(configDir, { recursive: true });
 
 const allowedPaths = [
+  'scripts\\run-dictionary-v2-remote-pipeline.mjs',
+  'scripts\\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs',
+  'scripts\\lib\\japanese-reverse-lookup-variants.mjs',
+  'scripts\\test-dictionary-v2-pipeline-execution-modes.mjs',
   'scripts\\publish-remote-dictionary-controlled-run.ps1',
   'scripts\\start-remote-dictionary-release-cohort-production.ps1',
   'scripts\\complete-remote-dictionary-production-run.ps1',
   'scripts\\run-remote-dictionary-production-until-release.ps1',
+  'scripts\\manage-remote-dictionary-runner.ps1',
+  'scripts\\set-remote-dictionary-task-credential.ps1',
+  'scripts\\new-remote-dictionary-runner-manifest.ps1',
   'scripts\\test-remote-dictionary-production-gate-continuation.mjs',
   'scripts\\new-remote-dictionary-production-batch.ps1',
   'scripts\\build-dictionary-v2-additional-sense-recovery-pool.mjs',
@@ -29,7 +36,9 @@ const allowedPaths = [
 ];
 const untouchedPath = 'scripts\\untouched.ps1';
 for (const [index, allowedPath] of allowedPaths.entries()) {
-  fs.writeFileSync(path.join(scriptDir, path.basename(allowedPath)), `new-content-${index}`, 'utf8');
+  const filePath = path.join(root, ...allowedPath.split('\\'));
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `new-content-${index}`, 'utf8');
 }
 fs.writeFileSync(path.join(scriptDir, 'untouched.ps1'), 'untouched', 'utf8');
 const expected = allowedPaths.map((allowedPath, index) => ({
@@ -66,4 +75,17 @@ fs.writeFileSync(disallowed, JSON.stringify([{ path: untouchedPath, sha256: '1'.
 const rejected = spawnSync(process.execPath, [tool, '--root', root, '--manifest', 'config/remote-runner-files.json', '--updates', disallowed, '--apply', 'true'], { encoding: 'utf8' });
 assert.notEqual(rejected.status, 0, 'disallowed path must be rejected');
 
-console.log(JSON.stringify({ ok: true, tested: ['dry_run_no_write', 'exact_apply', 'unlisted_entry_unchanged', 'disallowed_path_rejected'] }, null, 2));
+const newAllowedPath = 'scripts\\lib\\daily-candidate-quality.mjs';
+const newAllowedAbsolute = path.join(root, ...newAllowedPath.split('\\'));
+fs.mkdirSync(path.dirname(newAllowedAbsolute), { recursive: true });
+fs.writeFileSync(newAllowedAbsolute, 'new-allowed-dependency', 'utf8');
+fs.writeFileSync(updatesPath, JSON.stringify([{
+  path: newAllowedPath,
+  sha256: crypto.createHash('sha256').update('new-allowed-dependency').digest('hex').toUpperCase()
+}]));
+const appended = run(true);
+assert.equal(appended.status, 0, appended.stderr);
+const appendedManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+assert.equal(appendedManifest.files.at(-1).path, newAllowedPath);
+
+console.log(JSON.stringify({ ok: true, tested: ['dry_run_no_write', 'exact_apply', 'unlisted_entry_unchanged', 'disallowed_path_rejected', 'allowed_dependency_append'] }, null, 2));

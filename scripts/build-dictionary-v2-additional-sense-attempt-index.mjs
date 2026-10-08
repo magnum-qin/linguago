@@ -7,6 +7,11 @@ const args = parseArgs(process.argv.slice(2));
 const root = path.resolve(args.root || '.');
 const runsRoot = path.resolve(root, args['runs-root'] || 'runs');
 const outPath = path.resolve(root, args.out || 'state/additional-sense-attempt-index.json');
+const historyPaths = String(args.history || '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map((value) => path.resolve(root, value));
 const attempts = new Map();
 let reportsRead = 0;
 
@@ -41,6 +46,16 @@ if (fs.existsSync(runsRoot)) {
   }
 }
 
+for (const historyPath of historyPaths) {
+  try {
+    const report = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+    reportsRead += 1;
+    recordRows(report.selected || report.candidates || report.items || report.results || report.reviews);
+  } catch (error) {
+    throw new Error(`Unable to read attempt history ${historyPath}: ${error.message}`);
+  }
+}
+
 function recordRows(rows = []) {
   for (const row of rows) {
     const sourceEntryId = Number(row?.source_entry_id);
@@ -61,7 +76,8 @@ const output = {
   generated_at: new Date().toISOString(),
   policy: {
     records_every_locked_daily_primary_sense: true,
-    failed_and_successful_runs_are_both_attempts: true
+    failed_and_successful_runs_are_both_attempts: true,
+    explicit_history_reports_are_attempts: true
   },
   summary: { reports_read: reportsRead, attempted_source_senses: selected.length },
   selected

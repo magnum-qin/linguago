@@ -6,6 +6,8 @@ param(
   [string]$CandidateMode = 'native-daily',
   [string]$Pool = 'data\candidates\v123-authoritative-pool.json',
   [string]$History = 'data\candidates\v123-attempted-source-history.json',
+  [string]$ResidualHistory = 'state\dictionary-final-review-residuals.json',
+  [string]$ExactSenseHistory = '',
   [int]$NativeMaxRank = 2000000,
   [int]$NativeScanLimit = 2000000,
   [string]$NativeTargets = 'zh=30000,ja=10000,pt-BR=5000,en=5000',
@@ -14,7 +16,7 @@ param(
   [ValidateRange(1, 100)]
   [int]$AdditionalSenseMaxEntryAttempts = 3,
   [bool]$ExcludePreviouslyAttemptedSourceEntries = $true,
-  [switch]$IncludeCompletedRunBatches = $true,
+  [bool]$IncludeCompletedRunBatches = $true,
   [switch]$SkipVerify
 )
 
@@ -81,6 +83,7 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $OutPath) -Force | Out-Nu
 
 $ExcludePaths = [Collections.Generic.List[string]]::new()
 $ExcludePaths.Add($HistoryPath)
+$CompletedRunBatchPaths = [Collections.Generic.List[string]]::new()
 if ($IncludeCompletedRunBatches) {
   $RunsRoot = Join-Path $Root 'runs'
   if (Test-Path -LiteralPath $RunsRoot) {
@@ -91,7 +94,10 @@ if ($IncludeCompletedRunBatches) {
         if ([string]::IsNullOrWhiteSpace([string]$Manifest.input)) { continue }
         $CompletedBatchPath = [IO.Path]::GetFullPath((Join-Path $Root ([string]$Manifest.input)))
         if (-not $CompletedBatchPath.StartsWith($BatchRoot, [StringComparison]::OrdinalIgnoreCase)) { continue }
-        if (Test-Path -LiteralPath $CompletedBatchPath) { $ExcludePaths.Add($CompletedBatchPath) }
+        if (Test-Path -LiteralPath $CompletedBatchPath) {
+          $ExcludePaths.Add($CompletedBatchPath)
+          $CompletedRunBatchPaths.Add($CompletedBatchPath)
+        }
       } catch {
         Write-Warning "Ignoring unreadable completed-run manifest: $($ManifestPath.FullName)"
       }
@@ -99,33 +105,62 @@ if ($IncludeCompletedRunBatches) {
   }
 }
 $ExcludePaths = @($ExcludePaths | Sort-Object -Unique)
+$CompletedRunBatchPaths = @($CompletedRunBatchPaths | Sort-Object -Unique)
 $ExcludeArgument = $ExcludePaths -join ','
 $NativeExclusionIndex = Join-Path $StateRoot 'native-daily-source-entry-exclusions.json'
 $NativeExclusionClassification = Join-Path $StateRoot 'native-daily-source-entry-exclusion-classification.json'
 $NativeBlockedExclusions = Join-Path $StateRoot 'native-daily-source-entry-blocked.json'
 
 if ($CandidateMode -eq 'native-daily') {
+  $HistoryInputs = @($History)
+  $ResolvedResidualHistory = Join-Path $Root $ResidualHistory
+  if (Test-Path -LiteralPath $ResolvedResidualHistory) { $HistoryInputs += $ResidualHistory }
   & node.exe (Join-Path $Root 'scripts\build-dictionary-v2-source-entry-exclusion-index.mjs') `
     --root $Root `
-    --history $History `
+    --history ($HistoryInputs -join ',') `
     --runs-root 'runs' `
     --batch-root 'batches' `
     --out $NativeExclusionIndex
   if ($LASTEXITCODE -ne 0) { throw "Native exclusion index build failed with exit code $LASTEXITCODE" }
-  & node.exe (Join-Path $Root 'scripts\build-dictionary-v2-additional-sense-attempt-index.mjs') `
-    --root $Root --runs-root 'runs' --out 'state\additional-sense-attempt-index.json'
+  $AttemptIndexArgs = @(
+    (Join-Path $Root 'scripts\build-dictionary-v2-additional-sense-attempt-index.mjs'),
+    '--root', $Root,
+    '--runs-root', 'runs',
+    '--out', 'state\additional-sense-attempt-index.json'
+  )
+  if (Test-Path -LiteralPath $ResolvedResidualHistory) {
+    $AttemptHistories = @($ResidualHistory)
+  } else {
+    $AttemptHistories = @()
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ExactSenseHistory)) {
+    $AttemptHistories += @($ExactSenseHistory.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  }
+  if ($AttemptHistories.Count -gt 0) {
+    $AttemptIndexArgs += @('--history', ($AttemptHistories -join ','))
+  }
+  & node.exe @AttemptIndexArgs
   if ($LASTEXITCODE -ne 0) { throw 'Native exact-sense attempt index build failed' }
-  & node.exe (Join-Path $Root 'scripts\classify-dictionary-v2-native-daily-exclusions.mjs') `
-    --source-db (Join-Path $Root 'data\processed\linguago_v2_full.db') `
-    --product-db $ProductDb `
-    --exclusions $NativeExclusionIndex `
-    --attempt-index (Join-Path $StateRoot 'additional-sense-attempt-index.json') `
-    --out $NativeExclusionClassification `
-    --blocked-out $NativeBlockedExclusions
-  if ($LASTEXITCODE -ne 0) { throw "Native exclusion classification failed with exit code $LASTEXITCODE" }
+  $PreviousErrorActionPreference = $ErrorActionPreference
+  try {
+    # Node reports scan progress on stderr; do not promote those progress lines
+    # to terminating PowerShell errors. The process exit code remains the gate.
+    $ErrorActionPreference = 'Continue'
+    & node.exe (Join-Path $Root 'scripts\classify-dictionary-v2-native-daily-exclusions.mjs') `
+      --source-db (Join-Path $Root 'data\processed\linguago_v2_full.db') `
+      --product-db $ProductDb `
+      --exclusions $NativeExclusionIndex `
+      --attempt-index (Join-Path $StateRoot 'additional-sense-attempt-index.json') `
+      --out $NativeExclusionClassification `
+      --blocked-out $NativeBlockedExclusions
+    $ClassificationExitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $PreviousErrorActionPreference
+  }
+  if ($ClassificationExitCode -ne 0) { throw "Native exclusion classification failed with exit code $ClassificationExitCode" }
   # The compact index preserves every attempted source entry without exceeding
   # the Windows command-line limit with dozens of historical report paths.
-  $ExcludeArgument = $NativeBlockedExclusions
+  $ExcludeArgument = @($NativeBlockedExclusions; $CompletedRunBatchPaths) -join ','
 }
 
 if ($CandidateMode -eq 'additional-sense') {
@@ -184,7 +219,9 @@ if ($CandidateMode -eq 'additional-sense') {
     --rejected-out $TrustedRejectedPath `
     --enabled true `
     --require-authoritative-source-sense true `
-    --allow-english-omw-source false
+    --allow-english-omw-source false `
+    --allow-pt-br-omw-source true `
+    --allow-pt-br-wikdict-source true
   if ($LASTEXITCODE -ne 0) { throw "Additional-sense trust filter failed with exit code $LASTEXITCODE" }
   $PoolPath = $TrustedPoolPath
   # Entry-level history is intentionally not applied here. A represented entry
@@ -234,7 +271,9 @@ if ($CandidateMode -eq 'native-daily') {
     --rejected-out $NativeTrustedRejectedPath `
     --enabled true `
     --require-authoritative-source-sense true `
-    --allow-english-omw-source false
+    --allow-english-omw-source false `
+    --allow-pt-br-omw-source true `
+    --allow-pt-br-wikdict-source true
   if ($LASTEXITCODE -ne 0) { throw "Native daily trust filter failed with exit code $LASTEXITCODE" }
   $PoolPath = $NativeTrustedPoolPath
 }

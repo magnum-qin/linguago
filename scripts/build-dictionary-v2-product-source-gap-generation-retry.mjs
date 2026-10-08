@@ -24,6 +24,12 @@ for (const generated of generation.generated || []) {
   selected.push({
     ...candidate,
     latest_errors: [...new Set(generated.errors || [])],
+    latest_ja_term: generated?.output?.localizations?.ja?.term || null,
+    latest_ja_reading: generated?.output?.localizations?.ja?.reading || null,
+    latest_zh_term: generated?.output?.localizations?.zh?.term || null,
+    latest_zh_reading: generated?.output?.localizations?.zh?.reading || null,
+    latest_en_term: generated?.output?.localizations?.en?.term || null,
+    latest_pt_term: generated?.output?.localizations?.['pt-BR']?.term || null,
     latest_generation_endpoint: generated.endpoint || null,
     generation_retry: {
       source_report: relative(generationPath),

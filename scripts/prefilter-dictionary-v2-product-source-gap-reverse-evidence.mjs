@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { hasBoundNativeSourceEvidence } from "./lib/bound-native-source-evidence.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -13,15 +14,15 @@ const DEFAULT_SUPPLEMENTAL_SOURCE_DB =
   ".tmp/combined/openwn-word2word3-ja-apertium-wikidata-v3-evidence.db";
 const DEFAULT_REPORT = "logs/product-coverage-gaps-clean-high-value.json";
 const STRONG_SOURCES = {
-  en: new Set(["ecdict"]),
-  "pt-BR": new Set(["freedict-por-eng", "wikdict-pt-en"]),
-  zh: new Set(["cc-cedict", "kaikki-zh", "wikdict-zh-en"]),
-  ja: new Set(["jmdict", "wikdict-ja-en", "kaikki-ja"])
+  en: new Set(["ecdict", "omw-30", "wordnet", "kaikki-en", "freedict-eng-por"]),
+  "pt-BR": new Set(["freedict-por-eng", "wikdict-pt-en", "omw-30", "kaikki-pt", "wikdict-pt-ja", "wikdict-pt-zh"]),
+  zh: new Set(["cc-cedict", "kaikki-zh", "wikdict-zh-en", "omw-30", "wikdict-zh-pt", "wikdict-zh-ja"]),
+  ja: new Set(["jmdict", "wikdict-ja-en", "kaikki-ja", "omw-30", "wikdict-ja-pt", "wikdict-ja-zh"])
 };
 const FORWARD_SOURCES = {
-  "pt-BR": new Set(["freedict-eng-por", "wikdict-en-pt"]),
-  zh: new Set(["wikdict-en-zh"]),
-  ja: new Set(["wikdict-en-ja"])
+  "pt-BR": new Set(["freedict-eng-por", "wikdict-en-pt", "omw-30"]),
+  zh: new Set(["wikdict-en-zh", "omw-30"]),
+  ja: new Set(["wikdict-en-ja", "omw-30", "freedict-eng-por"])
 };
 const STOPWORDS = new Set([
   "a", "an", "and", "as", "at", "be", "by", "for", "from", "in", "into", "is", "of", "on", "or",
@@ -108,6 +109,8 @@ const excludeAmbiguousOmw = args["exclude-ambiguous-omw"] !== "false";
 const lockHintsToUniqueWikidataConcept =
   args["lock-hints-to-unique-wikidata-concept"] === "true";
 const requireSourceIdentity = args["require-source-identity"] !== "false";
+const allowBoundNativeSourceEvidence =
+  args["allow-bound-native-source-evidence"] === "true";
 
 for (const filePath of [
   sourceDbPath,
@@ -316,7 +319,8 @@ const summary = {
   exclude_capitalized_anchor: excludeCapitalizedAnchor,
   exclude_ambiguous_omw: excludeAmbiguousOmw,
   lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept,
-  require_source_identity: requireSourceIdentity
+  require_source_identity: requireSourceIdentity,
+  allow_bound_native_source_evidence: allowBoundNativeSourceEvidence
 };
 const output = {
   ...report,
@@ -361,7 +365,8 @@ const evidenceOutput = {
     exclude_capitalized_anchor: excludeCapitalizedAnchor,
     exclude_ambiguous_omw: excludeAmbiguousOmw,
     lock_hints_to_unique_wikidata_concept: lockHintsToUniqueWikidataConcept,
-    require_source_identity: requireSourceIdentity
+    require_source_identity: requireSourceIdentity,
+    allow_bound_native_source_evidence: allowBoundNativeSourceEvidence
   },
   summary,
   validations
@@ -383,6 +388,7 @@ function validateCandidate(row) {
   if (!sourceTerm || !anchor || !STRONG_SOURCES[sourceLang]) {
     return result(row, "unsupported", !sourceTerm ? "missing_source_term" : "missing_english_anchor");
   }
+  let sourceIdentityMatches = false;
   if (requireSourceIdentity) {
     const sourceEntryId = Number(row.source_entry_id);
     const sourceSenseId = Number(row.first_sense_id ?? row.source_sense_id);
@@ -398,6 +404,7 @@ function validateCandidate(row) {
       entry.source_lang === sourceLang &&
       normalizeTerm(entry.normalized_key) === normalizeTerm(sourceTerm) &&
       Number(sense.entry_id) === sourceEntryId;
+    sourceIdentityMatches = Boolean(identityMatches);
     if (!identityMatches) {
       return result(row, "unsupported", "stale_source_identity_mismatch", null, {
         source_identity: {
@@ -466,11 +473,21 @@ function validateCandidate(row) {
     matchingSourceFamilies.size >= minSourceFamilies &&
     (glosses.size <= 2 || matchRatio >= minMatchRatio)
   ) {
+    const boundNativeSourceEvidence = hasBoundNativeSourceEvidence({
+      enabled: allowBoundNativeSourceEvidence,
+      sourceIdentityMatches,
+      nativeSourceFamily: row?.native_source_family,
+      matchingEvidence: matches,
+      evidenceFamilyFor: evidenceFamily
+    });
     const sourceRoundTrip = sourceLang === "en"
       ? true
-      : sourceTermRoundTrips(sourceLang, sourceTerm, anchor, boundCandidateKey);
+      : boundNativeSourceEvidence ||
+        sourceTermRoundTrips(sourceLang, sourceTerm, anchor, boundCandidateKey);
     if (!sourceRoundTrip) {
-      return result(row, "unsupported", "english_anchor_does_not_translate_back_to_source_term", details);
+      return result(row, "unsupported", "english_anchor_does_not_translate_back_to_source_term", details, {
+        bound_native_source_evidence: boundNativeSourceEvidence
+      });
     }
     const localizationRoundTrip = existingLocalizationsRoundTrip(row, anchor, boundCandidateKey);
     if (requireExistingLocalizationRoundtrip && !localizationRoundTrip.passed) {
@@ -533,6 +550,7 @@ function validateCandidate(row) {
     return result(row, "supported", "strong_reverse_dictionary_evidence", details, {
       generation_hints: generationHints,
       wikidata_hint_lock: wikidataHintLock.audit,
+      bound_native_source_evidence: boundNativeSourceEvidence,
       target_coverage_count: targetCoverageCount,
       omw_target_coverage_count: omwTargetCoverageCount
     });

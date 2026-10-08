@@ -300,6 +300,16 @@ async function importKaikkiLanguage({ limit, sourceKey, sourceName, sourceUrl, f
 }
 
 async function importCcCedict({ limit }) {
+  const legacy = db.prepare(`
+    SELECT e.id FROM source_entries e
+    JOIN dictionary_sources s ON s.id = e.source_id
+    WHERE s.source_key = 'cc-cedict'
+      AND e.source_entry_key NOT LIKE 'cedict-v2:%'
+    LIMIT 1
+  `).get();
+  if (legacy) {
+    throw new Error('Legacy CC-CEDICT identities omit readings; import into a fresh staging DB, not over existing source links');
+  }
   const sourceId = ensureSource({
     source_key: 'cc-cedict',
     source_name: 'CC-CEDICT',
@@ -317,7 +327,10 @@ async function importCcCedict({ limit }) {
     crlfDelay: Infinity
   });
   const insertOne = db.transaction((parsed) => {
-    const sourceEntryKey = `${parsed.traditional}|${parsed.simplified}`;
+    // Homographs with different readings must not collide under INSERT OR IGNORE.
+    const sourceEntryKey = `cedict-v2:${JSON.stringify([
+      parsed.traditional, parsed.simplified, parsed.pinyin.trim().replace(/\s+/gu, ' ')
+    ])}`;
     insertSourceEntry({
       source_id: sourceId,
       source_entry_key: sourceEntryKey,

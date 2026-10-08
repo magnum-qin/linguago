@@ -2,6 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { bindSourceReviews, isAcceptedSourceReview } from './lib/source-consensus-binding.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const primaryPath = requiredPath(args.primary, 'primary');
@@ -11,9 +12,8 @@ const primary = readJson(primaryPath);
 const reviewer = readJson(reviewerPath);
 const selectedSource = args.selected ? readJson(requiredPath(args.selected, 'selected')) : primary;
 const requireTermAgreement = args['require-term-agreement'] !== 'false';
-const primaryReviews = new Map((primary.reviews || []).map((row) => [key(row), row]));
-const reviewerReviews = new Map((reviewer.reviews || []).map((row) => [key(row), row]));
-const selectedByKey = new Map((selectedSource.selected || []).map((row) => [key(row), row]));
+const { first: primaryReviews, second: reviewerReviews, candidates: selectedByKey } =
+  bindSourceReviews(selectedSource.selected || [], primary.reviews || [], reviewer.reviews || []);
 const agreed = [];
 const disagreements = [];
 
@@ -22,8 +22,8 @@ for (const [candidateKey, primaryReview] of primaryReviews) {
   if (!independentReview) continue;
   const termMismatches = preferredTermMismatches(primaryReview, independentReview);
   const accepted =
-    primaryReview.approved === true &&
-    independentReview.approved === true &&
+    isAcceptedSourceReview(primaryReview) &&
+    isAcceptedSourceReview(independentReview) &&
     (!requireTermAgreement || termMismatches.length === 0);
   const record = {
     source_entry_id: Number(primaryReview.source_entry_id),

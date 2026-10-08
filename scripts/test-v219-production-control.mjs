@@ -20,11 +20,26 @@ exit 0
 // The production scripts must never be invoked for an empty candidate pool.
 fs.writeFileSync(path.join(root, 'scripts/manage-remote-dictionary-runner.ps1'), "throw 'GPU_MUST_NOT_START'");
 const orchestrator = path.resolve('scripts/run-remote-dictionary-production-until-release.ps1');
+const targetDefault = (file) => fs.readFileSync(file, 'utf8').match(/\$NativeTargets = '([^']+)'/)[1];
+assert.equal(targetDefault(orchestrator), targetDefault(path.resolve('scripts/new-remote-dictionary-production-batch.ps1')));
 const run = () => spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', orchestrator, '-Root', root, '-CandidateMode', 'native-daily', '-BatchLimit', '100', '-MaxBatches', '1', '-PollSeconds', '2'], { encoding: 'utf8', timeout: 30000 });
 let result = run();
 assert.equal(result.status, 0, result.stdout + result.stderr);
 let state = JSON.parse(fs.readFileSync(path.join(root, 'state/release-cohort-production.json'), 'utf8'));
 assert.equal(state.status, 'candidate_exhausted');
+assert.equal(state.gpu_started, false);
+assert.equal(state.batches_started, 0);
+fs.writeFileSync(batchScript, `param($Root,$Limit,$Out,$CandidateMode,$NativeMaxRank,$NativeScanLimit,$NativeTargets)
+[IO.File]::WriteAllText((Join-Path $Root $Out), '{"selected_count":81,"selected":[]}', (New-Object Text.UTF8Encoding($false)))
+exit 0
+`);
+result = run();
+assert.equal(result.status, 0, result.stdout + result.stderr);
+state = JSON.parse(fs.readFileSync(path.join(root, 'state/release-cohort-production.json'), 'utf8'));
+assert.equal(state.status, 'candidate_shortfall');
+assert.equal(state.requested, 100);
+assert.equal(state.selected, 81);
+assert.equal(state.validation_batch_complete, false);
 assert.equal(state.gpu_started, false);
 assert.equal(state.batches_started, 0);
 fs.writeFileSync(batchScript, "Write-Error 'failure with quote: \" and newline'; exit 7");
@@ -54,4 +69,15 @@ const customQuota = quotaCheck('zh=50,ja=50');
 assert.equal(customQuota.status, 0, customQuota.stdout + customQuota.stderr);
 assert.equal(JSON.parse(customQuota.stdout).HeadwordLanguageQuotas, 'zh=50,ja=50,pt-BR=0,en=0');
 for (const quotas of ['zh=50,zh=50', 'zh=50,ja=49', 'zh=-1,ja=101', 'fr=100']) assert.notEqual(quotaCheck(quotas).status, 0);
-console.log(JSON.stringify({ ok: true, tests: ['empty_pool_exit_zero', 'no_gpu_on_empty', 'child_exit_code', 'failure_json_parseable', 'validation_shortfall_normal_not_passed', 'validation_empty_normal_not_passed'] }));
+const heldRun = path.join(root, 'runs/held-test');
+fs.mkdirSync(heldRun, { recursive: true });
+fs.writeFileSync(path.join(heldRun, 'manifest.json'), JSON.stringify({ status: 'complete' }));
+fs.writeFileSync(path.join(heldRun, 'summary.json'), JSON.stringify({ summary: { final_accepted: 19 } }));
+fs.writeFileSync(path.join(root, 'state/daily-production-quality-hold.json'), JSON.stringify({ status: 'candidate_quality_review_required' }));
+fs.writeFileSync(path.join(root, 'scripts/publish-remote-dictionary-controlled-run.ps1'), "throw 'PUBLISH_MUST_NOT_START'");
+const held = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('scripts/complete-remote-dictionary-production-run.ps1'), '-Root', root, '-RunId', 'held-test', '-ExpectedMainSha256', 'unused', '-PollSeconds', '1'], { encoding: 'utf8', timeout: 30000 });
+assert.notEqual(held.status, 0);
+const heldStatus = JSON.parse(fs.readFileSync(path.join(heldRun, 'production-supervisor.json'), 'utf8'));
+assert.match(heldStatus.details.error, /quality hold prevents commit/);
+assert.equal(fs.existsSync(path.join(heldRun, 'controlled-publish-supervisor.log')), false);
+console.log(JSON.stringify({ ok: true, tests: ['empty_pool_exit_zero', 'no_gpu_on_empty', 'shortfall_no_gpu', 'child_exit_code', 'failure_json_parseable', 'validation_shortfall_normal_not_passed', 'validation_empty_normal_not_passed', 'hold_prevents_publish'] }));

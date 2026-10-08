@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { buildAlternateReview } from './build-dictionary-alternate-sense-review.mjs';
+const alt = { id: 3, source: 'jmdict', gloss: 'third son' };
+const pool = { selected: [{ source_entry_id: 1, first_sense_id: 2, source_lang: 'ja', word: '三男', frequency_rank: 10, gloss_key: 'three sons', verified_translation_hints: { en: 'stale' }, daily_sense_selection: { alternatives: [alt] } }] };
+const triage = { rows: [{ key: '1:2', word: '三男', locked_gloss: 'three sons', alternatives: [alt] }] };
+const result = buildAlternateReview(pool, triage);
+assert.equal(result.selected_count, 1);
+assert.equal(result.selected[0].first_sense_id, 3);
+assert.equal(result.selected[0].verified_translation_hints, undefined);
+assert.deepEqual(result.selected[0].first_sense_localizations, []);
+assert.equal(result.automatic_publication, false);
+assert.throws(() => buildAlternateReview(pool, { rows: [{ ...triage.rows[0], alternatives: [{ ...alt, gloss: 'invented' }] }] }), /Invalid alternative/);
+// pt-BR alternates come from the conditionally-native Plan A families;
+// quarantined freedict alternates are never selected.
+const ptAlt = { id: 9, source: 'wikdict-pt-en', gloss: 'route' };
+const ptAltFreedict = { id: 10, source: 'freedict-por-eng', gloss: 'course' };
+const ptPool = { selected: [{ source_entry_id: 7, first_sense_id: 8, source_lang: 'pt-BR', word: 'percurso', frequency_rank: 11_406, gloss_key: 'walking', daily_sense_selection: { alternatives: [ptAlt, ptAltFreedict] } }] };
+const ptResult = buildAlternateReview(ptPool, { rows: [{ key: '7:8', word: 'percurso', locked_gloss: 'walking', alternatives: [ptAlt, ptAltFreedict] }] });
+assert.equal(ptResult.selected_count, 1);
+assert.equal(ptResult.selected[0].first_sense_id, 9);
+assert.equal(ptResult.selected[0].gloss_key, 'route');
+assert.ok(ptResult.selected[0].daily_sense_selection.alternatives.every((r) => r.source !== 'freedict-por-eng'));
+console.log('Alternate review tests passed');

@@ -2,6 +2,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 
 const LANGS = ['en', 'pt-BR', 'zh', 'ja']
 const KANA_RE = /[\u3040-\u30ff]/u
@@ -208,8 +209,13 @@ function hasLockedSourceSense(row) {
     authoritativeAdditionalSenseSource(row?.source_lang, selectedAlternative?.source) &&
     String(row?.candidate_key || '') === `${Number(row?.source_entry_id)}:${firstSenseId}`
   if (additionalSenseLocked) return true
+  const revisedSourceLocked =
+    selection?.policy === 'revised_unique_consensus_source_requires_full_rereview' &&
+    finalGateEnabled &&
+    selectedAlternative?.gloss === row.gloss_key &&
+    selectedAlternative?.linked_product_sense == null
   return (
-    selection?.policy === 'native_dictionary_then_daily_semantics' &&
+    (selection?.policy === 'native_dictionary_then_daily_semantics' || revisedSourceLocked) &&
     selection?.requires_independent_source_review === true &&
     Number.isInteger(firstSenseId) &&
     selectedAlternative?.blocked_reason == null &&
@@ -307,6 +313,12 @@ function loadFinalGate() {
   const generation = readJson(finalGenerationPath)
   const evidence = readJson(finalEvidencePath)
   const consensus = readJson(finalConsensusPath)
+  for (const [key, file] of [['generation', finalGenerationPath], ['evidence', finalEvidencePath]]) {
+    const hash = createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+    if (consensus.input_sha256?.[key] !== hash) {
+      throw new Error(`Final consensus has missing or mismatched ${key} fingerprint`)
+    }
+  }
   if (evidence?.policy?.require_source_reverse_evidence !== true) {
     throw new Error('Final evidence report does not require source reverse evidence')
   }

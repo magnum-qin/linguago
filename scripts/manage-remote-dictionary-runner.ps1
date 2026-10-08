@@ -8,6 +8,8 @@ param(
   [string]$SourceRunDir = '',
   [ValidateSet('legacy', 'simplified')]
   [string]$PipelineMode = 'simplified',
+  [ValidateSet('full', 'draft-production', 'release-validation')]
+  [string]$ExecutionMode = 'full',
   [object]$ProductionPrefilter = $true,
   [object]$RequireAuthoritativeSourceSense = $true,
   [object]$DailyPrimarySenseSelection = $false,
@@ -20,7 +22,7 @@ param(
   [object]$ReverseEvidencePrefilter = $false,
   [int]$ReverseEvidenceMinTargetLangs = 2,
   [int]$ReverseEvidencePrefilterLimit = 1000000,
-  [object]$EnforceGenerationHintTerms = $false,
+  [object]$EnforceGenerationHintTerms = $true,
   [object]$AllowModelDownload = $false,
   [string]$QwenEndpoints = 'http://127.0.0.1:11441,http://127.0.0.1:11442,http://127.0.0.1:11443,http://127.0.0.1:11444,http://127.0.0.1:11445,http://127.0.0.1:11446,http://127.0.0.1:11447,http://127.0.0.1:11448',
   [string]$QwenVariants = '11441=UD-Q4_K_XL,11442=UD-Q4_K_XL,11443=UD-Q4_K_XL,11444=UD-Q4_K_XL,11445=UD-Q4_K_XL,11446=UD-IQ4_NL,11447=UD-IQ4_NL,11448=UD-IQ4_NL',
@@ -66,6 +68,7 @@ $StartupPath = Join-Path $RunDir 'startup.json'
 $StateDir = Join-Path $Root 'state'
 $GlobalControllerPath = Join-Path $StateDir 'remote-pipeline-controller.json'
 $GlobalLockPath = Join-Path $StateDir 'remote-pipeline.lock.json'
+$TaskCredentialPath = Join-Path $StateDir 'secrets\dictionary-task-credential.dpapi'
 $ScheduledTaskName = 'Linguago Remote Dictionary Pipeline'
 
 function Read-JsonFile([string]$Path) {
@@ -203,6 +206,7 @@ $Arguments = @(
   '--run-id', $RunId,
   '--run-dir', $RunDir,
   '--pipeline-mode', $PipelineMode,
+  '--execution-mode', $ExecutionMode,
   '--production-prefilter', $ProductionPrefilter.ToString().ToLowerInvariant(),
   '--require-authoritative-source-sense', $RequireAuthoritativeSourceSense.ToString().ToLowerInvariant(),
   '--daily-primary-sense-selection', $DailyPrimarySenseSelection.ToString().ToLowerInvariant(),
@@ -296,6 +300,7 @@ $Launch = [ordered]@{
   SupplementalSourceDb = $SupplementalSourceDb
   SourceRunDir = $SourceRunDir
   PipelineMode = $PipelineMode
+  ExecutionMode = $ExecutionMode
   ProductionPrefilter = $ProductionPrefilter
   RequireAuthoritativeSourceSense = $RequireAuthoritativeSourceSense
   DailyPrimarySenseSelection = $DailyPrimarySenseSelection
@@ -335,19 +340,40 @@ try {
   $TaskArguments = "-NoProfile -ExecutionPolicy Bypass -File `"$TaskScript`" -Config `"$LaunchPath`""
   $TaskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $TaskArguments -WorkingDirectory $Root
   $TaskTrigger = New-ScheduledTaskTrigger -Once -At ([DateTime]::Now.AddDays(1))
-  # Use the signed-in user's interactive token. On this jump host, Node can be
-  # created under the default background token but remain before ESM startup,
-  # leaving a PID without ever writing manifest.json.
-  $TaskPrincipal = New-ScheduledTaskPrincipal `
-    -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) `
-    -LogonType Interactive `
-    -RunLevel Limited
-  Register-ScheduledTask `
-    -TaskName $ScheduledTaskName `
-    -Action $TaskAction `
-    -Trigger $TaskTrigger `
-    -Principal $TaskPrincipal `
-    -Force | Out-Null
+  $TaskUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+  if (Test-Path -LiteralPath $TaskCredentialPath) {
+    Add-Type -AssemblyName System.Security
+    $CipherBytes = [Convert]::FromBase64String([IO.File]::ReadAllText($TaskCredentialPath).Trim())
+    $PlainBytes = [Security.Cryptography.ProtectedData]::Unprotect(
+      $CipherBytes, $null, [Security.Cryptography.DataProtectionScope]::LocalMachine
+    )
+    try {
+      $Password = [Text.Encoding]::UTF8.GetString($PlainBytes)
+      Register-ScheduledTask `
+        -TaskName $ScheduledTaskName `
+        -Action $TaskAction `
+        -Trigger $TaskTrigger `
+        -User $TaskUser `
+        -Password $Password `
+        -RunLevel Limited `
+        -Force | Out-Null
+    } finally {
+      [Array]::Clear($PlainBytes, 0, $PlainBytes.Length)
+      [Array]::Clear($CipherBytes, 0, $CipherBytes.Length)
+      Remove-Variable Password -ErrorAction SilentlyContinue
+    }
+  } else {
+    $TaskPrincipal = New-ScheduledTaskPrincipal `
+      -UserId $TaskUser `
+      -LogonType Interactive `
+      -RunLevel Limited
+    Register-ScheduledTask `
+      -TaskName $ScheduledTaskName `
+      -Action $TaskAction `
+      -Trigger $TaskTrigger `
+      -Principal $TaskPrincipal `
+      -Force | Out-Null
+  }
   Start-ScheduledTask -TaskName $ScheduledTaskName
 } catch {
   Write-StartupState 'launch_failed' @{ error = [string]$_.Exception.Message }

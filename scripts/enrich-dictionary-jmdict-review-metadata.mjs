@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
+import { XMLParser } from 'fast-xml-parser';
+import { indexJmdictMetadata, matchJmdictMetadata } from './lib/jmdict-review-metadata.mjs';
+const [input, raw, output] = process.argv.slice(2);
+if (!output) throw new Error('Usage: enrich-dictionary-jmdict-review-metadata.mjs input.json JMdict_e.gz output.json');
+const bytes = fs.readFileSync(raw);
+const parsed = new XMLParser({ ignoreAttributes: false, processEntities: false, parseTagValue: false }).parse(zlib.gunzipSync(bytes).toString('utf8'));
+const index = indexJmdictMetadata(parsed.JMdict.entry);
+const report = JSON.parse(fs.readFileSync(input, 'utf8'));
+const counts = {};
+const selected = report.selected.map((row) => {
+  if (row.source_lang !== 'ja') return row;
+  const metadata = matchJmdictMetadata(index, row);
+  counts[metadata.status] = (counts[metadata.status] || 0) + 1;
+  return { ...row, native_review_metadata: metadata };
+});
+fs.writeFileSync(output, JSON.stringify({ ...report, selected, metadata_enrichment: { source: raw, sha256: crypto.createHash('sha256').update(bytes).digest('hex'), counts, changes_locked_senses: false } }, null, 2) + '\n');
+console.log(JSON.stringify(counts));

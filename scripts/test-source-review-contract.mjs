@@ -2,8 +2,14 @@ import assert from 'node:assert/strict';
 import {
   definitionContractLanguageLooksRight,
   validateDefinitionContract,
-  validateSourceReviewEnvelope
+  validateSourceReviewEnvelope,
+  sourceReviewSystemPrompt
 } from './lib/source-review-contract.mjs';
+
+assert.match(sourceReviewSystemPrompt(), /Judge only whether the proposed sense is real/);
+assert.match(sourceReviewSystemPrompt(true), /Judge both exact source-language meaning and modern everyday sense priority/);
+assert.doesNotMatch(sourceReviewSystemPrompt(true), /Judge only whether/);
+assert.match(sourceReviewSystemPrompt(true), /manual_review/);
 
 const terms = {
   en: 'physiological',

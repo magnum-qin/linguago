@@ -5,6 +5,15 @@ export function normalizeJapaneseKanaReading(value) {
     .replace(/[ァ-ヶ]/gu, (character) => String.fromCodePoint(character.codePointAt(0) - 0x60));
 }
 
+export function isValidJapaneseKanaReading(value) {
+  const reading = normalizeJapaneseKanaReading(value);
+  return Boolean(reading) && !reading.includes('\uFFFD') && /^[\p{Script=Hiragana}ー]+$/u.test(reading);
+}
+
+export function filterValidJapaneseKanaReadings(readings) {
+  return new Set([...(readings || [])].filter(isValidJapaneseKanaReading));
+}
+
 export function selectCanonicalJapaneseReading(currentReading, expectedReadings) {
   const readings = [...(expectedReadings || [])].filter(Boolean);
   if (!readings.length) return null;
@@ -130,17 +139,20 @@ const JAPANESE_TENS_READINGS = new Map([
 // narrow: only canonical kanji integers from 1 through 99 are accepted.
 export function compositionalJapaneseNumberReadings(term) {
   const value = String(term || '').trim();
-  const single = JAPANESE_DIGIT_READINGS.get(value);
-  if (single) return new Set(single);
+  const ordinal = value.startsWith('第');
+  const number = ordinal ? value.slice(1) : value;
+  const prefix = ordinal ? 'だい' : '';
+  const single = JAPANESE_DIGIT_READINGS.get(number);
+  if (single) return new Set(single.map((reading) => `${prefix}${reading}`));
 
-  const match = value.match(/^([二三四五六七八九]?)十([一二三四五六七八九]?)$/u);
+  const match = number.match(/^([二三四五六七八九]?)十([一二三四五六七八九]?)$/u);
   if (!match) return null;
   const tens = match[1] ? JAPANESE_TENS_READINGS.get(match[1]) : [''];
   const ones = match[2] ? JAPANESE_DIGIT_READINGS.get(match[2]) : [''];
   if (!tens?.length || !ones?.length) return null;
   return new Set(
     tens.flatMap((tensReading) =>
-      ones.map((onesReading) => `${tensReading}じゅう${onesReading}`)
+      ones.map((onesReading) => `${prefix}${tensReading}じゅう${onesReading}`)
     )
   );
 }

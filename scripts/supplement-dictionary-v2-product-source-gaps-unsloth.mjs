@@ -8,10 +8,13 @@ import { performance } from 'node:perf_hooks';
 import { pinyin } from 'pinyin-pro';
 import * as OpenCC from 'opencc-js';
 import { definitionContractLanguageLooksRight } from './lib/source-review-contract.mjs';
+import { assertProposalWriteMode } from './lib/source-consensus-binding.mjs';
+import { compactRetryFeedback } from './lib/dictionary-generation-retry-feedback.mjs';
 import {
   compositionalJapanesePhraseReadings,
   compositionalJapaneseNumberReadings,
   normalizeJapaneseKanaReading,
+  filterValidJapaneseKanaReadings,
   selectCanonicalJapaneseReading,
   transparentJapaneseCompoundReadings
 } from './lib/japanese-reading-contract.mjs';
@@ -139,6 +142,7 @@ const requireEvidenceVerdict = args['require-evidence-verdict'] === 'true';
 const replayReportPath = args['replay-report'] ? path.resolve(args['replay-report']) : null;
 const replayInvalidOutputs = args['replay-invalid-outputs'] === 'true';
 const controlledConsensusDraftWrite = args['controlled-consensus-draft-write'] === 'true';
+const allowNoPromoteDraftWrites = args['allow-no-promote-draft-writes'] === 'true';
 const replayReportStats = replayReportPath && fs.existsSync(replayReportPath)
   ? JSON.parse(fs.readFileSync(replayReportPath, 'utf8'))?.stats || null
   : null;
@@ -199,6 +203,9 @@ if (controlledConsensusDraftWrite && !replayReportPath) {
 if (controlledConsensusDraftWrite && publishable) {
   throw new Error('--controlled-consensus-draft-write cannot be combined with --publishable true');
 }
+if (allowNoPromoteDraftWrites && (!apply || publishable)) {
+  throw new Error('--allow-no-promote-draft-writes requires --apply true and --publishable false');
+}
 if (!endpoints.length) throw new Error('No endpoints configured');
 if (!Number.isInteger(limit) || limit < 1) throw new Error(`Invalid --limit: ${args.limit}`);
 if (!Number.isInteger(concurrency) || concurrency < 1) throw new Error(`Invalid --concurrency: ${args.concurrency}`);
@@ -242,6 +249,7 @@ if (!Number.isInteger(postLoadWaitMs) || postLoadWaitMs < 0 || postLoadWaitMs > 
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const allRows = report.selected || report.residuals || [];
+assertProposalWriteMode(allRows, { apply, publishable });
 const noPromoteSourceEntryIds = new Set(
   allRows
     .filter((row) => row?.promote_allowed === false)
@@ -530,6 +538,7 @@ const stats = {
   applied_entry_status: appliedEntryStatus,
   applied_sense_status: appliedSenseStatus,
   applied_localization_needs_review: appliedLocalizationNeedsReview,
+  allow_no_promote_draft_writes: allowNoPromoteDraftWrites,
   log_generated: logGenerated,
   selected: selected.length,
   checkpoint_completed: checkpointCompleted.size,
@@ -579,7 +588,11 @@ for (let chunkIndex = 0; chunkIndex < generationChunks.length; chunkIndex++) {
   const chunkGenerated = pool.results;
   const chunkAcceptedItems = chunkGenerated.filter((item) => item.valid);
   const chunkAccepted = chunkAcceptedItems
-    .filter((item) => !noPromoteSourceEntryIds.has(String(item.source_entry_id)))
+    .filter(
+      (item) =>
+        allowNoPromoteDraftWrites ||
+        !noPromoteSourceEntryIds.has(String(item.source_entry_id))
+    )
     .map((item) => item.output);
   const chunkNoPromoteAccepted = chunkAcceptedItems.filter((item) =>
     noPromoteSourceEntryIds.has(String(item.source_entry_id))
@@ -590,7 +603,7 @@ for (let chunkIndex = 0; chunkIndex < generationChunks.length; chunkIndex++) {
   stats.generated += chunkGenerated.length;
   stats.accepted += chunkAcceptedItems.length;
   stats.no_promote_accepted += chunkNoPromoteAccepted.length;
-  stats.no_promote_writes_skipped += chunkNoPromoteAccepted.length;
+  stats.no_promote_writes_skipped += allowNoPromoteDraftWrites ? 0 : chunkNoPromoteAccepted.length;
   stats.rejected += chunkGenerated.length - chunkAcceptedItems.length;
   stats.evidence_rejected += chunkGenerated.filter((item) => item.errors.includes('source_evidence_mismatch')).length;
   stats.infrastructure_rejected += chunkGenerated.filter((item) => item.infrastructure_failure).length;
@@ -647,7 +660,10 @@ function replayGeneratedReport() {
     if ((!item?.valid && !replayInvalidOutputs) || !item?.output) continue;
     const row = rowsByCandidateKey.get(replayCandidateKey(item));
     if (!row) continue;
-    const output = normalizeGeneratedOutput(row, item.output);
+    // Final consensus covers these exact bytes, not a newly normalized translation.
+    const output = controlledConsensusDraftWrite
+      ? structuredClone(item.output)
+      : normalizeGeneratedOutput(row, item.output);
     const errors = validateOutput(row, output).errors;
     if (item.quality_review && item.quality_review.approved !== true) errors.push('replay_quality_review_not_approved');
     replayed.push({
@@ -663,6 +679,7 @@ function replayGeneratedReport() {
   const accepted = validItems
     .filter(
       (item) =>
+        allowNoPromoteDraftWrites ||
         !noPromoteSourceEntryIds.has(String(item.source_entry_id)) ||
         controlledDraftIds.has(String(item.source_entry_id))
     )
@@ -670,6 +687,7 @@ function replayGeneratedReport() {
   const noPromoteWritesSkipped = validItems.filter(
     (item) =>
       noPromoteSourceEntryIds.has(String(item.source_entry_id)) &&
+      !allowNoPromoteDraftWrites &&
       !controlledDraftIds.has(String(item.source_entry_id))
   ).length;
   const replayStats = {
@@ -686,6 +704,7 @@ function replayGeneratedReport() {
     accepted: accepted.length,
     rejected: replayed.length - accepted.length,
     controlled_consensus_draft_write: controlledConsensusDraftWrite,
+    allow_no_promote_draft_writes: allowNoPromoteDraftWrites,
     controlled_consensus_draft_write_count: controlledDraftIds.size,
     no_promote_writes_skipped: noPromoteWritesSkipped,
     entries_inserted: 0,
@@ -2051,7 +2070,8 @@ function buildCompactPrompt(row) {
     'gloss_key must be concise: use one meaning label or at most 2 close synonyms, not a long semicolon-separated synonym list.',
     'Use Simplified Chinese for zh. zh.reading must be pinyin with tone marks or tone numbers, not hanzi.',
     'Use kana for ja reading. ja.reading must contain Japanese kana, not romaji.',
-    'Use IPA for en and pt-BR.'
+    'Use IPA for en and pt-BR.',
+    ...compactRetryFeedback(row, gloss)
   ];
   if (requireExamples) {
     lines.push(
@@ -2101,6 +2121,7 @@ function buildCompactBatchPrompt(rows) {
     const retryErrors = Array.isArray(row.latest_errors) && row.latest_errors.length
       ? row.latest_errors.join(',')
       : '';
+    const retryFeedback = compactRetryFeedback(row, gloss).join(' ');
     const expectedJaReadings = Array.isArray(row.latest_ja_expected_readings)
       ? row.latest_ja_expected_readings.join('|')
       : '';
@@ -2114,6 +2135,7 @@ function buildCompactBatchPrompt(rows) {
       (suggestedTerms ? `; semantic_term_suggestions=${suggestedTerms}` : '') +
       (japaneseContract ? `; required_ja_contract=${japaneseContract}` : '') +
       (retryErrors ? `; previous_validation_errors=${retryErrors}` : '') +
+      (retryFeedback ? `; retry_feedback=${retryFeedback}` : '') +
       (expectedJaReadings ? `; required_ja_reading=${expectedJaReadings}` : '') +
       (expectedZhReadings ? `; required_zh_reading=${expectedZhReadings}` : '')
     );
@@ -2764,7 +2786,7 @@ function expectedJapaneseReadings(term) {
 }
 
 function lookupJapaneseReadings(term) {
-  const direct = getJmdictReadingMap().get(term);
+  const direct = filterValidJapaneseKanaReadings(getJmdictReadingMap().get(term));
   if (direct?.size) return direct;
   const numberReadings = compositionalJapaneseNumberReadings(term);
   if (numberReadings?.size) return numberReadings;
@@ -2777,17 +2799,17 @@ function lookupJapaneseReadings(term) {
   if (compositionalReadings?.size) return compositionalReadings;
   const transparentCompoundReadings = transparentJapaneseCompoundReadings(
     term,
-    (prefix) => getJmdictReadingMap().get(prefix)
+    (prefix) => filterValidJapaneseKanaReadings(getJmdictReadingMap().get(prefix))
   );
   if (transparentCompoundReadings?.size) return transparentCompoundReadings;
   const phraseReadings = compositionalJapanesePhraseReadings(
     term,
-    (segment) => getJmdictReadingMap().get(segment)
+    (segment) => filterValidJapaneseKanaReadings(getJmdictReadingMap().get(segment))
   );
   if (phraseReadings?.size) return phraseReadings;
   for (const [suffix, suffixReading] of JMDICT_COMPOSITIONAL_SUFFIX_READINGS) {
     if (!term.endsWith(suffix) || term.length <= suffix.length) continue;
-    const baseReadings = getJmdictReadingMap().get(term.slice(0, -suffix.length));
+    const baseReadings = filterValidJapaneseKanaReadings(getJmdictReadingMap().get(term.slice(0, -suffix.length)));
     if (baseReadings?.size) {
       return new Set([...baseReadings].map((reading) => `${reading}${suffixReading}`));
     }
@@ -2796,7 +2818,7 @@ function lookupJapaneseReadings(term) {
   for (const suffix of suffixes) {
     if (!term.endsWith(suffix) || term.length <= suffix.length) continue;
     const base = term.slice(0, -suffix.length);
-    const baseReadings = getJmdictReadingMap().get(base);
+    const baseReadings = filterValidJapaneseKanaReadings(getJmdictReadingMap().get(base));
     if (baseReadings?.size) {
       return new Set([...baseReadings].map((reading) => `${reading}${normalizeJapaneseReading(suffix)}`));
     }
@@ -3609,6 +3631,7 @@ function buildCheckpointConfig() {
     publishable,
     apply,
     dry_run: dryRun,
+    allow_no_promote_draft_writes: allowNoPromoteDraftWrites,
     chunk_size: chunkSize,
     force_reload: forceReload,
     circuit_breaker_reset_ms: circuitBreakerResetMs,

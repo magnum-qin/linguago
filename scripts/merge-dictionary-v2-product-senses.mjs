@@ -102,6 +102,12 @@ const statements = {
   updateSplitPlanSense: db.prepare(`
     UPDATE product_fusion_split_plans SET product_sense_id = ?, updated_at = CURRENT_TIMESTAMP WHERE product_sense_id = ?
   `),
+  deleteVerification: db.prepare(`DELETE FROM product_sense_verification WHERE product_sense_id = ?`),
+  hasVerification: db.prepare(`SELECT 1 FROM product_sense_verification WHERE product_sense_id = ?`),
+  moveVerification: db.prepare(`UPDATE product_sense_verification SET product_sense_id = ? WHERE product_sense_id = ?`),
+  deleteBlock: db.prepare(`DELETE FROM product_sense_publication_blocks WHERE product_sense_id = ?`),
+  hasBlock: db.prepare(`SELECT 1 FROM product_sense_publication_blocks WHERE product_sense_id = ?`),
+  moveBlock: db.prepare(`UPDATE product_sense_publication_blocks SET product_sense_id = ? WHERE product_sense_id = ?`),
   deleteSense: db.prepare(`
     DELETE FROM product_senses WHERE id = ?
   `),
@@ -226,10 +232,21 @@ function enrichSenses(senses) {
       localizations,
       normalized_gloss: normalizeGloss(sense.gloss_key),
       term_signature: buildTermSignature(localizations),
+      definition_signature: buildDefinitionSignature(localizations),
       source_words: new Set(links.map((link) => `${link.source_lang}:${normalizeWord(link.source_word)}`)),
       source_sense_ids: new Set(links.map((link) => link.source_sense_id))
     };
   });
+}
+
+function buildDefinitionSignature(localizations) {
+  const parts = [];
+  for (const loc of localizations) {
+    if (loc.definition && loc.definition.trim()) {
+      parts.push(`${loc.lang}:${loc.definition.trim().toLowerCase()}`);
+    }
+  }
+  return parts.sort().join('|');
 }
 
 function findRuleDuplicatePairs(senses) {
@@ -254,6 +271,9 @@ function duplicateReason(a, b) {
   if (a.normalized_gloss && a.normalized_gloss === b.normalized_gloss) return 'same_gloss';
   if (a.term_signature && a.term_signature === b.term_signature && hasSetOverlap(a.source_words, b.source_words)) {
     return 'same_terms_with_source_overlap';
+  }
+  if (a.definition_signature && a.definition_signature === b.definition_signature && a.definition_signature.length > 10) {
+    return 'same_definitions';
   }
   return '';
 }
@@ -307,6 +327,24 @@ function mergeSensePair({ keeper, loser, reason }) {
     } else {
       statements.moveJob.run(keeper.id, job.id);
       stats.jobs_moved++;
+    }
+  }
+
+  // Handle product_sense_verification
+  if (statements.hasVerification.get(loser.id)) {
+    if (statements.hasVerification.get(keeper.id)) {
+      statements.deleteVerification.run(loser.id);
+    } else {
+      statements.moveVerification.run(keeper.id, loser.id);
+    }
+  }
+
+  // Handle product_sense_publication_blocks
+  if (statements.hasBlock.get(loser.id)) {
+    if (statements.hasBlock.get(keeper.id)) {
+      statements.deleteBlock.run(loser.id);
+    } else {
+      statements.moveBlock.run(keeper.id, loser.id);
     }
   }
 

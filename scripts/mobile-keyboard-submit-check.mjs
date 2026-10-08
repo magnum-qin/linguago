@@ -44,8 +44,28 @@ async function checkContext(options) {
     };
   });
 
+  await page.evaluate(() => {
+    window.clearFocusedDuringClick = false;
+    document.addEventListener(
+      'click',
+      (event) => {
+        if (!(event.target instanceof Element) || !event.target.closest('[data-testid="clear-button"]')) return;
+        window.clearFocusedDuringClick = document.activeElement === document.querySelector('textarea');
+      },
+      { once: true }
+    );
+  });
+  const clearButton = page.locator('[data-testid="clear-button"]');
+  if (options.isMobile) {
+    await clearButton.tap({ force: true, noWaitAfter: true });
+  } else {
+    await clearButton.click({ force: true, noWaitAfter: true });
+  }
+  const clearFocus = await page.evaluate(() => window.clearFocusedDuringClick);
+  const clearedValue = await textarea.inputValue();
+
   await context.close();
-  return { ...result, requests };
+  return { ...result, requests, clearFocus, clearedValue };
 }
 
 const mobile = await checkContext({
@@ -64,8 +84,12 @@ if (mobile.requests !== 1) failures.push(`mobile requests: expected 1, got ${mob
 if (mobile.activeIsTextarea) failures.push('mobile textarea remained focused');
 if (mobile.enterKeyHint !== 'go') failures.push(`mobile enterkeyhint: expected go, got ${mobile.enterKeyHint}`);
 if (mobile.value.includes('\n')) failures.push('mobile Enter inserted a newline');
+if (!mobile.clearFocus) failures.push('mobile clear did not focus textarea within the click event');
+if (mobile.clearedValue !== '') failures.push('mobile clear did not empty textarea');
 if (desktop.requests !== 1) failures.push(`desktop requests: expected 1, got ${desktop.requests}`);
 if (!desktop.activeIsTextarea) failures.push('desktop textarea lost focus');
+if (!desktop.clearFocus) failures.push('desktop clear did not focus textarea within the click event');
+if (desktop.clearedValue !== '') failures.push('desktop clear did not empty textarea');
 
 console.log(JSON.stringify({ ok: failures.length === 0, url, mobile, desktop, failures }, null, 2));
 if (failures.length > 0) process.exitCode = 1;

@@ -61,6 +61,14 @@ try {
     return
   }
 
+  $QualityHoldPath = Join-Path $Root 'state\daily-production-quality-hold.json'
+  if (Test-Path -LiteralPath $QualityHoldPath) {
+    $QualityHold = Read-JsonWithRetry $QualityHoldPath
+    if ([string]$QualityHold.status -ne 'resolved') {
+      throw "Production quality hold prevents commit: $($QualityHold.status)"
+    }
+  }
+
   Write-Status 'validating_and_committing' @{}
   $PublishLog = Join-Path $RunDir 'controlled-publish-supervisor.log'
   $PublishOutput = @()

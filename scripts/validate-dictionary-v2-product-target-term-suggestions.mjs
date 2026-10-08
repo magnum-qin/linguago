@@ -23,6 +23,12 @@ const allowedZhFamilies = new Set(
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean)
 );
+const allowedPtFamilies = new Set(
+  String(args['allowed-pt-families'] || 'freedict,wiktionary,dicionario-aberto')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+);
 const findSenses = sourceDb.prepare(`SELECT ds.source_key, se.word, ss.gloss, ss.raw_json
   FROM source_entries se JOIN dictionary_sources ds ON ds.id=se.source_id
   JOIN source_senses ss ON ss.source_entry_id=se.id
@@ -31,7 +37,8 @@ const findSupplemental = supplementalDb.prepare(`SELECT source_key,source_family
   FROM lexical_evidence WHERE normalized_key=? AND lang=? ORDER BY source_key,english_gloss`);
 const reverseSourcesByLang = {
   zh: new Set(['cc-cedict', 'wikdict-zh-en', 'kaikki-zh']),
-  ja: new Set(['jmdict', 'wikdict-ja-en', 'kaikki-ja'])
+  ja: new Set(['jmdict', 'wikdict-ja-en', 'kaikki-ja']),
+  'pt-BR': new Set(['freedict-por-eng', 'wikdict-pt-en', 'kaikki-pt'])
 };
 
 const validations = (report.suggestions || []).map((row) => {
@@ -50,6 +57,7 @@ const output = {
     new_independent_family_required: true,
     minimum_same_term_families: minTermFamilies,
     allowed_zh_families: [...allowedZhFamilies].sort(),
+    allowed_pt_families: [...allowedPtFamilies].sort(),
     llm_is_not_evidence: true
   },
   summary: { input: validations.length, accepted_candidates: validations.filter((row) => row.decision === 'accept').length, rejected_candidates: validations.filter((row) => row.decision === 'reject').length, accepted_terms: validations.reduce((sum, row) => sum + row.accepted_terms.length, 0) },
@@ -79,7 +87,9 @@ function validateTerm(row, term) {
   const families = unique(evidence.map((item) => item.family));
   const allowedFamilies = row.target_lang === 'zh'
     ? allowedZhFamilies
-    : new Set(['jmdict', 'wiktionary', 'ejdict']);
+    : row.target_lang === 'pt-BR'
+      ? allowedPtFamilies
+      : new Set(['jmdict', 'wiktionary', 'ejdict']);
   const newFamilies = families.filter((value) =>
     allowedFamilies.has(value) && !(row.observed_families || []).includes(value)
   );
@@ -106,6 +116,7 @@ function targetScriptMatches(lang, term) {
   const value = String(term || '');
   if (lang === 'zh') return /\p{Script=Han}/u.test(value) && !/[A-Za-z\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value);
   if (lang === 'ja') return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value) && !/[A-Za-z]/u.test(value);
+  if (lang === 'pt-BR') return /\p{Script=Latin}/u.test(value) && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value);
   return false;
 }
 function englishGlosses(row) {

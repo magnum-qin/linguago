@@ -27,8 +27,16 @@ for (const [key, value] of Object.entries(runner)) {
   runnerArgs.push(`--${key}`, String(value));
 }
 runnerArgs.push('--batch', batch, '--run-id', runId);
-for (const key of ['run-dir', 'generation-target', 'resume']) {
-  if (args[key] != null) runnerArgs.push(`--${key}`, String(args[key]));
+const reserved = new Set(['profile', 'batch', 'run-id', 'print-command']);
+for (const [key, value] of Object.entries(args)) {
+  if (reserved.has(key) || value == null || value === '') continue;
+  const flag = `--${key}`;
+  const idx = runnerArgs.indexOf(flag);
+  if (idx !== -1) {
+    runnerArgs[idx + 1] = String(value);
+  } else {
+    runnerArgs.push(flag, String(value));
+  }
 }
 
 const invocation = {

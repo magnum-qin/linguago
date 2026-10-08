@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
 import {
+  compositionalJapaneseNumberReadings,
+  filterValidJapaneseKanaReadings,
+  isValidJapaneseKanaReading,
   normalizeJapaneseKanaReading,
   selectCanonicalJapaneseReading,
   transparentJapaneseCompoundReadings
 } from './lib/japanese-reading-contract.mjs';
 
 assert.equal(normalizeJapaneseKanaReading('ライオン'), 'らいおん');
+assert.equal(isValidJapaneseKanaReading('だいきゅう'), true);
+assert.equal(isValidJapaneseKanaReading('だい�'), false);
+assert.deepEqual([...filterValidJapaneseKanaReadings(['だい�', 'だいきゅう'])], ['だいきゅう']);
+assert.deepEqual([...compositionalJapaneseNumberReadings('第九')], ['だいきゅう', 'だいく']);
+assert.deepEqual([...compositionalJapaneseNumberReadings('第八')], ['だいはち']);
 
 const armReadings = new Set(['りょううで', 'もろうで']);
 assert.equal(selectCanonicalJapaneseReading('りょうわん', armReadings), 'りょううで');
@@ -19,4 +27,4 @@ assert.deepEqual(
 assert.equal(transparentJapaneseCompoundReadings('雌ライオン賞', lookup), null);
 assert.equal(transparentJapaneseCompoundReadings('ライオン', lookup), null);
 
-console.log(JSON.stringify({ ok: true, assertions: 7 }));
+console.log(JSON.stringify({ ok: true, assertions: 11 }));

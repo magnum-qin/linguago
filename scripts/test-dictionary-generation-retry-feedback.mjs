@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { compactRetryFeedback } from './lib/dictionary-generation-retry-feedback.mjs';
+assert.deepEqual(compactRetryFeedback({}, 'trial'), []);
+const english = compactRetryFeedback({ latest_errors: ['en_term_gloss_mismatch'] }, 'drenched').join('\n');
+assert.match(english, /drenched/);
+assert.match(english, /Do not add an anchor word/);
+const reading = compactRetryFeedback({ latest_errors: ['ja_reading_mismatch'], latest_ja_term: 'term', latest_ja_expected_readings: ['reading'] }, 'meaning').join('\n');
+assert.match(reading, /attested readings/);
+assert.match(reading, /do not apply to a different term/);
+assert.match(compactRetryFeedback({ latest_errors: ['missing_required_example'] }, '').join('\n'), /all four translations/);
+assert.match(compactRetryFeedback({ latest_errors: ['ja_term_not_in_jmdict'], latest_ja_term: 'bad' }, '').join('\n'), /bad/);
+const supplementSource = fs.readFileSync(new URL('./supplement-dictionary-v2-product-source-gaps-unsloth.mjs', import.meta.url), 'utf8');
+assert.match(supplementSource, /retry_feedback=\$\{retryFeedback\}/u);
+console.log('Compact retry feedback tests passed');
