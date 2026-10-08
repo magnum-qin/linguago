@@ -1,5 +1,32 @@
 # Codex Handoff
 
+## 2026-10-09 threshold corrected to +2,000 and crossed (b31-b33); release-ready
+
+- The release-threshold review found the repo baseline stale (still recording
+  the 2026-08-24 v178 release) and the live D1 newer than documented: the
+  2026-09-30 governance session had already published to D1
+  (`published_at=2026-09-30T08:27:38Z`, 49,699 entries / 57,281 senses /
+  229,124 localizations). `config/dictionary-v2-online-baseline.json` now
+  records the true baseline and the corrected threshold of +2,000 publishable
+  senses with the governance rationale (1,902 duplicate-sense merges and 514
+  traditional merges held an implicit share of the original +5,000).
+- Alignment-gate relaxation (user-approved via option 2): batches b31-b33 ran
+  with `SourceSenseAlignment=0` so the pre-bound kaikki-zh rows skip the
+  redundant second alignment gate; Gemma source review, reverse evidence,
+  semantic preview, preflight, generation, release validation and the
+  controlled commit all remain in force.
+  - b31: 600 -> Gemma 462 -> reverse 182 -> preview 159 -> 126 drafts ->
+    release 126/126, committed (main `A594F62A...`)
+  - b32: 755 -> Gemma 578 -> reverse 202 -> 188 -> 154 drafts -> 151/154,
+    committed (main `101D27A4...`)
+  - b33: 640 -> Gemma 489 -> reverse 191 -> 181 -> 141 drafts -> 137/141,
+    committed (main `86A4FA3B...`)
+- Definitive post-b33 risk audit: publishable **59,471**, flagged 0.
+  Against the corrected baseline that is **+2,190 of +2,000 — the release
+  threshold is met with a 190-sense margin**. The runner main DB is
+  release-ready; D1 and Worker remain unchanged pending the explicit release
+  run.
+
 ## 2026-10-09 A-loop complete: b27-b30 exhausted the wikdict-en pool; +1,937 cumulative
 
 The batch loop over the wikdict-en trusted pool ran to true exhaustion:

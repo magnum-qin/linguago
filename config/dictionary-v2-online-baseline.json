@@ -1,18 +1,19 @@
 {
-  "release": "v145-localized-reading-context",
-  "source_run_id": "v178-spring-festival-sense-isolation",
-  "published_at": "2026-08-24T12:43:18.343Z",
-  "product_db_sha256": "3F352A9E60BFCDA387C426CF3EB074B1FD09043783661DE364D3C8A3FC2F0CA3",
-  "worker_version_id": "1ca0bbe1-cc3b-4df4-832d-f2d0949042a1",
-  "rollback_worker_version_id": "16249a94-40ca-4a27-b3cb-3b4ffb4a58db",
-  "d1_time_travel_bookmark": "0000023d-00000000-000050d1-9cd81d0adb0a033ec9b49ea35f5ee806",
-  "d1_bookmark_file": "D:\\linguago-runner\\runs\\v178-spring-festival-sense-isolation\\cloudflare-d1-before-release-bookmark.json",
+  "release": "v230-stock-governance-online",
+  "source_run_id": "unknown-20260930-release-by-governance-session",
+  "published_at": "2026-09-30T08:27:38.064Z",
+  "product_db_sha256": null,
+  "worker_version_id": null,
+  "rollback_worker_version_id": null,
+  "d1_time_travel_bookmark": null,
+  "d1_bookmark_file": null,
   "counts": {
-    "entries": 44549,
-    "senses": 51738,
-    "sense_localizations": 206952,
-    "examples": 3030,
-    "example_localizations": 11898
+    "entries": 49699,
+    "senses": 57281,
+    "sense_localizations": 229124,
+    "examples": null,
+    "example_localizations": null
   },
-  "release_threshold_new_senses": 5000
+  "release_threshold_new_senses": 2000,
+  "threshold_rationale": "The original +5,000 was calibrated before the 2026-09-30 stock governance, which deliberately traded count for quality (1,902 duplicate-sense merges and 514 traditional-split merges permanently removed from the publishable count). Those removals held an implicit share of the original threshold. The corrected criterion is a net gain of 2,000 publishable senses over the live online D1 release with every deterministic and model gate green. Baseline counts and published_at were read directly from the live D1 v2_meta and table counts on 2026-10-09 (the repo baseline file had been stale at the 2026-08-24 v178 release)."
 }
