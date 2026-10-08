@@ -1,5 +1,29 @@
 # Codex Handoff
 
+## 2026-10-09 A-loop complete: b27-b30 exhausted the wikdict-en pool; +1,937 cumulative
+
+The batch loop over the wikdict-en trusted pool ran to true exhaustion:
+- b27: 600 -> 194 drafts -> 194/194 reverse -> 188 final-accepted (main
+  `11D8F6DA...`)
+- b28: 600 -> 289 drafts -> 288/288 reverse -> 284 final-accepted (main
+  `01FB69EC...`)
+- b29: 600 -> 297 drafts -> 297/297 reverse -> 295 final-accepted (main
+  `2398C1B1...`)
+- b30 (pool remainder): 129 -> 60 drafts -> 60/60 reverse -> 58
+  final-accepted (main `9312C1BD...`)
+All four committed via the official controlled path with rollback backups;
+custodian attributed every main-DB change.
+- Definitive post-cycle risk audit: accepted 59,070 / publishable 59,057 /
+  flagged 0. Cumulative vs the v218 online baseline (57,120): **+1,937 of
+  the +5,000 threshold** (restore state +970 plus 967 from seven batches
+  b24-b30). Raw DB counts: 52,710 entries / 61,7xx senses / 246xxx
+  localizations.
+- Both additional-sense pool generations (CC-CEDICT repair supply and the
+  wikdict-en lever) are now fully converted. Remaining levers all need user
+  decisions or data: EN alignment-gate relaxation (~539/batch), JA/PT reverse
+  evidence expansion, D1 release-threshold review, external zh frequency
+  list (1,044 deferred words).
+
 ## 2026-10-09 wikdict-en lever; b27 committed with 188 promoted senses
 
 User approved conditional wikdict-en authorization for the EN lane
