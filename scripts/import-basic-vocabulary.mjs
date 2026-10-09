@@ -40,17 +40,19 @@ function run() {
     stats.processed++;
     const existing = prod.prepare("SELECT id FROM product_entries WHERE headword = ? AND primary_lang = ? AND status = 'accepted'").get(word, lang);
     if (existing) { stats.skipped++; continue; }
-    if (!t.en || !t.zh || !t.ja) { stats.no_translation++; continue; }
+    const targets = ['en', 'zh', 'ja', 'pt-BR'].filter((l) => l !== lang);
+    if (targets.some((l) => !t[l])) { stats.no_translation++; continue; }
     const srcEntry = findSrc.get(word, lang);
     const srcSense = srcEntry ? findSrcSense.get(srcEntry.id) : null;
     const info = insertEntry.run(word, word.toLowerCase(), lang, srcEntry?.frequency_rank || 100, 'basic-' + lang + ':' + word, now);
     const entryId = Number(info.lastInsertRowid);
-    const senseInfo = insertSense.run(entryId, t.en, now);
+    const gloss = t.en || t.zh || t.ja || t['pt-BR'] || word;
+    const senseInfo = insertSense.run(entryId, gloss, now);
     const senseId = Number(senseInfo.lastInsertRowid);
-    insertLoc.run(senseId, lang, word, t.en);
-    insertLoc.run(senseId, 'en', t.en, t.en);
-    insertLoc.run(senseId, 'zh', t.zh, t.en);
-    insertLoc.run(senseId, 'ja', t.ja, t.en);
+    insertLoc.run(senseId, lang, word, gloss);
+    for (const l of targets) {
+      insertLoc.run(senseId, l, t[l], gloss);
+    }
     if (srcEntry && srcSense) {
       insertLink.run(senseId, srcEntry.id, srcSense.id, lang, word);
     }
