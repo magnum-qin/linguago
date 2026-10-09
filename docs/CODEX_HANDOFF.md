@@ -1,5 +1,35 @@
 # Codex Handoff
 
+## 2026-10-09 v150 release: D1 data published; worker deploy blocked by D1 free-tier quota
+
+- D1 data release completed against the repaired main DB (maintenance
+  controller path): live counts 50,764 entries / 59,700 senses / 238,800
+  localizations / 341,594 forms / 53,317 pronunciation groups, exactly
+  matching the export manifest; all 10 lookup indexes present;
+  `published_at=2026-10-09T00:35:43Z`. The repair brought back 207 entries
+  the model overwrite had knocked out of the publishable set.
+- Third data incident (discovered by the deploy-time regression fixture):
+  the 10/1-10/2 production-4000 campaign import rewrote localizations of
+  2,685 senses that were already accepted on 2026-10-01 (8,169 rows —
+  e.g. 春节 degraded to 'New Year'). Repaired in place from the 10/1 backup
+  via `restore-accepted-localization-overwrites.mjs` (content fields only;
+  239 glosses also restored; draft-sense regeneration untouched; verified
+  on the v178 spring-festival case; backup
+  `backups/main-before-accepted-overwrite-restore-20261009.db`).
+- Worker deploy (commit `394e50c`, cache `v150-b33-cycle-release`): deployed,
+  online regressions failed, auto-rolled-back (mechanism worked). Root cause
+  of the widespread lookup failures found via `wrangler tail`:
+  **D1 free-tier daily row-read quota exhausted** — the release-day
+  verification queries (7-table COUNT × 3 retries × 2 pushes ≈ 4M rows) plus
+  regression reruns consumed the 5M/day allowance. Dictionary data and
+  indexes are correct; lookups error with the quota message and the worker
+  falls back to the model (users still get translations).
+- NEXT STEP (pending): after the D1 quota resets (midnight UTC) or a plan
+  upgrade, re-run `deploy-remote-worker-release.ps1` for the staged commit
+  `394e50c9...` with cache version `v150-b33-cycle-release`; the fixtures in
+  that commit already match the published counts. Expect the three online
+  regression checks to pass with quota available.
+
 ## 2026-10-09 threshold corrected to +2,000 and crossed (b31-b33); release-ready
 
 - The release-threshold review found the repo baseline stale (still recording
