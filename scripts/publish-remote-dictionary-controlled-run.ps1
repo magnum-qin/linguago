@@ -93,6 +93,12 @@ try {
     --run-dir $RunDir --out (Join-Path $RunDir 'production-gate.json')
   if ($LASTEXITCODE -ne 0) { throw 'Production gates failed' }
 
+  # Quality gate: block the commit if the isolated DB has genuine structural
+  # defects (term-headword mismatches or duplicate senses beyond tolerance).
+  & node.exe (Join-Path $Root 'scripts\check-dictionary-v2-release-quality-gate.mjs') `
+    --db $IsolatedDb --out (Join-Path $RunDir 'release-quality-gate.json')
+  if ($LASTEXITCODE -ne 0) { throw 'Release quality gate failed' }
+
   $Apply = Read-JsonFile (Join-Path $RunDir '09-isolated-controlled-apply.json')
   $Idempotent = Read-JsonFile (Join-Path $RunDir '10-isolated-controlled-idempotent.json')
   $PromoteDry = Read-JsonFile (Join-Path $RunDir '11-isolated-promote-dry-run.json')
