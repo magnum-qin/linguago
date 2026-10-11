@@ -85,9 +85,11 @@ const sourceReverseMinSupportedTargetLangs = Math.max(
     10
   )
 );
+const phraseHeadReverseEvidence = args['phrase-head-reverse-evidence'] !== 'false';
 const additionalSenseReverseEvidenceArgs = [
   '--max-manual-target-langs', String(sourceReverseMaxManualTargetLangs),
-  '--min-supported-target-langs', String(sourceReverseMinSupportedTargetLangs)
+  '--min-supported-target-langs', String(sourceReverseMinSupportedTargetLangs),
+  '--phrase-head-reverse-evidence', String(phraseHeadReverseEvidence)
 ];
 const sourceSenseAlignment = args['source-sense-alignment'] === 'true';
 const allowNativeSourceFallback = args['allow-native-source-fallback'] === 'true';

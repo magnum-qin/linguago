@@ -15,8 +15,8 @@
     },
     {
       "path": "scripts\\run-dictionary-v2-remote-pipeline.mjs",
-      "bytes": 63995,
-      "sha256": "FC159A92B91F5090D510A4BBFD85E910F33A84F29E8A856BE0CB87A1D6E1EF5B"
+      "bytes": 64406,
+      "sha256": "4D40C97E5805132621B1ED2C4DBC05BFF7EDC54E700A530ECE7A4A43EEAB7A30"
     },
     {
       "path": "scripts\\evaluate-dictionary-v2-simplified-draft-flow.mjs",
@@ -25,8 +25,8 @@
     },
     {
       "path": "scripts\\test-dictionary-v2-pipeline-execution-modes.mjs",
-      "bytes": 3958,
-      "sha256": "AC0B71886589633C85CBC18884488498E134AFF7622DFC0D589A3C1126B5A6E9"
+      "bytes": 2305,
+      "sha256": "9AB369307C1A3830CDC953A13611EABBCE24392F5B40E9A43AA539B54EAE44F0"
     },
     {
       "path": "scripts\\test-simplified-draft-flow-evaluator.mjs",
@@ -325,8 +325,8 @@
     },
     {
       "path": "scripts\\filter-dictionary-v2-production-batch.mjs",
-      "bytes": 11865,
-      "sha256": "C787997BCBDEB0D1BAAE798E1F1306F69866B87D1435A307A9B4AE4A1BFF81FC"
+      "bytes": 12654,
+      "sha256": "A053EFD85B1ED7AA9FD7EF84FA448DF62D93D739887C4A9D25B84CA9EDB47149"
     },
     {
       "path": "scripts\\test-dictionary-v2-production-batch-filter.mjs",
@@ -340,8 +340,8 @@
     },
     {
       "path": "scripts\\validate-dictionary-v2-product-source-gap-reverse-evidence.mjs",
-      "bytes": 36754,
-      "sha256": "2B5A8F51865B267023C780429C3E78016EF5149F6ABC6C2315C3A259444EC8CB"
+      "bytes": 38970,
+      "sha256": "036861B616D2A84E06BC17DAF94F50D66262C71D7023FD16EFDD43613B86E4EB"
     },
     {
       "path": "scripts\\build-dictionary-v2-product-source-gap-controlled-consensus-input.mjs",
@@ -595,8 +595,8 @@
     },
     {
       "path": "scripts\\new-remote-dictionary-production-batch.ps1",
-      "bytes": 16831,
-      "sha256": "306BD886C091487B696BF771E507E60C535FC100C37679BC58A9BAC82B3652E2"
+      "bytes": 16409,
+      "sha256": "958368871166110901F429625F2BB92A92E1D0F046BE3393090826DF4B0670AF"
     },
     {
       "path": "scripts\\select-dictionary-v2-source-gap-fresh-cohort.mjs",
@@ -660,8 +660,8 @@
     },
     {
       "path": "config\\dictionary-overrides\\product-entry-form-aliases.json",
-      "bytes": 230997,
-      "sha256": "0481077791CE8ED80AC7F070A3AD5649424FAD4CEEBDFDB87A68DCA5C1CD1622"
+      "bytes": 231437,
+      "sha256": "3C3A88E0C0685732FE1D07489B40709E5325C9558DAE2FA638CCF66D285B7C4A"
     },
     {
       "path": "config\\remote-candidate-sources.json",
@@ -685,7 +685,7 @@
     },
     {
       "path": "data\\processed\\linguago_v2_product_top5000_freedict_filtered_candidate.db",
-      "bytes": 367538176,
+      "bytes": 371077120,
       "sha256": "86A4FA3B94A8C45A5DF0EEF04165BF83CBD522DE12C92532D4AE08109C035158"
     },
     {
@@ -700,8 +700,8 @@
     },
     {
       "path": "scripts\\update-remote-runner-manifest-entries.mjs",
-      "sha256": "02F982044FEBF161BA8297EEE955B10C04FD5F296C2DBF699111075A534F259A",
-      "bytes": 4991
+      "sha256": "12A668E0A7D461415693F5BF4A8984074F0103AED2F8F08105E06221C2C8E209",
+      "bytes": 5162
     },
     {
       "path": "scripts\\set-remote-dictionary-task-credential.ps1",
@@ -709,14 +709,19 @@
       "bytes": 1947
     },
     {
-      "path": "scripts\\lib\\japanese-reverse-lookup-variants.mjs",
-      "sha256": "5457EF7AF0F51DAA149FEDC92803981F179876D27614F4252143F1BD02BCEEB2",
-      "bytes": 723
+      "path": "scripts\\build-dictionary-v2-model-confirmed-sense-index.mjs",
+      "sha256": "E5E6FD115F255CBC09E947710A016418EEE44CC331C6BA522E8CA9B1BCB49598",
+      "bytes": 6303
     },
     {
-      "path": "scripts\\build-dictionary-v2-model-confirmed-sense-index.mjs",
-      "bytes": 6303,
-      "sha256": "E5E6FD115F255CBC09E947710A016418EEE44CC331C6BA522E8CA9B1BCB49598"
+      "path": "scripts\\watch-remote-dictionary-main-db.ps1",
+      "sha256": "A7DFDEC368105F58924090D6E47F089A2B3BA14D6068919C8C8129E97A5D004F",
+      "bytes": 4836
+    },
+    {
+      "path": "scripts\\restore-dictionary-v2-missing-stock.mjs",
+      "sha256": "9350B72C7B602386C2DFD7EC48DC82BD12AC212CE5008AA0478AF56AFDDBAC72",
+      "bytes": 13132
     }
   ]
 }

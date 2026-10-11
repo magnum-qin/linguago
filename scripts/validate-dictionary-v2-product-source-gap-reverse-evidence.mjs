@@ -33,6 +33,11 @@ const STOPWORDS = new Set([
   "a", "an", "and", "as", "at", "be", "by", "for", "from", "in", "into", "is", "of", "on", "or",
   "the", "to", "with"
 ]);
+const PHRASE_HEAD_PORTUGUESE_STOPWORDS = new Set([
+  "a", "à", "ao", "aos", "as", "com", "como", "da", "das", "de", "do", "dos", "e", "em",
+  "entre", "até", "mais", "muito", "na", "nas", "no", "nos", "o", "os", "ou", "para",
+  "pela", "pelo", "por", "que", "se", "sem", "seu", "sua", "sobre", "um", "uma"
+]);
 
 const args = parseArgs(process.argv.slice(2));
 const sourceDbPath = path.resolve(args["source-db"] || DEFAULT_SOURCE_DB);
@@ -63,6 +68,7 @@ const minSupportedTargetLanguages = Math.max(
   Number.parseInt(args["min-supported-target-langs"] || "0", 10)
 );
 const evidenceFamilyPolicy = args["evidence-family-policy"] || "wiktionary";
+const phraseHeadReverseEvidence = args["phrase-head-reverse-evidence"] === "true";
 const progressEvery = Math.max(1, Number.parseInt(args["progress-every"] || "100", 10));
 const allowedReviewedSupplementalSourceKeys = new Set(
   String(args["reviewed-supplemental-source-keys"] || "")
@@ -226,6 +232,7 @@ const output = {
     max_manual_target_languages: maxManualTargetLanguages,
     min_supported_target_languages: minSupportedTargetLanguages,
     evidence_family_policy: evidenceFamilyPolicy,
+    phrase_head_reverse_evidence: phraseHeadReverseEvidence,
     blocked_supplemental_source_keys: [...blockedSupplementalSourceKeys].sort(),
     blocked_supplemental_families: [...blockedSupplementalFamilies].sort(),
     reviewed_supplemental_source_keys: [...reviewedSupplementalSourceKeys].sort(),
@@ -572,7 +579,20 @@ function validateLocalization({
     return decision("supported", "english_term_matches_anchor");
   }
 
-  const reverseRows = termLookupVariants(lang, term).flatMap((value) => findReverse.all(normalizeTerm(value), lang));
+  const fullTermReverseRows = termLookupVariants(lang, term).flatMap((value) =>
+    findReverse.all(normalizeTerm(value), lang)
+  );
+  // Phrase-level translations (zh idioms rendered as pt/ja multi-word terms)
+  // have no dictionary headword; their content words still carry legitimate
+  // reverse evidence. Only consulted when the full term has no entry at all,
+  // so single words and existing headwords keep their original verdict path.
+  const phraseHeadReverseRows =
+    phraseHeadReverseEvidence && fullTermReverseRows.length === 0
+      ? phraseHeadLookupVariants(lang, term).flatMap((value) =>
+          findReverse.all(normalizeTerm(value), lang)
+        )
+      : [];
+  const reverseRows = [...fullTermReverseRows, ...phraseHeadReverseRows];
   const supplementalRows = findSupplementalReverse
     ? termLookupVariants(lang, term).flatMap((value) =>
         findSupplementalReverse.all(normalizeTerm(value), lang)
@@ -893,6 +913,29 @@ function termLookupVariants(lang, value) {
   }
   if (lang === 'zh' && term.endsWith('的') && term.length > 1) variants.add(term.slice(0, -1));
   return [...variants];
+}
+
+function phraseHeadLookupVariants(lang, value) {
+  const term = String(value || '').normalize('NFKC').trim();
+  if (!term) return [];
+  if (lang === 'pt-BR') {
+    const words = term
+      .split(/\s+/u)
+      .map((word) => word.replace(/[,.;:!?…]+$/u, ''))
+      .filter((word) => word.length >= 3 && !PHRASE_HEAD_PORTUGUESE_STOPWORDS.has(normalizeTerm(word)));
+    return unique(words).slice(0, 4);
+  }
+  if (lang === 'ja') {
+    const variants = new Set();
+    if (/をする$/u.test(term)) variants.add(term.replace(/をする$/u, ''));
+    if (/する$/u.test(term)) variants.add(term.replace(/する$/u, ''));
+    for (const chunk of term.split(/[をがにはとでへからまで]/u)) {
+      if (chunk.length >= 2) variants.add(chunk);
+    }
+    variants.delete(term);
+    return [...variants].slice(0, 4);
+  }
+  return [];
 }
 
 function termsEquivalent(lang, left, right) {
