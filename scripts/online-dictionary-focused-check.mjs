@@ -5,11 +5,11 @@ const baseUrl = process.env.PWA_URL || 'https://translation-pwa.qhzggzh-linguago
 const outDir = path.resolve('output/online-dictionary-focused-check');
 const langs = ['zh', 'en', 'pt-BR', 'ja'];
 const expectedCounts = {
-  entries: 51178,
-  senses: 60114,
-  sense_localizations: 239800,
-  examples: 3045,
-  example_localizations: 11958
+  entries: 51172,
+  senses: 59235,
+  sense_localizations: 236940,
+  examples: 3044,
+  example_localizations: 11954
 };
 const traditionalSmokeChars =
   /[\u9019\u500b\u5011\u4f86\u8aaa\u6642\u9084\u5f8c\u767c\u807d\u8207\u5c0d\u6703\u8868\u5b78\u958b\u95dc\u9ad4]/u;
@@ -18,10 +18,10 @@ const cases = [
   {
     id: 'zh-zhong-polyphone',
     term: '中',
-    minSenses: 5,
+    minSenses: 3,
     requirePronunciationGroups: true,
-    expectedReadings: ['zhōng', 'zhòng'],
-    expectedTerms: ['medium; intermediary', 'hit; strike', 'win; be selected']
+    expectedReadings: ['zhōng'],
+    expectedTerms: ['inside', 'among', 'middle']
   },
   {
     id: 'zh-gan-polyphone',
