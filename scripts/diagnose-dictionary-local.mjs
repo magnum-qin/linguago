@@ -41,7 +41,11 @@ switch (command) {
         )
     `).get().c;
     counts.publishable_senses = publishable;
-    const flagged = db.prepare("SELECT COUNT(*) c FROM product_senses WHERE status = 'accepted' AND needs_review = 1").get().c;
+    const flagged = db.prepare(`
+      SELECT COUNT(*) c FROM product_senses s
+      WHERE s.status = 'accepted'
+        AND EXISTS (SELECT 1 FROM product_localizations l WHERE l.product_sense_id = s.id AND l.needs_review = 1)
+    `).get().c;
     counts.flagged_senses = flagged;
     console.log(JSON.stringify(counts, null, 2));
     break;
