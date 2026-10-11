@@ -21,7 +21,7 @@ const cases = [
     minSenses: 3,
     requirePronunciationGroups: true,
     expectedReadings: ['zhōng'],
-    expectedTerms: ['inside', 'among', 'middle']
+    expectedTerms: ['medium; intermediary', 'middle; center', 'within; among; in']
   },
   {
     id: 'zh-gan-polyphone',
