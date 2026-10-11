@@ -43,6 +43,10 @@ function Invoke-D1File {
 function Assert-RemoteCounts {
   param([object]$Stats)
 
+  # MAX(rowid) is O(1) via the primary key index; COUNT(*) scans the full
+  # B-tree and burns D1 free-tier row-read quota (~750K rows per call).
+  # Fresh imports produce sequential rowids, so MAX(rowid) == COUNT(*).
+  # If MAX mismatches (non-fresh table), falls back to COUNT for that table.
   $tables = [ordered]@{
     entries = "v2_entries"
     entry_forms = "v2_entry_forms"
@@ -54,7 +58,7 @@ function Assert-RemoteCounts {
   }
   $columns = @()
   foreach ($item in $tables.GetEnumerator()) {
-    $columns += "(SELECT COUNT(*) FROM $($item.Value)) AS $($item.Key)"
+    $columns += "(SELECT IFNULL(MAX(rowid), 0) FROM $($item.Value)) AS max_$($item.Key)"
   }
   $sql = "SELECT $($columns -join ', ');"
   $raw = $null
@@ -62,21 +66,43 @@ function Assert-RemoteCounts {
     $raw = & (Join-Path $root "node_modules/.bin/wrangler.cmd") d1 execute $DatabaseName --remote --command $sql --json
     if ($LASTEXITCODE -eq 0) { break }
     if ($attempt -lt $MaxAttempts) {
-      Write-Warning "Remote D1 count verification failed (attempt $attempt/$MaxAttempts); retrying."
+      Write-Warning "Remote D1 verification failed (attempt $attempt/$MaxAttempts); retrying."
       Start-Sleep -Seconds ([Math]::Min(10, 2 * $attempt))
     }
   }
-  if ($LASTEXITCODE -ne 0) { throw "Remote D1 count verification failed after $MaxAttempts attempts" }
+  if ($LASTEXITCODE -ne 0) { throw "Remote D1 verification failed after $MaxAttempts attempts" }
   $response = $raw | ConvertFrom-Json
   $actual = $response[0].results[0]
+  $needFallback = @()
   foreach ($name in $tables.Keys) {
     $expectedCount = [int64]$Stats.$name
-    $actualCount = [int64]$actual.$name
+    $maxId = [int64]($actual.("max_$name"))
+    if ($maxId -eq $expectedCount) { continue }
+    $needFallback += $name
+  }
+  if ($needFallback.Count -eq 0) {
+    Write-Host "Remote D1 counts match manifest (MAX(rowid) fast path)."
+    return
+  }
+  # Fallback: verify only mismatched tables with COUNT (quota-capped scope)
+  Write-Warning "MAX(rowid) mismatch for [$($needFallback -join ', ')]; falling back to COUNT for those tables."
+  $fbColumns = @()
+  foreach ($name in $needFallback) {
+    $fbColumns += "(SELECT COUNT(*) FROM $($tables[$name])) AS cnt_$name"
+  }
+  $fbSql = "SELECT $($fbColumns -join ', ');"
+  $fbRaw = & (Join-Path $root "node_modules/.bin/wrangler.cmd") d1 execute $DatabaseName --remote --command $fbSql --json
+  if ($LASTEXITCODE -ne 0) { throw "Remote D1 COUNT fallback failed" }
+  $fbResponse = $fbRaw | ConvertFrom-Json
+  $fbActual = $fbResponse[0].results[0]
+  foreach ($name in $needFallback) {
+    $expectedCount = [int64]$Stats.$name
+    $actualCount = [int64]($fbActual.("cnt_$name"))
     if ($actualCount -ne $expectedCount) {
       throw "Remote D1 count mismatch for ${name}: expected=$expectedCount actual=$actualCount"
     }
   }
-  Write-Host "Remote D1 counts match manifest."
+  Write-Host "Remote D1 counts match manifest (COUNT fallback)."
 }
 
 if (-not $SkipExport) {
