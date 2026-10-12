@@ -10,6 +10,9 @@ param(
   [string]$ExactSenseHistory = '',
   [int]$NativeMaxRank = 2000000,
   [int]$NativeScanLimit = 2000000,
+  [int]$NativeFrequencyRankLimit = 50000,
+  [int]$NativeMinRank = 1,
+  [string]$RepairEvidenceReport = '',
   [string]$NativeTargets = 'zh=30000,ja=10000,pt-BR=5000,en=5000',
   [string]$NativeLangQuotas = '',
   [string]$AdditionalSenseAttemptIndex = 'state\additional-sense-attempt-index.json',
@@ -152,7 +155,8 @@ if ($CandidateMode -eq 'native-daily') {
       --exclusions $NativeExclusionIndex `
       --attempt-index (Join-Path $StateRoot 'additional-sense-attempt-index.json') `
       --out $NativeExclusionClassification `
-      --blocked-out $NativeBlockedExclusions
+      --blocked-out $NativeBlockedExclusions `
+      $(if ($RepairEvidenceReport) { @('--repair-evidence-report', (Join-Path $Root $RepairEvidenceReport)) } else { @() })
     $ClassificationExitCode = $LASTEXITCODE
   } finally {
     $ErrorActionPreference = $PreviousErrorActionPreference
@@ -243,6 +247,7 @@ if ($CandidateMode -eq 'native-daily') {
   & node.exe (Join-Path $Root 'scripts\find-dictionary-v2-native-daily-coverage-gaps.mjs') `
     --source-db $NativeSourceDb `
     --product-db $ProductDb `
+    --min-rank $NativeMinRank `
     --max-rank $NativeMaxRank `
     --scan-limit $NativeScanLimit `
     --targets $NativeTargets `
@@ -255,14 +260,21 @@ if ($CandidateMode -eq 'native-daily') {
   # entry-only rows cannot pass the authoritative source-sense prefilter.
   $NativeSensePoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-native-daily-senses.json"
   $NativeSenseRejectedPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-native-daily-senses-rejected.json"
-  & node.exe (Join-Path $Root 'scripts\select-dictionary-v2-product-daily-primary-senses.mjs') `
-    --report $PoolPath `
-    --source-db $NativeSourceDb `
-    --product-db $ProductDb `
-    --out $NativeSensePoolPath `
-    --rejected-out $NativeSenseRejectedPath `
-    --attempt-index (Join-Path $StateRoot 'additional-sense-attempt-index.json') `
-    --min-score 2500
+  $NativeSenseArgs = @(
+    (Join-Path $Root 'scripts\select-dictionary-v2-product-daily-primary-senses.mjs'),
+    '--report', $PoolPath,
+    '--source-db', $NativeSourceDb,
+    '--product-db', $ProductDb,
+    '--out', $NativeSensePoolPath,
+    '--rejected-out', $NativeSenseRejectedPath,
+    '--attempt-index', (Join-Path $StateRoot 'additional-sense-attempt-index.json'),
+    '--min-score', '2500',
+    '--max-frequency-rank', [string]$NativeFrequencyRankLimit
+  )
+  if (-not [string]::IsNullOrWhiteSpace($RepairEvidenceReport)) {
+    $NativeSenseArgs += @('--repair-evidence-report', (Join-Path $Root $RepairEvidenceReport))
+  }
+  & node.exe @NativeSenseArgs
   if ($LASTEXITCODE -ne 0) { throw "Native daily sense binding failed with exit code $LASTEXITCODE" }
 
   $NativeTrustedPoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-native-daily-trusted.json"
@@ -286,7 +298,8 @@ if ($CandidateMode -in @('native-daily', 'additional-sense')) {
   $DailyPoolPath = Join-Path (Split-Path -Parent $OutPath) "$OutBaseName-daily-quality.json"
   $Lane = if ($CandidateMode -eq 'native-daily') { 'new_headword' } else { 'additional_sense' }
   & node.exe (Join-Path $Root 'scripts\filter-dictionary-v2-daily-recovery-candidates.mjs') `
-    --report $PoolPath --out $DailyPoolPath --lane $Lane
+    --report $PoolPath --out $DailyPoolPath --lane $Lane `
+    --max-frequency-rank $NativeFrequencyRankLimit
   if ($LASTEXITCODE -ne 0) { throw 'Daily recovery quality filter failed' }
   $PoolPath = $DailyPoolPath
 }

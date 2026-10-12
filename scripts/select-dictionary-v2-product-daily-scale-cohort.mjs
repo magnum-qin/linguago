@@ -1,9 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { dailyCandidateReasons } from './lib/daily-candidate-quality.mjs';
+import {
+  dailyCandidateReasons,
+  setDailyFrequencyRankLimit
+} from './lib/daily-candidate-quality.mjs';
 
 const args = parseArgs(process.argv.slice(2));
+if (args['max-frequency-rank']) {
+  setDailyFrequencyRankLimit(args['max-frequency-rank']);
+}
 const reportPath = requiredPath(args.report, 'report');
 const outPath = requiredPath(args.out, 'out');
 const limit = positiveInteger(args.limit, 20);

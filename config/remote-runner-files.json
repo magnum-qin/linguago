@@ -95,8 +95,8 @@
     },
     {
       "path": "scripts\\classify-dictionary-v2-native-daily-exclusions.mjs",
-      "bytes": 7562,
-      "sha256": "B94C52DF75F330C95884C10254679B9673023C071EFFDD5C5FFA861C00ED7D2F"
+      "bytes": 8796,
+      "sha256": "8B4DFC4CC118FBD22E5B321C62CDD79D121942599A440111CBF1B71515301427"
     },
     {
       "path": "scripts\\merge-dictionary-v2-daily-production-lanes.mjs",
@@ -125,13 +125,13 @@
     },
     {
       "path": "scripts\\filter-dictionary-v2-daily-recovery-candidates.mjs",
-      "bytes": 1483,
-      "sha256": "DB4B36B83B8BD8C89E5AD992225D2A80F60F3DB7FAFD1A270B42EB0447FE9359"
+      "bytes": 1603,
+      "sha256": "B0B9F3F3B8D315E5F84F3BF93BF35E179E6163AFA576C4C94144F88010FB29E7"
     },
     {
       "path": "scripts\\lib\\daily-candidate-quality.mjs",
-      "bytes": 11209,
-      "sha256": "985DB48B27E331377E1A400FCCBA4EC83F3C710A24E4F312220D56B9428B7C8E"
+      "bytes": 11840,
+      "sha256": "BD910F38C2DEE04C4276A6DC9B21A383752E31A8DFC0A66C5CD85DD6296EE23C"
     },
     {
       "path": "scripts\\test-v219-production-control.mjs",
@@ -215,8 +215,8 @@
     },
     {
       "path": "scripts\\select-dictionary-v2-product-daily-primary-senses.mjs",
-      "bytes": 18551,
-      "sha256": "4F3ED07BF72BBCBB88459C925BAA8A47B0CEAD94F93C333A2A1546C656EDCDDF"
+      "bytes": 19283,
+      "sha256": "4C1DE2A8A84B24CB7A54D57376569FD6E715F511F0C48A730E5038BB18422FE1"
     },
     {
       "path": "scripts\\test-dictionary-v2-additional-sense-selection.mjs",
@@ -310,8 +310,8 @@
     },
     {
       "path": "scripts\\run-remote-dictionary-production-until-release.ps1",
-      "bytes": 17761,
-      "sha256": "D6A8E0995A6C886792D1E5004826F0FEA5EF01E967CD702AE3459F50EDBEE979"
+      "bytes": 17873,
+      "sha256": "06964409C171B39666933514A2A0C7BAC56B4E3F18A65CC99CED30F62A52E6D6"
     },
     {
       "path": "scripts\\start-remote-dictionary-release-cohort-production.ps1",
@@ -595,8 +595,8 @@
     },
     {
       "path": "scripts\\new-remote-dictionary-production-batch.ps1",
-      "bytes": 16409,
-      "sha256": "958368871166110901F429625F2BB92A92E1D0F046BE3393090826DF4B0670AF"
+      "bytes": 17996,
+      "sha256": "BE470501229991C285695CF3E33E18E6A1DF0AA8B9152381A9A27050667C3F0F"
     },
     {
       "path": "scripts\\select-dictionary-v2-source-gap-fresh-cohort.mjs",
@@ -695,13 +695,13 @@
     },
     {
       "path": "scripts\\select-dictionary-v2-product-daily-scale-cohort.mjs",
-      "sha256": "D371C4C6DD0CAB8BED3CFDCA0812C3A902CD55D645022E228C1BF36126F72A03",
-      "bytes": 13814
+      "sha256": "4E29EBCD0985DADF353BFEA4127BF911CF24FEE05CEA6535E9AF2B12EDBAF0FD",
+      "bytes": 13940
     },
     {
       "path": "scripts\\update-remote-runner-manifest-entries.mjs",
-      "sha256": "12A668E0A7D461415693F5BF4A8984074F0103AED2F8F08105E06221C2C8E209",
-      "bytes": 5162
+      "sha256": "7B79E230AA3FBC38C088D69CE9252AAF51B362B36D820149335EADA949AFE40B",
+      "bytes": 5227
     },
     {
       "path": "scripts\\set-remote-dictionary-task-credential.ps1",

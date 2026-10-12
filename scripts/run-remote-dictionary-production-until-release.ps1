@@ -9,6 +9,7 @@ param(
   [string]$CandidateMode = 'daily-mixed',
   [string]$SupplementalSourceDb = '.tmp\combined\openwn-word2word3-ja-apertium-wikidata-v3-evidence.db',
   [string]$NativeTargets = 'zh=30000,ja=10000,pt-BR=5000,en=5000',
+  [int]$NativeFrequencyRankLimit = 50000,
   [ValidateRange(1, 100)]
   [int]$AdditionalSenseMaxEntryAttempts = 3,
   [ValidateRange(1, 100)]
@@ -222,7 +223,8 @@ try {
       '-Root', $Root, '-Limit', [string]$Requested, '-Out', $BatchRelative,
       '-CandidateMode', $(if ($EffectiveMode -eq 'daily-mixed') { 'native-daily' } else { $EffectiveMode }),
       '-NativeMaxRank', '2000000', '-NativeScanLimit', '2000000',
-      '-NativeTargets', $NativeTargets
+      '-NativeTargets', $NativeTargets,
+      '-NativeFrequencyRankLimit', [string]$NativeFrequencyRankLimit
     )
     if (-not [string]::IsNullOrWhiteSpace($LangQuotas)) {
       $BatchArgs += @('-NativeLangQuotas', $LangQuotas)

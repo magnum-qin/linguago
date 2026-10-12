@@ -44,6 +44,7 @@ const allowed = new Set([
   'scripts\\select-dictionary-v2-product-daily-primary-senses.mjs',
   'scripts\\filter-dictionary-v2-production-batch.mjs',
   'scripts\\filter-dictionary-v2-daily-recovery-candidates.mjs',
+  'scripts\\classify-dictionary-v2-native-daily-exclusions.mjs',
   'scripts\\build-dictionary-v2-model-confirmed-sense-index.mjs',
   'scripts\\restore-dictionary-v2-missing-stock.mjs',
   'scripts\\watch-remote-dictionary-main-db.ps1',

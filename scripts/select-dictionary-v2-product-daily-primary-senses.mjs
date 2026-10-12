@@ -3,9 +3,15 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import { dailyCandidateReasons } from './lib/daily-candidate-quality.mjs';
+import {
+  dailyCandidateReasons,
+  setDailyFrequencyRankLimit
+} from './lib/daily-candidate-quality.mjs';
 
 const args = parseArgs(process.argv.slice(2));
+if (args['max-frequency-rank']) {
+  setDailyFrequencyRankLimit(args['max-frequency-rank']);
+}
 const reportPath = requiredPath(args.report, 'report');
 const sourceDbPath = requiredPath(args['source-db'], 'source-db');
 const productDbPath = requiredPath(
@@ -25,6 +31,17 @@ const excludedReportPaths = [args.exclude, args['attempt-index']]
   .filter(Boolean)
   .map((value) => requiredPath(value, 'exclude'));
 const attemptedSourceSenses = loadAttemptedSourceSenses(excludedReportPaths);
+// Senses whose only historical failure was the reverse-evidence gate and that
+// now pass under the current validation policy (e.g. phrase-head evidence)
+// are retry-approved: they no longer count as attempted dead ends.
+const repairedSourceSenses = args['repair-evidence-report']
+  ? new Set((readJson(requiredPath(args['repair-evidence-report'], 'repair-evidence-report')).selected || [])
+      .map((row) => sourceSenseKey(row.source_entry_id, row.source_sense_id)))
+  : new Set();
+const senseAttempted = (entryId, senseId) => {
+  const key = sourceSenseKey(entryId, senseId);
+  return attemptedSourceSenses.has(key) && !repairedSourceSenses.has(key);
+};
 const confirmedSensesPath = args['confirmed-senses'] ? requiredPath(args['confirmed-senses'], 'confirmed-senses') : null;
 const confirmedByEntry = confirmedSensesPath
   ? new Map((readJson(confirmedSensesPath).selected || []).map((row) => [Number(row.source_entry_id), row]))
@@ -76,7 +93,7 @@ for (const candidate of candidates) {
       candidate,
       sense,
       firstOrderBySource.get(String(sense.source || 'unknown')),
-      attemptedSourceSenses.has(sourceSenseKey(candidate.source_entry_id, sense.id))
+      senseAttempted(candidate.source_entry_id, sense.id)
     )
   );
   const primaryNativeSense = alternatives
@@ -111,7 +128,7 @@ for (const candidate of candidates) {
     (sense) => !sense.linked_product_sense && !sense.blocked_reason
   );
   const eligible = otherwiseEligible.filter(
-    (sense) => !attemptedSourceSenses.has(sourceSenseKey(candidate.source_entry_id, sense.id))
+    (sense) => !senseAttempted(candidate.source_entry_id, sense.id)
   );
   const best = pinnedUsable
     ? pinnedAlternative

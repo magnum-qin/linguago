@@ -12,10 +12,24 @@ const exclusionsPath = path.resolve(args.exclusions || 'state/native-daily-sourc
 const outPath = path.resolve(args.out || 'logs/native-daily-exclusion-classification.json');
 const blockedOutPath = args['blocked-out'] ? path.resolve(args['blocked-out']) : null;
 const attemptPath = path.resolve(args['attempt-index'] || 'state/additional-sense-attempt-index.json');
+const repairReportPath = args['repair-evidence-report'] ? path.resolve(args['repair-evidence-report']) : null;
 const traditionalToSimplified = OpenCC.Converter({ from: 'tw', to: 'cn' });
 
 for (const file of [sourceDbPath, productDbPath, exclusionsPath, attemptPath]) {
   if (!fs.existsSync(file)) throw new Error(`Required input not found: ${file}`);
+}
+// Senses that failed the reverse-evidence gate historically but pass under the
+// current validation policy (e.g. phrase-head evidence) are repair-verified:
+// their entries may re-enter the candidate queue.
+const repairedByEntry = new Map();
+if (repairReportPath) {
+  if (!fs.existsSync(repairReportPath)) throw new Error(`Repair evidence report not found: ${repairReportPath}`);
+  for (const row of readJson(repairReportPath).selected || []) {
+    const entryId = Number(row.source_entry_id);
+    if (!Number.isInteger(entryId) || !Number(row.source_sense_id)) continue;
+    if (!repairedByEntry.has(entryId)) repairedByEntry.set(entryId, new Set());
+    repairedByEntry.get(entryId).add(Number(row.source_sense_id));
+  }
 }
 const exclusionReport = readJson(exclusionsPath);
 const attempted = new Set((readJson(attemptPath).selected || []).map((row) => `${row.source_entry_id}:${row.source_sense_id}`));
@@ -93,14 +107,20 @@ function classify(row) {
   if (exactCovered) return disposition('published_or_semantic_duplicate', false, simplified, sourceWord);
   if (sourceWord !== simplified && simplifiedCovered) return disposition('traditional_form_of_existing_simplified', false, simplified, sourceWord);
   if (lowValue(row, simplified)) return disposition('low_value_proper_or_variant', false, simplified, sourceWord);
+  const repairedSenses = repairedByEntry.get(row.source_entry_id) || new Set();
   const freshSenses = selectSenses.all(row.source_entry_id).filter((sense) =>
-    !attempted.has(`${row.source_entry_id}:${sense.id}`) &&
+    (!attempted.has(`${row.source_entry_id}:${sense.id}`) || repairedSenses.has(Number(sense.id))) &&
     /cc-cedict|jmdict|freedict|ecdict/i.test(String(sense.source || '')) &&
     String(sense.gloss_key || '').trim().length > 1
   );
   if (!freshSenses.length) return disposition('manual_review_no_unattempted_native_sense', false, simplified, sourceWord);
   const rank = Number(row.frequency_rank || Number.MAX_SAFE_INTEGER);
   if (rank <= 50000) return disposition('high_frequency_gap_pending_evidence', true, simplified, sourceWord);
+  // Repair-verified senses carry their own evidence that the historical
+  // rejection was repaired; they do not need the blanket deep-rank deferral.
+  if (repairedSenses.size) {
+    return disposition('reverse_evidence_repair_verified', true, simplified, sourceWord);
+  }
   // A frequency rank alone cannot establish that a historical rejection was
   // repaired. Defer lower-value and previously judged senses for explicit review.
   if (rank <= 200000) return disposition('previous_failure_requires_repair_evidence', false, simplified, sourceWord);

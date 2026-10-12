@@ -8,6 +8,19 @@ export const JAPANESE_GRAMMAR_FRAGMENTS = new Set([
   'てる', 'ちゃう', 'とる', 'やれ', 'ませ'
 ]);
 
+// Daily-vocabulary rank ceiling. Deep-rank batches (e.g. ja loanword pools
+// beyond 50K) raise it explicitly via setDailyFrequencyRankLimit before any
+// dailyCandidateReasons call; every other caller keeps the default.
+export const DEFAULT_DAILY_FREQUENCY_RANK_LIMIT = 50000;
+let dailyFrequencyRankLimit = DEFAULT_DAILY_FREQUENCY_RANK_LIMIT;
+export function setDailyFrequencyRankLimit(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`daily frequency rank limit must be a positive integer, got ${value}`);
+  }
+  dailyFrequencyRankLimit = parsed;
+}
+
 export function dailyCandidateReasons(row, lane = row.production_lane) {
   const word = String(row.word || '').trim();
   const gloss = String(row.gloss_key || row.gloss_preview || row.first_gloss_preview || '').trim();
@@ -132,7 +145,7 @@ export function dailyCandidateReasons(row, lane = row.production_lane) {
   if (/^(?:en|ja|zh|es|fr|de|pt):\s/iu.test(gloss) || /\|\s*(?:en|ja|zh|es|fr|de|pt):\s/iu.test(gloss)) {
     reasons.push('multilang_gloss_artifact');
   }
-  if (!Number.isFinite(Number(row.frequency_rank)) || Number(row.frequency_rank) < 1 || Number(row.frequency_rank) > 50000) reasons.push('outside_daily_frequency_limit');
+  if (!Number.isFinite(Number(row.frequency_rank)) || Number(row.frequency_rank) < 1 || Number(row.frequency_rank) > dailyFrequencyRankLimit) reasons.push('outside_daily_frequency_limit');
   if (/\uFFFD|<\/?[a-z][^>]*>/iu.test(word + ' ' + gloss)) reasons.push('text_artifact');
   if (lane === 'new_headword' && row.daily_sense_selection?.alternatives?.length) {
     const alternatives = row.daily_sense_selection.alternatives;

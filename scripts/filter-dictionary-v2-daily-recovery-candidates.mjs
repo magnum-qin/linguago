@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { dailyCandidateReasons } from './lib/daily-candidate-quality.mjs';
+import {
+  dailyCandidateReasons,
+  setDailyFrequencyRankLimit
+} from './lib/daily-candidate-quality.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, token, index, all) => token.startsWith('--') ? [...pairs, [token.slice(2), all[index + 1]]] : pairs, []));
 if (!args.report || !args.out || !['new_headword', 'additional_sense'].includes(args.lane)) throw new Error('Require --report, --out, and --lane new_headword|additional_sense');
+if (args['max-frequency-rank']) setDailyFrequencyRankLimit(args['max-frequency-rank']);
 const report = JSON.parse(fs.readFileSync(args.report, 'utf8'));
 const selected = [], rejected = [];
 for (const row of report.selected || []) {
