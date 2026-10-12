@@ -39,6 +39,7 @@ $StateDir = Join-Path $Root 'state'
 $PipelineLock = Join-Path $StateDir 'remote-pipeline.lock.json'
 $ReleaseLock = Join-Path $StateDir 'dictionary-release.lock.json'
 $MainDb = Join-Path $Root 'data\processed\linguago_v2_product_top5000_freedict_filtered_candidate.db'
+$IsolatedDb = Join-Path $RunDir 'isolated-controlled-replay.db'
 $BackupDir = Join-Path $Root 'backups'
 New-Item -ItemType Directory -Path $StateDir, $BackupDir -Force | Out-Null
 
@@ -191,7 +192,6 @@ try {
   Assert-Zero $Audit.content_integrity.mojibake_texts 'mojibake_texts'
   Assert-Zero $Audit.content_integrity.html_artifacts 'html_artifacts'
 
-  $IsolatedDb = Join-Path $RunDir 'isolated-controlled-replay.db'
   & node.exe (Join-Path $Root 'scripts\checkpoint-sqlite-db.mjs') '--db' $IsolatedDb
   if ($LASTEXITCODE -ne 0) { throw 'SQLite checkpoint failed' }
 
