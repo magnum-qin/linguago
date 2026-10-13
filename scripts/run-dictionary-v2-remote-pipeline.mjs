@@ -57,6 +57,9 @@ const batchItemCount = reportItemCount(batchPath);
 const sourceQwenPool = qwenPoolForWork(batchItemCount);
 const gemmaConcurrency = csvValues(gemmaEndpoints).length;
 const generationTarget = Math.max(1, Number.parseInt(args['generation-target'] || '20', 10));
+// Wiktionary language editions count as independent evidence families; pass
+// --evidence-family-policy wiktionary to restore the single-family grouping.
+const evidenceFamilyPolicy = String(args['evidence-family-policy'] || 'wiktionary-edition');
 const stopAfterSourceScreen = args['stop-after-source-screen'] === 'true';
 const productionPrefilter = args['production-prefilter'] !== 'false';
 const requireAuthoritativeSourceSense =
@@ -299,7 +302,7 @@ try {
     '--supported-report', files.consensusSupported,
     '--input-mode', 'reviewed',
     '--require-source-reverse-evidence', 'true',
-    '--evidence-family-policy', 'wiktionary',
+    '--evidence-family-policy', evidenceFamilyPolicy,
     ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
     ...supplementalValidationArgs
   ], [files.consensusReverse, files.consensusSupported]);
@@ -400,7 +403,7 @@ try {
     '--out', files.semanticRepairReverse,
     '--supported-report', files.semanticRepairReverseSupported,
     '--require-source-reverse-evidence', 'true',
-    '--evidence-family-policy', 'wiktionary',
+    '--evidence-family-policy', evidenceFamilyPolicy,
     ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
     ...supplementalValidationArgs
   ], [files.semanticRepairReverse, files.semanticRepairReverseSupported]);
@@ -477,7 +480,7 @@ try {
     '--out', files.reverse,
     '--supported-report', files.reverseSupported,
     '--require-source-reverse-evidence', 'true',
-    '--evidence-family-policy', 'wiktionary',
+    '--evidence-family-policy', evidenceFamilyPolicy,
     ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
     ...supplementalValidationArgs
   ], [files.reverse, files.reverseSupported]);
@@ -548,7 +551,7 @@ try {
     '--out', files.repairReverse,
     '--supported-report', files.repairReverseSupported,
     '--require-source-reverse-evidence', 'true',
-    '--evidence-family-policy', 'wiktionary',
+    '--evidence-family-policy', evidenceFamilyPolicy,
     ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
     ...supplementalValidationArgs
   ], [files.repairReverse, files.repairReverseSupported]);
@@ -777,7 +780,7 @@ async function runSimplifiedPipeline() {
       '--supported-report', files.consensusSupported,
       '--input-mode', 'reviewed-suggested',
       '--require-source-reverse-evidence', 'true',
-      '--evidence-family-policy', 'wiktionary',
+      '--evidence-family-policy', evidenceFamilyPolicy,
       ...additionalSenseReverseEvidenceArgs,
       ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
       ...supplementalValidationArgs
@@ -940,7 +943,7 @@ async function runSimplifiedPipeline() {
     '--supported-report', files.reverseSupported,
     '--input-mode', 'generated',
     '--require-source-reverse-evidence', 'true',
-    '--evidence-family-policy', 'wiktionary',
+    '--evidence-family-policy', evidenceFamilyPolicy,
     ...additionalSenseReverseEvidenceArgs,
     ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
     ...supplementalValidationArgs
@@ -1049,7 +1052,7 @@ async function runReleaseValidationPipeline() {
     '--supported-report', files.reverseSupported,
     '--input-mode', 'generated',
     '--require-source-reverse-evidence', 'true',
-    '--evidence-family-policy', 'wiktionary',
+    '--evidence-family-policy', evidenceFamilyPolicy,
     ...additionalSenseReverseEvidenceArgs,
     ...(supplementalSourceDb ? ['--supplemental-source-db', supplementalSourceDb] : []),
     ...supplementalValidationArgs

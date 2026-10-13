@@ -82,7 +82,7 @@ const allowedCandidateBoundRoundtripSourceKeys = new Set(
     .map((value) => value.trim())
     .filter(Boolean)
 );
-if (!new Set(["wiktionary", "legacy"]).has(evidenceFamilyPolicy)) {
+if (!new Set(["wiktionary", "wiktionary-edition", "legacy"]).has(evidenceFamilyPolicy)) {
   throw new Error(`Invalid --evidence-family-policy: ${evidenceFamilyPolicy}`);
 }
 if (!new Set(["generated", "reviewed", "reviewed-suggested", "hints", "aligned", "product"]).has(inputMode)) {
@@ -680,9 +680,21 @@ function validateLocalization({
 }
 
 function evidenceSourceFamily(source, explicitFamily = null) {
+  const value = String(source || "").toLowerCase();
+  if (evidenceFamilyPolicy === "wiktionary-edition") {
+    // Wiktionary language editions are independent editorial communities.
+    // kaikki extracts and wikdict-en both derive from the English edition;
+    // wikdict-XX-* dictionaries come from the XX edition. The edition split
+    // only refines source-key families: curated supplemental families
+    // (apertium, wikdata, panlex, ...) keep their explicit family value.
+    if (value.startsWith("kaikki-") || value.startsWith("wikdict-en-")) return "wiktionary-en";
+    if (value.startsWith("wikdict-pt-")) return "wiktionary-pt";
+    if (value.startsWith("wikdict-ja-")) return "wiktionary-ja";
+    if (value.startsWith("wikdict-zh-")) return "wiktionary-zh";
+    if (value.startsWith("wikdict-")) return "wiktionary-other";
+  }
   const family = String(explicitFamily || "").trim().toLowerCase();
   if (family) return family;
-  const value = String(source || "").toLowerCase();
   if (evidenceFamilyPolicy === "legacy") {
     if (value.startsWith("wikdict-")) return "wikdict";
     if (value.startsWith("kaikki-")) return "kaikki";
@@ -709,7 +721,12 @@ function supplementalRowMatchesCandidate(row, boundCandidateKey) {
 }
 
 function isIndependentStrongFamily(family) {
-  return evidenceFamilyPolicy === "legacy" ? family !== "wikdict" : family !== "wiktionary";
+  if (evidenceFamilyPolicy === "legacy") return family !== "wikdict";
+  // Under the edition policy a single Wiktionary edition still cannot carry a
+  // candidate alone; support requires two distinct editions (or a non-Wiktionary
+  // strong family) via the multi-family decision path.
+  if (evidenceFamilyPolicy === "wiktionary-edition") return !String(family).startsWith("wiktionary");
+  return family !== "wiktionary";
 }
 
 function extractReverseEvidence(row, lang, anchors) {
