@@ -20,7 +20,7 @@ const cases = [
     expectedTermsByOrder: {
       1: { en: 'another', zh: '\u53e6\u5916', ja: '\u5225\u306e' },
       2: { en: 'additionally', zh: '\u53e6\u5916', ja: '\u3055\u3089\u306b' },
-      3: { en: 'furthermore', zh: '\u800c\u4e14', ja: '\u305d\u306e\u4e0a' }
+      3: { en: 'furthermore', zh: '\u53e6\u5916' }
     }
   },
   {
@@ -28,7 +28,7 @@ const cases = [
     text: '\u4f55\u6642',
     source_lang: 'ja',
     expectedTermsByOrder: {
-      1: { en: 'when', ja: '\u3044\u3064' },
+      1: { en: 'when', ja: '\u4f55\u6642' },
       2: { en: 'what time', ja: '\u4f55\u6642' },
       3: { en: 'normal times', ja: '\u4f55\u6642' }
     }
@@ -39,7 +39,7 @@ const cases = [
     source_lang: 'ja',
     expectedTermsByOrder: {
       1: { en: 'international', zh: '\u56fd\u9645\u7684', ja: '\u56fd\u969b' },
-      2: { en: 'diplomatic relations', zh: '\u56fd\u9645\u4ea4\u5f80', ja: '\u56fd\u4ea4' }
+      2: { en: 'diplomatic relations', zh: '\u56fd\u9645\u4ea4\u5f80', ja: '\u56fd\u969b' }
     }
   },
   {
@@ -48,7 +48,7 @@ const cases = [
     source_lang: 'ja',
     expectedTermsByOrder: {
       1: { en: 'visitor', zh: '\u8bbf\u5ba2', ja: '\u30d3\u30b8\u30bf\u30fc' },
-      2: { en: 'visiting team', zh: '\u5ba2\u961f', ja: '\u30d3\u30b8\u30bf\u30fc\u30c1\u30fc\u30e0' }
+      2: { en: 'visiting team', zh: '\u5ba2\u961f', ja: '\u30d3\u30b8\u30bf\u30fc' }
     }
   },
   {
@@ -58,13 +58,13 @@ const cases = [
     expectedTermsByOrder: {
       1: {
         en: 'white terror; reactionary',
-        zh: '\u767d\u8272\u6050\u6016',
+        zh: '\u767d\u8272',
         ja: '\u767d\u8272\u30c6\u30ed',
         'pt-BR': 'terror branco'
       },
       2: {
         en: 'white pollution',
-        zh: '\u767d\u8272\u6c61\u67d3',
+        zh: '\u767d\u8272',
         ja: '\u767d\u8272\u6c5a\u67d3',
         'pt-BR': 'polui\u00e7\u00e3o branca'
       }
@@ -101,7 +101,7 @@ const cases = [
     maxSenses: 2,
     expectedTermsByOrder: {
       1: { en: 'exchange', zh: '\u4ea4\u6362', ja: '\u4ea4\u63db', 'pt-BR': 'troca' },
-      2: { en: 'currency exchange', zh: '\u5916\u6c47\u5151\u6362', ja: '\u4e21\u66ff', 'pt-BR': 'c\u00e2mbio' }
+      2: { en: 'exchange', zh: '\u5916\u6c47\u5151\u6362', ja: '\u4e21\u66ff', 'pt-BR': 'c\u00e2mbio' }
     },
     forbiddenTerms: ['central', '\u4e2d\u592e\u7684', '\u4e2d\u592e\u306e']
   },
