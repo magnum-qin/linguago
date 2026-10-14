@@ -120,9 +120,10 @@ const cases = [
     id: 'zh-bi-overrides',
     text: '\u9589',
     source_lang: 'zh',
-    minSenses: 1,
+    minSenses: 2,
     expectedTermsByOrder: {
-      1: { en: 'to close', zh: '\u95ed', ja: '\u9589\u3058\u308b', 'pt-BR': 'fechar' }
+      1: { en: 'to close', zh: '\u95ed', ja: '\u9589\u3058\u308b', 'pt-BR': 'fechar' },
+      2: { en: 'close', zh: '\u95ed', ja: '\u9589\u3081\u308b', 'pt-BR': 'fechar' }
     }
   },
   {
