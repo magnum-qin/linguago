@@ -481,6 +481,16 @@ export async function lookupDictionaryFirst(input: {
 }
 
 export async function fetchDictionaryStats(env: Env): Promise<Record<string, unknown>> {
+  // Live COUNT(*) scans burn ~380K D1 free-tier row reads per health call and
+  // can exhaust the daily quota on their own; cache the snapshot in KV.
+  if (env.CACHE && env.DB) {
+    try {
+      const cached = await env.CACHE.get<Record<string, unknown>>('dictionary-stats-v1', 'json');
+      if (cached && Number(cached.entries) > 0) return cached;
+    } catch {
+      // KV read failure falls through to the live query.
+    }
+  }
   if (env.DB) {
     try {
       const stats = await env.DB.prepare(
@@ -496,10 +506,20 @@ export async function fetchDictionaryStats(env: Env): Promise<Record<string, unk
       `
       ).first<Record<string, unknown>>();
       if (stats) {
-        return {
+        const snapshot = {
           source: 'cloudflare-d1-v2',
           ...stats
         };
+        if (env.CACHE) {
+          try {
+            await env.CACHE.put('dictionary-stats-v1', JSON.stringify(snapshot), {
+              expirationTtl: 3600
+            });
+          } catch {
+            // Cache write failure is non-fatal.
+          }
+        }
+        return snapshot;
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
