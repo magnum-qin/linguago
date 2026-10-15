@@ -96,7 +96,6 @@ async function handleTranslate(request: Request, env: Env, ctx: ExecutionContext
     }
 
     validateInputLength(text);
-    await assertRateLimit(request, env, ctx);
 
     const dictionaryCacheKey = await buildDictionaryCacheKey(text, sourceLang, targetLang);
     const dictionaryCached = await env.CACHE.get<TranslateResponse>(dictionaryCacheKey, 'json');
@@ -123,6 +122,11 @@ async function handleTranslate(request: Request, env: Env, ctx: ExecutionContext
       );
       return json(dictionaryResponse);
     }
+
+    // The rate limit protects paid/slow AI providers. Dictionary cache and D1
+    // lookups above are free and millisecond-fast, so bursts of word lookups
+    // must never be throttled into the model fallback path.
+    await assertRateLimit(request, env, ctx);
 
     const selected = selectProvider(env, provider, requestedModel);
     const cacheKey = await buildCacheKey(text, sourceLang, targetLang, selected.provider, selected.model);
@@ -236,7 +240,6 @@ async function handleTranslateStream(request: Request, env: Env, ctx: ExecutionC
         }
 
         validateInputLength(text);
-        await assertRateLimit(request, env, ctx);
 
         send('status', { stage: 'started' });
 
@@ -271,6 +274,10 @@ async function handleTranslateStream(request: Request, env: Env, ctx: ExecutionC
           controller.close();
           return;
         }
+
+        // Rate limit only what reaches the AI providers; dictionary paths above
+        // are free and must stay unthrottled for burst word lookups.
+        await assertRateLimit(request, env, ctx);
 
         const selected = selectProvider(env, provider, requestedModel);
         const cacheKey = await buildCacheKey(text, sourceLang, targetLang, selected.provider, selected.model);

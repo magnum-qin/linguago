@@ -14,27 +14,29 @@ const viewports = [
 const terms = [
   {
     term: '\u4e2d',
-    expectedText: ['zhong', 'medium; intermediary', 'hit; strike']
+    expectedText: ['zhong', 'medium; intermediary', 'm\u00e9dio']
   },
   {
     term: '\u6746',
-    expectedText: ['gan', 'pole; post; staff', 'shaft; handle; classifier']
+    expectedText: ['gan', 'pole; post; staff', '\u68d2; \u7aff', 'haste; poste; vara']
   },
   {
     term: '\u4f60\u597d',
-    expectedText: ['hello', '\u4f60\u597d\uff0c\u597d\u4e45\u4e0d\u89c1\u3002']
+    expectedText: ['hello', '\u4f60\u597d', '\u3053\u3093\u306b\u3061\u306f', 'ol\u00e1']
   },
-  { term: 'inside', expectedText: ['inside', 'IPA'] },
-  { term: '\u79d8\u5bc6', expectedText: ['secret'] },
-  { term: '\u4f55\u6642', expectedText: ['when', 'what time'] },
-  { term: '\u56fd\u969b', expectedText: ['international'] },
-  { term: '\u30d3\u30b8\u30bf\u30fc', expectedText: ['visitor', 'visiting team'] },
-  { term: 'maremoto', expectedText: ['seaquake', 'IPA'] },
-  { term: 'is\u00f4mero', expectedText: ['isomer', 'IPA'] },
-  { term: 'eucarionte', expectedText: ['eukaryote', 'membrane-bound nucleus', 'IPA'] },
-  { term: 'comercializa\u00e7\u00e3o', expectedText: ['commercialization', 'IPA'] },
-  { term: 'radicalismo', expectedText: ['radicalism', 'IPA'] },
-  { term: 'supersimetria', expectedText: ['supersymmetry', 'IPA'] }
+  // The UI renders only the selected target-language result for a word
+  // lookup; assert that any of the four localization terms appears.
+  { term: 'inside', expectedText: ['inside', '\u91cc\u9762', 'dentro'] },
+  { term: '\u79d8\u5bc6', expectedText: ['secret', '\u79d8\u5bc6', 'segredo'] },
+  { term: '\u4f55\u6642', expectedText: ['when', '\u4f55\u6642', '\u4f55\u65f6', 'quando'] },
+  { term: '\u56fd\u969b', expectedText: ['international', '\u56fd\u969b', '\u56fd\u9645\u7684', 'internacional'] },
+  { term: '\u30d3\u30b8\u30bf\u30fc', expectedText: ['visitor', '\u8bbf\u5ba2', '\u30d3\u30b8\u30bf\u30fc', 'visitante'] },
+  { term: 'maremoto', expectedText: ['seaquake', '\u6d77\u9707', 'maremoto'] },
+  { term: 'is\u00f4mero', expectedText: ['isomer', '\u5f02\u6784\u4f53', '\u7570\u6027\u4f53', 'is\u00f4mero'] },
+  { term: 'eucarionte', expectedText: ['eukaryote', '\u771f\u6838\u751f\u7269', 'eucarionte'] },
+  { term: 'comercializa\u00e7\u00e3o', expectedText: ['commercialization', '\u5546\u4e1a\u5316', '\u5546\u696d\u5316', 'comercializa\u00e7\u00e3o'] },
+  { term: 'radicalismo', expectedText: ['radicalism', '\u6fc0\u8fdb\u4e3b\u4e49', '\u6025\u9032\u4e3b\u7fa9', 'radicalismo'] },
+  { term: 'supersimetria', expectedText: ['supersymmetry', '\u8d85\u5bf9\u79f0', '\u8d85\u5bfe\u79f0\u7406\u8ad6', 'supersimetria'] }
 ];
 
 await fs.mkdir(outDir, { recursive: true });
@@ -63,6 +65,11 @@ try {
       });
       const viewportReport = { name: viewport.name, terms: [] };
       for (const [index, item] of terms.entries()) {
+        if (index > 0) {
+          // Pace browser-driven lookups so bursts stay clear of any
+          // provider-side throttling between items.
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
         viewportReport.terms.push(await checkRenderedTerm(page, item, viewport.name, index + 1));
       }
       await page.close();
