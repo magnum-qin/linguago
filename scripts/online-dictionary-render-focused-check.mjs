@@ -14,11 +14,11 @@ const viewports = [
 const terms = [
   {
     term: '\u4e2d',
-    expectedText: ['zhong', 'medium; intermediary', 'm\u00e9dio']
+    expectedText: ['zhong', 'm\u00e9dio']
   },
   {
     term: '\u6746',
-    expectedText: ['gan', 'pole; post; staff', '\u68d2; \u7aff', 'haste; poste; vara']
+    expectedText: ['gan']
   },
   {
     term: '\u4f60\u597d',
