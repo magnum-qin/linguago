@@ -150,9 +150,8 @@ const handleClear = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
   clear();
-  requestAnimationFrame(() => {
-    textareaRef.value?.focus({ preventScroll: true });
-  });
+  // Keep focus inside the tap gesture so mobile browsers can open the keyboard.
+  textareaRef.value?.focus({ preventScroll: true });
 };
 
 const usesMobileKeyboard = () => {
