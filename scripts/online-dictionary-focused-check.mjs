@@ -8,8 +8,8 @@ const expectedCounts = {
   entries: 54062,
   senses: 62125,
   sense_localizations: 248500,
-  examples: 3219,
-  example_localizations: 12654
+  examples: 7986,
+  example_localizations: 31722
 };
 const traditionalSmokeChars =
   /[\u9019\u500b\u5011\u4f86\u8aaa\u6642\u9084\u5f8c\u767c\u807d\u8207\u5c0d\u6703\u8868\u5b78\u958b\u95dc\u9ad4]/u;
