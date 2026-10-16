@@ -90,10 +90,11 @@ async function runLane(endpoint, lane) {
 }
 
 async function generateExample(endpoint, row, previousError) {
+  const langName = { zh: 'Simplified Chinese', ja: 'Japanese', en: 'English', 'pt-BR': 'Brazilian Portuguese' }[row.primary_lang] || row.primary_lang;
   const prompt = [
     'Write ONE natural everyday example sentence for the dictionary sense below.',
-    `W=${JSON.stringify(row.headword)};L=${row.primary_lang};M=${JSON.stringify(String(row.gloss_key || '').slice(0, 160))};POS=${JSON.stringify(String(row.part_of_speech || '').slice(0, 40))}.`,
-    'The sentence must be in language L, must actually contain the word W in this sense, everyday register, 6-18 words for latin scripts or 8-30 chars for CJK.',
+    `W=${JSON.stringify(row.headword)};L=${JSON.stringify(row.primary_lang)};M=${JSON.stringify(String(row.gloss_key || '').slice(0, 160))};POS=${JSON.stringify(String(row.part_of_speech || '').slice(0, 40))}.`,
+    `The sentence MUST be written in ${langName} (language L) and must actually contain the word W in this sense. Everyday register, 6-18 words for latin scripts or 8-30 chars for CJK.`,
     'Also give faithful translations of the same sentence in the other three languages.',
     'Return JSON only: {"source_text":"...","translations":{"en":"...","zh":"...","ja":"...","pt-BR":"..."},"ja_reading":"kana reading of the ja sentence or empty"}.',
     previousError ? `Fix:${JSON.stringify(previousError)}.` : ''
@@ -116,6 +117,12 @@ async function generateExample(endpoint, row, previousError) {
   }
   if (!sourceText) throw new Error(`missing source_text; raw=${content.slice(0, 160)}`);
   if (Object.values(translations).some((text) => !text)) throw new Error('missing translation');
+  // Cheap language sanity gate before the expensive review: zh sentences must
+  // not be kana-dominant Japanese, ja sentences must contain kana.
+  const kanaCount = (sourceText.match(/[\u3040-\u30ff]/gu) || []).length;
+  const cjkCount = (sourceText.match(/[\u4e00-\u9fff]/gu) || []).length;
+  if (row.primary_lang === 'zh' && kanaCount > cjkCount / 2) throw new Error('source_text is Japanese, not Chinese');
+  if (row.primary_lang === 'ja' && kanaCount === 0 && cjkCount > 0 && !translations.ja) throw new Error('source_text lacks kana');
   if (translations[row.primary_lang] !== sourceText && row.primary_lang !== 'en') {
     // Keep the source-language slot aligned with the generated sentence.
     translations[row.primary_lang] = sourceText;

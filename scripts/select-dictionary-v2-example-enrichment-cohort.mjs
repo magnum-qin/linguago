@@ -16,6 +16,7 @@ const limit = positiveInteger(args.limit, 300);
 // relax this to cover secondary senses of the same entry.
 const primaryOnly = args['primary-sense-only'] !== 'false';
 const maxRank = positiveInteger(args['max-rank'], 100_000);
+const minRank = positiveInteger(args['min-rank'], 0);
 
 const db = new Database(dbPath, { readonly: true, fileMustExist: true });
 db.pragma('query_only = ON');
@@ -32,6 +33,7 @@ const rows = db.prepare(`
   WHERE ps.status = 'accepted'
     AND pe.status = 'accepted'
     AND pe.frequency_rank IS NOT NULL
+    AND pe.frequency_rank >= ?
     AND pe.frequency_rank <= ?
     ${primaryOnly ? 'AND ps.sense_order = 1' : ''}
     AND NOT EXISTS (
@@ -40,7 +42,7 @@ const rows = db.prepare(`
     )
   ORDER BY pe.frequency_rank, ps.sense_order, ps.id
   LIMIT ?
-`).all(maxRank, limit);
+`).all(minRank, maxRank, limit);
 
 const byLang = {};
 for (const row of rows) byLang[row.primary_lang] = (byLang[row.primary_lang] || 0) + 1;
@@ -52,6 +54,7 @@ const report = {
     selected: rows.length,
     primary_sense_only: primaryOnly,
     max_rank: maxRank,
+    min_rank: minRank,
     selected_by_lang: byLang
   },
   selected_count: rows.length,
