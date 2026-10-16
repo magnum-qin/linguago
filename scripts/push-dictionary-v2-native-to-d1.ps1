@@ -63,8 +63,14 @@ function Assert-RemoteCounts {
   $sql = "SELECT $($columns -join ', ');"
   $raw = $null
   for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-    $raw = & (Join-Path $root "node_modules/.bin/wrangler.cmd") d1 execute $DatabaseName --remote --command $sql --json
+    $raw = & (Join-Path $root "node_modules/.bin/wrangler.cmd") d1 execute $DatabaseName --remote --command $sql --json 2>&1
     if ($LASTEXITCODE -eq 0) { break }
+    $rawText = @($raw) -join "`n"
+    # Retrying under quota exhaustion only deepens the hole; fail fast so the
+    # caller surfaces the real cause instead of burning more row reads.
+    if ($rawText -match 'row read limit|exceeded.*free tier') {
+      throw "Remote D1 verification blocked by free-tier row-read quota; retrying would deepen the exhaustion"
+    }
     if ($attempt -lt $MaxAttempts) {
       Write-Warning "Remote D1 verification failed (attempt $attempt/$MaxAttempts); retrying."
       Start-Sleep -Seconds ([Math]::Min(10, 2 * $attempt))
