@@ -243,7 +243,7 @@ enrichment remains a separate quality pass and must not be claimed as complete.
 
 ### Jump-host migration status (v124 qualification)
 
-The production pipeline is now qualified on `100.99.99.99` through candidate
+The production pipeline is now qualified on `100.64.0.1` through candidate
 selection and an isolated release rehearsal. Frozen candidate/history inputs
 are hash-pinned by `config/remote-candidate-sources.json`; local and remote
 100-row selection had identical canonical SHA-256. The remotely generated
@@ -999,10 +999,10 @@ Project-approved test nodes and jump-host forwarding:
 
 | Node         | Base URL                    | Target               |
 | ------------ | --------------------------- | -------------------- |
-| `a6000-143`  | `http://100.99.99.99:11441` | `192.168.2.143:8888` |
-| `a6000-147`  | `http://100.99.99.99:11444` | `172.23.4.53:8888`   |
-| `rtx4090-47` | `http://100.99.99.99:11448` | `172.23.4.47:8888`   |
-| `rtx4090-56` | `http://100.99.99.99:11447` | `172.23.4.56:8888`   |
+| `gpu-node-a6000`  | `http://100.64.0.1:11441` | `10.0.0.143:8888` |
+| `gpu-node-a6000`  | `http://100.64.0.1:11444` | `172.23.4.53:8888`   |
+| `rtx4090-47` | `http://100.64.0.1:11448` | `172.23.4.47:8888`   |
+| `rtx4090-56` | `http://100.64.0.1:11447` | `172.23.4.56:8888`   |
 
 Run the cluster smoke test with `UNSLOTH_API_KEY` set:
 
@@ -1017,7 +1017,7 @@ Current production-generation guidance from the 2026-06-23 source-gap benchmarks
 - Use `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` with `gguf_variant=UD-IQ4_NL`.
 - Use `max_seq_length=8192`, `speculative_type=mtp`, `batch-size=1`, and one worker per GPU endpoint.
 - `rtx4090-56` (`11447`) and `rtx4090-47` (`11448`) both run `UD-IQ4_NL` with `-ngl -1` full layer GPU offload, `--flash-attn on`, `--spec-type draft-mtp`, and about 19.8 GB VRAM used. This avoids the previous `UD-Q4_K_XL` 4090 VRAM pressure and CPU offload problem.
-- Measured source-gap dry-run throughput: `rtx4090-56` 47/50 accepted at 51.66 accepted/min, `rtx4090-47` 47/50 accepted at 46.64 accepted/min, dual 4090 96/100 accepted at about 90-100 accepted/min wall-clock. `a6000-155` with the same variant produced 48/50 accepted at 38.96 accepted/min.
+- Measured source-gap dry-run throughput: `rtx4090-56` 47/50 accepted at 51.66 accepted/min, `rtx4090-47` 47/50 accepted at 46.64 accepted/min, dual 4090 96/100 accepted at about 90-100 accepted/min wall-clock. `gpu-node-a6000` with the same variant produced 48/50 accepted at 38.96 accepted/min.
 - Unsloth Studio detects the Qwen3.6 MTP repo as a vision model and auto-adds `mmproj-F16.gguf`. Local OpenAPI exposes `gguf_variant`, `max_seq_length`, `speculative_type`, `spec_draft_n_max`, `tensor_parallel`, and `llama_extra_args`, but no supported `vision=false` or `mmproj=false` load option. Do not assume mmproj can be disabled through `/v1/load`.
 
 ## Current Dictionary Baseline
@@ -1053,7 +1053,7 @@ The current online D1 baseline is v82:
   `25/25` generated rows passed dry-run, `25` draft senses were written, and
   deterministic promote accepted all `25`. The two known pt-BR residual drafts
   are still held in review.
-- The v69 follow-up used `a6000-143` and `a6000-147` with Unsloth
+- The v69 follow-up used `gpu-node-a6000` and `gpu-node-a6000` with Unsloth
   `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` / `UD-Q4_K_XL`: the 20-row dry-run
   accepted `20/20`, the 100-row draft apply accepted `99/100`, and
   deterministic promote accepted `94` senses. Seven source-term mismatches
@@ -1085,7 +1085,7 @@ The current online D1 baseline is v82:
   with `entries=24233`, `senses=29750`, and `sense_localizations=119000`, then
   was pushed to D1 and deployed as a clean production baseline.
 - v75 continued the post-WikDict/OMW pass with all four Unsloth endpoints
-  (`a6000-143`, `a6000-147`, `rtx4090-47`, `rtx4090-56`), generated a 100-row
+  (`gpu-node-a6000`, `gpu-node-a6000`, `rtx4090-47`, `rtx4090-56`), generated a 100-row
   pt-BR/ja-heavy source-gap batch, promoted `91` clean draft senses, and kept
   `8` source-mismatch or low-confidence rows in `needs_review`. Product fast
   audit, published-risk audit, full D1 native export audit, online API check,
@@ -1123,7 +1123,7 @@ The current online D1 baseline is v82:
   audit, full D1 native export audit, online dictionary regression, focused API
   check, and render focused check passed. The deployed D1 counts are
   `entries=24663`, `senses=30180`, and `sense_localizations=120720`.
-- Direct `100.99.99.99:11441`, `11444`, `11447`, and `11448` access from this
+- Direct `100.64.0.1:11441`, `11444`, `11447`, and `11448` access from this
   workstation still fails with `Bad access`/timeout. Testing from lab-win shows
   the Windows portproxy mappings and Unsloth backends are healthy, so the
   likely blocker is Windows Firewall or Tailscale inbound policy. For v79,
@@ -1718,7 +1718,7 @@ replay and promotion.
 ## Remote production runner (2026-08-20)
 
 The generation pipeline has a validated jump-host deployment at
-`100.99.99.99`, rooted at `D:\linguago-runner`. It contains the hash-matched
+`100.64.0.1`, rooted at `D:\linguago-runner`. It contains the hash-matched
 v123 product DB and evidence DBs. Use
 `scripts/verify-remote-dictionary-runner.ps1` before work and
 `scripts/manage-remote-dictionary-runner.ps1` for start/run/status/stop.

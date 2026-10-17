@@ -66,7 +66,7 @@ The corrected history index scanned 374 reports and ten checkpoints, with no
 parse failures, and excluded 4,752 previously attempted or explicitly rejected
 source entries. The next OMW-aligned pool contained 50 fresh pt-BR candidates.
 
-Remote evidence review on A6000-143 and RTX4090-56 completed with 50 valid JSON
+Remote evidence review on gpu-node-a6000 and RTX4090-56 completed with 50 valid JSON
 responses, 44 approvals, six rejections, and no endpoint or model failures.
 Independent reviewer-term evidence retained 38 of the 44 approved candidates.
 
@@ -192,7 +192,7 @@ publication. Keep the two-target policy as the automatic path. Route one-target
 rows to manual or an independent second-model consensus workflow; do not use
 them to build a 500-row automatic batch.
 
-## Two-Target Remainder on A6000-151
+## Two-Target Remainder on gpu-node-a6000
 
 The original two-source/two-target pool contained 33 candidates. A reusable
 report-subtraction script now removes previously sampled source entry IDs
@@ -207,17 +207,17 @@ The first attempt against the former 143/56 endpoints produced 13/13
 `fetch failed` results. These were infrastructure failures only; no candidate
 was rejected semantically and no database write occurred. After the available
 node changed, the current Windows port-proxy table was verified directly:
-`100.99.99.99:11442 -> 192.168.2.151:8888`. Direct LAN access from the local
+`100.64.0.1:11442 -> 10.0.0.151:8888`. Direct LAN access from the local
 workstation timed out, so the verified Tailscale jump-host mapping is required.
 
-The A6000-151 Unsloth service was healthy on Studio `v0.1.501-beta`. Its local
+The gpu-node-a6000 Unsloth service was healthy on Studio `v0.1.501-beta`. Its local
 model inventory included:
 
 - `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`
 - `unsloth/Qwen3.6-27B-MTP-GGUF`
 - `unsloth/gemma-4-31B-it-qat-GGUF`
 
-The 13-row pipeline used only A6000-151 and Qwen3.6 35B:
+The 13-row pipeline used only gpu-node-a6000 and Qwen3.6 35B:
 
 - source-sense review: 13 valid responses, 12 accepted, one rejected (`gonzo`)
 - reviewed-term reverse evidence: 11 supported, one manual review
@@ -240,7 +240,7 @@ The database backup before this write is
 `linguago_v2_product_top5000_freedict_filtered_candidate.before-v83-two-source-target2-remaining13-draft10-20260728-135020.db`.
 Production D1 remains v82.
 
-Because A6000-151 also has Gemma 4 31B, it can provide a genuinely independent
+Because gpu-node-a6000 also has Gemma 4 31B, it can provide a genuinely independent
 model-family review for the one-target manual queue. Qwen 35B versus Qwen 27B
 must still not be counted as independent consensus.
 
@@ -256,7 +256,7 @@ or database-write interface. Consensus acceptance requires:
 - an empty corrections list
 
 The first test reviewed the ten non-supported results from the one-target
-diagnostic. Qwen3.6 35B generated the records; Gemma 4 31B on A6000-151 acted
+diagnostic. Qwen3.6 35B generated the records; Gemma 4 31B on gpu-node-a6000 acted
 as the independent reviewer:
 
 - targeted: 10
@@ -430,8 +430,8 @@ evidence-gated-87 product database remains the current local baseline.
 
 ## Evidence-87 Two-Target Follow-up
 
-The 11 refreshed two-source/two-target candidates were reviewed on A6000-151
-through `100.99.99.99:11442` using
+The 11 refreshed two-source/two-target candidates were reviewed on gpu-node-a6000
+through `100.64.0.1:11442` using
 `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`. Source-sense review returned 11 valid
 responses and accepted all 11 at confidence 0.95, with no endpoint, model, or
 JSON failures.
@@ -518,11 +518,11 @@ manual review. Production D1 remains v82; evidence-gated-88 is local only.
 
 The ten rows that did not pass the reviewed-term reverse-evidence gate were
 kept out of the automatic path and processed with two independent model
-families on A6000-151:
+families on gpu-node-a6000:
 
 - generator: `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`
 - reviewer: `unsloth/gemma-4-31B-it-qat-GGUF`
-- endpoint: `100.99.99.99:11442`
+- endpoint: `100.64.0.1:11442`
 
 Qwen generated ten responses. Seven passed the generator's deterministic
 schema and content validation; three were rejected after two attempts. There
@@ -632,7 +632,7 @@ Production D1 remains v82.
 
 ## Evidence-89 One-Target Focused-20
 
-The first 20 rows from the 36-row one-target queue were processed on A6000-151
+The first 20 rows from the 36-row one-target queue were processed on gpu-node-a6000
 without writing publishable data.
 
 Qwen source-sense review:
@@ -811,7 +811,7 @@ caused by polysemy. The deterministic selector
 highest-frequency rows and preserved the evidence reason and matching sources
 in candidate provenance.
 
-A6000-151 source review with Qwen 35B returned:
+gpu-node-a6000 source review with Qwen 35B returned:
 
 - reviewed: `20`
 - approved: `17`
@@ -1000,8 +1000,8 @@ words, and conservative proper-name/encyclopedic-gloss filtering. A balanced
 20-row pool was built with `zh=2`, `ja=10`, and `pt-BR=8`. Known noisy rows
 `两个`, `ミロ`, `pepperoni`, `thorn`, and `drift` were excluded explicitly.
 
-Qwen source review ran only on A6000-151 through
-`http://100.99.99.99:11442`, using
+Qwen source review ran only on gpu-node-a6000 through
+`http://100.64.0.1:11442`, using
 `unsloth/Qwen3.6-35B-A3B-MTP-GGUF / UD-Q4_K_XL`:
 
 - prewarm: passed in `6.43s`
@@ -1391,7 +1391,7 @@ post-chunk02 database.
 - source-review rejected: `276`
 - bounded residual failures: `59`
 
-A6000-151 accepted model-listing and short chat requests while repeatedly
+gpu-node-a6000 accepted model-listing and short chat requests while repeatedly
 resetting the connection for the real 1,262-character source-review prompt.
 A 430-character `micro` prompt without a redundant system message restored
 transport. At `max_tokens=260`, some responses were truncated JSON; one bounded
@@ -1442,7 +1442,7 @@ cycle budget.
 
 ## Formal 5,000-Candidate Production Cycle: Chunk 04
 
-Chunk04 was completed locally on 2026-07-30 using only A6000-151.
+Chunk04 was completed locally on 2026-07-30 using only gpu-node-a6000.
 
 Before generation, the candidate builder exposed a major efficiency problem:
 chunk02 and chunk03 had `446/500` overlapping candidates because unpublished
@@ -1505,7 +1505,7 @@ ID zero as one exclusion; it now correctly reports zero.
 ## Formal 5,000-Candidate Production Cycle: Chunk 05 Conservative Promotion
 
 Chunk05 reached the draft-only safety boundary on 2026-08-02. The only
-available nodes were A6000-143 (`11441`), A6000-147 (`11444`), RTX4090-47
+available nodes were gpu-node-a6000 (`11441`), gpu-node-a6000 (`11444`), RTX4090-47
 (`11448`), and RTX4090-56 (`11447`). All four authenticate with the earlier
 four-node token and have Qwen 3.6 35B MTP installed. None has Gemma 4 or another
 independent model family installed.
@@ -1551,7 +1551,7 @@ The 44 valid generations were initially written only as
 and 176 review localizations. Fast audit, published-risk audit, and
 `npm run check` passed before any promotion.
 
-A6000-155 (`11445`) later supplied the independent reviewer family through
+gpu-node-a6000 (`11445`) later supplied the independent reviewer family through
 `unsloth/gemma-4-31B-it-qat-GGUF`, variant `UD-Q4_K_XL`. The node was not used
 for generation. It was already sharing the GPU with a separate
 DiffusionGemma vLLM process, so the Gemma reviewer ran at about `2.3 tok/s` and

@@ -1,6 +1,6 @@
 # Nightly Dictionary V2 Automation
 
-This workflow moves dictionary generation orchestration to the Tailscale Windows jump host (`100.99.99.99`) so local desktop data processing is no longer required during nightly runs.
+This workflow moves dictionary generation orchestration to the Tailscale Windows jump host (`100.64.0.1`) so local desktop data processing is no longer required during nightly runs.
 
 ## What Runs
 
@@ -16,12 +16,12 @@ Default behavior:
 - Model: `qwen3.6:latest`.
 - Database: `data/processed/linguago_v2_full.db`.
 - A6000 nodes considered from the jump host:
-  - `a6000-143` / `http://192.168.2.143:11433` / `en,zh`
-  - `a6000-144` / `http://192.168.2.151:11433` / `ja`
-  - `a6000-048` / `http://172.23.4.48:11433` / `pt-BR`
-  - `a6000-147` / `http://172.23.4.53:11433` / `en,zh,ja,pt-BR`
+  - `gpu-node-a6000` / `http://10.0.0.143:11433` / `en,zh`
+  - `gpu-node-a6000` / `http://10.0.0.151:11433` / `ja`
+  - `gpu-node-a6000` / `http://172.23.4.48:11433` / `pt-BR`
+  - `gpu-node-a6000` / `http://172.23.4.53:11433` / `en,zh,ja,pt-BR`
 - Excluded by default:
-  - `a6000-155`, because it previously had NVML driver/library mismatch.
+  - `gpu-node-a6000`, because it previously had NVML driver/library mismatch.
   - `rtx4090-224`, because it is reserved for training.
   - RTX 4090 nodes, because `qwen3.6:latest` is not the preferred production model there.
 
@@ -39,7 +39,7 @@ This is intentionally conservative: any active GPU compute process makes the nod
 
 ## Install On The Jump Host
 
-Run this once on `100.99.99.99` from the project directory:
+Run this once on `100.64.0.1` from the project directory:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install-nightly-dictionary-v2-task.ps1
