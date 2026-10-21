@@ -79,6 +79,11 @@ if ([int64]$verify.ex -ne $expectedEx -or [int64]$verify.exl -ne $expectedExl) {
 }
 Write-Host "Incremental push verified: examples=$($verify.ex) localizations=$($verify.exl) (added $($Manifest.stats.examples)/$($Manifest.stats.example_localizations))"
 
+# Maintain v2_meta stats so the worker's health endpoint never needs COUNT
+# scans (seven single-row reads instead of ~380K).
+& $Wrangler d1 execute $DatabaseName --remote --command "INSERT INTO v2_meta (key, value) VALUES ('stats_examples', '$($verify.ex)') ON CONFLICT(key) DO UPDATE SET value = excluded.value; INSERT INTO v2_meta (key, value) VALUES ('stats_example_localizations', '$($verify.exl)') ON CONFLICT(key) DO UPDATE SET value = excluded.value;" | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Warning 'v2_meta stats maintenance failed (non-fatal; worker falls back to KV)' }
+
 [pscustomobject]@{
   Ok = $true
   OutDir = $ResolvedOutDir

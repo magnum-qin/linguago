@@ -325,6 +325,13 @@ append("INSERT INTO v2_meta (key, value) VALUES ('policy', 'product_complete_4_l
 append(
   `INSERT INTO v2_meta (key, value) VALUES ('source_tables', 'product_entries,product_senses,product_localizations,product_examples');\n`
 );
+// Exact counts live in v2_meta so the worker's health endpoint reads seven
+// rows instead of scanning every table.
+for (const [name, value] of Object.entries(stats)) {
+  if (name === 'chunks') continue;
+  append(`INSERT INTO v2_meta (key, value) VALUES ('stats_${name}', '${value}');
+`);
+}
 flush();
 db.close();
 stats.chunks = chunkPaths.length;

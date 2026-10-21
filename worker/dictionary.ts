@@ -481,6 +481,29 @@ export async function lookupDictionaryFirst(input: {
 }
 
 export async function fetchDictionaryStats(env: Env): Promise<Record<string, unknown>> {
+  // Preferred path: counts maintained in v2_meta by push scripts (seven
+  // single-row reads, immune to the KV snapshot staleness that breaks
+  // exact-count smoke fixtures after a push).
+  if (env.DB) {
+    try {
+      const metaRows = await env.DB.prepare(
+        `SELECT key, value FROM v2_meta WHERE key LIKE 'stats_%' OR key IN ('published_at', 'policy')`
+      ).all<{ key: string; value: string }>();
+      const meta = new Map((metaRows?.results || []).map((row) => [row.key, row.value]));
+      const stats: Record<string, unknown> = {};
+      for (const name of ['entries', 'senses', 'sense_localizations', 'examples', 'example_localizations']) {
+        const value = Number(meta.get(`stats_${name}`));
+        if (Number.isFinite(value) && value > 0) stats[name] = value;
+      }
+      if (stats.entries && stats.senses && stats.examples) {
+        if (meta.has('published_at')) stats.published_at = meta.get('published_at');
+        if (meta.has('policy')) stats.policy = meta.get('policy');
+        return { source: 'cloudflare-d1-v2', ...stats };
+      }
+    } catch {
+      // Fall through to the KV/COUNT path.
+    }
+  }
   // Live COUNT(*) scans burn ~380K D1 free-tier row reads per health call and
   // can exhaust the daily quota on their own; cache the snapshot in KV.
   if (env.CACHE && env.DB) {
