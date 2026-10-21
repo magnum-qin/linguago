@@ -62,10 +62,18 @@ $PushFiles = @()
 if ($Manifest.schema) { $PushFiles += (Join-Path $Root ([string]$Manifest.schema)) }
 foreach ($Chunk in @($Manifest.chunks)) { $PushFiles += (Join-Path $Root ([string]$Chunk)) }
 foreach ($File in $PushFiles) {
-  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-    & $Wrangler d1 execute $DatabaseName --remote --file $File 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) { break }
-    if ($attempt -lt $MaxAttempts) { Start-Sleep -Seconds (2 * $attempt) }
+  # wrangler prints progress warnings on stderr; do not let them become
+  # terminating PowerShell errors mid-import.
+  $PreviousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+      & $Wrangler d1 execute $DatabaseName --remote --file $File 2>&1 | Out-Null
+      if ($LASTEXITCODE -eq 0) { break }
+      if ($attempt -lt $MaxAttempts) { Start-Sleep -Seconds (2 * $attempt) }
+    }
+  } finally {
+    $ErrorActionPreference = $PreviousErrorActionPreference
   }
   if ($LASTEXITCODE -ne 0) { throw "Incremental chunk execution failed: $File" }
 }
