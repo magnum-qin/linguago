@@ -41,7 +41,7 @@ $SinceExampleId = [int64]$watermark.ex
 $SinceLocalizationId = [int64]$watermark.exl
 Write-Host "D1 watermarks: examples=$SinceExampleId localizations=$SinceLocalizationId"
 
-& (Join-Path $Root 'node.exe') (Join-Path $Root 'scripts\export-dictionary-v2-product-examples-incremental.mjs') `
+& node (Join-Path $Root 'scripts\export-dictionary-v2-product-examples-incremental.mjs') `
   --db $ResolvedDb `
   --out-dir $ResolvedOutDir `
   --since-example-id $SinceExampleId `
@@ -56,8 +56,19 @@ if ([int64]$Manifest.stats.examples -eq 0 -and [int64]$Manifest.stats.example_lo
   return
 }
 
-& (Join-Path $Root 'node.exe') (Join-Path $Root 'scripts\push-dictionary-v2-native-to-d1.ps1') -SkipExport -OutDir ((Resolve-Path $Manifest.out_dir).Path) -DatabaseName $DatabaseName | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'Incremental chunk push failed' }
+# Execute the incremental chunk directly; the generic push script's
+# seven-table count verification does not fit an examples-only manifest.
+$PushFiles = @()
+if ($Manifest.schema) { $PushFiles += (Join-Path $Root ([string]$Manifest.schema)) }
+foreach ($Chunk in @($Manifest.chunks)) { $PushFiles += (Join-Path $Root ([string]$Chunk)) }
+foreach ($File in $PushFiles) {
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    & $Wrangler d1 execute $DatabaseName --remote --file $File 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) { break }
+    if ($attempt -lt $MaxAttempts) { Start-Sleep -Seconds (2 * $attempt) }
+  }
+  if ($LASTEXITCODE -ne 0) { throw "Incremental chunk execution failed: $File" }
+}
 
 $verifyRaw = Invoke-D1Json 'SELECT (SELECT IFNULL(MAX(rowid), 0) FROM v2_examples) ex, (SELECT IFNULL(MAX(rowid), 0) FROM v2_example_localizations) exl;'
 $verify = @($verifyRaw)[0].results[0]

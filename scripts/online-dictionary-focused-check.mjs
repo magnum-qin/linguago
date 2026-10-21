@@ -8,7 +8,7 @@ const expectedCounts = {
   entries: 54062,
   senses: 62125,
   sense_localizations: 248500,
-  examples: 9724,
+  examples: 11157,
   example_localizations: 38674
 };
 const traditionalSmokeChars =
